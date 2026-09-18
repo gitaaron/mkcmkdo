@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>SportCam — interactive wiring schematic (d3-hwschematic)</title>
+<!--
+  Interactive block-level wiring schematic rendered with d3-hwschematic.
+  Open this file with a local static server (CDN scripts require network):
+
+      npx serve schematics/interactive
+-->
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/elkjs@0.8.2/lib/elk.bundled.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-hwschematic@0.1.0/dist/d3-hwschematic.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/d3-hwschematic@0.1.0/dist/d3-hwschematic.css" />
+<style>
+  html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+  header { padding: 10px 16px; background: #1a2233; color: #fff; }
+  header h1 { margin: 0; font-size: 16px; }
+  #scheme { width: 100%; height: calc(100% - 44px); }
+</style>
+</head>
+<body>
+<header><h1>SportCam wiring — base · head · wearable (zoom/pan with mouse)</h1></header>
+<svg id="scheme"></svg>
+<script>
+const port = (id, name, side) => ({
+  id, hwMeta: { name }, direction: side, properties: { side: side === "OUTPUT" ? "EAST" : "WEST" },
+});
+const node = (id, name, ports, isExternal = false) => ({
+  id,
+  hwMeta: { name, cls: isExternal ? "Process" : "Component", isExternalPort: false },
+  properties: { "org.eclipse.elk.portConstraints": "FIXED_ORDER" },
+  ports,
+  children: [],
+  edges: [],
+});
+
+// Block-level netlist of the whole system
+const graph = {
+  id: "root",
+  hwMeta: { name: "SportCam system", maxId: 200 },
+  properties: { "org.eclipse.elk.hierarchyHandling": "INCLUDE_CHILDREN" },
+  ports: [],
+  edges: [],
+  children: [
+    node("psu", "12V 5A PSU", [port("psu_12v", "12V OUT", "OUTPUT")]),
+    node("buck1", "Buck#1 5V3A (base)", [port("b1_in", "12V", "INPUT"), port("b1_out", "5V", "OUTPUT")]),
+    node("slip", "Slip ring (power only)", [port("sl_in", "12V IN", "INPUT"), port("sl_out", "12V UP", "OUTPUT")]),
+    node("buck2", "Buck#2 5V5A (head)", [port("b2_in", "12V", "INPUT"), port("b2_out", "5V", "OUTPUT")]),
+    node("buck3", "Buck#3 5V3A servo", [port("b3_in", "12V", "INPUT"), port("b3_out", "5V", "OUTPUT")]),
+    node("esp", "ESP32 base ctrl", [
+      port("esp_5v", "5V", "INPUT"),
+      port("esp_step", "G25 STEP", "OUTPUT"),
+      port("esp_dir", "G26 DIR", "OUTPUT"),
+      port("esp_led", "G18 DIN", "OUTPUT"),
+    ]),
+    node("tmc", "TMC2209", [
+      port("tmc_step", "STEP", "INPUT"), port("tmc_dir", "DIR", "INPUT"),
+      port("tmc_vm", "VM 12V", "INPUT"), port("tmc_ab", "A/B coils", "OUTPUT"),
+    ]),
+    node("nema", "NEMA17 pan", [port("nema_ab", "A/B", "INPUT")]),
+    node("ring", "WS2812B ×16", [port("ring_din", "DIN", "INPUT"), port("ring_5v", "5V", "INPUT")]),
+    node("pi", "Raspberry Pi 5", [
+      port("pi_5v", "USB-C 5V", "INPUT"),
+      port("pi_usb1", "USB A1", "INPUT"), port("pi_usb2", "USB A2", "INPUT"),
+      port("pi_csi", "CSI", "OUTPUT"), port("pi_i2c", "I2C", "OUTPUT"), port("pi_pwm", "PWM G18", "OUTPUT"),
+    ]),
+    node("cam", "Arducam IMX219 zoom", [port("cam_csi", "CSI", "INPUT"), port("cam_i2c", "lens I2C", "INPUT")]),
+    node("servo", "DS3225 270° tilt", [port("srv_sig", "SIG", "INPUT"), port("srv_5v", "5V", "INPUT")]),
+    node("a1", "UWB anchor A1", [port("a1_usb", "USB", "OUTPUT")]),
+    node("a2", "UWB anchor A2", [port("a2_usb", "USB", "OUTPUT")]),
+    node("tag", "Wearable tag (LiPo)", [port("tag_rf", "UWB RF", "OUTPUT")], true),
+  ],
+};
+
+let eid = 0;
+const edge = (srcNode, srcPort, dstNode, dstPort, name) => ({
+  id: "e" + (eid++), hwMeta: { name },
+  sources: [[srcNode, srcPort]], targets: [[dstNode, dstPort]],
+});
+graph.edges = [
+  edge("psu", "psu_12v", "buck1", "b1_in", "12V"),
+  edge("psu", "psu_12v", "tmc", "tmc_vm", "12V"),
+  edge("psu", "psu_12v", "slip", "sl_in", "12V"),
+  edge("slip", "sl_out", "buck2", "b2_in", "12V (rotating)"),
+  edge("slip", "sl_out", "buck3", "b3_in", "12V (rotating)"),
+  edge("buck1", "b1_out", "esp", "esp_5v", "5V"),
+  edge("buck1", "b1_out", "ring", "ring_5v", "5V"),
+  edge("buck2", "b2_out", "pi", "pi_5v", "5V 5A"),
+  edge("buck3", "b3_out", "servo", "srv_5v", "5V servo"),
+  edge("esp", "esp_step", "tmc", "tmc_step", "STEP"),
+  edge("esp", "esp_dir", "tmc", "tmc_dir", "DIR"),
+  edge("esp", "esp_led", "ring", "ring_din", "WS2812 data"),
+  edge("tmc", "tmc_ab", "nema", "nema_ab", "coils"),
+  edge("pi", "pi_csi", "cam", "cam_csi", "CSI-2"),
+  edge("pi", "pi_i2c", "cam", "cam_i2c", "lens I2C"),
+  edge("pi", "pi_pwm", "servo", "srv_sig", "PWM 50Hz"),
+  edge("a1", "a1_usb", "pi", "pi_usb1", "serial ranging"),
+  edge("a2", "a2_usb", "pi", "pi_usb2", "serial ranging"),
+];
+
+const svg = d3.select("#scheme");
+const schematic = new d3.HwSchematic(svg);
+const zoom = d3.zoom().on("zoom", (ev) => schematic.root.attr("transform", ev.transform));
+svg.call(zoom).on("dblclick.zoom", null);
+schematic.bindData(graph);
+</script>
+</body>
+</html>
