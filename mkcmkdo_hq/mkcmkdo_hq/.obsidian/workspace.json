@@ -13,12 +13,40 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Welcome.md",
+                "file": "startup_checklists/checklist_6.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Welcome"
+              "title": "checklist_6"
+            }
+          },
+          {
+            "id": "83a684f8508586e3",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "startup_checklists/checklist_1.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "checklist_1"
+            }
+          },
+          {
+            "id": "f98d3b7203d0df39",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "business model canvas/v_1.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "v_1"
             }
           }
         ]
@@ -165,11 +193,35 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "c332825329357067",
+  "active": "a0a70d7bd2ac959a",
   "lastOpenFiles": [
-    "customer_discovery/Hogtown Visit 2.md",
-    "customer_discovery/Hogtown Visit 1.md",
+    "startup_checklists/checklist_5.md",
+    "startup_checklists/checklist_4.md",
+    "startup_checklists/checklist_12.md",
+    "startup_checklists/checklist_13.md",
+    "startup_checklists/checklist_11.md",
+    "startup_checklists/checklist_10.md",
+    "startup_checklists/checklist_25.md",
+    "startup_checklists/checklist_26.md",
+    "startup_checklists/checklist_24.md",
+    "startup_checklists/checklist_23.md",
+    "startup_checklists/checklist_22.md",
+    "startup_checklists/checklist_21.md",
+    "startup_checklists/checklist_20_web.md",
+    "startup_checklists/checklist_19_web.md",
+    "startup_checklists/checklist_16.md",
+    "startup_checklists/checklist_9_web.md",
+    "startup_checklists/checklist_9_physical.md",
+    "startup_checklists/checklist_8.md",
+    "startup_checklists/checklist_7.md",
+    "startup_checklists/checklist_6.md",
+    "business model canvas/v_1.md",
+    "startup_checklists/checklist_1.md",
+    "startup_checklists/checklist_3.md",
+    "startup_checklists/checklist_2.md",
+    "business model canvas",
     "Welcome.md",
+    "customer_discovery/Hogtown Visit 2.md",
     "customer_discovery"
   ]
 }
