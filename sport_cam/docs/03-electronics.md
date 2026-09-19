@@ -3,7 +3,9 @@
 Three boards' worth of wiring, all off-the-shelf modules plus one optional
 carrier PCB. Schematic sources live in `schematics/` — `render_schematics.py`
 (schemdraw) produces the PNGs below, `schematics/interactive/index.html` is a
-zoomable d3-hwschematic view of the whole system, and
+zoomable d3-hwschematic view of the whole system (open it via `npm run docs`
+at http://localhost:8090/schematics/interactive/index.html — its libraries
+are vendored locally, no internet needed), and
 `schematics/tscircuit/base-board.circuit.tsx` is a tscircuit design for the
 base carrier PCB if you want to fab one instead of point-to-point wiring.
 

@@ -1,5 +1,25 @@
 # 01 — System overview
 
+## Introduction
+
+One picture of what this project builds — an indoor climbing session, filmed
+by nobody:
+
+![SportCam tracking a climber](images/intro-scene.png)
+
+The climber wears a matchbox-sized UWB tag on the rear of their harness
+(off-spine — see [wearing the tag](04-tracking-system.md#wearing-the-tag)).
+On the mats 8–12 m back — anywhere from 7 m to ~30 m works, see the
+[placement envelope](04-tracking-system.md#camera-placement-envelope) —
+SportCam sits on an ordinary photo tripod: the
+head unit ranges the tag 20 times a second through the climber's body and
+clothing, pans and tilts to keep them centred — the 270° tilt axis follows
+them from the first move to past-vertical top-outs — and the motorized lens
+zooms to hold framing as they move up the wall. The LED ring on the base
+glows green (tracking) or pulses red (recording), and the same status shows
+in the companion app streaming the live view to a phone. Climb, tap
+**Start recording**, and the session films itself.
+
 ## Goals
 
 1. Camera on a robotic tripod head: **360° continuous pan**, **> 180° vertical

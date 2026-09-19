@@ -11,9 +11,10 @@
    diffused window around the circumference so status is visible from any
    direction.
 3. **Pan stage**: a 3" lazy-susan bearing carries the rotating platform. A
-   60-tooth GT2 pulley is bolted to the platform's underside; the NEMA17
-   (20-tooth pulley) drives it by belt at 3:1. 1.8° motor × 16 microsteps × 3
-   = **0.0375°/step** — far finer than needed to keep a person centred.
+   printed 120-tooth GT2 ring pulley is bolted to the platform's underside —
+   its 60 mm bore encircles the slip-ring flange — and the NEMA17 (20-tooth
+   pulley) drives it by belt at 6:1. 1.8° motor × 16 microsteps × 6 =
+   **0.019°/step** — far finer than needed to keep a person centred.
 4. **Slip ring** (Adafruit-style 22 mm, 12 wires @ 2 A) mounted in the centre
    of the pan axis. We parallel wires: 4 for +12 V, 4 for GND (≈ 8 A capacity),
    4 spare. Its stationary flange screws to the base; the rotating shaft wires
@@ -33,7 +34,7 @@
 
 | Axis | Mechanism | Range | Notes |
 | --- | --- | --- | --- |
-| Pan | NEMA17 + TMC2209, GT2 3:1 belt | **360° continuous, unlimited turns** | Homing via hall sensor + magnet on the platform edge |
+| Pan | NEMA17 + TMC2209, GT2 6:1 belt | **360° continuous, unlimited turns** | Homing via hall sensor + magnet on the platform edge |
 | Tilt | DS3225 270° servo, direct drive | **−45° … +225°** (270°) | > 180° vertical requirement met; end stops enforced in software |
 | Zoom | Arducam motorized lens | ~8–20 mm EFL (≈ 2.5× optical) | Plus digital crop for further reach |
 
@@ -66,13 +67,28 @@ slightly below) the tripod is reachable — and the pan axis can always take the
 | --- | --- | --- |
 | Base housing + LED diffuser ring | 1 | diffuser in white PETG, 2 walls, 0 % infill |
 | Rotating platform | 1 | or 3 mm aluminium plate |
-| 60T GT2 ring pulley | 1 | print at 0.16 mm layers, or buy a 60T pulley and bolt-adapt |
+| 120T GT2 ring pulley | 1 | print at 0.16 mm layers; must be a ring (ID 60 mm) to clear the slip-ring flange |
 | Tilt tower uprights | 2 | one carries servo, one carries 6701ZZ bearing |
 | Camera cradle | 1 | fits Arducam lens barrel |
 | UWB anchor arms | 2 | 200 mm, dovetail into platform |
 | Wearable case + strap loop | 1 | fits ESP32-UWB board + 1000 mAh LiPo |
 
-STL/CAD note: model in OnShape or FreeCAD; all parts are simple extrusions —
-the only precision features are the pan-bearing bolt circle and the servo
-spline pocket (use the DS3225's included metal horn screwed into the printed
-cradle instead of printing a spline).
+## CAD sources
+
+All printed parts have **parametric OpenSCAD sources in [`cad/`](../cad/)** —
+every dimension (bearing sizes, board hole patterns, lens diameter, clearances)
+lives in `cad/config.scad`. Render everything to STL with:
+
+```bash
+./cad/render_all.sh        # requires openscad; outputs to cad/stl/
+```
+
+Before printing, measure and update the three dimensions flagged `MEASURE
+YOURS` in `config.scad`: the Arducam lens barrel diameter (`lens_d`), and your
+UWB board's outline/hole pattern (`uwb_*`) — vendors vary. Precision features
+are only the pan-bearing bolt circle and the servo interface; use the
+DS3225's included metal horn screwed into the printed cradle rather than
+printing a spline.
+
+Prefer remixing proven designs? See
+[08 — Open-source printed-part alternatives](08-open-source-parts.md).

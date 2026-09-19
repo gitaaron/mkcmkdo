@@ -3,25 +3,31 @@
 <head>
 <meta charset="utf-8" />
 <title>SportCam — interactive wiring schematic (d3-hwschematic)</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📷</text></svg>" />
 <!--
   Interactive block-level wiring schematic rendered with d3-hwschematic.
-  Open this file with a local static server (CDN scripts require network):
+  All libraries are vendored in ./vendor/ (same-origin — the ELK layout
+  engine cannot run from a CDN), so this works offline. Serve it with the
+  docs viewer:
 
-      npx serve schematics/interactive
+      npm run docs        → http://localhost:8090/schematics/interactive/index.html
+
+  or any static server rooted at the repo or at this directory.
+  To re-fetch the vendored libraries: ./update-vendor.sh
 -->
-<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-<script src="https://cdn.jsdelivr.net/npm/elkjs@0.8.2/lib/elk.bundled.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/d3-hwschematic@0.1.0/dist/d3-hwschematic.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/d3-hwschematic@0.1.0/dist/d3-hwschematic.css" />
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/elk.bundled.js"></script>
+<script src="vendor/d3-hwschematic.js"></script>
+<link rel="stylesheet" href="vendor/d3-hwschematic.css" />
 <style>
-  html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
-  header { padding: 10px 16px; background: #1a2233; color: #fff; }
-  header h1 { margin: 0; font-size: 16px; }
-  #scheme { width: 100%; height: calc(100% - 44px); }
+  html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; overflow: hidden; }
+  header { padding: 10px 16px; background: #1a2233; color: #fff; height: 24px; }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  #scheme { width: 100vw; height: calc(100vh - 44px); display: block; }
 </style>
 </head>
 <body>
-<header><h1>SportCam wiring — base · head · wearable (zoom/pan with mouse)</h1></header>
+<header><h1>SportCam wiring — base · head · wearable (drag to pan, wheel to zoom)</h1></header>
 <svg id="scheme"></svg>
 <script>
 const port = (id, name, side) => ({
@@ -29,7 +35,7 @@ const port = (id, name, side) => ({
 });
 const node = (id, name, ports, isExternal = false) => ({
   id,
-  hwMeta: { name, cls: isExternal ? "Process" : "Component", isExternalPort: false },
+  hwMeta: { name, cls: "Component", isExternalPort: isExternal },
   properties: { "org.eclipse.elk.portConstraints": "FIXED_ORDER" },
   ports,
   children: [],
@@ -39,7 +45,7 @@ const node = (id, name, ports, isExternal = false) => ({
 // Block-level netlist of the whole system
 const graph = {
   id: "root",
-  hwMeta: { name: "SportCam system", maxId: 200 },
+  hwMeta: { name: "SportCam system", maxId: 1000 },
   properties: { "org.eclipse.elk.hierarchyHandling": "INCLUDE_CHILDREN" },
   ports: [],
   edges: [],
@@ -100,11 +106,16 @@ graph.edges = [
   edge("a2", "a2_usb", "pi", "pi_usb2", "serial ranging"),
 ];
 
-const svg = d3.select("#scheme");
+const svg = d3.select("#scheme")
+  .attr("width", window.innerWidth)
+  .attr("height", window.innerHeight - 44);
 const schematic = new d3.HwSchematic(svg);
 const zoom = d3.zoom().on("zoom", (ev) => schematic.root.attr("transform", ev.transform));
 svg.call(zoom).on("dblclick.zoom", null);
-schematic.bindData(graph);
+schematic.bindData(graph).then(
+  () => {},
+  (err) => { document.querySelector("header h1").textContent = "layout error: " + err; },
+);
 </script>
 </body>
 </html>

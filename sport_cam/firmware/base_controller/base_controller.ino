@@ -27,8 +27,8 @@ const int PIN_LED  = 18;
 const int PIN_HALL = 34;
 
 const int   NUM_LEDS       = 16;
-const float GEAR_RATIO     = 3.0f;              // 60T / 20T belt
-const float STEPS_PER_DEG  = 200.0f * 16 * GEAR_RATIO / 360.0f;  // 26.67
+const float GEAR_RATIO     = 6.0f;              // 120T ring / 20T motor pulley
+const float STEPS_PER_DEG  = 200.0f * 16 * GEAR_RATIO / 360.0f;  // 53.33
 const float MAX_DPS        = 200.0f;            // absolute slew ceiling
 const uint32_t CMD_TIMEOUT_MS = 500;            // no panVel → stop
 

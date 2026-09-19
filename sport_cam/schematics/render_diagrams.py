@@ -59,6 +59,95 @@ def save(fig, name):
 
 
 # ----------------------------------------------------------------------------
+# 0. Intro scene — camera tracking a climber wearing the tag
+# ----------------------------------------------------------------------------
+def intro_scene():
+    fig, ax = new_fig(12, 8.2, "SportCam tracking a climber")
+
+    # gym floor + mats
+    ax.add_patch(Rectangle((0, 0), 12, 0.5, fc="#2a3850", ec="none"))
+    ax.add_patch(Rectangle((0, 0.5), 4.4, 0.35, fc="#3d4f74", ec="none"))
+    ax.text(2.1, 0.16, "mats", fontsize=8, color="#8fa0c0")
+
+    # climbing wall (slight overhang)
+    wall = Polygon([(0.4, 0.5), (1.5, 8.0), (0, 8.0), (0, 0.5)], fc="#e9edf5", ec=INK, lw=1.5)
+    ax.add_patch(wall)
+    rng = [(0.55, 1.3, "#d64541"), (0.95, 2.4, "#f2a93b"), (0.7, 3.4, "#1f9d55"),
+           (1.15, 4.3, "#2f6fed"), (0.9, 5.5, "#d64541"), (1.35, 6.3, "#8e5bd6"),
+           (1.05, 7.2, "#f2a93b"), (1.5, 7.6, "#1f9d55"), (0.55, 2.0, "#8e5bd6"),
+           (1.3, 5.0, "#f2a93b")]
+    for x, y, c in rng:
+        ax.add_patch(Circle((x, y), 0.11, fc=c, ec="none"))
+
+    # climber (mid-wall, reaching for a hold)
+    hx, hy = 1.75, 5.9                     # hip position
+    ax.plot([hx, hx + 0.28], [hy, hy + 0.85], color=INK, lw=3.5)              # torso (leaning into wall)
+    ax.add_patch(Circle((hx + 0.42, hy + 1.1), 0.22, fc="#f5d0b5", ec=INK, lw=1.5))  # head
+    ax.plot([hx + 0.2, 1.32, 1.35], [hy + 0.75, hy + 1.15, 6.28], color=INK, lw=3)   # reaching arm → purple hold
+    ax.plot([hx + 0.25, 1.42, 1.32], [hy + 0.6, hy + 0.3, 5.02], color=INK, lw=3)    # lower arm → orange hold
+    ax.plot([hx, 1.05, 0.92], [hy, hy - 0.7, 5.52], color=INK, lw=3)                 # leg → red hold
+    ax.plot([hx, 1.55, 1.32], [hy - 0.05, hy - 1.0, 5.0], color=INK, lw=3)           # trailing leg
+    # harness + wearable tag (rear waist, off-spine → faces the camera)
+    ax.plot([hx - 0.06, hx + 0.16], [hy + 0.02, hy + 0.06], color="#5a3d2b", lw=5)
+    ax.add_patch(Circle((hx + 0.02, hy - 0.06), 0.09, fc=RED, ec="white", lw=1.5, zorder=5))
+    ax.annotate("wearable tag\n(rear harness, off-spine)", xy=(hx + 0.02, hy - 0.06),
+                xytext=(3.2, 6.9), fontsize=9, color=RED,
+                arrowprops=dict(arrowstyle="->", color=RED, lw=1.2))
+
+    # tripod + SportCam, floor right, aimed up-left at the climber
+    tx, ty = 8.6, 0.5                      # tripod centre at floor
+    for dx in (-1.1, 1.1):
+        ax.plot([tx, tx + dx], [ty + 1.6, ty], color=INK, lw=3)
+    ax.plot([tx, tx], [ty + 1.6, ty], color=GREY, lw=3)
+    # base with LED ring (green = tracking)
+    ax.add_patch(Rectangle((tx - 0.55, ty + 1.6), 1.1, 0.55, fc=BGBOX, ec=INK, lw=1.5))
+    ax.add_patch(Rectangle((tx - 0.55, ty + 1.72), 1.1, 0.14, fc=GREEN, ec="none"))
+    ax.annotate("LED ring: tracking", xy=(tx - 0.55, ty + 1.79), xytext=(5.4, 0.9),
+                fontsize=9, color=GREEN, arrowprops=dict(arrowstyle="->", color=GREEN, lw=1.2))
+    # rotating head, tilted toward climber
+    ang = math.degrees(math.atan2(hy - (ty + 2.5), hx - tx))   # ≈ toward climber
+    ax.add_patch(Rectangle((tx - 0.45, ty + 2.15), 0.9, 0.28, fc=BGBOX, ec=INK, lw=1.5))
+    # camera body + lens on the head
+    import matplotlib.transforms as mtransforms
+    cam_x, cam_y = tx, ty + 2.62
+    tr = mtransforms.Affine2D().rotate_deg_around(cam_x, cam_y, ang - 180) + ax.transData
+    ax.add_patch(Rectangle((cam_x - 0.42, cam_y - 0.2), 0.84, 0.4, fc="#dde3ef", ec=INK,
+                           lw=1.5, transform=tr))
+    ax.add_patch(Rectangle((cam_x - 0.72, cam_y - 0.13), 0.3, 0.26, fc=INK, ec=INK, transform=tr))
+    # UWB anchor arms (perpendicular-ish to view; shown as two pods)
+    for s in (-0.62, 0.62):
+        ax.add_patch(Circle((tx + s, ty + 2.29), 0.1, fc="#e8f7ee", ec=GREEN, lw=1.5))
+    ax.text(tx, ty + 3.35, "SportCam head:\npan · tilt · zoom", fontsize=9, color=INK, ha="center")
+
+    # field-of-view cone from lens to climber
+    fov = Polygon([(cam_x - 0.55, cam_y + 0.1), (hx + 0.9, hy + 1.7), (hx + 0.4, hy - 1.4)],
+                  closed=True, fc="#2f6fed", ec="none", alpha=0.10)
+    ax.add_patch(fov)
+    ax.annotate("", xy=(hx + 0.75, hy + 0.35), xytext=(cam_x - 0.6, cam_y + 0.05),
+                arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=1.6, ls="-"))
+    ax.text(5.1, 4.35, "camera follows,\nzoom holds framing", fontsize=9, color=BLUE, rotation=24)
+
+    # UWB ranging lines anchors → tag
+    for s in (-0.62, 0.62):
+        ax.plot([tx + s, hx + 0.02], [ty + 2.29, hy - 0.06], color=GREEN, ls="--", lw=1.1)
+    ax.text(4.6, 2.95, "UWB ranging 20 Hz", fontsize=9, color=GREEN, rotation=31)
+
+    # phone in the corner showing the app
+    px, py = 10.6, 4.6
+    ax.add_patch(FancyBboxPatch((px, py), 1.1, 2.1, boxstyle="round,pad=0.05",
+                                fc="white", ec=INK, lw=1.5))
+    ax.add_patch(Rectangle((px + 0.08, py + 0.5), 0.94, 1.45, fc="#0d1420", ec="none"))
+    ax.add_patch(Circle((px + 0.83, py + 1.75), 0.08, fc=GREEN, ec="white", lw=1))
+    ax.plot([px + 0.45, px + 0.55], [py + 1.0, py + 1.25], color="#cbd6ea", lw=1.5)
+    ax.add_patch(Circle((px + 0.55, py + 1.33), 0.05, fc="none", ec="#cbd6ea", lw=1.2))
+    for i, c in enumerate(["#eef1f7", GREEN]):
+        ax.add_patch(Rectangle((px + 0.1 + i * 0.47, py + 0.12), 0.43, 0.3, fc=c, ec=INK, lw=0.6))
+    ax.text(px + 0.55, py - 0.25, "live app", fontsize=8.5, color=INK, ha="center")
+
+    save(fig, "intro-scene.png")
+
+
+# ----------------------------------------------------------------------------
 # 1. System architecture
 # ----------------------------------------------------------------------------
 def system_architecture():
@@ -112,11 +201,11 @@ def mechanical_layout():
     # stepper + belt
     ax.add_patch(Rectangle((cx + 0.55, 1.75), 0.8, 0.8, fc="#dde3ef", ec=INK))
     ax.text(cx + 0.95, 2.15, "NEMA\n17", ha="center", va="center", fontsize=7.5, color=INK)
-    ax.text(cx + 1.9, 1.95, "GT2 belt 3:1", fontsize=8.5, color=INK)
+    ax.text(cx + 1.9, 1.95, "GT2 belt 6:1", fontsize=8.5, color=INK)
 
     # turntable bearing + slip ring
     ax.add_patch(Rectangle((cx - 1.2, 3.1), 2.4, 0.28, fc="#c9d2e4", ec=INK))
-    ax.text(cx + 2.15, 3.2, "lazy-susan bearing\n(60 T GT2 pulley bolted under)", fontsize=8.5, color=INK)
+    ax.text(cx + 2.15, 3.2, "lazy-susan bearing\n(120 T GT2 ring pulley bolted under)", fontsize=8.5, color=INK)
     ax.add_patch(Rectangle((cx - 0.22, 2.6), 0.44, 0.9, fc="#ffe9c7", ec=INK))
     ax.text(cx - 1.05, 2.85, "slip ring\n(5 V ×2 + GND ×2)", fontsize=8.5, ha="center", color="#9a6b00")
 
@@ -299,6 +388,7 @@ def power_tree():
 
 
 if __name__ == "__main__":
+    intro_scene()
     system_architecture()
     mechanical_layout()
     state_machine()
