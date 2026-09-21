@@ -74,6 +74,7 @@ const PAGE = `<!doctype html>
 <script>
 const toc = document.getElementById("toc");
 const content = document.getElementById("content");
+let pendingAnchor = null;
 
 function currentDoc() {
   return decodeURIComponent(location.hash.slice(1)) || "README.md";
@@ -99,29 +100,45 @@ async function loadDoc() {
   if (!res.ok) { content.innerHTML = '<p class="err">not found: ' + path + "</p>"; return; }
   content.innerHTML = marked.parse(await res.text());
   const base = path.includes("/") ? path.slice(0, path.lastIndexOf("/") + 1) : "";
+  // GitHub-style heading ids, so section anchors work
+  const slug = (s) => s.toLowerCase().replace(/[^\\w\\s-]/g, "").trim().replace(/\\s+/g, "-");
+  for (const h of content.querySelectorAll("h1,h2,h3,h4")) h.id = h.id || slug(h.textContent);
   // resolve relative images against the doc's directory
   for (const img of content.querySelectorAll("img")) {
     const src = img.getAttribute("src");
     if (src && !src.startsWith("http") && !src.startsWith("/"))
       img.src = "/" + base + src;
   }
-  // .md cross-links stay inside the viewer; everything else opens normally
+  // .md cross-links stay inside the viewer; in-page anchors scroll;
+  // everything else opens normally
   for (const a of content.querySelectorAll("a")) {
     const href = a.getAttribute("href");
-    if (!href || href.startsWith("http") || href.startsWith("#")) {
-      if (href && href.startsWith("http")) a.target = "_blank";
+    if (!href) continue;
+    if (href.startsWith("http")) { a.target = "_blank"; continue; }
+    if (href.startsWith("#")) {   // in-page anchor — don't fight the hash router
+      const target = href.slice(1);
+      a.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        document.getElementById(target)?.scrollIntoView({ behavior: "smooth" });
+      });
       continue;
     }
-    const clean = href.split("#")[0];
+    const [clean, anchor] = href.split("#");
     if (clean.endsWith(".md")) {
       const resolved = new URL(clean, "http://x/" + base).pathname.slice(1);
       a.href = "#" + resolved;
+      if (anchor) a.addEventListener("click", () => { pendingAnchor = anchor; });
     } else {
       a.href = "/" + new URL(clean, "http://x/" + base).pathname.slice(1);
       a.target = "_blank";
     }
   }
-  window.scrollTo(0, 0);
+  if (pendingAnchor) {
+    document.getElementById(pendingAnchor)?.scrollIntoView();
+    pendingAnchor = null;
+  } else {
+    window.scrollTo(0, 0);
+  }
   document.title = "SportCam docs — " + path;
 }
 
@@ -138,7 +155,6 @@ async function listDocs() {
     const first = (await readFile(join(ROOT, "docs", f), "utf8")).split("\n")[0];
     entries.push({ path: `docs/${f}`, title: first.replace(/^#\s*/, "") || f });
   }
-  entries.push({ path: "cad/README.md", title: "08 b — CAD — printed parts" });
   return entries;
 }
 

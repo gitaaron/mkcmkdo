@@ -75,20 +75,14 @@ slightly below) the tripod is reachable — and the pan axis can always take the
 
 ## CAD sources
 
-All printed parts have **parametric OpenSCAD sources in [`cad/`](../cad/)** —
-every dimension (bearing sizes, board hole patterns, lens diameter, clearances)
-lives in `cad/config.scad`. Render everything to STL with:
-
-```bash
-./cad/render_all.sh        # requires openscad; outputs to cad/stl/
-```
-
-Before printing, measure and update the three dimensions flagged `MEASURE
-YOURS` in `config.scad`: the Arducam lens barrel diameter (`lens_d`), and your
-UWB board's outline/hole pattern (`uwb_*`) — vendors vary. Precision features
-are only the pan-bearing bolt circle and the servo interface; use the
-DS3225's included metal horn screwed into the printed cradle rather than
-printing a spline.
+All printed parts have parametric OpenSCAD sources in [`cad/`](../cad/) —
+see **[Appendix A — CAD: printed parts](appendix-a-cad-parts.md)** for the
+render workflow, per-part print settings, and the measure-before-printing
+checklist. Compiled STLs with preview images are linked from the
+[BOM's printed-parts table](07-bill-of-materials.md#printed-parts).
+Precision features are only the pan-bearing bolt circle and the servo
+interface; use the DS3225's included metal horn screwed into the printed
+cradle rather than printing a spline.
 
 Prefer remixing proven designs? See
-[08 — Open-source printed-part alternatives](08-open-source-parts.md).
+[Appendix B — Open-source printed-part alternatives](appendix-b-open-source-parts.md).

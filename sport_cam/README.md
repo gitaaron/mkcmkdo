@@ -17,8 +17,9 @@ app both show the three system states (idle / tracking / recording).
 | [04 — Tracking system](docs/04-tracking-system.md) | UWB geometry, control loops, CV assist |
 | [05 — Device software](docs/05-device-software.md) | Pi head service, base firmware, wearable firmware, video streaming |
 | [06 — Server & app](docs/06-server-and-app.md) | Protocol, function-style API, Vue app, Firebase migration path |
-| [07 — Bill of materials](docs/07-bill-of-materials.md) | Every part, CAD price, and Canadian sourcing (< 2-week delivery to Toronto) |
-| [08 — Open-source printed parts](docs/08-open-source-parts.md) | Community STL alternatives on Printables/MakerWorld and what each trade costs |
+| [07 — Bill of materials](docs/07-bill-of-materials.md) | Every part, CAD price, Canadian sourcing (< 2-week delivery to Toronto), printed parts with STL links |
+| [Appendix A — CAD printed parts](docs/appendix-a-cad-parts.md) | OpenSCAD render workflow, print settings, measure-first checklist |
+| [Appendix B — Open-source printed parts](docs/appendix-b-open-source-parts.md) | Community STL alternatives on Printables/MakerWorld and what each trade costs |
 
 ## Repository layout
 
@@ -43,6 +44,24 @@ wearable/           ESP32-UWB tag firmware (Arduino)
 npm install
 npm run dev        # starts API on :8787 and web app on :5173, both with watch
 ```
+
+### Docker workspace (all toolchain requirements pre-installed)
+
+`compose.yaml` + `Dockerfile` define a dev workspace with **Node 22,
+OpenSCAD, and the Python render stack** (schemdraw, matplotlib, pillow,
+numpy-stl) baked in — this is the environment `sbx_run_claude.sh` brings up:
+
+```bash
+docker compose up -d workspace      # build image, npm install, idle ready
+docker compose exec workspace bash  # shell with every tool available
+```
+
+Ports 5173 (app), 8787 (API), and 8090 (docs) are published to the host; the
+repo is bind-mounted at `/workspace` (node_modules live in named volumes so
+host and container installs don't clash). Inside the workspace, all repo
+tasks work as documented: `npm run dev`, `npm run docs`,
+`./cad/render_all.sh`, `python3 cad/render_previews.py`, and the
+`schematics/render_*.py` scripts.
 
 Open http://localhost:5173. With no hardware attached the server runs a built-in
 **device simulator** (`SIM=1`, on by default in dev) so the full app — stream

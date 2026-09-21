@@ -60,6 +60,27 @@ C$80-class launch price).
 | 26 | Aluminium tripod (1/4-20 head) | 1 | $35 | [Amazon.ca](https://www.amazon.ca/s?k=aluminum+camera+tripod) | skip if you own one |
 | 27 | Elastic armband/pouch + strap | 1 | $10 | [Amazon.ca](https://www.amazon.ca/s?k=elastic+armband+pouch+small) | wearable mounting; see doc 04 for climbing-specific wearing |
 
+## Printed parts
+
+Fabricated from item 25's filament (~350 g total). Each row links the STL
+compiled by OpenSCAD from the parametric sources
+([Appendix A](appendix-a-cad-parts.md)) and, where one exists, an open-source
+community alternative ([Appendix B](appendix-b-open-source-parts.md)).
+Regenerate STLs/previews with `./cad/render_all.sh` and
+`python3 cad/render_previews.py`.
+
+| Preview | Part | Qty | Compiled STL | OpenSCAD source | Open-source alternative |
+| --- | --- | --- | --- | --- | --- |
+| <img src="images/parts/base_housing.png" width="150"> | Base housing | 1 | [base_housing.stl](../cad/stl/base_housing.stl) | [base_housing.scad](../cad/base_housing.scad) | [Motorized turntable — MakerWorld 1013366](https://makerworld.com/en/models/1013366-motorized-turntable-3-versions) |
+| <img src="images/parts/led_diffuser_ring.png" width="150"> | LED diffuser ring | 1 | [led_diffuser_ring.stl](../cad/stl/led_diffuser_ring.stl) | [led_diffuser_ring.scad](../cad/led_diffuser_ring.scad) | [Clip-on 16-LED diffuser — Printables 628361](https://www.printables.com/model/628361-clip-on-ws2812-neopixel-16-led-diffuser) |
+| <img src="images/parts/ring_pulley.png" width="150"> | 120T GT2 ring pulley | 1 | [ring_pulley.stl](../cad/stl/ring_pulley.stl) | [ring_pulley.scad](../cad/ring_pulley.scad) | — (project-specific: must encircle the slip ring) |
+| <img src="images/parts/rotating_platform.png" width="150"> | Rotating platform | 1 | [rotating_platform.stl](../cad/stl/rotating_platform.stl) | [rotating_platform.scad](../cad/rotating_platform.scad) | — (project-specific hole pattern) |
+| <img src="images/parts/tilt_tower_servo.png" width="150"> | Tilt tower, servo side | 1 | [tilt_tower_servo.stl](../cad/stl/tilt_tower_servo.stl) | [tilt_tower.scad](../cad/tilt_tower.scad) | [Pan-tilt mount — Printables 1180365](https://www.printables.com/model/1180365-pan-tilt-mount-nema-17-stepper-motor) |
+| <img src="images/parts/tilt_tower_bearing.png" width="150"> | Tilt tower, bearing side | 1 | [tilt_tower_bearing.stl](../cad/stl/tilt_tower_bearing.stl) | [tilt_tower.scad](../cad/tilt_tower.scad) (`-D 'side="bearing"'`) | [Pan-tilt mount — Printables 1180365](https://www.printables.com/model/1180365-pan-tilt-mount-nema-17-stepper-motor) |
+| <img src="images/parts/camera_cradle.png" width="150"> | Camera cradle | 1 | [camera_cradle.stl](../cad/stl/camera_cradle.stl) | [camera_cradle.scad](../cad/camera_cradle.scad) | [Arducam case — Printables 983982](https://www.printables.com/model/983982-case-for-arducam-camera-module-for-raspberry-pi) |
+| <img src="images/parts/anchor_arm.png" width="150"> | UWB anchor arm | 2 | [anchor_arm.stl](../cad/stl/anchor_arm.stl) | [anchor_arm.scad](../cad/anchor_arm.scad) | — (project-specific: sets the 400 mm baseline) |
+| <img src="images/parts/wearable_case.png" width="150"> | Wearable pod (body + lid) | 1 | [wearable_case.stl](../cad/stl/wearable_case.stl) | [wearable_case.scad](../cad/wearable_case.scad) | [ESP32 smartwatch case — MakerWorld 1749335](https://makerworld.com/en/models/1749335-diy-smartwatch-case-for-esp32-c3-0-96-oled) |
+
 ## Totals (CAD)
 
 | Configuration | Total |

@@ -1,7 +1,7 @@
-# 08 — Open-source printed-part alternatives
+# Appendix B — Open-source printed-part alternatives
 
 If you'd rather remix proven community designs than print the parametric parts
-in [`cad/`](../cad/), this doc maps each SportCam printed part to open-source
+in [`cad/`](../cad/) ([Appendix A](appendix-a-cad-parts.md)), this doc maps each SportCam printed part to open-source
 models on Printables / MakerWorld / Thingiverse, and is honest about what each
 substitution costs you.
 
