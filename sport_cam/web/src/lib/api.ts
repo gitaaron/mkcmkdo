@@ -16,6 +16,14 @@ export interface StateSnapshot {
   updatedAt: string;
 }
 
+export interface RecordingMeta {
+  name: string;
+  bytes: number;
+  createdAt: string;
+  durationS: number | null;
+  url: string;
+}
+
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 
 /**
@@ -42,4 +50,15 @@ export const api = {
   startRecording: () => call("startRecording"),
   stopRecording: () => call("stopRecording"),
   getState: () => call("getState"),
+  getRecordings: () => call<{ recordings: RecordingMeta[] }>("getRecordings"),
 };
+
+/** Playback URL for a recording (range-capable; same-origin or VITE_API_BASE). */
+export function recordingUrl(r: RecordingMeta): string {
+  return r.url.startsWith("http") ? r.url : `${BASE}${r.url}`;
+}
+
+/** Live MJPEG relay URL. */
+export function streamUrl(): string {
+  return `${BASE}/api/stream.mjpeg`;
+}

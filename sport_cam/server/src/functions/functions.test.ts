@@ -1,8 +1,16 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MemoryStore, FnError } from "../state.js";
+import { Recordings } from "../recordings.js";
 import { fns } from "./index.js";
 
-const ctx = () => ({ store: new MemoryStore() }); // starts in 'idle'
+// starts in 'idle', with an empty temp recordings dir
+const ctx = () => ({
+  store: new MemoryStore(),
+  recordings: new Recordings(mkdtempSync(join(tmpdir(), "sportcam-test-")), 1024 ** 3),
+});
 
 describe("state machine functions", () => {
   it("full happy path idle → tracking → recording → tracking → idle", async () => {

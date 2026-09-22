@@ -15,15 +15,23 @@ Python 3.11+, systemd unit `sportcam-head.service`. Modules:
 | `tilt.py` | pigpio hardware PWM on GPIO18, soft end-stops −45…+225° |
 | `uwb.py` | reads both anchor serials, DS-TWR maths + Kalman → (θ, d) at 20 Hz |
 | `tracker.py` | PIDs from [04](04-tracking-system.md): pan velocity out, tilt/zoom applied directly |
-| `config.py` | all tunables (pins, PID gains, calibration biases) |
+| `uploader.py` | background recording upload → backend, with progress + retry ([08](08-recordings-and-cloud.md)) |
+| `wifi_portal.py` | hotspot + captive setup page when offline, for gym Wi-Fi ([08](08-recordings-and-cloud.md)) |
+| `config.py` | all tunables (pins, PID gains, calibration biases, `UPLOAD_API_BASE`) |
 
 Install on the Pi:
 
 ```bash
 sudo apt install -y python3-picamera2 python3-opencv pigpiod
-pip install websockets simple-pid filterpy
-sudo systemctl enable pigpiod sportcam-head
+pip install -r device/requirements.txt          # websockets, aiohttp, pyserial, simple-pid
+sudo systemctl enable pigpiod sportcam-head sportcam-wifi
 ```
+
+After a recording stops, `main.py` hands the finished MP4 to `uploader.py`
+as a background task — tracking and live streaming continue uninterrupted —
+which uploads it to whichever backend `UPLOAD_API_BASE` points at, then
+deletes the local copy once the backend confirms the byte count. See
+[08 — Recordings, cloud backend & gym Wi-Fi](08-recordings-and-cloud.md).
 
 Streaming choices:
 
@@ -69,6 +77,13 @@ reporting, deep sleep after 10 min without any anchor poll.
 { "type": "telemetry", "pan": 123.4, "tilt": 10.0, "zoomMm": 12.5, "dist": 4.2, "battery": 0.82 }
 { "type": "frame" }                    // followed by one binary WS message (JPEG)
 { "type": "tagButton", "kind": "short" | "long" }
+{ "type": "lost" }                     // tag gone past the timeout → server drops to idle
+{ "type": "uploadProgress", "name": "rec_….mp4", "sent": 12345, "total": 99999 }
+
+// server → app clients
+{ "type": "state", ... }               // full StateSnapshot
+{ "type": "recordings", "recordings": [ … ] }   // library, newest first
+{ "type": "uploadProgress", … }        // relayed from the head
 
 // server → device
 { "type": "state", "state": "idle" | "tracking" | "recording" | "off" }

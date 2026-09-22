@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import type { StateSnapshot } from "../lib/api";
+import { streamUrl, type StateSnapshot } from "../lib/api";
 
 const props = defineProps<{ cam: StateSnapshot & { connected: boolean } }>();
 
@@ -52,7 +52,8 @@ const showPlaceholder = computed(
 <template>
   <div class="video">
     <video v-if="whepActive" ref="videoEl" autoplay playsinline muted />
-    <img v-else-if="!showPlaceholder" src="/api/stream.mjpeg" alt="live stream" />
+    <!-- bound, not literal: a literal path would be resolved as a build asset -->
+    <img v-else-if="!showPlaceholder" :src="streamUrl()" alt="live stream" />
     <div v-else class="placeholder">
       <p v-if="!cam.connected">Connecting to server…</p>
       <p v-else-if="cam.state === 'off'">Camera is off</p>

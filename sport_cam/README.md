@@ -18,6 +18,7 @@ app both show the three system states (idle / tracking / recording).
 | [05 — Device software](docs/05-device-software.md) | Pi head service, base firmware, wearable firmware, video streaming |
 | [06 — Server & app](docs/06-server-and-app.md) | Protocol, function-style API, Vue app, Firebase migration path |
 | [07 — Bill of materials](docs/07-bill-of-materials.md) | Every part, CAD price, Canadian sourcing (< 2-week delivery to Toronto), printed parts with STL links |
+| [08 — Recordings, cloud & gym Wi-Fi](docs/08-recordings-and-cloud.md) | Upload→library pipeline, Firebase deploy, phone-driven Wi-Fi setup |
 | [Appendix A — CAD printed parts](docs/appendix-a-cad-parts.md) | OpenSCAD render workflow, print settings, measure-first checklist |
 | [Appendix B — Open-source printed parts](docs/appendix-b-open-source-parts.md) | Community STL alternatives on Printables/MakerWorld and what each trade costs |
 
@@ -26,6 +27,8 @@ app both show the three system states (idle / tracking / recording).
 ```
 docs/               design docs + rendered PNG diagrams
 cad/                parametric OpenSCAD sources for all printed parts (+ render_all.sh → STL)
+firebase/           cloud backend: callable API + hosting + Firestore rules
+scripts/            firebase-setup.sh / firebase-deploy.sh
 schematics/         diagram/schematic sources
   render_diagrams.py      matplotlib → docs/images/*.png
   render_schematics.py    schemdraw   → docs/images/schematic-*.png
@@ -66,6 +69,27 @@ tasks work as documented: `npm run dev`, `npm run docs`,
 Open http://localhost:5173. With no hardware attached the server runs a built-in
 **device simulator** (`SIM=1`, on by default in dev) so the full app — stream
 placeholder, state machine, buttons, status ring — works end to end.
+
+## Recordings & the gym workflow
+
+Stopping a recording uploads the clip to the backend in the background; the
+app shows progress and then a **"Recording saved — watch now"** toast that
+opens it in the library (range-seekable playback). Full pipeline, failure
+behaviour, and the Pi's phone-driven Wi-Fi setup:
+[08 — Recordings, cloud & gym Wi-Fi](docs/08-recordings-and-cloud.md).
+
+To film away from home, deploy the cloud backend and point the Pi at it:
+
+```bash
+npm i -g firebase-tools && firebase login
+./scripts/firebase-setup.sh <project-id>   # project + bucket + .firebaserc
+./scripts/firebase-deploy.sh               # functions + hosting + rules
+# then: device/sportcam/config.py → UPLOAD_API_BASE = "https://<project-id>.web.app"
+```
+
+At the gym, power the camera on, join its `SportCam-Setup` hotspot from your
+phone, open `http://10.42.0.1`, and pick the gym's network — the Pi remembers
+it thereafter.
 
 ## Browsing the docs
 

@@ -16,6 +16,7 @@ from .camera import Camera
 from .lens import Lens
 from .tilt import Tilt
 from .tracker import Tracker
+from .uploader import upload_with_retry
 from .uwb import UwbArray
 
 
@@ -29,6 +30,8 @@ class Head:
         self.tracker = Tracker(self.uwb, self.camera, self.lens, self.tilt)
         self.ws: websockets.WebSocketClientProtocol | None = None
         self.pan_deg = 0.0  # dead-reckoned from base telemetry, for display
+        self._rec_path = ""
+        self._rec_started = 0.0
 
     async def run(self) -> None:
         self.lens.home()
@@ -63,11 +66,16 @@ class Head:
     async def apply_state(self, new: str) -> None:
         old, self.state = self.state, new
         if old != "recording" and new == "recording":
-            path = self.camera.start_recording()
-            print(f"[rec] → {path}")
+            self._rec_path = self.camera.start_recording()
+            self._rec_started = time.monotonic()
+            print(f"[rec] → {self._rec_path}")
         elif old == "recording" and new != "recording":
             self.camera.stop_recording()
-            print("[rec] stopped")
+            duration = time.monotonic() - self._rec_started
+            print(f"[rec] stopped ({duration:.0f}s) — uploading in background")
+            asyncio.create_task(
+                upload_with_retry(self._rec_path, round(duration, 1), self.send)
+            )
         if new in ("idle", "off"):
             await self.send({"type": "panVel", "dps": 0.0})
             if new == "off":

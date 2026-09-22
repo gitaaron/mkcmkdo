@@ -21,15 +21,28 @@ server/src/
   hub.ts              WebSocket hub: app clients + device connections, broadcasts
   state.ts            the state machine (single source of truth) + store interface
   stream.ts           MJPEG relay: latest-frame buffer → multipart HTTP response
-  sim.ts              device simulator (SIM=1): fake head that streams test frames
+  recordings.ts       recording store: upload → disk, range-served playback, retention
+  sim.ts              device simulator (SIM=1): test frames + sample recordings
   functions/          ── portable, Firebase-callable-shaped functions ──
     index.ts          registry
     power.ts          setPower({on})
     tracking.ts       startTracking(), stopTracking()
     recording.ts      startRecording(), stopRecording()
+    recordings.ts     createUploadUrl(), finalizeRecording(), getRecordings()
     status.ts         getState()
   lib/adapters.ts     mountLocal(app, fns)  — Express adapter
 ```
+
+### The recording library
+
+`recordings.ts` owns uploaded clips: `PUT /api/recordings/upload/:name`
+streams to a `.part` temp file and renames on completion (so a partial upload
+never appears in the library), `GET /api/recordings/:name` serves them with
+HTTP **range** support (phones need it to seek), and a retention budget
+(`RECORDINGS_MAX_GB`, default 20) prunes oldest first. The callables
+`createUploadUrl` / `finalizeRecording` / `getRecordings` are shared verbatim
+with the Firebase deployment — see
+[08 — Recordings, cloud backend & gym Wi-Fi](08-recordings-and-cloud.md).
 
 ### The Firebase migration trick
 
@@ -70,11 +83,12 @@ Vue 3 + Vite + TypeScript, no UI framework — one screen, three components:
 
 ```
 web/src/
-  App.vue                shell; opens stream + WS on mount
+  App.vue                shell; opens stream + WS on mount, library button, toast
   components/
     VideoView.vue        WHEP video with MJPEG <img> fallback, full-bleed
     StatusRing.vue       top-right circular indicator, colours = LED colours
     ControlBar.vue       bottom buttons, swap with state
+    LibraryView.vue      recordings list + <video> player (range-seekable)
   lib/api.ts             call(name, data) + typed wrappers
   lib/useCameraState.ts  composable: WS client, reconnecting, reactive state
 ```
@@ -94,6 +108,11 @@ Behaviour (matches the mock in [01 — System overview](01-system-overview.md)):
 - All buttons just `call()` a function; the UI never assumes success — it
   waits for the state broadcast, so app, LED ring, and any second phone stay
   in lock-step.
+- **Recording library**: the ▶ button (top-left, badged with the clip count)
+  opens `LibraryView`; while a clip uploads the app shows a progress pill,
+  and when it lands a **"Recording saved — watch now"** toast opens it in one
+  tap. Playback uses a plain `<video>` against the range-capable endpoint, so
+  scrubbing works on phones.
 
 ## Configuration
 
@@ -101,6 +120,8 @@ Behaviour (matches the mock in [01 — System overview](01-system-overview.md)):
 | --- | --- | --- |
 | `PORT` | `8787` | API port |
 | `SIM` | `1` in dev | run the built-in device simulator when no head connects |
+| `RECORDINGS_DIR` | `server/recordings` | where uploaded clips are stored |
+| `RECORDINGS_MAX_GB` | `20` | retention budget; oldest clips pruned beyond it |
 | `VITE_API_BASE` | same-origin | override for app pointing at a remote server |
 
 ## Testing

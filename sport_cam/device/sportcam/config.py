@@ -2,6 +2,12 @@
 
 SERVER_WS = "ws://homeserver.local:8787/ws/device"
 
+# Recording upload backend — same callable protocol either way:
+#   home LAN : "http://homeserver.local:8787"
+#   Firebase : "https://<your-project>.web.app"   (gym / away workflow)
+UPLOAD_API_BASE = "http://homeserver.local:8787"
+DELETE_AFTER_UPLOAD = True   # SD card is a buffer, not a store
+
 # --- tracking -------------------------------------------------------------
 UWB_BASELINE_M = 0.40          # anchor separation
 UWB_PORTS = ("/dev/ttyUSB0", "/dev/ttyUSB1")

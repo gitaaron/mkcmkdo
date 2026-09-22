@@ -3,6 +3,7 @@ import type { Server, IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type { Store, Telemetry } from "./state.js";
 import type { FrameBus } from "./stream.js";
+import type { Recordings, RecordingMeta } from "./recordings.js";
 
 type DeviceKind = "head" | "base" | "sim";
 
@@ -25,14 +26,18 @@ export class Hub {
   private devices = new WebSocketServer({ noServer: true });
   private deviceConns = new Set<DeviceConn>();
 
-  constructor(private store: Store, private frames: FrameBus) {
+  constructor(private store: Store, private frames: FrameBus, private recordings: Recordings) {
     store.on("change", () => {
       this.broadcastState();
       this.sendToDevices({ type: "state", state: store.get().state });
     });
+    recordings.on("change", (list: RecordingMeta[]) => {
+      this.broadcastToApps({ type: "recordings", recordings: list });
+    });
 
     this.apps.on("connection", (ws) => {
       ws.send(this.statePayload());
+      ws.send(JSON.stringify({ type: "recordings", recordings: recordings.list() }));
     });
 
     this.devices.on("connection", (ws) => {
@@ -104,6 +109,10 @@ export class Hub {
         // head lost the tag past the timeout → back to idle (saves recording)
         if (this.store.get().state !== "off") this.store.patch({ state: "idle" });
         break;
+      case "uploadProgress":
+        // head → apps: {name, sent, total} while a recording uploads
+        this.broadcastToApps(msg);
+        break;
     }
   }
 
@@ -119,7 +128,11 @@ export class Hub {
   }
 
   private broadcastState(): void {
-    const payload = this.statePayload();
+    this.broadcastToApps(null);
+  }
+
+  private broadcastToApps(msg: unknown | null): void {
+    const payload = msg === null ? this.statePayload() : JSON.stringify(msg);
     for (const ws of this.apps.clients) {
       if (ws.readyState === WebSocket.OPEN) ws.send(payload);
     }

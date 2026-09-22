@@ -1,6 +1,7 @@
 # Raspberry Pi head-unit service.
 # System packages (apt): python3-picamera2 python3-opencv pigpiod
 websockets>=12.0
+aiohttp>=3.9
 pyserial>=3.5
 simple-pid>=2.0
 numpy>=1.26
