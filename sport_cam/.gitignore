@@ -8,3 +8,8 @@ __pycache__/
 recordings/
 firebase/.firebaserc
 .firebase/
+app_flutter/.dart_tool/
+app_flutter/build/
+app_flutter/.packages
+*.swp
+.obsidian

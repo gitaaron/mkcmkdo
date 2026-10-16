@@ -1,26 +1,59 @@
-// Base housing: holds ESP32 + TMC2209 carrier, buck #1, 12 V jack, NEMA17.
-// The lazy-susan bottom plate and slip-ring flange bolt to the top deck.
-// LED diffuser ring (separate part) snaps into the circumferential window.
+// Static enclosure: Raspberry Pi 5, 5 V distribution, WS2812B ring.
+// The lid carries the Arducam pan-tilt base; the anchor arms bolt to the
+// bosses at ±Y and the A3 mast foot to the one at −X, behind the lens.
+// Nothing rotates — there is no pan stage.
+//
+// Renders the body; `lid.scad` is the separate top plate.
 include <config.scad>
 
-led_window_h = 12;             // circumferential LED slot
-led_window_z = 18;
-deck_t = 4;
+module vent_slot() {
+    hull() {
+        cylinder(d = 4, h = base_wall * 4, center = true);
+        translate([0, 4, 0]) cylinder(d = 4, h = base_wall * 4, center = true);
+    }
+}
 
-module bolt_pattern(spacing, d, depth) {
+module pi_standoffs() {
+    // Pi lies flat on the floor, long axis along X, shifted to -X so the
+    // PD trigger, buck and INA226 get the +X side of the floor
     for (x = [-1, 1], y = [-1, 1])
-        translate([x * spacing / 2, y * spacing / 2, 0])
-            cylinder(d = d, h = depth);
+        translate([pi_x_off + x * pi_hole_dx / 2, y * pi_hole_dy / 2, base_wall])
+            difference() {
+                cylinder(d = 7, h = pi_standoff_h);
+                cylinder(d = 2.4, h = pi_standoff_h + 1);   // M2.5 thread-form
+            }
+}
+
+module power_standoffs() {
+    // Buck, PD trigger and INA226 on the +X side of the floor, on M3 posts
+    for (p = [[46, -18], [46, 18], [46, 0]])
+        translate([p[0], p[1], base_wall])
+            difference() {
+                cylinder(d = 7, h = 4);
+                cylinder(d = 2.9, h = 5);
+            }
+}
+
+module arm_boss() {
+    // Pad on the outside wall at ±Y that the static anchor arm bolts to.
+    // Two M3 inserts, vertical, spaced along Z.
+    difference() {
+        translate([-arm_w / 2 - 2, base_d / 2 - 2, 10])
+            cube([arm_w + 4, 6, arm_root_h]);
+        for (z = [16, 16 + 12])
+            translate([0, base_d / 2 + 6, z]) rotate([90, 0, 0])
+                cylinder(d = arm_insert_d, h = 10, $fn = 24);
+    }
 }
 
 module base_housing() {
     difference() {
         union() {
-            // shell
             cylinder(d = base_d, h = base_h);
-            // NEMA17 mount tower: motor hangs under the deck, offset so its
-            // 20T pulley meets the ring pulley (center distance ≈ ring_pitch_r + 20T pitch_r)
-            // 20T pitch r = 20*2/(2*PI) ≈ 6.37 → center ≈ 44.5 from pan axis
+            // tripod boss on the floor: 3/8-16 insert, 1/4-20 via bushing
+            cylinder(d = tripod_boss_d, h = tripod_boss_h);
+            for (s = [0, 180]) rotate([0, 0, s]) arm_boss();
+            rotate([0, 0, 90]) arm_boss();      // A3 mast foot, at −X
         }
         // hollow interior
         translate([0, 0, base_wall])
@@ -31,43 +64,24 @@ module base_housing() {
                 cylinder(d = base_d + 2, h = led_window_h);
                 cylinder(d = base_d - 2 * base_wall - 2, h = led_window_h);
             }
-        // 12 V barrel jack (8 mm panel mount) — low on the wall
-        translate([0, -base_d / 2, 10]) rotate([90, 0, 0])
-            cylinder(d = 8.2, h = 3 * base_wall, center = true);
-        // vent slots
-        for (a = [30:30:150])
-            rotate([0, 0, a]) translate([0, base_d / 2, 8]) rotate([90, 0, 0])
-                hull() {
-                    translate([0, 0, -base_wall * 2]) cylinder(d = 4, h = base_wall * 4);
-                    translate([0, 4, -base_wall * 2]) cylinder(d = 4, h = base_wall * 4);
-                }
+        // 5 V barrel jack, low on the −Y wall
+        translate([0, -base_d / 2, 11]) rotate([90, 0, 0])
+            cylinder(d = jack_d, h = 3 * base_wall, center = true);
+        // tripod insert bore
+        translate([0, 0, -1]) cylinder(d = tripod_hole_d, h = tripod_boss_h + 1);
+        // vents: the Pi's blower needs a path, and the lid is sealed by the base
+        // (the slot at 100° would notch the mast boss, so it is left out)
+        for (a = [25:25:155]) if (abs(a - 90) > 12)
+            rotate([0, 0, a]) translate([0, base_d / 2, 9]) rotate([90, 0, 0]) vent_slot();
+        for (a = [205:25:335])
+            rotate([0, 0, a]) translate([0, base_d / 2, 9]) rotate([90, 0, 0]) vent_slot();
+        // lid screws: 4 × M3 into the wall top
+        for (a = [45:90:315])
+            rotate([0, 0, a]) translate([base_d / 2 - base_wall / 2 - 1.2, 0, base_h - 12])
+                cylinder(d = 2.6, h = 13, $fn = 24);
     }
-    // top deck (separate ring so the LED window stays open below it)
-    translate([0, 0, base_h - deck_t]) deck();
-    // 1/4-20 tripod boss on the floor
-    difference() {
-        cylinder(d = 20, h = 8);
-        cylinder(d = 6.35, h = 9);     // press/epoxy a 1/4-20 brass insert
-    }
-}
-
-module deck() {
-    difference() {
-        cylinder(d = base_d, h = deck_t);
-        // slip-ring: body drops through, flange screws down
-        cylinder(d = sr_body_d + 2 * clr, h = deck_t);
-        for (s = [-1, 1])
-            translate([s * sr_hole_space / 2, 0, 0]) cylinder(d = 3.2, h = deck_t);
-        // lazy-susan bottom plate bolts
-        bolt_pattern(ls_bolt, ls_hole_d, deck_t);
-        // NEMA17: shaft + boss hole and 4 × M3, motor body below deck
-        translate([44.5 + 6.37, 0, 0]) {
-            cylinder(d = nema_boss_d + 2 * clr, h = deck_t);
-            bolt_pattern(nema_bolt, 3.2, deck_t);
-        }
-        // wire pass (ESP32 → deck-top LED ring feed etc.)
-        translate([-45, 25, 0]) cylinder(d = 10, h = deck_t);
-    }
+    pi_standoffs();
+    power_standoffs();
 }
 
 base_housing();

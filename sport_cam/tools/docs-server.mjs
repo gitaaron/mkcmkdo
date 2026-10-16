@@ -82,8 +82,9 @@ function currentDoc() {
 
 async function loadToc() {
   const docs = await (await fetch("/api/docs")).json();
-  toc.innerHTML = docs.map(d =>
-    '<a href="#' + d.path + '" data-path="' + d.path + '">' + d.title + "</a>").join("");
+  toc.innerHTML = docs.map(d => d.path.endsWith(".md")
+    ? '<a href="#' + d.path + '" data-path="' + d.path + '">' + d.title + "</a>"
+    : '<a href="/' + d.path + '" target="_blank">' + d.title + " ↗</a>").join("");
   markActive();
 }
 
@@ -155,6 +156,12 @@ async function listDocs() {
     const first = (await readFile(join(ROOT, "docs", f), "utf8")).split("\n")[0];
     entries.push({ path: `docs/${f}`, title: first.replace(/^#\s*/, "") || f });
   }
+  entries.push({ path: "docs/3d_printer/specifications.md", title: "3D printing specifications" });
+  entries.push({ path: "docs/setup/README.md", title: "Setup — start here" });
+  entries.push({ path: "docs/setup/assembly/index.html", title: "Setup 1: Assembly guide (interactive 3D)" });
+  entries.push({ path: "docs/setup/wiring.md", title: "Setup 1a: Wiring guide" });
+  entries.push({ path: "docs/setup/software_setup.md", title: "Setup 2: Software setup" });
+  entries.push({ path: "schematics/interactive/index.html", title: "Wiring schematic (interactive)" });
   return entries;
 }
 

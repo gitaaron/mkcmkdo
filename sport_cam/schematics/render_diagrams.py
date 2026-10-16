@@ -153,28 +153,34 @@ def intro_scene():
 def system_architecture():
     fig, ax = new_fig(12, 7.6, "SportCam — system architecture")
 
-    # Home server
     box(ax, 4.5, 5.4, 3.2, 1.9, "Home server (Node.js + TS)",
-        ["REST /api/call/*  (fn-style)", "WebSocket hub  /ws", "MJPEG relay + state store", "Vue 3 web app (Vite)"])
-    # App
+        ["REST /api/call/*  (fn-style)", "WebSocket hub  /ws",
+         "MJPEG relay + state store", "Vue 3 web app (Vite)"])
     box(ax, 9.2, 5.4, 2.5, 1.9, "Phone / laptop app",
-        ["Vue 3 SPA", "live video", "status ring + buttons"])
-    # Head
-    box(ax, 0.4, 2.4, 3.4, 2.3, "Head unit (rotating)",
-        ["Raspberry Pi 5", "Arducam zoom cam (I2C)", "Tilt servo 270°", "2× UWB anchors (UART)"])
-    # Base
-    box(ax, 4.6, 0.3, 3.2, 2.0, "Base unit (static)",
-        ["ESP32 base controller", "NEMA17 + TMC2209 (pan)", "WS2812 LED status ring", "12 V PSU + slip ring"])
-    # Wearable
+        ["Flutter (phone) · Vue (web)", "live video",
+         "link badge + status ring"])
+    box(ax, 0.4, 2.2, 3.6, 2.6, "Camera unit (one board)",
+        ["Raspberry Pi 4 (HW H.264)", "Arducam PTZ ctrl (I2C 0x0C)",
+         "pan + tilt + zoom + focus", "3× ULA1 anchors (USB)",
+         "LED ring (SPI) · INA260 gauge"])
+    box(ax, 4.6, 0.3, 3.2, 1.8, "Battery", ["USB-C PD bank 92 Wh",
+                                            "PD trigger 12 V → buck 5 V",
+                                            "6.2 h tracking + recording"], fc="#fdf6e8")
     box(ax, 9.2, 2.4, 2.5, 1.9, "Wearable tag",
-        ["ESP32 + DW1000 UWB", "LiPo + strap", "pair button"])
+        ["ULA1 (ESP32 + DWM1000)", "USB power bank", "worn off-spine"])
 
-    arrow(ax, (6.1, 5.4), (6.1, 2.3), "Wi-Fi WS: pan cmds / LED state", color=BLUE, lofs=(1.35, 0))
-    arrow(ax, (3.8, 4.0), (4.5, 5.6), "Wi-Fi: state + video", color=BLUE, lofs=(-0.9, 0.1))
+    arrow(ax, (4.0, 4.3), (4.5, 5.6), "Wi-Fi: state + video", color=BLUE, lofs=(-0.75, 0.15))
     arrow(ax, (7.7, 6.4), (9.2, 6.4), "HTTP + WS + WebRTC", color=BLUE)
-    arrow(ax, (9.2, 3.3), (3.8, 3.3), "UWB two-way ranging (6.5 GHz)", color=GREEN, ls="--")
-    arrow(ax, (6.2, 2.3), (3.4, 2.55), "5 V via slip ring", color=RED, lofs=(0.2, -0.35))
-    ax.text(2.1, 5.05, "camera aims at subject", fontsize=8.5, color=GREY, ha="center")
+    ax.annotate("", xy=(4.05, 4.5), xytext=(10.4, 5.35),
+                arrowprops=dict(arrowstyle="<|-|>", color=GREEN, lw=2.2,
+                                connectionstyle="arc3,rad=-0.38"))
+    ax.text(8.15, 4.85, "DIRECT (same Wi-Fi): mDNS discovery →\nlive video + control, no server",
+            fontsize=9, color=GREEN, ha="center", fontweight="bold",
+            bbox=dict(fc="white", ec=GREEN, boxstyle="round,pad=0.28", lw=1.1))
+    arrow(ax, (9.2, 3.1), (4.0, 3.1), "UWB two-way ranging (6.5 GHz)", color=GREEN, ls="--")
+    arrow(ax, (4.6, 1.2), (4.0, 2.4), "5 V", color=RED, lofs=(-0.35, -0.1))
+    ax.text(2.2, 5.15, "the whole control loop closes\non the Pi — no second\nmicrocontroller, no slip ring",
+            fontsize=8.5, color=GREY, ha="center")
     save(fig, "system-architecture.png")
 
 
@@ -182,69 +188,76 @@ def system_architecture():
 # 2. Mechanical layout (side view)
 # ----------------------------------------------------------------------------
 def mechanical_layout():
-    fig, ax = new_fig(9.5, 9, "Head + base assembly (side view)")
+    fig, ax = new_fig(9.5, 9, "Camera unit assembly (side view)")
     cx = 4.4
 
     # tripod legs
     for dx in (-2.6, 2.6):
-        ax.plot([cx, cx + dx], [1.6, 0.2], color=INK, lw=3)
-    ax.plot([cx, cx], [1.6, 0.2], color=GREY, lw=3)
-    ax.text(cx + 2.0, 0.55, "standard tripod\n(1/4-20 mount)", fontsize=9, color=GREY)
+        ax.plot([cx, cx + dx], [1.9, 0.2], color=INK, lw=3)
+    ax.plot([cx, cx], [1.9, 0.2], color=GREY, lw=3)
+    ax.text(cx + 2.75, 0.3, "any standard tripod\n(3/8-16, or 1/4-20\nvia bushing)", fontsize=9, color=GREY)
 
-    # base housing
-    ax.add_patch(Rectangle((cx - 1.5, 1.6), 3.0, 1.5, fc=BGBOX, ec=INK, lw=1.5))
-    ax.text(cx, 2.62, "BASE (static)", ha="center", fontsize=10, fontweight="bold", color=INK)
-    ax.text(cx, 2.28, "ESP32 · TMC2209 · 12V in", ha="center", fontsize=8.5, color=INK)
-    # LED ring
-    ax.add_patch(Rectangle((cx - 1.62, 1.72), 0.12, 1.0, fc=GREEN, ec="none"))
-    ax.text(cx - 2.35, 2.2, "WS2812\nLED ring", fontsize=8.5, color=GREEN, ha="center")
-    # stepper + belt
-    ax.add_patch(Rectangle((cx + 0.55, 1.75), 0.8, 0.8, fc="#dde3ef", ec=INK))
-    ax.text(cx + 0.95, 2.15, "NEMA\n17", ha="center", va="center", fontsize=7.5, color=INK)
-    ax.text(cx + 1.9, 1.95, "GT2 belt 6:1", fontsize=8.5, color=INK)
+    # battery tray, slung low
+    ax.add_patch(Rectangle((cx - 1.7, 1.9), 3.4, 0.75, fc="#fdf6e8", ec=INK, lw=1.4))
+    ax.text(cx, 2.27, "BATTERY TRAY — 92 Wh USB-C bank", ha="center",
+            fontsize=8.5, color=INK)
+    ax.text(cx - 2.6, 2.25, "heaviest item\nlowest", fontsize=8, color=GREY, ha="center")
 
-    # turntable bearing + slip ring
-    ax.add_patch(Rectangle((cx - 1.2, 3.1), 2.4, 0.28, fc="#c9d2e4", ec=INK))
-    ax.text(cx + 2.15, 3.2, "lazy-susan bearing\n(120 T GT2 ring pulley bolted under)", fontsize=8.5, color=INK)
-    ax.add_patch(Rectangle((cx - 0.22, 2.6), 0.44, 0.9, fc="#ffe9c7", ec=INK))
-    ax.text(cx - 1.05, 2.85, "slip ring\n(5 V ×2 + GND ×2)", fontsize=8.5, ha="center", color="#9a6b00")
+    # enclosure
+    ax.add_patch(Rectangle((cx - 1.5, 2.75), 3.0, 1.9, fc=BGBOX, ec=INK, lw=1.5))
+    ax.text(cx, 4.2, "ENCLOSURE (static)", ha="center", fontsize=10,
+            fontweight="bold", color=INK)
+    ax.text(cx, 3.82, "Raspberry Pi 4", ha="center", fontsize=8.5, color=INK)
+    ax.text(cx, 3.5, "PD trigger · buck 5 V · INA226", ha="center", fontsize=8.5, color=INK)
+    ax.add_patch(Rectangle((cx - 1.62, 3.0), 0.12, 0.9, fc=GREEN, ec="none"))
+    ax.text(cx - 2.4, 3.45, "WS2812\nLED ring", fontsize=8.5, color=GREEN, ha="center")
 
-    # rotating platform
-    ax.add_patch(Rectangle((cx - 1.7, 3.45), 3.4, 0.25, fc=BGBOX, ec=INK))
-    ax.text(cx - 2.6, 3.5, "rotating\nplatform", fontsize=8.5, color=INK, ha="center")
+    # lid
+    ax.add_patch(Rectangle((cx - 1.5, 4.65), 3.0, 0.3, fc="#dde3ef", ec=INK, lw=1.5))
+    ax.text(cx + 2.55, 4.78, "LID — carries the camera,\nslotted bolt pattern",
+            fontsize=8.5, color=INK, ha="center")
 
-    # Pi
-    ax.add_patch(Rectangle((cx - 1.55, 3.8), 1.3, 0.75, fc=BGBOX, ec=INK))
-    ax.text(cx - 0.9, 4.17, "Pi 5", ha="center", va="center", fontsize=9, fontweight="bold", color=INK)
-    # tilt tower
-    ax.add_patch(Rectangle((cx + 0.4, 3.7), 0.5, 1.9, fc=BGBOX, ec=INK))
-    ax.text(cx + 1.5, 4.4, "tilt tower +\nDS3225 270° servo", fontsize=8.5, color=INK)
-    # camera
-    ax.add_patch(Circle((cx + 0.65, 5.9), 0.34, fc="#dde3ef", ec=INK, lw=1.5))
-    ax.add_patch(Rectangle((cx + 0.28, 6.0), 0.74, 0.55, fc=BGBOX, ec=INK))
-    ax.text(cx + 0.65, 6.28, "cam", ha="center", fontsize=8, color=INK)
-    ax.add_patch(Wedge((cx + 0.65, 6.3), 1.4, 55, 125, fc="#eaf1ff", ec="none"))
-    ax.text(cx + 0.65, 7.45, "motorized zoom lens (I2C)", fontsize=8.5, ha="center", color=BLUE)
+    # anchor arms
+    for sx in (-1, 1):
+        ax.plot([cx + sx * 1.5, cx + sx * 2.8], [4.1, 4.1], color=BLUE, lw=3)
+        ax.add_patch(Rectangle((cx + sx * 2.8 - 0.18, 4.0), 0.36, 0.26,
+                               fc=BLUE, ec="none"))
+    ax.annotate("", xy=(cx - 2.8, 3.72), xytext=(cx + 2.8, 3.72),
+                arrowprops=dict(arrowstyle="<|-|>", color=BLUE, lw=1.4))
+    ax.text(cx, 3.5, "", ha="center")
+    ax.text(cx, 4.45, "UWB anchors — 250 mm, STATIC", ha="center",
+            fontsize=8.5, color=BLUE)
 
-    # UWB anchor arms
-    for sx, name in ((-1, "anchor A1"), (1, "anchor A2")):
-        x = cx + sx * 2.0
-        ax.plot([cx + sx * 0.6, x], [5.1, 5.1], color=INK, lw=2)
-        ax.add_patch(Rectangle((x - 0.22, 4.95), 0.44, 0.5, fc="#e8f7ee", ec=GREEN, lw=1.4))
-        ax.text(x, 5.75, name, ha="center", fontsize=8.5, color=GREEN)
-    ax.annotate("", xy=(cx - 2.0, 4.75), xytext=(cx + 2.0, 4.75),
-                arrowprops=dict(arrowstyle="<->", color=GREEN))
-    ax.text(cx, 4.5, "UWB baseline b = 40 cm", ha="center", fontsize=8.5, color=GREEN)
+    # A3 mast behind the camera (drawn to the left: the lens faces right)
+    mx = cx - 1.85
+    ax.plot([mx, mx], [3.05, 7.55], color="#b08a4a", lw=3)
+    ax.add_patch(Rectangle((mx - 0.2, 2.95), 0.35, 0.6, fc=BLUE, ec="none"))
+    ax.add_patch(Rectangle((mx - 0.3, 7.55), 0.6, 0.16, fc=BLUE, ec="none"))
+    ax.text(mx - 0.4, 7.25, "A3 — 250 mm up,\nbehind the lens\n(elevation)", fontsize=8.5,
+            color=BLUE, ha="right")
 
-    # motion arrows
-    ax.annotate("", xy=(cx + 2.6, 3.35), xytext=(cx + 3.3, 2.9),
-                arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=2,
-                                connectionstyle="arc3,rad=0.5"))
-    ax.text(cx + 3.45, 3.35, "pan 360°\ncontinuous", fontsize=9, color=BLUE)
-    ax.annotate("", xy=(cx - 0.35, 6.6), xytext=(cx + 1.7, 6.6),
-                arrowprops=dict(arrowstyle="<|-|>", color=BLUE, lw=2,
-                                connectionstyle="arc3,rad=-0.6"))
-    ax.text(cx - 1.6, 6.75, "tilt 270°\n(−45°…+225°)", fontsize=9, color=BLUE, ha="center")
+    # PTZ base + camera
+    ax.add_patch(Rectangle((cx - 0.75, 4.95), 1.5, 0.85, fc="#e8ecf5", ec=INK, lw=1.5))
+    ax.text(cx, 5.38, "Arducam metal\npan-tilt base", ha="center", va="center",
+            fontsize=8, color=INK)
+    ax.add_patch(Circle((cx, 6.5), 0.52, fc="#cfd7e6", ec=INK, lw=1.5))
+    ax.add_patch(Rectangle((cx + 0.35, 6.28), 0.75, 0.44, fc=INK, ec=INK))
+    ax.text(cx - 3.0, 6.55, "IMX477 + motorized\nzoom lens", fontsize=8.5,
+            color=INK, ha="center")
+
+    # motion arcs
+    ax.annotate("", xy=(cx + 1.5, 7.45), xytext=(cx - 1.5, 7.45),
+                arrowprops=dict(arrowstyle="<|-|>", color=RED, lw=1.6,
+                                connectionstyle="arc3,rad=0.3"))
+    ax.text(cx, 7.95, "PAN ±80° (not continuous)", ha="center", fontsize=9,
+            color=RED, fontweight="bold")
+    ax.annotate("", xy=(cx + 1.9, 7.1), xytext=(cx + 1.9, 5.7),
+                arrowprops=dict(arrowstyle="<|-|>", color=RED, lw=1.6,
+                                connectionstyle="arc3,rad=0.35"))
+    ax.text(cx + 2.9, 6.4, "TILT\n−45°…+85°", ha="center", fontsize=9, color=RED)
+
+    ax.text(cx, 8.45, "No pan stage: no slip ring, no stepper, no lazy susan.",
+            ha="center", fontsize=9, color=GREY, style="italic")
     save(fig, "mechanical-layout.png")
 
 
@@ -293,7 +306,7 @@ def tracking_geometry():
     mid = ((a1[0] + a2[0]) / 2, a1[1])
 
     ax.add_patch(Circle(mid, 0.35, fc="#dde3ef", ec=INK, lw=1.5))
-    ax.text(mid[0], mid[1] - 0.75, "camera axis", ha="center", fontsize=9, color=INK)
+    ax.text(mid[0] - 0.45, mid[1] - 0.45, "camera axis", ha="right", fontsize=9, color=INK)
     for p, name in ((a1, "A1"), (a2, "A2")):
         ax.add_patch(Circle(p, 0.22, fc="#e8f7ee", ec=GREEN, lw=2))
         ax.text(p[0], p[1] - 0.55, name, ha="center", fontsize=9, color=GREEN)
@@ -310,7 +323,7 @@ def tracking_geometry():
     # camera boresight and error angle
     ax.annotate("", xy=(mid[0], 6.4), xytext=mid,
                 arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=2))
-    ax.text(mid[0] - 0.15, 6.35, "boresight", fontsize=9, color=BLUE, ha="right")
+    ax.text(mid[0] + 0.15, 6.35, "boresight", fontsize=9, color=BLUE, ha="left")
     ang = math.degrees(math.atan2(tag[1] - mid[1], tag[0] - mid[0]))
     ax.add_patch(Wedge(mid, 1.5, ang, 90, fc="#eaf1ff", ec="none", alpha=0.9))
     ax.text(mid[0] + 0.75, 3.9, "θ error", fontsize=10, color=BLUE)
@@ -318,8 +331,12 @@ def tracking_geometry():
     ax.text(1.0, 6.3, "θ ≈ asin( (r₁² − r₂²) / (2·b·d) )\nd = (r₁ + r₂) / 2",
             fontsize=11, color=INK, family="monospace",
             bbox=dict(fc=BGBOX, ec=INK, boxstyle="round,pad=0.5"))
-    ax.text(1.0, 4.9, "pan loop drives θ → 0\nzoom loop holds d at target framing\ntilt from person-detect bounding box",
+    ax.text(1.0, 4.9, "pan is commanded to θ\ntilt to φ from A3, 250 mm above the bar\nzoom and focus from d",
             fontsize=9, color=GREY)
+    # A3 is 86 mm behind the bar (0.65 units at this scale) and 250 mm up
+    a3 = (mid[0], mid[1] - 0.65)
+    ax.add_patch(Circle(a3, 0.18, fc="#eaf1ff", ec=BLUE, lw=2))
+    ax.text(a3[0] + 0.3, a3[1] - 0.1, "A3 — 250 mm up, on the mast", fontsize=8.5, color=BLUE)
     save(fig, "tracking-geometry.png")
 
 
@@ -370,20 +387,31 @@ def app_ui():
 # 6. Power tree
 # ----------------------------------------------------------------------------
 def power_tree():
-    fig, ax = new_fig(11, 6.2, "Power distribution")
-    box(ax, 0.4, 4.4, 2.5, 1.3, "12 V 5 A PSU", ["barrel jack, 60 W"])
-    box(ax, 4.0, 4.7, 2.6, 1.1, "TMC2209 + NEMA17", ["12 V · ≤1.2 A"], fc="#fff4f2")
-    box(ax, 4.0, 3.2, 2.6, 1.1, "Buck #1 → 5 V 3 A", ["base: ESP32 + LED ring"], fc="#f2fff5")
-    box(ax, 4.0, 1.7, 2.6, 1.1, "Buck #2 → 5 V 5 A", ["through slip ring →"], fc="#f2f7ff")
-    box(ax, 7.8, 2.6, 2.8, 1.4, "Head rail 5 V", ["Pi 5 (≤5 A pk)", "camera + UWB ×2"], fc="#f2f7ff")
-    box(ax, 7.8, 0.6, 2.8, 1.2, "Servo rail 5 V", ["DS3225 stall 2.5 A", "own buck #3 on head"], fc="#fffbe8")
-    box(ax, 0.4, 0.6, 2.5, 1.3, "Wearable LiPo", ["1000 mAh + TP4056", "USB-C charge"], fc="#fdf2f2")
-    arrow(ax, (2.9, 5.1), (4.0, 5.25), "12 V")
-    arrow(ax, (2.9, 4.9), (4.0, 3.75), "12 V")
-    arrow(ax, (2.9, 4.7), (4.0, 2.25), "12 V")
-    arrow(ax, (6.6, 2.25), (7.8, 3.1), "slip ring 2+2 wires", lofs=(0.1, -0.3))
-    arrow(ax, (6.6, 2.0), (7.8, 1.3), "12 V up, buck on head", lofs=(0.15, -0.35))
-    ax.text(1.65, 0.25, "independent — never wired to tripod", fontsize=8, color=GREY, ha="center")
+    fig, ax = new_fig(11.5, 6.4, "Power distribution — battery")
+    box(ax, 0.3, 4.1, 2.7, 1.7, "USB-C PD power bank",
+        ["25 000 mAh · 92 Wh label", "≈ 84 Wh at 12 V", "65 W+, 100 W cable"], fc="#fdf6e8")
+    box(ax, 3.7, 4.1, 2.4, 1.7, "PD trigger → 12 V", ["+ rocker switch"], fc="#fdf6e8")
+    box(ax, 6.8, 4.1, 2.3, 1.7, "INA260 gauge",
+        ["I2C 0x40", "shunt on die", "Wh integration"], fc="#f2fff5")
+    box(ax, 3.7, 2.3, 2.4, 1.3, "Buck 12→5 V 8 A", ["5.1 V under load", "≈ 92 % efficient"], fc="#f2f7ff")
+    box(ax, 7.0, 1.95, 3.4, 2.05, "5 V rail — 11.5 W avg",
+        ["Pi 4 + HW encode + CV  6.0 W", "PTZ servos + lens  1.0 W",
+         "3× ULA1 anchors  3.0 W", "LED ring  1.5 W"], fc="#f2f7ff")
+    box(ax, 7.0, 0.1, 3.4, 1.6, "Runtime (84 Wh at 12 V)",
+        ["tracking + recording  6.2 h", "tracking only  6.5 h",
+         "idle  8.0 h"], fc="#f2fff5")
+    box(ax, 0.3, 0.6, 2.7, 1.4, "Wearable tag",
+        ["ULA1 on a 2 500 mAh", "USB bank, > 1 day"], fc="#fdf2f2")
+
+    arrow(ax, (3.0, 4.95), (3.7, 4.95), "USB-C PD")
+    arrow(ax, (6.1, 4.95), (6.8, 4.95), "12 V")
+    arrow(ax, (7.9, 4.1), (5.5, 3.5), "12 V sensed", lofs=(0.55, 0.2))
+    arrow(ax, (6.1, 2.95), (7.0, 2.95), "5 V")
+    arrow(ax, (8.7, 1.95), (8.7, 1.72), "", color=GREEN)
+    ax.text(1.65, 0.25, "independent — never wired to the tripod",
+            fontsize=8, color=GREY, ha="center")
+    ax.text(5.4, 1.1, "No mains. The 7 % cutoff\nstops and saves the recording\nbefore the pack dies.",
+            fontsize=8.5, color=GREY, ha="center")
     save(fig, "power-tree.png")
 
 

@@ -2,87 +2,134 @@
 
 ![Mechanical layout](images/mechanical-layout.png)
 
+SportCam is built around the **Arducam IMX477 PTZ camera with metal pan-tilt
+base** (B0167B12). That one part supplies the camera, the motorized zoom lens,
+and both motion axes, which is why there is no pan stage, no slip ring and no
+tilt tower in this design. Everything printed is an enclosure or a bracket.
+
+> **This is a deliberate trade.** An earlier revision used a continuous-rotation
+> pan stage: a lazy-susan bearing, a slip ring, a NEMA17 driving a printed 120T
+> ring pulley, and a 270° tilt tower. It panned forever and tilted past vertical,
+> and it took about a month to build. This one is a weekend, and it gives up
+> continuous pan. See [ranges of motion](#ranges-of-motion) for exactly what
+> that costs.
+
 ## Stack, bottom to top
 
-1. **Standard photo tripod** — any tripod with a 1/4-20 screw. The base
-   housing has a 1/4-20 brass insert epoxied into its floor.
-2. **Base housing** (3D-printed, ~120 × 120 × 60 mm): 12 V barrel jack, ESP32
-   DevKitC, TMC2209 on the carrier PCB, buck #1, and the WS2812B LED ring in a
-   diffused window around the circumference so status is visible from any
-   direction.
-3. **Pan stage**: a 3" lazy-susan bearing carries the rotating platform. A
-   printed 120-tooth GT2 ring pulley is bolted to the platform's underside —
-   its 60 mm bore encircles the slip-ring flange — and the NEMA17 (20-tooth
-   pulley) drives it by belt at 6:1. 1.8° motor × 16 microsteps × 6 =
-   **0.019°/step** — far finer than needed to keep a person centred.
-4. **Slip ring** (Adafruit-style 22 mm, 12 wires @ 2 A) mounted in the centre
-   of the pan axis. We parallel wires: 4 for +12 V, 4 for GND (≈ 8 A capacity),
-   4 spare. Its stationary flange screws to the base; the rotating shaft wires
-   feed the platform.
-5. **Rotating platform** (3D-printed or 3 mm aluminium plate): carries the
-   Raspberry Pi 5, buck #2 (Pi rail) and buck #3 (servo rail), the tilt tower,
-   and the two UWB anchor arms.
-6. **Tilt tower**: two printed uprights; the DS3225 270° servo sits in one,
-   its spline driving the camera cradle shaft; the far side rides in a 6701ZZ
-   ball bearing. Mount the camera so the lens axis passes through the tilt
-   axis (minimises parallax and servo load).
-7. **Camera cradle**: Arducam IMX219 + motorized zoom lens. The lens's zoom
-   and focus are driven by the lens's own little steppers via I2C — no extra
-   mechanics needed.
+1. **Any standard tripod** — the floor socket is a 3/8-16 insert with a
+   removable 1/4-20 reducer bushing, so photo tripods (1/4-20) and video
+   tripods (3/8-16) both screw straight on.
+2. **Battery tray** — a printed saddle that sandwiches between the tripod plate
+   and the enclosure, carrying the USB-C power bank under the whole assembly.
+   Hanging the heaviest single item lowest is what keeps the thing from being
+   tippy once the arms are on.
+3. **Enclosure** (3D-printed, Ø 135 × 66 mm): the Raspberry Pi 4 flat on
+   standoffs, the 5 V buck and PD trigger, the INA226 battery gauge, and the
+   WS2812B LED ring in a diffused window around the circumference so status is
+   visible from any direction. Nothing in here moves.
+4. **Lid** (3D-printed, 5 mm): structural. It carries the entire camera, so it
+   is the one printed part worth extra walls. The Arducam base bolts to it
+   through four radial slots; the camera ribbon and the servo lead drop through
+   the central opening to the Pi below.
+5. **Arducam metal pan-tilt base**: aluminium bracket, two digital servos, both
+   axes 0–180°. It arrives assembled with the camera already in it.
+6. **Camera and lens**: IMX477 12 MP sensor behind the motorized zoom lens.
+   Zoom and focus are driven by the lens's own steppers, commanded over the
+   same I2C bus as the two servos.
+7. **UWB anchor arms** — two printed arms bolted to the enclosure wall at ±Y,
+   each carrying a ULA1 module on a USB extension.
+   They are **static**: they no longer rotate with the camera, which changes the
+   tracking maths (see [04](04-tracking-system.md)).
+8. **A3 mast** — a ½-inch hardwood dowel, 246 mm, standing in a printed foot
+   on a third wall boss at −X, directly behind the lens. A printed cradle on
+   top carries the third ULA1 **250 mm above A1 and A2**, which is what gives
+   the tracker elevation. Pan never points the lens backwards, and at this
+   height the mast stays out of the shot even looking straight up.
+
+The whole head is about **30 cm across the arms and 28 cm tall** to the top of
+the mast — sized for a cramped room
+(see [constraints](01-system-overview.md#constraints)).
 
 ## Ranges of motion
 
 | Axis | Mechanism | Range | Notes |
 | --- | --- | --- | --- |
-| Pan | NEMA17 + TMC2209, GT2 6:1 belt | **360° continuous, unlimited turns** | Homing via hall sensor + magnet on the platform edge |
-| Tilt | DS3225 270° servo, direct drive | **−45° … +225°** (270°) | > 180° vertical requirement met; end stops enforced in software |
-| Zoom | Arducam motorized lens | ~8–20 mm EFL (≈ 2.5× optical) | Plus digital crop for further reach |
+| Pan | PTZ base servo, direct | **±80° soft (160° total)** | servo sweeps 180°; soft limits stop short of where the bracket fouls |
+| Tilt | PTZ base servo, direct | **−45° … +85°** | same; verify yours with `python -m sportcam.ptzcheck` |
+| Zoom | Arducam motorized lens | 96° → 33° horizontal (≈ 3.5× optical) | ≈ 2.8–10.6 mm EFL on this sensor |
 
-The 270° tilt is what buys ">180° on the vertical plane": the camera can look
-45° below the horizon, up through the zenith, and 45° below the horizon on the
-*other* side. Combined with continuous pan, every direction above (and
-slightly below) the tripod is reachable — and the pan axis can always take the
-"shorter way round" because it is unlimited.
+**What the 160° pan costs you.** There are no end stops on a continuous axis,
+so the old build could follow a subject through a full circle and always take
+the shorter way round. This one cannot. A subject crossing a soft limit is
+lost: the camera stops, holds, and falls back to idle after 5 s. Point the
+lens at the thing you are filming — a wall, a pitch, a mat — and this never
+comes up. Expect to care if people circulate around the tripod.
+
+**Tilt is enough for climbing.** A 15 m top-out filmed from 7 m back is about
+65° of elevation, comfortably inside +85°. At +85° and full wide zoom, the
+top edge of the frame looks about 27° past vertical. The A3 board sits about
+30° past vertical from the tilt axis, so it stays just out of shot; a taller
+mast would not, and then `TILT_MAX_DEG` wants lowering.
 
 ## Design rules that matter
 
-- **Nothing but power crosses the slip ring.** Video, control, and telemetry
-  are Wi-Fi. If you ever see stepper noise on the head's 5 V rail, add a
-  470 µF electrolytic + ferrite at buck #2's input.
-- **Mass balance**: keep the Pi and bucks diametrically opposite the tilt
-  tower so the platform's centre of mass sits on the pan axis; the stepper
-  then only fights inertia, not gravity.
-- **Cable service loop**: the tilt axis needs ~120 mm of slack in the camera
-  FFC, spiralled around the tilt shaft.
-- **UWB anchors** go at the ends of two 200 mm printed arms (400 mm baseline),
-  level with the camera, with their antennas clear of the metal plate — see
-  [04 — Tracking system](04-tracking-system.md) for why baseline length sets
-  bearing resolution.
-- Print structural parts in **PETG** (20 % infill, 4 walls); brackets touching
-  the servo in **PETG or ABS** (servo gets warm).
+- **The lid is the structure.** Print it at 5 walls, 40 % infill. Everything
+  above it is cantilevered off those four slots.
+- **Mass balance barely matters now** because the pan axis carries only the
+  camera, but the *tripod* still cares: keep the battery tray low and spread
+  the legs once the arms and the mast are on.
+- **Cable service loop**: the camera ribbon and the servo lead cross the pan
+  axis, so leave ~80 mm of slack coiled under the lid. Sweep both axes to their
+  limits by hand before you tidy the loop, not after.
+- **UWB anchors** go at the ends of two printed arms, antennas level with
+  *each other* and clear of the enclosure. The baseline sets bearing
+  resolution: 250 mm is the compact choice, about 9° filtered against 7° at
+  400 mm ([04](04-tracking-system.md#geometry)). If you have room, raise
+  `uwb_half_base` in `cad/config.scad` and `UWB_BASELINE_M` to match. A3's
+  height above them, `uwb_v_base` / `UWB_A3_UP_M`, sets elevation resolution
+  the same way; keep it at least 250 mm or the blind corner described in 04
+  grows.
+- **Nothing metal near an antenna.** That is why the mast is wood. An
+  aluminium tube under A3 detunes it and biases its range, and every
+  centimetre of r₃ bias is over two degrees of elevation at 10 m.
+- Print structural parts in **PETG** (20 % infill, 4 walls); the lid heavier.
 
 ## Printed / fabricated parts list
 
 | Part | Qty | Notes |
 | --- | --- | --- |
-| Base housing + LED diffuser ring | 1 | diffuser in white PETG, 2 walls, 0 % infill |
-| Rotating platform | 1 | or 3 mm aluminium plate |
-| 120T GT2 ring pulley | 1 | print at 0.16 mm layers; must be a ring (ID 60 mm) to clear the slip-ring flange |
-| Tilt tower uprights | 2 | one carries servo, one carries 6701ZZ bearing |
-| Camera cradle | 1 | fits Arducam lens barrel |
-| UWB anchor arms | 2 | 200 mm, dovetail into platform |
-| Wearable case + strap loop | 1 | fits ESP32-UWB board + 1000 mAh LiPo |
+| Enclosure + LED diffuser ring | 1 | diffuser in white PETG, 2 walls, 0 % infill |
+| Lid | 1 | 5 walls, 40 % — it carries the camera |
+| UWB anchor arms | 2 | ≈ 80 mm, bolt to the ±Y wall bosses; M3 inserts go in the bosses |
+| A3 mast foot | 1 | bolts to the −X wall boss; M3 insert in the socket for a pinch screw |
+| A3 mast cradle | 1 | caps the dowel, carries the third ULA1; M3 insert for a pinch screw |
+| ½-inch hardwood dowel | 1 | bought, cut to 246 mm — the mast itself |
+| Battery tray | 1 | sized in `cad/config.scad` to your power bank |
+| Wearable case + strap loop | 1 | fits a ULA1 module beside a small USB power bank |
+
+About 380 g of PETG and 35 hours of machine time in total, on any printer with
+a 170 × 150 × 80 mm build volume. Settings, orientation and materials are in
+[3D printing specifications](3d_printer/specifications.md).
+
+Deleted with the pan stage: the rotating platform, the 120T ring pulley, both
+tilt-tower uprights and the camera cradle.
+
+## Assembly
+
+The **[interactive assembly guide](setup/assembly/index.html)** walks the build in 3D
+(open `docs/setup/assembly/index.html`, or use the docs viewer's sidebar): enclosure
+electronics, lid and camera, anchor arms and the A3 mast, battery, cabling
+and bring-up, with
+the part being fitted highlighted and animated into place.
 
 ## CAD sources
 
 All printed parts have parametric OpenSCAD sources in [`cad/`](../cad/) —
 see **[Appendix A — CAD: printed parts](appendix-a-cad-parts.md)** for the
 render workflow, per-part print settings, and the measure-before-printing
-checklist. Compiled STLs with preview images are linked from the
-[BOM's printed-parts table](07-bill-of-materials.md#printed-parts).
-Precision features are only the pan-bearing bolt circle and the servo
-interface; use the DS3225's included metal horn screwed into the printed
-cradle rather than printing a spline.
+checklist.
 
-Prefer remixing proven designs? See
-[Appendix B — Open-source printed-part alternatives](appendix-b-open-source-parts.md).
+The one dimension worth measuring twice is the **Arducam base's bolt pattern**.
+Arducam publishes no drawing and it has changed between revisions, so the lid
+is cut with slots spanning 30–72 mm rather than fixed holes. Mark through the
+slots and bolt it down.

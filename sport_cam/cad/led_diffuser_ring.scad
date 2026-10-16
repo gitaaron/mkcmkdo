@@ -1,8 +1,7 @@
-// Translucent diffuser band that closes the base housing's LED window.
+// Translucent diffuser band that closes the enclosure's LED window.
 // Print in white/natural PETG, 2 perimeters, 0% infill, no top/bottom.
 include <config.scad>
 
-led_window_h = 12;             // must match base_housing.scad
 lip = 2;
 
 module led_diffuser_ring() {

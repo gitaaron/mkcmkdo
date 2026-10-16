@@ -87,6 +87,7 @@ web/src/
   components/
     VideoView.vue        WHEP video with MJPEG <img> fallback, full-bleed
     StatusRing.vue       top-right circular indicator, colours = LED colours
+  lib/chime.ts           recording start/stop chimes (Web Audio)
     ControlBar.vue       bottom buttons, swap with state
     LibraryView.vue      recordings list + <video> player (range-seekable)
   lib/api.ts             call(name, data) + typed wrappers
@@ -97,9 +98,16 @@ Behaviour (matches the mock in [01 — System overview](01-system-overview.md)):
 
 - **Opening the app starts the stream** — `VideoView` mounts immediately;
   no play button.
-- Status ring top-right: grey `off` / blue `idle` / green `tracking` /
+- Status ring top-right: grey `off` / blue `idle` / green `tracking`
+  (blinking fast, labelled "Acquiring subject…", until the camera locks on) /
   pulsing red `recording`; it also doubles as the connection indicator
-  (hollow while WS is down).
+  (hollow while WS is down). If acquiring stalls, a pill says "Can't see you
+  — step into view, facing the camera".
+- **Chimes** (`lib/chime.ts`): a rising two-note chime when recording starts
+  and a falling one when it stops, synthesised with Web Audio. Browsers only
+  allow sound after a tap, so the first tap on the page arms it. A background
+  tab on a computer still chimes; a phone browser suspends background pages,
+  so for chimes with the phone in your bag use the native app ([09](09-direct-connection-and-app.md)).
 - Bottom buttons by state:
   - `idle` → **Turn off** · **Start tracking**
   - `tracking` → **Turn off** · **Start recording**

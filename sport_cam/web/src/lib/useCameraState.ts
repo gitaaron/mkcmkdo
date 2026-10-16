@@ -1,5 +1,6 @@
 import { reactive, readonly } from "vue";
-import { api, type RecordingMeta, type StateSnapshot } from "./api.js";
+import { api, type CamState, type RecordingMeta, type StateSnapshot } from "./api.js";
+import { chime } from "./chime.js";
 
 export interface UploadProgress {
   name: string;
@@ -27,6 +28,16 @@ const store = reactive<CameraStore>({
 });
 
 let started = false;
+let lastState: CamState | null = null;   // null until the first snapshot
+
+/** Chime on recording start and stop — never on the snapshot that arrives at connect. */
+function announce(next: CamState): void {
+  if (lastState !== null && lastState !== next) {
+    if (next === "recording") chime("start");
+    else if (lastState === "recording") chime("stop");
+  }
+  lastState = next;
+}
 
 function connect(): void {
   const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -38,6 +49,7 @@ function connect(): void {
     try {
       const msg = JSON.parse(ev.data);
       if (msg.type === "state") {
+        announce(msg.state);
         Object.assign(store, {
           state: msg.state,
           telemetry: msg.telemetry ?? {},
@@ -62,6 +74,7 @@ function connect(): void {
   };
   ws.onclose = () => {
     store.connected = false;
+    lastState = null;            // a reconnect's first snapshot is not a change
     setTimeout(connect, 1500);
   };
 }

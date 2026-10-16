@@ -45,6 +45,8 @@ export function startSimulator(store: Store, frames: FrameBus, recordings: Recor
 
   let i = 0;
   let pan = 0;
+  let panDir = 1;
+  let wh = 0;
   setInterval(() => {
     if (store.get().state === "off") return;
     if (jpegs.length) frames.push(jpegs[i++ % jpegs.length]!);
@@ -53,14 +55,25 @@ export function startSimulator(store: Store, frames: FrameBus, recordings: Recor
   setInterval(() => {
     const s = store.get().state;
     if (s === "off") return;
-    if (s === "tracking" || s === "recording") pan = (pan + 3.6) % 360;
+    // The PTZ base sweeps between its soft limits and turns round; it has
+    // no continuous rotation, so this bounces rather than wrapping at 360.
+    if (s === "tracking" || s === "recording") {
+      pan += 3.6 * panDir;
+      if (pan >= 80 || pan <= -80) panDir = -panDir;
+    }
+    const watts = s === "idle" ? 7.5 : 14.5;
+    wh += watts / 3600;
+    const frac = Math.max(0, 1 - wh / 92);
     store.patch({
       telemetry: {
         pan: Math.round(pan * 10) / 10,
         tilt: 12,
-        zoomMm: 11.5,
+        zoomMm: 7.4,
         dist: 4.2 + Math.sin(Date.now() / 3000),
-        battery: 0.82,
+        battery: Math.round(frac * 1000) / 1000,
+        batteryWatts: watts,
+        batteryMinutes: Math.round((92 * frac) / watts * 60),
+        batteryLevel: frac <= 0.07 ? "critical" : frac <= 0.2 ? "low" : "ok",
       },
     });
   }, 1000);

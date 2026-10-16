@@ -14,20 +14,27 @@ const color = computed(() =>
   })[props.cam.state],
 );
 
+// Tag switched on, camera still turning to find the subject.
+const acquiring = computed(
+  () => props.cam.state === "tracking" && props.cam.telemetry?.phase === "acquiring",
+);
+
 const label = computed(() =>
-  ({
-    off: "Off",
-    idle: "On — not tracking",
-    tracking: "Tracking",
-    recording: "Recording",
-  })[props.cam.state],
+  acquiring.value
+    ? "Acquiring subject…"
+    : ({
+        off: "Off",
+        idle: "On — not tracking",
+        tracking: "Tracking",
+        recording: "Recording",
+      })[props.cam.state],
 );
 </script>
 
 <template>
   <div
     class="ring"
-    :class="{ pulsing: cam.state === 'recording', hollow: !cam.connected }"
+    :class="{ pulsing: cam.state === 'recording', acquiring, hollow: !cam.connected }"
     :style="{ '--c': color }"
     :title="label"
     role="status"
@@ -46,6 +53,10 @@ const label = computed(() =>
 }
 .ring.pulsing {
   animation: pulse 1.2s ease-in-out infinite;
+}
+.ring.acquiring {
+  /* the LED ring chases round while acquiring; a quick blink stands in */
+  animation: pulse 0.5s ease-in-out infinite;
 }
 .ring.hollow {
   background: transparent;

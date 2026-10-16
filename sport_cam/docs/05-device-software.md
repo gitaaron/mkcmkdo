@@ -1,30 +1,58 @@
 # 05 — Device software
 
-Three programs run on the hardware. All speak the same WebSocket protocol to
-the server (`/ws/device`), documented in [06 — Server & app](06-server-and-app.md).
+Two programs run on the hardware now — the camera and the wearable. The base
+controller is gone: with no pan stepper there is nothing for a second
+microcontroller to do, so pan, tilt, zoom, focus and the status ring all moved
+onto the Pi. Both programs speak the same WebSocket protocol to the server
+(`/ws/device`), documented in [06 — Server & app](06-server-and-app.md).
 
-## 1. Head service — Raspberry Pi 5 (`device/`)
+## 1. Camera service — Raspberry Pi 4 (`device/`)
 
 Python 3.11+, systemd unit `sportcam-head.service`. Modules:
 
 | Module | Job |
 | --- | --- |
 | `main.py` | asyncio supervisor: WS client to server, state handling, control/frame/telemetry loops |
-| `camera.py` | Picamera2: 720p preview (JPEG + person-detect) and 1080p H.264 recording to `/home/pi/recordings` |
-| `lens.py` | Arducam zoom/focus over I2C (0x0C), homing, EFL → step conversion |
-| `tilt.py` | pigpio hardware PWM on GPIO18, soft end-stops −45…+225° |
-| `uwb.py` | reads both anchor serials, DS-TWR maths + Kalman → (θ, d) at 20 Hz |
-| `tracker.py` | PIDs from [04](04-tracking-system.md): pan velocity out, tilt/zoom applied directly |
-| `uploader.py` | background recording upload → backend, with progress + retry ([08](08-recordings-and-cloud.md)) |
+| `camera.py` | Picamera2: 720p preview (JPEG + person-detect) and 1080p **hardware** H.264 recording to `/home/pi/recordings` |
+| `ptz.py` | the whole PTZ controller at I2C 0x0C: pan, tilt, zoom, focus, soft limits, homing |
+| `ptzcheck.py` | bench tool — sweeps both axes to their limits so you can set `config` before filming |
+| `led.py` | WS2812B status ring over SPI, so nothing needs to run as root |
+| `power.py` | battery gauge (INA260 or INA226, or none): watt-hour integration, runtime estimate, low/critical levels |
+| `storage.py` | SD-card space in minutes of recording left, with the same low/critical treatment |
+| `uwb.py` | parses ranges from the radio (ULA1 frames, or our own two-serial sketch), bearing maths + Kalman → (θ, d) |
+| `tracker.py` | loops from [04](04-tracking-system.md): pan and tilt positions from ranging, CV bias trims, vision framing (zoom to fill 65 % of the frame), focus from distance, and the lock-on test |
+| `session.py` | tag-driven sessions: tag on → tracking (acquiring) → recording on lock-on; tag off → idle ([01](01-system-overview.md#concept-of-operations)) |
+| `focuscal.py` | `python -m sportcam.focuscal <metres>` — sweeps the focus motor at five focal lengths and prints a `FOCUS_GRID` |
+| `rangecal.py` | `python -m sportcam.rangecal <metres>` — with the tag taped on the boresight, measures each anchor's range bias and noise and prints a `RANGE_BIAS_M` |
+| `uploader.py` | background recording upload → backend, with progress, retry, and a boot-time drain of anything stranded ([08](08-recordings-and-cloud.md)) |
 | `wifi_portal.py` | hotspot + captive setup page when offline, for gym Wi-Fi ([08](08-recordings-and-cloud.md)) |
 | `config.py` | all tunables (pins, PID gains, calibration biases, `UPLOAD_API_BASE`) |
 
 Install on the Pi:
 
 ```bash
-sudo apt install -y python3-picamera2 python3-opencv pigpiod
-pip install -r device/requirements.txt          # websockets, aiohttp, pyserial, simple-pid
-sudo systemctl enable pigpiod sportcam-head sportcam-wifi
+sudo apt install -y python3-picamera2 python3-opencv
+pip install -r device/requirements.txt    # + smbus2 and neopixel-spi
+sudo raspi-config            # Interface Options → enable I2C (PTZ, gauge) and SPI (ring)
+sudo systemctl enable sportcam-head sportcam-wifi
+```
+
+The service runs as an ordinary user. Nothing here needs root, which is why
+the LED ring goes out over SPI rather than the PWM/DMA driver.
+
+Before the first tracking run, set the soft limits and check the servo
+directions:
+
+```bash
+cd device && python -m sportcam.ptzcheck
+```
+
+Then, with the tag taped 5.00 m out on the boresight, measure each anchor's
+range bias. With the 250 mm mast this is not optional: a few centimetres on
+A3 is ten degrees of tilt.
+
+```bash
+cd device && python -m sportcam.rangecal 5
 ```
 
 After a recording stops, `main.py` hands the finished MP4 to `uploader.py`
@@ -43,41 +71,119 @@ Streaming choices:
   directly from the Pi; the server only brokers the URL. ~150 ms latency,
   no transcode. The Vue player tries WHEP first and falls back to MJPEG.
 
-## 2. Base controller — ESP32 (`firmware/base_controller/`)
+### Motion, in one place
 
-Arduino (arduino-esp32 core). Responsibilities: Wi-Fi + WS client, pan
-stepper, LED ring, hall-sensor homing.
+`ptz.py` is the only module that moves anything. It exposes angles in degrees
+from centre and hides the controller's raw 0–180 servo units, the soft limits,
+and the open-loop zoom calibration:
 
-- **Stepper**: `FastAccelStepper` driving TMC2209 STEP/DIR at 16 microsteps;
-  accepts `{"type":"panVel","dps":-42.0}` messages (degrees/sec, slew- and
-  accel-limited on-board so a dropped packet can't cause a lurch; auto-stops
-  if no command for 500 ms).
-- **LED ring**: FastLED, 16 × WS2812B. `idle`=solid blue, `tracking`=solid
-  green, `recording`=1 Hz breathing red, `error`=flash orange.
-- **Homing**: on boot, rotate until the hall sensor fires → that's pan 0°.
-  Reports absolute pan angle back to the server at 5 Hz (dead-reckoned from
-  step count; re-zeroed every time the magnet passes).
+```python
+ptz.set_pan(-12.5)      # degrees from the anchor bar's normal
+ptz.set_tilt(18.0)      # degrees above level, at the lens
+ptz.set_focus(9.4)      # subject distance in metres; looked up in FOCUS_GRID
+ptz.set_zoom_mm(7.4)    # interpolated through config.ZOOM_CURVE, rate-limited
+ptz.park()              # centre both axes
+```
 
-Build: Arduino IDE or `arduino-cli compile --fqbn esp32:esp32:esp32`
-with libraries `FastAccelStepper`, `FastLED`, `ArduinoWebsockets`, `ArduinoJson`.
+The tracker calls `set_pan` with an absolute target each tick, slew-limited to
+`PAN_MAX_DPS` so the servo glides between frames instead of snapping. There is
+no `panVel` message any longer, on the wire or anywhere else.
 
-## 3. Wearable tag — ESP32-UWB (`wearable/tag_firmware/`)
+### Vision, and why it runs slowly
 
-Arduino + `arduino-dw1000` (Makerfabs fork for their board). DS-TWR responder
-loop, button handling (short = re-acquire, long = toggle record — broadcast
-as a 500 ms BLE advertisement `SPORTCAM-BTN:<kind>`, which the Pi head
-service picks up with a BLE scan and relays as `tagButton`), battery ADC
-reporting, deep sleep after 10 min without any anchor poll.
+With the third anchor fitted, ranging gives both angles and the person
+detector does three jobs: it cancels a slow bias on pan and on tilt, it
+frames the shot (zooming until the person fills 65 % of the frame, and out
+fast if they near an edge), and it verifies lock-on before a tag-started
+session records. On a two-anchor build
+(`UWB_ANCHORS = 2`) it is the only source of tilt, because a horizontal
+baseline carries no elevation information. None of it needs to be fast.
+
+Two things make it cheap enough for a Pi 4:
+
+- **It runs at 3 fps**, dropping to 0.5 when idle. Tilt only has to keep up
+  with roughly 1.7°/s of subject motion.
+- **It searches a vertical strip, not the frame.** The tracker turns the known
+  bearing into a pixel column and hands it to `Camera.set_search_column()`,
+  so the detector looks at about 40 % of frame width.
+
+`Camera.person_bbox()` returns `(bbox, fresh)`. The control loop runs at 20 Hz
+and vision at 3, so acting on the cached box every tick would apply one
+measurement about seven times over and make the tilt axis hunt. The tracker
+acts only when `fresh` is true. `device/tests/test_tracker.py` covers that,
+the strip hint, the slew limits, tilt from the third anchor, the sign of every
+vertical correction, and vision framing (fill target, edge guard, stale
+relax). `device/tests/test_session.py` covers lock-on and the tag-driven
+session flow, and `device/tests/test_ptz.py` the focus lookup. All run on any
+machine.
+
+When ranging drops out the camera **holds** rather than letting vision chase
+whoever is in frame. The detector cannot tell your subject from a bystander;
+the tag can, and that is the reason the tag exists.
+
+### Status ring
+
+16 × WS2812B over SPI0 MOSI: `idle` solid blue, `tracking` while acquiring a
+green light chasing round once a second, `tracking` once locked on solid green,
+`recording` 1 Hz breathing red, lost tag 2 Hz flash, low battery dims the ring
+and blinks orange once a second over whatever colour the state is.
+
+### Where ranges come from
+
+`config.UWB_PROTOCOL` picks the radio stack, and the two differ in shape:
+
+- **`ula1`** — Haorutech ULA1. The tag polls each anchor and broadcasts one
+  RangeData frame; a single anchor plugged into the Pi forwards it as
+  `mc <mask> <r0> <r1> <r2> <r3> …`, ranges in **hexadecimal millimetres**
+  behind a validity mask. RANGE0–2 are A1–A3. They share a timestamp, which
+  is what the angle maths assumes. One USB data connection, not three. A
+  frame missing only A3 still gives a bearing; it just carries no elevation.
+
+  **Flash the `RTLS_Tag` and `RTLS_Anchor` sketches, not `RangingTag` and
+  `RangingAnchor`.** The vendor ships both pairs and they behave differently:
+  the Ranging pair completes one tag-to-anchor exchange and reports that
+  single distance, while the RTLS pair ranges to every anchor in turn and then
+  broadcasts the collected RangeData. Only the second produces the frame this
+  parser reads, and only the second lets one anchor report for all three.
+  Load the wrong pair and you will see a stream carrying one range where
+  three are expected — at which point either reflash, or switch to
+  `dual-serial`.
+- **`dual-serial`** — one port per anchor running our own DS-TWR sketch,
+  printing `R,<tag>,<range_m>`. Vendor-agnostic, but the ranges are
+  independent samples.
+
+`device/tests/test_uwb.py` parses the manual's own worked example and checks
+the mask, the hex scaling, the bearing geometry, and the elevation solve —
+exact to 0.01° across the whole envelope with A3's backward offset in. It
+runs anywhere.
+
+## 2. Wearable tag — ULA1 (`wearable/`)
+
+The tag is a ULA1 module running the vendor's ranging firmware, powered by a
+small USB bank. It initiates ranging against each anchor and broadcasts the
+results.
+
+Our previous sketch (`wearable/tag_firmware/`) targeted a Makerfabs
+ESP32-UWB and added a pair/record button broadcast over BLE as
+`SPORTCAM-BTN:<kind>`, which the camera relayed as `tagButton`. The ULA1 is
+also an ESP32 under Arduino, so that code can be ported, but the pin map must
+come from the vendor's schematic first. Until then, recording is started from
+the phone.
 
 ## Message protocol (device ↔ server)
 
 ```jsonc
 // device → server
-{ "type": "hello", "device": "head" | "base" | "sim", "caps": ["video","tilt","zoom","uwb"] }
-{ "type": "telemetry", "pan": 123.4, "tilt": 10.0, "zoomMm": 12.5, "dist": 4.2, "battery": 0.82 }
+{ "type": "hello", "device": "head" | "sim", "caps": ["video","pan","tilt","zoom","uwb","led","battery"] }
+{ "type": "telemetry", "pan": -12.5, "tilt": 10.0, "zoomMm": 7.4, "dist": 4.2,
+  "phase": "acquiring" | "acquired" | null, "tagPresent": true,
+  "battery": 0.82, "batteryWatts": 14.6, "batteryMinutes": 191, "batteryLevel": "ok" }
+{ "type": "warning", "code": "battery-low", ... }
 { "type": "frame" }                    // followed by one binary WS message (JPEG)
 { "type": "tagButton", "kind": "short" | "long" }
 { "type": "lost" }                     // tag gone past the timeout → server drops to idle
+{ "type": "stateReport", "state": "recording" }  // the head changed state itself
+                                       // (tag on/off, lock-on, low battery); the server adopts it
 { "type": "uploadProgress", "name": "rec_….mp4", "sent": 12345, "total": 99999 }
 
 // server → app clients
@@ -87,10 +193,16 @@ reporting, deep sleep after 10 min without any anchor poll.
 
 // server → device
 { "type": "state", "state": "idle" | "tracking" | "recording" | "off" }
-{ "type": "panVel", "dps": -42.0 }     // server relays head → base
+{ "type": "resetBattery" }             // zero the fuel gauge on a fresh pack
 { "type": "shutdown" }
 ```
 
 Devices are dumb about state: they render/act on whatever `state` the server
-last sent, and the server persists the state machine — so a rebooting device
-rejoins in the correct mode.
+last sent. The exception is a change the head makes itself — the tag
+switched on or off, lock-on, low battery — which it reports as `stateReport`
+and the server adopts. On (re)connecting, the head reports its state first
+and the server takes it, rather than pushing its own: a recording the tag
+started at the gym must survive the home server coming back into reach.
+
+`pan` is degrees from centre (negative is left), not an absolute 0–360
+heading, because the axis no longer rotates.

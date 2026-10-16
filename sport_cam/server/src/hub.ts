@@ -5,7 +5,7 @@ import type { Store, Telemetry } from "./state.js";
 import type { FrameBus } from "./stream.js";
 import type { Recordings, RecordingMeta } from "./recordings.js";
 
-type DeviceKind = "head" | "base" | "sim";
+type DeviceKind = "head" | "sim";
 
 interface DeviceConn {
   ws: WebSocket;
@@ -16,7 +16,7 @@ interface DeviceConn {
 /**
  * WebSocket hub.
  *   /ws         app clients   — receive { type:"state", ... } broadcasts
- *   /ws/device  head/base/sim — protocol in docs/05-device-software.md
+ *   /ws/device  head/sim — protocol in docs/05-device-software.md
  *
  * In a Firebase migration the app side of this becomes a Firestore
  * `onSnapshot` listener; the device side stays a plain socket server.
@@ -48,7 +48,10 @@ export class Hub {
         this.deviceConns.delete(conn);
         this.updatePresence();
       });
-      ws.send(JSON.stringify({ type: "state", state: this.store.get().state }));
+      // No state push on connect: the head owns its state (the tag can start
+      // a session with no server in reach) and reports it right after its
+      // hello. Pushing ours first would stop a recording every time the
+      // server restarted or the Wi-Fi blinked.
     });
   }
 
@@ -93,9 +96,14 @@ export class Hub {
       case "telemetry":
         this.store.patch({ telemetry: msg as Telemetry });
         break;
-      case "panVel":
-        // relay head → base
-        this.sendToDevices(msg, "base");
+      case "stateReport":
+        // The head changed state on its own — the tag switched on or off, a
+        // lock-on started recording, the battery ran low. Adopt it, so the
+        // apps follow and the next server → device message does not undo it.
+        if (["off", "idle", "tracking", "recording"].includes(msg.state) &&
+            msg.state !== this.store.get().state) {
+          this.store.patch({ state: msg.state });
+        }
         break;
       case "tagButton":
         // long press on the wearable toggles recording

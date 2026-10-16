@@ -3,11 +3,21 @@ import { EventEmitter } from "node:events";
 export type CamState = "off" | "idle" | "tracking" | "recording";
 
 export interface Telemetry {
-  pan?: number;
+  pan?: number;          // degrees from centre, +/- PAN_MAX_DEG (not 0-360)
   tilt?: number;
   zoomMm?: number;
   dist?: number;
-  battery?: number;
+  phase?: "acquiring" | "acquired" | null;  // while tracking: found the subject yet?
+  acquireStalled?: boolean;  // acquiring a long time: vision cannot see the subject
+  tagPresent?: boolean;      // the wearable is switched on and ranging
+  battery?: number;          // fraction of the pack remaining, 0-1
+  batteryWatts?: number;     // present draw
+  batteryMinutes?: number;   // estimated runtime left
+  batteryLevel?: "ok" | "low" | "critical";
+  storageFreeGb?: number;      // space left on the SD card
+  storageMinutes?: number;     // recording time that space represents
+  storageLevel?: "ok" | "low" | "critical";
+  pendingUploads?: number;     // clips still on the card awaiting upload
 }
 
 export interface StateSnapshot {

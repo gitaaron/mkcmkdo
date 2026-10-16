@@ -5,6 +5,8 @@ export interface Telemetry {
   tilt?: number;
   zoomMm?: number;
   dist?: number;
+  phase?: "acquiring" | "acquired" | null;
+  acquireStalled?: boolean;
   battery?: number;
 }
 

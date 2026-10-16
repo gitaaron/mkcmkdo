@@ -1,0 +1,113 @@
+"""WS2812B status ring, driven by the Pi over SPI.
+
+This used to live on the base ESP32. With the pan stepper gone there is no
+base controller any more, so the ring is wired straight to the Pi.
+
+Data goes out of SPI0 MOSI (GPIO10) through a 74AHCT125, which shifts 3.3 V
+logic up to 5 V. Enable SPI with `raspi-config` → Interface Options → SPI.
+
+A Pi 4 could instead use the classic `rpi_ws281x` PWM+DMA driver on GPIO18,
+which this build deliberately avoids: it needs the whole service to run as
+root. SPI does not, and it keeps the module working unchanged if the camera
+ever moves to a Pi 5, whose RP1 I/O chip cannot run the PWM+DMA driver at
+all.
+"""
+from __future__ import annotations
+
+import asyncio
+import math
+import time
+
+try:
+    import board
+    import neopixel_spi
+except (ImportError, NotImplementedError):   # dev machine / no SPI
+    board = None
+    neopixel_spi = None
+
+from . import config
+
+# state → (r, g, b), matching the app's status ring and docs/01
+COLOURS = {
+    "off":       (0, 0, 0),
+    "idle":      (0x2F, 0x6F, 0xED),    # solid blue
+    "tracking":  (0x1F, 0x9D, 0x55),    # solid green
+    "recording": (0xD6, 0x45, 0x41),    # breathing red
+    "error":     (0xF2, 0xA9, 0x3B),    # flashing orange
+}
+
+
+class StatusRing:
+    def __init__(self) -> None:
+        self._pixels = None
+        self.state = "idle"
+        self.lost = False          # tracking but no ranges → flash
+        self.warn = False          # battery or storage low: dim + orange blink
+        self.acquiring = False     # tracking, not yet locked on → green chase
+        if neopixel_spi is not None:
+            try:
+                self._pixels = neopixel_spi.NeoPixel_SPI(
+                    board.SPI(), config.LED_COUNT, auto_write=False,
+                    brightness=config.LED_BRIGHTNESS)
+            except Exception as exc:                 # noqa: BLE001 — never fatal
+                print(f"[led] disabled: {exc}")
+
+    def set_state(self, state: str) -> None:
+        self.state = state
+
+    async def run(self) -> None:
+        """Render at 30 Hz forever. Cheap; the ring is 16 pixels."""
+        while True:
+            self._render()
+            await asyncio.sleep(1 / 30)
+
+    def _render(self) -> None:
+        if not self._pixels:
+            return
+        r, g, b = COLOURS.get(self.state, COLOURS["idle"])
+        t = time.monotonic()
+        if self.warn:
+            # A warning never hides the state: it dims the ring and slips a
+            # short orange blink in once a second. Used for both low battery
+            # and low card space, because the response is the same — finish
+            # up soon.
+
+            if (t % 1.0) < 0.12:
+                r, g, b = COLOURS["error"]
+            self._pixels.brightness = config.LED_BRIGHTNESS_LOW_BATT
+        else:
+            self._pixels.brightness = config.LED_BRIGHTNESS
+        if self.state == "recording":
+            k = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(2 * math.pi * t))   # 1 Hz breath
+        elif self.lost and self.state in ("tracking", "recording"):
+            k = 1.0 if (t % 0.5) < 0.25 else 0.15                        # 2 Hz flash
+        else:
+            k = 1.0
+        colour = (int(r * k), int(g * k), int(b * k))
+        if (self.acquiring and self.state == "tracking" and not self.lost):
+            for i, c in enumerate(chase(colour, t, config.LED_COUNT)):
+                self._pixels[i] = c
+        else:
+            self._pixels.fill(colour)
+        self._pixels.show()
+
+    def park(self) -> None:
+        if self._pixels:
+            self._pixels.fill((0, 0, 0))
+            self._pixels.show()
+
+
+def chase(colour: tuple[int, int, int], t: float, n: int) -> list[tuple[int, int, int]]:
+    """"Acquiring": a bright head with a fading tail, once round per second.
+
+    Clearly different from steady green (locked, tracking) and from the 2 Hz
+    flash (lost), so you can tell from the far side of the room whether the
+    camera has found you yet.
+    """
+    head = (t % 1.0) * n
+    out = []
+    for i in range(n):
+        behind = (head - i) % n            # pixels behind the head, 0 … n
+        k = max(0.08, 1.0 - behind / 5.0)  # 5-pixel tail over a dim base
+        out.append((int(colour[0] * k), int(colour[1] * k), int(colour[2] * k)))
+    return out

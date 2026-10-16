@@ -19,6 +19,7 @@ from typing import Awaitable, Callable
 import aiohttp
 
 from . import config
+from .storage import pending_files
 
 ProgressFn = Callable[[dict], Awaitable[None]]
 
@@ -91,4 +92,31 @@ async def upload_with_retry(path: str, duration_s: float | None, progress: Progr
             print(f"[upload] attempt {attempt + 1} failed: {err}; retry in {delay:.0f}s")
             await asyncio.sleep(delay)
             delay = min(delay * 2, 300)
-    print(f"[upload] giving up on {path} — kept locally")
+    print(f"[upload] giving up on {path} — kept locally, will retry later")
+
+
+async def drain_pending(progress: ProgressFn, exclude: str | None = None) -> int:
+    """Upload everything still sitting on the card, oldest first.
+
+    Called once at start-up and then on `UPLOAD_RETRY_INTERVAL_S`. Anything
+    here either failed its retry ladder or was interrupted by a restart, and
+    nothing else would ever pick it up again — that is how a card fills.
+
+    Oldest first matters: if space is tight, clearing the oldest clip frees
+    the card soonest for whatever is being filmed now.
+    """
+    files = [p for p in pending_files() if p != exclude]
+    if not files:
+        return 0
+    print(f"[upload] {len(files)} recording(s) pending")
+    done = 0
+    for path in files:
+        if not os.path.exists(path):          # uploaded by another pass
+            continue
+        try:
+            await upload_recording(path, None, progress)
+            done += 1
+        except Exception as err:              # noqa: BLE001 — try the rest
+            print(f"[upload] still cannot send {os.path.basename(path)}: {err}")
+            break                             # backend is down; stop hammering
+    return done

@@ -26,6 +26,10 @@ function openFromToast(): void {
       ▶<span v-if="cam.recordings.length" class="badge">{{ cam.recordings.length }}</span>
     </button>
 
+    <div v-if="cam.state === 'tracking' && cam.telemetry.acquireStalled" class="hint" role="status">
+      Can't see you — step into view, facing the camera
+    </div>
+
     <div v-if="cam.upload" class="upload">
       Uploading… {{ Math.round((cam.upload.sent / cam.upload.total) * 100) }}%
     </div>
@@ -72,6 +76,19 @@ function openFromToast(): void {
   border-radius: 9px;
   font-size: 10.5px;
   padding: 1px 5px;
+}
+.hint {
+  position: absolute;
+  top: calc(60px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(19, 28, 44, 0.9);
+  border: 1px solid var(--tracking);
+  color: var(--ink);
+  font-size: 14px;
+  white-space: nowrap;
 }
 .upload,
 .toast {

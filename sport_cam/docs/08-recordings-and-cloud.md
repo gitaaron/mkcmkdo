@@ -12,6 +12,10 @@ stop recording
              │   (tracking + live streaming continue; app shows progress)
              └─► backend confirms byte count
                   └─► Pi deletes its local copy   (SD card = buffer, not store)
+
+The delete happens only after `finalizeRecording` returns, which is the
+backend confirming the byte count. A failed or unconfirmed upload keeps the
+file, which is why the card needs both a retry sweep and a space guard.
                        └─► app library streams it back, with seeking
 ```
 
@@ -120,6 +124,8 @@ every future session.
 | Situation | What happens |
 | --- | --- |
 | Wi-Fi drops mid-upload | `upload_with_retry` retries with exponential backoff (5 s → 5 min, 8 attempts); the file stays on the Pi until confirmed |
+| Backend unreachable for the whole session | the ladder above gives up after ~15 min and keeps the file. `upload_loop` then re-attempts everything still on the card at start-up and every 15 min thereafter, oldest first, so the backlog drains as soon as a backend appears |
+| Card nearly full | at 20 min of recording space left the ring blinks orange and the app warns; at 5 min the camera refuses to start a new recording and stops a running one cleanly. See [03](03-electronics.md#the-sd-card) |
 | Upload never succeeds | File is kept locally; it uploads on the next successful attempt after reconnect |
 | Backend unreachable at record time | Recording is unaffected — recording is local; only the upload needs the network |
 | Partial upload | Server writes to a `.part` temp file and renames on completion, so a half-file never appears in the library |

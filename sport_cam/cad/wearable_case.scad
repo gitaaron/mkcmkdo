@@ -1,8 +1,9 @@
-// Wearable pod: ESP32-UWB board + 1000 mAh LiPo + TP4056.
+// Wearable pod: ULA1 tag module beside the small USB bank it plugs into
+// (sized by bank_tag_* and uwb_* in config.scad).
 // Renders body + friction-fit lid side by side. Strap bars fit a 26 mm
-// elastic armband. USB-C charge slot on one end. Rounded, no sharp corners
-// (worn against an arm). Add a 3 mm foam pad under the board — keeps the
-// ceramic antenna off the skin.
+// elastic armband. USB-C slot on one end, for charging the bank in place.
+// Rounded, no sharp corners (worn against an arm). Add a 3 mm foam pad under
+// the board — keeps the antenna off the skin.
 include <config.scad>
 
 r = 4;                                    // corner radius
