@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SportCam assembly guide</title>
+<meta name="description" content="Interactive step-by-step guide for building the SportCam camera-only tracking tripod, with 3D renderings of every assembly step." />
+<link rel="stylesheet" href="guide.css" />
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script src="models.js"></script>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📷 SportCam — assembly guide</h1>
+    <div class="sub">Camera-only person-tracking tripod head · drag the model to inspect each step</div>
+  </div>
+  <select id="stepSelect" class="step-select" aria-label="Jump to step"></select>
+  <div class="spacer"></div>
+  <div class="progress-label" id="progressLabel">0 / 0 done</div>
+  <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+</header>
+
+<div class="layout">
+  <nav class="steps" id="stepNav" aria-label="Steps"></nav>
+
+  <main id="main">
+    <div class="step-head">
+      <h2 id="stepTitle">…</h2>
+      <span class="chip" id="stepPhase"></span>
+      <span class="chip" id="stepTime"></span>
+    </div>
+
+    <div class="cols">
+      <section class="viewer">
+        <div class="stage" id="stage">
+          <div class="stage-msg" id="stageMsg">Loading 3D viewer…</div>
+          <div class="hint" id="stageHint">drag to orbit · scroll to zoom · right-drag to pan</div>
+        </div>
+        <div class="viewer-bar">
+          <button id="btnReplay" title="Replay the insertion animation (R)">↻ Replay</button>
+          <label class="slider"><span>exploded</span>
+            <input type="range" id="explode" min="0" max="1000" value="1000" aria-label="Exploded ↔ assembled" />
+            <span>assembled</span></label>
+        </div>
+        <div class="viewer-bar views">
+          <span class="muted">view</span>
+          <button data-view="iso">Iso</button>
+          <button data-view="front">Front</button>
+          <button data-view="side">Side</button>
+          <button data-view="top">Top</button>
+          <button data-view="under">Under</button>
+          <span class="spacer"></span>
+          <button id="btnXray" title="See through already-fitted parts (X)">X-ray</button>
+          <button id="btnLabels" class="on" title="Toggle callouts (L)">Labels</button>
+          <button id="btnDemo" hidden title="Animate pan and tilt">▶ Motion demo</button>
+        </div>
+        <div class="legend">
+          <span><i class="swatch" style="background:#2f6fed"></i> fitted in this step</span>
+          <span><i class="swatch" style="background:#c3ccdb"></i> already assembled</span>
+          <span><i class="swatch" style="background:#1f9d55"></i> insertion direction / callout</span>
+        </div>
+      </section>
+
+      <section class="detail" id="detail"></section>
+    </div>
+
+    <div class="footer-nav">
+      <button class="btn" id="btnPrev">← Previous</button>
+      <span class="kbd">←</span> <span class="kbd">→</span> <span class="muted small">to move · </span>
+      <span class="kbd">D</span> <span class="muted small">mark done</span>
+      <span class="spacer"></span>
+      <button class="btn" id="btnDone">✓ Mark done</button>
+      <button class="btn primary" id="btnNext">Next →</button>
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   Assembly data. Coordinates are OpenSCAD-space millimetres, matching
+   cad/config.scad (Z up, lens axis +X, tilt axis Y).
+   ===================================================================== */
+const LID_Z = 66;                 // lid spigot drops into the enclosure mouth
+const LID_TOP = LID_Z + 5;        // top face of the lid — the PTZ base bolts here
+const TILT_Z = 120;               // tilt axis of the Arducam base
+
+const PHASES = ["Prepare", "Enclosure", "Camera", "Power & cables", "Finish"];
+
+// part groups, in assembly order
+const SHELL = ["base_housing", "insert"];
+const POWER = ["jack", "trigger", "switch", "ina226", "buck"];
+const PI = ["pi", "cooler"];
+const LED = ["ledring", "shifter", "led_diffuser_ring"];
+const HEAD = ["lid", "ptz_plate", "ptz_pan", "ptz_yoke", "camera", "lens"];
+const BATT = ["battery_tray", "bank"];
+const CABLES = ["ffc", "pwr_pi", "i2c_lead"];
+const lift = (ids, dz) => ids.map((id) => [id, 0, 0, dz]);
+
+const STEPS = [
+  {
+    id: "prep", phase: 0, title: "Print, measure and prepare the parts", time: "≈ 25 h print · 35 min prep",
+    parts: ["All 4 printed bodies (≈ 280 g PETG) — settings and filament in <a href='../../3d_printer/specifications.md' target='_blank'>printer specifications</a>", "M2.5 / M3 screw kit + brass heat-set inserts", "Calipers"],
+    tools: ["3D printer", "Calipers", "Soldering iron (for inserts)", "3.2 mm drill bit, flush cutters"],
+    steps: [
+      "<b>Measure before printing.</b> The one that matters is your Arducam base's <b>bolt spacing</b> — the lid is cut with slots spanning 30–72 mm because Arducam publishes no drawing and it has changed between revisions. Also check <code>bank_l/w/h</code> against your power bank. Edit <code>cad/config.scad</code>, then <code>./cad/render_all.sh</code>. The full list is in the <a href='../../10-verification.md' target='_blank'>verification checklist</a>.",
+      "<b>Print:</b> enclosure — PETG, 4 walls, 20 %, no supports · <b>lid — 5 walls, 40 %</b>, it carries the whole camera · diffuser — white PETG, 2 walls, 0 % infill · battery tray — 3 walls, 20 %.",
+      "<b>Clean up.</b> Remove brims, run a 3.2 mm drill through every M3 clearance hole, and check the lid's slots are clear so the base can slide to its bolt spacing.",
+      "<b>Dry-fit</b> the lid spigot in the enclosure mouth, the diffuser in its seat, and the bank in the tray.",
+    ],
+    note: "This is a much shorter parts list than the continuous-pan revision: no ring pulley, rotating platform, tilt towers or camera cradle. The Arducam base replaces all of them.",
+    scene: {
+      show: [], arrows: false, focus: "all", stay: true,
+      add: [["base_housing", 0, 0, 0], ["led_diffuser_ring", 0, 0, 95],
+            ["lid", 0, 0, 150], ["battery_tray", 0, 0, -90]],
+      view: "iso", render: "prep",
+    },
+  },
+  {
+    id: "tripod-insert", phase: 1, title: "Tripod insert into the enclosure floor", time: "15 min + cure",
+    parts: ["Enclosure", "3/8-16 brass insert, ≤ 8 mm long", "3/8-16 → 1/4-20 reducer bushing", "2-part epoxy"],
+    tools: ["Drill or step bit, if your insert is larger than the bore", "3/8-16 screw as a plug", "Flat screwdriver (for the bushing's slot)"],
+    steps: [
+      "The floor has a 24 mm boss with a 12.7 mm bore. Check your insert slips in snugly; open the bore up to its outside diameter if not.",
+      "Mix epoxy, coat the outside of the insert, and press it in <b>from inside the enclosure</b> so the threads open downward.",
+      "Thread a lightly greased 3/8-16 screw in from below while it cures — it keeps epoxy out of the threads and holds the insert square.",
+      "Cure 24 h, remove the screw, confirm the enclosure sits flat on a tripod plate.",
+      "<b>Pick the thread for your tripod:</b> most photo tripods and phone-style mini tripods have a 1/4-20 screw — run the reducer bushing into the insert with a flat screwdriver, slot downward. Video heads and heavier tripods with a 3/8-16 screw go straight into the insert; unscrew the bushing for those.",
+    ],
+    warn: "This single insert carries the camera and the battery. Do not rush the cure, and do not use hot glue. Keep the insert no longer than the 8 mm boss: the Pi sits right above it.",
+    scene: { show: ["base_housing"], add: [["insert", 0, 0, 60]], view: "iso-high", focus: "all", render: "tripod-insert",
+             marks: [[0, 0, 8, "3/8-16 insert (1/4-20 via bushing)", 45, -45, 45]] },
+  },
+  {
+    id: "power", phase: 1, title: "Power chain into the enclosure", time: "60 min",
+    parts: ["USB-C PD trigger board (12 V)", "Rocker switch", "INA226 module", "12 V → 5 V 8 A buck", "Panel-mount barrel jack", "18 AWG silicone wire, 470 µF"],
+    tools: ["Soldering iron", "Multimeter", "4 A dummy load", "M3 screws"],
+    steps: [
+      "<b>Wiring:</b> connections P1–P5 and R1 in the <a href='../wiring.md' target='_blank'>wiring guide</a>, steps 1–3.",
+      "<b>Bench-set the buck to 5.1 V under a 4 A dummy load before it goes anywhere near the Pi.</b> Open-circuit voltage tells you nothing; a unit that reads 5.1 V unloaded and 4.8 V loaded will brown the Pi out under load.",
+      "Set the PD trigger to <b>12 V</b> (solder jumper or resistor, per its silkscreen) and confirm with a meter on a real bank before wiring anything else.",
+      "Mount the trigger, the gauge and the buck on the three M3 posts on the <b>+X</b> side of the floor. The Pi takes the other side.",
+      "Wire the chain: trigger 12 V out → rocker switch → gauge <b>IN+</b>, gauge <b>OUT+</b> → buck 12 V in. Grounds common. It has to sit in series on the positive line or it measures nothing.",
+      "Gauge SDA/SCL → Pi GPIO 2/3. It shares the bus with the PTZ controller at a different address, 0x40 against 0x0C. If you could not source one, set <code>POWER_MONITOR = \"none\"</code> and skip this — you lose the low-battery warning, nothing else.",
+      "Fit the barrel jack in the 8 mm hole low on the −Y wall as the 5 V service tap, and put a 470 µF across the buck output.",
+      "Leave the buck's 5 V out on 18 AWG, long enough to reach a USB-C pigtail, the LED ring and the lid.",
+    ],
+    warn: "Use the 100 W e-marked USB-C cable from the bill of materials. A charge-only cable cannot carry a 12 V PD contract and the trigger will silently stay at 5 V.",
+    scene: { show: SHELL, add: [["trigger", 0, 0, 70], ["switch", 0, 0, 70], ["ina226", 0, 0, 70], ["buck", 0, 0, 70], ["jack", 0, -55, 0]],
+             view: "iso-high", focus: "all", render: "power",
+             marks: [[46, 18, 14, "PD trigger → 12 V", 55, 45, 48], [46, 0, 13, "battery gauge (0x40)", 70, -5, 40], [46, -18, 15, "buck → 5.1 V @ 8 A", 50, -50, 46], [0, -74, 11, "5 V service jack", 0, -45, 30]] },
+  },
+  {
+    id: "pi", phase: 1, title: "Raspberry Pi 4 on the floor", time: "20 min",
+    parts: ["Raspberry Pi 4 Model B 4 GB + heatsink/fan + 64 GB microSD", "4 × M2.5 × 6", "USB-C pigtail"],
+    tools: ["2 mm driver"],
+    steps: [
+      "<b>Wiring:</b> connection R2 in the <a href='../wiring.md' target='_blank'>wiring guide</a>, step 4; the gauge's I2C (I1–I4) is step 5.",
+      "Fit the heatsinks or the fan case to the Pi <b>before</b> mounting it. The board sits low in a sealed enclosure and you will not reach the chips afterwards.",
+      "Flash the card and enable I2C and SPI in <code>raspi-config</code>. If the camera is not detected on first boot, add <code>dtoverlay=imx477</code> to <code>/boot/firmware/config.txt</code>. The <code>usb_max_current_enable</code> flag is a Pi 5 thing and is not needed here.",
+      "Mount the Pi on the four standoffs at <b>−X</b>, USB and Ethernet edge facing the vent slots.",
+      "Buck 5 V out → USB-C pigtail → Pi. Keep the run short and use 18 AWG; it carries 4 A.",
+      "Power up on the bench and confirm the Pi boots before the lid ever goes on.",
+    ],
+    scene: { show: [...SHELL, ...POWER], add: [["pi", 0, 0, 70], ["cooler", 0, 0, 70]],
+             view: "iso-high", focus: "all", render: "power",
+             marks: [[-10, 0, 26, "Pi 4 + heatsink", -70, 25, 45]] },
+  },
+  {
+    id: "led", phase: 1, title: "LED ring, level shifter and diffuser", time: "30 min",
+    parts: ["WS2812B 16-LED ring", "74AHCT125 level shifter", "LED diffuser ring (white PETG)", "CA or hot glue"],
+    tools: ["Soldering iron"],
+    steps: [
+      "<b>Wiring:</b> connections R4, R5 and L1–L4 in the <a href='../wiring.md' target='_blank'>wiring guide</a>, with the 74AHCT125 pin numbers.",
+      "Data comes out of <b>SPI0 MOSI, GPIO10</b>, not the classic <code>rpi_ws281x</code> PWM/DMA pin. A Pi 4 can do it either way, but the PWM driver needs the whole camera service to run as root and SPI does not.",
+      "Wire GPIO10 → 74AHCT125 input, its output → ring DIN. Tie the shifter's unused inputs to ground and power it from 5 V. Ring 5 V and ground come from the buck, not the Pi.",
+      "Sit the ring on a spacer so the LEDs are at window height (20–32 mm up), facing outward.",
+      "Power up and run the three state colours. Nudge the ring until the band glows evenly all the way round, then fix the diffuser to the enclosure with four dabs of glue.",
+    ],
+    note: "Two walls and 0 % infill are what make the band glow instead of showing 16 hot spots. A 60/m strip lining the window looks better still if you have one — change <code>LED_COUNT</code> to match.",
+    scene: { show: [...SHELL, ...POWER, ...PI], add: [["ledring", 0, 0, 80], ["shifter", 0, 0, 80], ["led_diffuser_ring", 0, 0, 80]],
+             view: "iso", focus: "all", render: "led",
+             marks: [[0, 0, 26, "ring at window height", 75, 35, 40]] },
+  },
+  {
+    id: "lid-ptz", phase: 2, title: "Arducam base onto the lid", time: "25 min",
+    parts: ["Lid", "Arducam IMX477 PTZ camera with metal pan-tilt base", "4 × M3 × 10 + nuts"],
+    tools: ["Calipers", "Marker", "2.5 mm hex key"],
+    steps: [
+      "Measure the base's bolt spacing. The lid's four radial slots accept 30–72 mm; if yours is outside that, change <code>ptz_bolt_min/max</code> in <code>cad/config.scad</code> and reprint the lid.",
+      "Sit the base on the lid, centred on the opening, and rotate it so the lens will point along <b>+X</b> — the direction the camera looks when pan is centred. Mark through the slots.",
+      "Pass the camera ribbon and the servo/I2C lead <b>down through the central opening first</b>, then bolt the base down with M3 and nuts. Doing it the other way round means undoing the bolts again.",
+      "Check the base can sweep both axes fully without the ribbon pulling. Leave about 80 mm of slack coiled under the lid.",
+    ],
+    warn: "Do not overtighten. The base plate is thin aluminium and the lid is plastic; snug plus a nylon-insert nut holds better than crushing the lid.",
+    scene: { show: ["lid"], add: [["ptz_plate", 0, 0, 60], ["ptz_pan", 0, 0, 60], ["ptz_yoke", 0, 0, 60], ["camera", 0, 0, 60], ["lens", 0, 0, 60]],
+             view: "iso-high", focus: "all", render: "lid-ptz",
+             marks: [[0, 0, LID_TOP + 3, "slots take 30–72 mm bolt spacing", -75, -45, 42], [40, 0, TILT_Z, "lens points +X at pan centre", 35, -40, 35]] },
+  },
+  {
+    id: "lid-on", phase: 2, title: "Lid onto the enclosure", time: "20 min",
+    parts: ["Lid assembly", "4 × M3 × 12 countersunk"],
+    tools: ["2.5 mm hex key"],
+    steps: [
+      "<b>Wiring:</b> connections R3, I1, I2 and C1 in the <a href='../wiring.md' target='_blank'>wiring guide</a>, step 7.",
+      "Connect the leads waiting inside: PTZ controller 5 V and ground to the buck output, SDA and SCL to Pi GPIO 2/3 alongside the INA226.",
+      "Plug the camera ribbon into the Pi's CSI connector, contacts the right way, latch closed. The 15-pin cable in the Arducam kit fits a Pi 4 directly, so there is no adapter to find.",
+      "Lower the lid so its spigot enters the enclosure mouth, feeding the cable coil in as you go. Nothing should be pinched between spigot and wall.",
+      "Four countersunk M3 down into the wall.",
+      "Power up and run <code>i2cdetect -y 1</code>. You want <b>0c</b> and <b>40</b>. If 0c is missing, the PTZ controller is unpowered or the lead is swapped.",
+    ],
+    scene: { show: [...SHELL, ...POWER, ...PI, ...LED], add: lift(HEAD, 95),
+             view: "iso", focus: "all", render: "lid-on",
+             marks: [[0, 0, 55, "ribbon + I2C down the middle", -80, 40, 30]] },
+  },
+  {
+    id: "battery", phase: 3, title: "Battery tray and power bank", time: "15 min",
+    parts: ["Battery tray", "USB-C PD power bank, 25 000 mAh (92 Wh)", "Hook-and-loop strap", "100 W USB-C cable, 30 cm"],
+    tools: [],
+    steps: [
+      "Drop the bank into the tray and strap it through the two floor slots.",
+      "Mount the tray either way: strap it to a tripod leg or centre column, or sandwich it between the tripod plate and the enclosure using a 1/4-20 × 50 mm through the central bore and into the reducer bushing. Either way the mass ends up low, which is what keeps the rig stable with the camera above it.",
+      "Run the 100 W USB-C cable from the bank up to the PD trigger. Dress it so it cannot snag a tripod leg.",
+      "Charge the bank fully before the first power-on. The fuel gauge counts what it measures from the moment the camera software starts and assumes a full pack then — it has no way to read the bank's own charge.",
+    ],
+    note: "Expect about 8.4 hours tracking and recording, 8.9 tracking only, and 12 idle. Those allow for the bank's own conversion loss, which is why they are lower than its 92 Wh label suggests. Recording is nearly free on this board: the Pi 4 has a hardware H.264 encoder, which is the reason the design is not on a Pi 5.",
+    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD], add: lift(BATT, -70),
+             view: "iso-low", focus: "all", render: "battery",
+             marks: [[0, 0, -14, "92 Wh bank, slung low", 85, -40, -25]] },
+  },
+  {
+    id: "cabling", phase: 3, title: "Cabling and service loops", time: "25 min",
+    parts: ["Zip ties, adhesive tie mounts"],
+    tools: ["Flush cutters"],
+    steps: [
+      "<b>Wiring:</b> the full connection list and a symptom table are in the <a href='../wiring.md' target='_blank'>wiring guide</a>.",
+      "<b>Camera ribbon:</b> about 80 mm of slack coiled under the lid, loose enough that neither axis pulls it at full travel. Sweep both by hand and watch the coil before you tie anything.",
+      "<b>PTZ I2C and power:</b> 5 V and ground from the buck, SDA and SCL to GPIO 2/3. Power the controller from the rail, <i>not</i> the Pi's GPIO 5 V pin — two servos stalling is about 0.7 A and the header is not the place for it.",
+      "Tie everything off. Nothing may hang where a tripod leg folds, and nothing may reach the pan axis.",
+    ],
+    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD, ...BATT], add: lift(CABLES, 0), arrows: false,
+             view: "iso-back", focus: "all", render: "complete",
+             marks: [[0, 0, 60, "ribbon service loop", -85, 35, 35]] },
+  },
+  {
+    id: "tripod", phase: 4, title: "Mount on the tripod", time: "10 min",
+    parts: ["Any photo or video tripod — 1/4-20 screw (bushing in) or 3/8-16 (bushing out)"],
+    tools: [],
+    steps: [
+      "Check the bushing matches the tripod's screw (step 2), then screw the enclosure on and tighten by hand.",
+      "<b>Spread the legs.</b> The whole head is about 14 cm across and 15 cm tall to the top of the camera, so a small tripod is fine — but the camera sits high, and a narrow stance with a bank hanging off it tips over.",
+      "Level the enclosure, then point the lens at the middle of what you are filming. At 8 m back the ±80° sweep covers about 22 m of wall, so aim it once and the limits never come up.",
+      "Switch on. The ring should come up solid blue.",
+    ],
+    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD, ...BATT, ...CABLES], add: [["tripod", 0, 0, -170]],
+             view: "iso-low", focus: "all", render: "complete" },
+  },
+  {
+    id: "limits", phase: 4, title: "Set the soft limits", time: "20 min",
+    parts: [],
+    tools: ["Laptop on the same Wi-Fi"],
+    steps: [
+      "Run <code>cd device && python -m sportcam.ptzcheck</code>. It walks pan, then tilt, to the configured soft limits in 5° steps so you can watch for binding.",
+      "<b>Watch the ribbon and the lens barrel.</b> The defaults (±80° pan, −45° to +85° tilt) are deliberately short of the servos' 180°, because the metal base fouls before that with a camera in it. Narrow them in <code>config.py</code> if anything touches, widen them if there is room.",
+      "Confirm <b>centre</b>: at pan 0 the lens should point straight out of the enclosure's front, along +X. Adjust <code>PAN_CENTER_RAW</code> until it does.",
+      "Confirm <b>direction</b>: a positive pan command must swing the lens to the camera's left, the way the sweep and the tracker assume. Get this backwards and the camera turns away from a person it has just seen, which looks like a tracking fault and is not one. Flip <code>PAN_SIGN</code> if so.",
+      "Do the same for tilt: at tilt 0 the lens should be level, and a positive command must tilt it <b>up</b>. Tracking and the search sweep both command tilt, so a mirrored <code>TILT_SIGN</code> sends the camera to the floor when a person stands up or the sweep steps to its next row.",
+      "Set the <b>sweep</b> limits too: the search runs pan end to end and steps through the tilt rows in <code>SEARCH_TILT_ROWS_DEG</code> (5° and 22° by default). Watch one full pass and confirm the lens and ribbon clear at both ends of the pan and on both rows. Narrow <code>PAN_MIN_DEG</code> / <code>PAN_MAX_DEG</code> if anything binds.",
+      "Finish with the zoom sweep and leave the lens homed.",
+    ],
+    warn: "Do this before the first tracking run, not after. A servo driving into a mechanical stop will strip itself given a few minutes.",
+    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD, ...BATT, ...CABLES, "tripod"], add: [],
+             view: "front-high", focus: "all", demo: true, render: "complete" },
+  },
+  {
+    id: "bringup", phase: 4, title: "Power-on checks", time: "55 min",
+    parts: [],
+    tools: ["Multimeter", "Laptop on the same Wi-Fi", "Stopwatch", "Tape measure"],
+    steps: [
+      "<b>Rails:</b> 5 V measured at the Pi end under load, not at the buck. You want 5.0 V or better with the camera streaming.",
+      "<b>Bus:</b> <code>i2cdetect -y 1</code> shows <b>0c</b> (PTZ) and <b>40</b> (gauge). <code>rpicam-hello</code> shows the camera.",
+      "<b>Ring:</b> solid blue in standby, before you press anything.",
+      "<b>Track &amp; record:</b> from the phone app press <b>Track &amp; record</b>. The camera zooms wide and sweeps left and right, stepping its tilt at each end, until it sees a person; it then turns to centre them, locks on after two centred detections, and the ring turns breathing red as recording starts. Walk the room; the head should follow smoothly. Step out of view for 6 s and it sweeps again. Hit <b>Motion demo</b> above to see what healthy pan and tilt look like. Do the sign checks in the <a href='../software_setup.md' target='_blank'>software setup</a> first.",
+      "<b>Battery:</b> check the gauge's minutes-left against a stopwatch over the first half hour. If the estimate is badly off, your <code>INA226_SHUNT_OHMS</code> does not match the shunt fitted to your module.",
+      "<b>Card:</b> the app should show free space as minutes of recording. A 64 GB card reads roughly 10 hours when empty. Fill it deliberately once if you want to see the camera decline to record and say why.",
+    ],
+    warn: "If the camera turns <i>away</i> from a person instead of towards them, flip <code>PAN_SIGN</code> or <code>TILT_SIGN</code> (see the software setup). If the sweep never stops for anyone in the room, raise <code>DETECT_HIT_THRESHOLD</code> only after you have checked the lens is focused.",
+    note: "Full bring-up order is in <a href='../../03-electronics.md' target='_blank'>doc 03</a>; the tracking maths and calibration are in <a href='../../04-tracking-system.md' target='_blank'>doc 04</a>.",
+    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD, ...BATT, ...CABLES, "tripod"], add: [],
+             view: "iso", focus: "all", demo: true, render: "complete" },
+  },
+];
+
+/* =====================================================================
+   UI (framework-free). Works before/without the 3D viewer; the viewer
+   registers itself via the 'viewer-ready' event.
+   ===================================================================== */
+const $ = (id) => document.getElementById(id);
+const STORE_KEY = "sportcam-assembly-done";
+let current = 0;
+let done = new Set();
+let viewer = null;          // { showStep(step), replay(), setExplode(t), setView(name), setXray(b), setLabels(b), setDemo(b) }
+
+try { done = new Set(JSON.parse(localStorage.getItem(STORE_KEY) || "[]")); } catch (e) { /* storage unavailable */ }
+function saveDone() { try { localStorage.setItem(STORE_KEY, JSON.stringify([...done])); } catch (e) { /* ignore */ } }
+
+function buildNav() {
+  const nav = $("stepNav");
+  const sel = $("stepSelect");
+  let html = "";
+  let selHtml = "";
+  PHASES.forEach((ph, pi) => {
+    html += `<div class="phase">${pi + 1}. ${ph}</div><ol>`;
+    STEPS.forEach((s, i) => {
+      if (s.phase !== pi) return;
+      html += `<li><button data-i="${i}" id="nav-${s.id}"><span class="n">${i + 1}</span><span><span class="t">${s.title}</span><span class="meta">${s.time}</span></span></button></li>`;
+      selHtml += `<option value="${i}">${i + 1}. ${s.title}</option>`;
+    });
+    html += "</ol>";
+  });
+  nav.innerHTML = html;
+  sel.innerHTML = selHtml;
+  nav.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => go(+b.dataset.i)));
+  sel.addEventListener("change", () => go(+sel.value));
+}
+
+function list(items) { return items.length ? "<ul>" + items.map((x) => `<li>${x}</li>`).join("") + "</ul>" : "<p class='muted'>none</p>"; }
+
+function renderDetail(s) {
+  let h = "";
+  if (s.warn) h += `<div class="warn"><strong>Check:</strong> ${s.warn}</div>`;
+  h += `<div class="panel"><h3>Do this</h3><ol>${s.steps.map((x) => `<li>${x}</li>`).join("")}</ol></div>`;
+  if (s.note) h += `<div class="note"><strong>Tip:</strong> ${s.note}</div>`;
+  h += `<div class="panel two"><div><h3>Parts</h3>${list(s.parts)}</div><div><h3>Tools</h3>${list(s.tools)}</div></div>`;
+  $("detail").innerHTML = h;
+}
+
+function updateProgress() {
+  $("progressLabel").textContent = `${done.size} / ${STEPS.length} done`;
+  $("progressBar").style.width = (100 * done.size / STEPS.length) + "%";
+  STEPS.forEach((s, i) => {
+    const b = $("nav-" + s.id);
+    b.classList.toggle("done", done.has(s.id));
+    b.classList.toggle("active", i === current);
+  });
+  const isDone = done.has(STEPS[current].id);
+  $("btnDone").textContent = isDone ? "✓ Done" : "✓ Mark done";
+  $("btnDone").classList.toggle("done", isDone);
+}
+
+function go(i, replaceHash) {
+  current = Math.max(0, Math.min(STEPS.length - 1, i));
+  const s = STEPS[current];
+  $("stepTitle").textContent = `${current + 1}. ${s.title}`;
+  $("stepPhase").textContent = PHASES[s.phase];
+  $("stepTime").textContent = s.time;
+  $("stepSelect").value = current;
+  renderDetail(s);
+  $("btnPrev").disabled = current === 0;
+  $("btnNext").textContent = current === STEPS.length - 1 ? "Finish" : "Next →";
+  $("btnDemo").hidden = !s.scene.demo;
+  $("btnXray").classList.toggle("on", !!s.scene.xray);
+  $("explode").value = 1000;
+  updateProgress();
+  if (viewer) viewer.showStep(s);
+  const h = "#" + s.id;
+  if (location.hash !== h) { if (replaceHash) history.replaceState(null, "", h); else location.hash = h; }
+  const nb = $("nav-" + s.id); if (nb) nb.scrollIntoView({ block: "nearest" });
+  $("main").scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function stepFromHash() {
+  const id = location.hash.slice(1);
+  const i = STEPS.findIndex((s) => s.id === id);
+  return i < 0 ? 0 : i;
+}
+
+$("btnPrev").addEventListener("click", () => go(current - 1));
+$("btnNext").addEventListener("click", () => {
+  if (current === STEPS.length - 1) { done.add(STEPS[current].id); saveDone(); updateProgress(); return; }
+  go(current + 1);
+});
+$("btnDone").addEventListener("click", () => {
+  const id = STEPS[current].id;
+  if (done.has(id)) done.delete(id); else done.add(id);
+  saveDone(); updateProgress();
+});
+$("btnReplay").addEventListener("click", () => viewer && viewer.replay());
+$("explode").addEventListener("input", (e) => viewer && viewer.setExplode(e.target.value / 1000));
+document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => viewer && viewer.setView(b.dataset.view)));
+$("btnXray").addEventListener("click", () => { const b = $("btnXray"); b.classList.toggle("on"); viewer && viewer.setXray(b.classList.contains("on")); });
+$("btnLabels").addEventListener("click", () => { const b = $("btnLabels"); b.classList.toggle("on"); viewer && viewer.setLabels(b.classList.contains("on")); });
+$("btnDemo").addEventListener("click", () => { const b = $("btnDemo"); b.classList.toggle("on"); b.textContent = b.classList.contains("on") ? "■ Stop demo" : "▶ Motion demo"; viewer && viewer.setDemo(b.classList.contains("on")); });
+
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowRight") go(current + 1);
+  else if (e.key === "ArrowLeft") go(current - 1);
+  else if (e.key.toLowerCase() === "d") $("btnDone").click();
+  else if (e.key.toLowerCase() === "r") $("btnReplay").click();
+  else if (e.key.toLowerCase() === "x") $("btnXray").click();
+  else if (e.key.toLowerCase() === "l") $("btnLabels").click();
+});
+window.addEventListener("hashchange", () => { const i = stepFromHash(); if (i !== current) go(i, true); });
+
+window.addEventListener("viewer-ready", (e) => {
+  viewer = e.detail;
+  $("stageMsg").remove();
+  viewer.setXray($("btnXray").classList.contains("on"));
+  viewer.showStep(STEPS[current]);
+});
+window.addEventListener("viewer-failed", (e) => {
+  // No WebGL or no internet for three.js: fall back to the pre-rendered
+  // turntables in renders/ (python3 docs/setup/assembly/render_steps.py).
+  $("stageMsg").remove();
+  $("stageHint").textContent = "offline mode · drag to spin between pre-rendered views";
+  document.querySelectorAll(".viewer-bar").forEach((el) => el.hidden = true);
+  viewer = makeTurntable($("stage"));
+  viewer.showStep(STEPS[current]);
+  console.warn("3D viewer unavailable, using pre-rendered turntable:", e.detail);
+});
+
+function makeTurntable(stage) {
+  const N = 8;
+  const img = document.createElement("img");
+  img.alt = "assembly step rendering";
+  stage.prepend(img);
+  let frame = 5, base = "";
+  const set = (f) => { frame = ((f % N) + N) % N; img.src = `renders/${base}_${frame}.png`; };
+  img.onerror = () => { img.alt = "No pre-rendered view for this step. Run: python3 docs/setup/assembly/render_steps.py"; };
+  let drag = null;
+  stage.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, f: frame }; stage.classList.add("dragging"); stage.setPointerCapture(e.pointerId); });
+  stage.addEventListener("pointermove", (e) => { if (drag) set(drag.f + Math.round((e.clientX - drag.x) / 40)); });
+  stage.addEventListener("pointerup", () => { drag = null; stage.classList.remove("dragging"); });
+  return {
+    showStep(s) { base = s.scene.render || s.id; set(5); },
+    replay() {}, setExplode() {}, setView() {}, setXray() {}, setLabels() {}, setDemo() {},
+  };
+}
+
+buildNav();
+go(stepFromHash(), true);
+</script>
+
+<script type="module">
+/* =====================================================================
+   Live 3D viewer: real STL geometry (models.js) + simple hardware models,
+   animated insertion per step, orbit controls, callouts, x-ray, demo.
+   ===================================================================== */
+let THREE, OrbitControls, CSS2DRenderer, CSS2DObject;
+try {
+  THREE = await import("three");
+  ({ OrbitControls } = await import("three/addons/controls/OrbitControls.js"));
+  ({ CSS2DRenderer, CSS2DObject } = await import("three/addons/renderers/CSS2DRenderer.js"));
+  if (!window.SPORTCAM_MODELS) throw new Error("models.js missing — run python3 docs/setup/assembly/build_models.py");
+  const c = document.createElement("canvas");
+  if (!(c.getContext("webgl2") || c.getContext("webgl"))) throw new Error("WebGL unavailable");
+} catch (err) {
+  window.dispatchEvent(new CustomEvent("viewer-failed", { detail: String(err) }));
+  throw err;
+}
+
+const COL = {
+  print: 0xc3ccdb, printAlt: 0xb3bdd0, white: 0xf3f3ee, black: 0x2a2e35, pcb: 0x2f7a4c, steel: 0xb3b7bd,
+  dark: 0x4a4f57, brass: 0xc9a24a, blue: 0x1e4f8f, purple: 0x5b3d8a, rubber: 0x1c1c1c, wire: 0x8e2b2b,
+  ffc: 0xe9e3cf, lensGlass: 0x1b3550, cream: 0xf0e4a0, tripod: 0x50555d,
+};
+const ACCENT = new THREE.Color(0x2f6fed);
+const GREEN = 0x1f9d55;
+
+function mat(color, opts = {}) {
+  return new THREE.MeshStandardMaterial({ color, flatShading: true, metalness: opts.metal ?? 0.08, roughness: opts.rough ?? 0.72,
+    transparent: opts.opacity != null, opacity: opts.opacity ?? 1, side: opts.double ? THREE.DoubleSide : THREE.FrontSide });
+}
+
+/* ---- geometry helpers (OpenSCAD axes) -------------------------------- */
+const box = (w, l, h) => new THREE.BoxGeometry(w, l, h);
+function cyl(r, h, axis = "z", rTop) {
+  const g = new THREE.CylinderGeometry(rTop ?? r, r, h, 32);
+  if (axis === "z") g.rotateX(Math.PI / 2); else if (axis === "x") g.rotateZ(Math.PI / 2);
+  return g;
+}
+function tube(ro, ri, h, axis = "z") {
+  const s = new THREE.Shape(); s.absarc(0, 0, ro, 0, Math.PI * 2, false);
+  const hole = new THREE.Path(); hole.absarc(0, 0, ri, 0, Math.PI * 2, true); s.holes.push(hole);
+  const g = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: false, curveSegments: 40 });
+  g.translate(0, 0, -h / 2);
+  if (axis === "y") g.rotateX(Math.PI / 2); else if (axis === "x") g.rotateY(Math.PI / 2);
+  return g;
+}
+function beltGeo(R, r, d, thick, width) {
+  const path = (R1, r1) => {
+    const a = Math.acos((R1 - r1) / d);
+    const s = new THREE.Shape();
+    s.moveTo(R1 * Math.cos(a), R1 * Math.sin(a));
+    s.absarc(0, 0, R1, a, Math.PI * 2 - a, false);
+    s.lineTo(d + r1 * Math.cos(-a), r1 * Math.sin(-a));
+    s.absarc(d, 0, r1, -a, a, false);
+    s.closePath();
+    return s;
+  };
+  const outer = path(R + thick, r + thick);
+  const inner = path(R, r);
+  outer.holes.push(inner);
+  return new THREE.ExtrudeGeometry(outer, { depth: width, bevelEnabled: false, curveSegments: 64 });
+}
+function cable(points, r, color) {
+  const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)));
+  const m = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, r, 10, false), mat(color, { rough: 0.9 }));
+  m.material.flatShading = false;
+  return m;
+}
+function mesh(g, color, opts) { return new THREE.Mesh(g, mat(color, opts)); }
+function at(m, x, y, z, rx = 0, ry = 0, rz = 0) { m.position.set(x, y, z); m.rotation.set(rx, ry, rz); return m; }
+function group(...children) { const g = new THREE.Group(); children.forEach((c) => g.add(c)); return g; }
+
+function stlGeometry(name) {
+  const d = window.SPORTCAM_MODELS[name];
+  if (!d) throw new Error("model missing: " + name);
+  const vb = Uint8Array.from(atob(d.v), (ch) => ch.charCodeAt(0));
+  const ib = Uint8Array.from(atob(d.i), (ch) => ch.charCodeAt(0));
+  const q = new Uint16Array(vb.buffer, vb.byteOffset, d.nv * 3);
+  const idx = d.i32 ? new Uint32Array(ib.buffer, ib.byteOffset, d.nt * 3) : new Uint16Array(ib.buffer, ib.byteOffset, d.nt * 3);
+  const pos = new Float32Array(d.nv * 3);
+  for (let i = 0; i < d.nv; i++) for (let k = 0; k < 3; k++)
+    pos[i * 3 + k] = d.min[k] + (q[i * 3 + k] / 65535) * (d.max[k] - d.min[k]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeVertexNormals();
+  return g;
+}
+
+/* ---- the parts catalogue ---------------------------------------------
+   build: returns an Object3D positioned at its seat in OpenSCAD coords.
+   grp:   static (base), pan (turns with the platform), tilt (turns on the
+          tilt axis). Used by the motion demo. */
+const D = { x: 0.5 }; // tiny offsets to avoid z-fighting on coplanar faces
+const PARTS = {
+  tripod: { grp: "static", build: () => {
+    const g = group(at(mesh(cyl(26, 6), COL.tripod), 0, 0, -3), at(mesh(cyl(11, 280), COL.steel), 0, 0, -146),
+                    at(mesh(cyl(3.1, 8), COL.steel), 0, 0, 3));
+    for (const a of [90, 210, 330]) {
+      const leg = mesh(cyl(6, 440, "z", 4.5), COL.tripod);
+      const tilt = new THREE.Group(); tilt.rotation.z = THREE.MathUtils.degToRad(a);
+      const lean = new THREE.Group(); lean.rotation.y = THREE.MathUtils.degToRad(24);
+      leg.position.set(0, 0, -220); lean.add(leg); lean.position.set(0, 0, -62); tilt.add(lean); g.add(tilt);
+    }
+    return g;
+  } },
+  battery_tray: { grp: "static", stl: "battery_tray", color: COL.print, pos: [-77.4, -38.4, -20] },
+  bank: { grp: "static", build: () => group(at(mesh(box(150, 72, 30), COL.dark, { rough: 0.5 }), 0, 0, -2.6),
+                                            at(mesh(box(26, 10, 2), COL.steel, { metal: 0.4 }), -70, 0, -2.6)) },
+  insert: { grp: "static", build: () => at(mesh(cyl(6.3, 8), COL.brass, { metal: 0.6, rough: 0.4 }), 0, 0, 4.2) },
+  base_housing: { grp: "static", stl: "base_housing", color: COL.print, double: true },
+
+  // power chain on the +X side of the floor
+  trigger: { grp: "static", build: () => group(at(mesh(box(30, 20, 1.6), COL.blue), 46, 18, 7.8),
+                                               at(mesh(box(9, 7, 3.2), COL.steel, { metal: 0.4 }), 34, 18, 10.2)) },
+  ina226: { grp: "static", build: () => group(at(mesh(box(20, 16, 1.6), COL.pcb), 46, 0, 7.8),
+                                              at(mesh(box(7, 5, 1.5), COL.black), 46, 0, 9.3)) },
+  buck: { grp: "static", build: () => group(at(mesh(box(45, 26, 1.6), COL.blue), 46, -18, 7.8),
+                                            at(mesh(box(13, 13, 9), COL.black), 36, -18, 13.2),
+                                            at(mesh(cyl(4.5, 10), COL.dark), 56, -18, 13.6)) },
+  switch: { grp: "static", build: () => group(at(mesh(box(13, 20, 10), COL.black), 60, 30, 9),
+                                              at(mesh(box(9, 14, 2), COL.steel, { metal: 0.4 }), 60, 30, 14.5)) },
+  jack: { grp: "static", build: () => group(at(mesh(cyl(4.5, 16, "y"), COL.black), 0, -62, 11),
+                                            at(mesh(cyl(5.6, 2, "y"), COL.steel, { metal: 0.5 }), 0, -69, 11)) },
+
+  // compute
+  pi: { grp: "static", build: () => group(at(mesh(box(85, 56, 1.6), COL.pcb), -10, 0, 9.8),
+                                          at(mesh(box(51, 5, 8.5), COL.black), -6, 24.5, 14.8),
+                                          at(mesh(box(17, 13, 15), COL.steel, { metal: 0.4 }), -46, -17, 18),
+                                          at(mesh(box(17, 13, 15), COL.steel, { metal: 0.4 }), -46, 0, 18),
+                                          at(mesh(box(21, 16, 13.5), COL.steel, { metal: 0.4 }), -44, 19, 17.3),
+                                          at(mesh(box(9, 7, 3.2), COL.steel, { metal: 0.4 }), 27, -22, 12.2)) },
+  cooler: { grp: "static", build: () => group(at(mesh(box(55, 40, 13), COL.dark, { metal: 0.3 }), -3, -5, 17.1),
+                                              at(mesh(tube(14, 11, 2), COL.black), 9, -5, 24.6),
+                                              at(mesh(cyl(10.5, 1.2), COL.black), 9, -5, 24.2)) },
+
+  // status ring
+  ledring: { grp: "static", build: () => {
+    const g = group(at(mesh(tube(24, 17, 1.6), COL.black), 0, 0, 25));
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; g.add(at(mesh(box(5, 5, 1.6), COL.cream), 20.5 * Math.cos(a), 20.5 * Math.sin(a), 26.6, 0, 0, a)); }
+    return g;
+  } },
+  shifter: { grp: "static", build: () => group(at(mesh(box(20, 8, 1.6), COL.pcb), 20, 40, 7.8),
+                                               at(mesh(box(13, 5, 3), COL.black), 20, 40, 10.3)) },
+  led_diffuser_ring: { grp: "static", stl: "led_diffuser_ring", color: COL.white, opacity: 0.82, pos: [0, 0, 18] },
+
+  // lid and the bought PTZ assembly
+  lid: { grp: "static", stl: "lid", color: COL.print, pos: [0, 0, LID_Z] },
+  ptz_plate: { grp: "static", build: () => group(at(mesh(box(56, 56, 6), COL.steel, { metal: 0.55, rough: 0.45 }), 0, 0, LID_TOP + 3),
+                                                 at(mesh(cyl(21, 4), COL.dark), 0, 0, LID_TOP + 8)) },
+  ptz_pan: { grp: "pan", build: () => group(at(mesh(cyl(22, 16), COL.steel, { metal: 0.55, rough: 0.45 }), 0, 0, LID_TOP + 16),
+                                            at(mesh(box(44, 30, 4), COL.steel, { metal: 0.55 }), 0, 0, LID_TOP + 26)) },
+  ptz_yoke: { grp: "pan", build: () => group(
+      at(mesh(box(26, 4, 42), COL.steel, { metal: 0.55, rough: 0.45 }), 0, 26, LID_TOP + 47),
+      at(mesh(box(26, 4, 42), COL.steel, { metal: 0.55, rough: 0.45 }), 0, -26, LID_TOP + 47),
+      at(mesh(box(22, 20, 18), COL.black), 0, 30, TILT_Z)) },
+  camera: { grp: "tilt", build: () => group(at(mesh(box(4, 38, 38), COL.pcb), 4, 0, TILT_Z),
+                                            at(mesh(box(2, 26, 26), COL.black), 7, 0, TILT_Z)) },
+  lens: { grp: "tilt", build: () => group(at(mesh(cyl(18, 42, "x"), COL.black, { rough: 0.6 }), 31, 0, TILT_Z),
+                                          at(mesh(tube(18.5, 16, 4, "x"), COL.dark), 48, 0, TILT_Z),
+                                          at(mesh(cyl(13.5, 1.2, "x"), COL.lensGlass, { metal: 0.5, rough: 0.2 }), 53, 0, TILT_Z)) },
+
+  // cabling
+  ffc: { grp: "static", build: () => cable([[6, 0, TILT_Z - 16], [14, 10, 100], [6, 16, 84], [-6, 10, 74], [-4, 0, 56], [0, -8, 30], [12, -16, 14]], 1.6, COL.ffc) },
+  pwr_pi: { grp: "static", build: () => group(cable([[56, -18, 14], [40, -34, 14], [10, -30, 13], [27, -22, 13]], 2.2, COL.wire),
+                                              cable([[46, 18, 10], [46, 34, 12], [20, 40, 10], [8, 30, 27]], 2.0, COL.wire)) },
+  i2c_lead: { grp: "static", build: () => cable([[0, 6, 62], [-6, 14, 44], [-14, 16, 26], [-24, 10, 13]], 1.4, COL.dark) },
+};
+
+/* ---- scene ------------------------------------------------------------ */
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0xf3f5f9);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.prepend(renderer.domElement);
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.domElement.className = "labels";
+stage.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf3f5f9);
+const camera = new THREE.PerspectiveCamera(38, 1, 1, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.1;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8e96a6, 1.15));
+const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(260, 420, 180);
+key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -400, right: 400, top: 400, bottom: -400, near: 10, far: 1500 });
+key.shadow.bias = -0.0005;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xdfe8ff, 0.5); fill.position.set(-300, 160, -220); scene.add(fill);
+
+const root = new THREE.Group(); root.rotation.x = -Math.PI / 2; scene.add(root);   // OpenSCAD Z-up → three Y-up
+const groups = { static: new THREE.Group(), pan: new THREE.Group(), tilt: new THREE.Group() };
+root.add(groups.static); root.add(groups.pan);
+const tiltPivot = new THREE.Group(); tiltPivot.position.set(0, 0, TILT_Z); groups.pan.add(tiltPivot);
+groups.tilt.position.set(0, 0, -TILT_Z); tiltPivot.add(groups.tilt);
+const overlay = new THREE.Group(); root.add(overlay);      // arrows, leader lines
+const labelsGroup = new THREE.Group(); root.add(labelsGroup);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.ShadowMaterial({ opacity: 0.12 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const grid = new THREE.GridHelper(1200, 24, 0xd5dbe6, 0xe4e8f0); grid.position.y = -0.5; scene.add(grid);
+
+const built = {};  // id -> { obj, seat: Vector3, mats: Material[], box: Box3 (local, at seat) }
+function build(id) {
+  if (built[id]) return built[id];
+  const def = PARTS[id];
+  let obj;
+  if (def.stl) {
+    obj = new THREE.Mesh(stlGeometry(def.stl), mat(def.color, { opacity: def.opacity, double: def.double }));
+    if (def.pos) obj.position.set(...def.pos);
+    if (def.rot) obj.rotation.set(...def.rot);
+    // wrap so explode offsets apply in group space without disturbing the part's own transform
+    const w = new THREE.Group(); w.add(obj); obj = w;
+  } else {
+    obj = def.build();
+  }
+  const mats = [];
+  obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; mats.push(o.material); o.material.userData.base = { opacity: o.material.opacity, transparent: o.material.transparent, depthWrite: o.material.depthWrite }; } });
+  groups[def.grp].add(obj);
+  obj.updateWorldMatrix(true, true);
+  const bb = new THREE.Box3().setFromObject(obj);  // world (three) coords at seat
+  const rec = { obj, seat: obj.position.clone(), mats, box: bb, def };
+  built[id] = rec;
+  obj.visible = false;
+  return rec;
+}
+
+/* ---- step state -------------------------------------------------------- */
+const VIEWS = {    // direction from target to camera, OpenSCAD coords (x, y, z-up)
+  "iso": [1.25, -1.1, 0.85], "iso-high": [1.1, -1.0, 1.4], "iso-low": [1.25, -1.1, 0.45], "iso-back": [-1.2, -1.1, 0.9],
+  "front": [1, 0.05, 0.3], "front-high": [1, -0.25, 0.7], "side": [0.05, -1, 0.3], "side-low": [0.3, -1, 0.12],
+  "top": [0.15, -0.25, 1], "under": [0.9, -0.8, -0.9], "under-iso": [1.1, -1.0, -0.75],
+};
+const toThree = (v) => new THREE.Vector3(v[0], v[2], -v[1]);
+let stepState = null;   // { adds: [{rec, explode: Vector3}], box, focusBox, arrows: [] , t, anim }
+let labelsOn = true, xray = false, demo = false, demoT = 0;
+const camTween = { active: false };
+
+const arrowMat = new THREE.MeshBasicMaterial({ color: GREEN, depthTest: false, transparent: true, opacity: 0.95 });
+function makeArrow(from, dir, len) {
+  const head = Math.min(16, len * 0.4), shaft = Math.max(1, len - head);
+  const g = new THREE.Group();
+  const s = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, shaft, 12), arrowMat); s.position.y = shaft / 2;
+  const h = new THREE.Mesh(new THREE.ConeGeometry(5, head, 16), arrowMat); h.position.y = shaft + head / 2;
+  g.add(s, h); g.renderOrder = 999;
+  g.position.copy(from);
+  g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  return g;
+}
+
+function clearOverlay() {
+  overlay.clear(); labelsGroup.traverse((o) => { if (o.isCSS2DObject && o.element.parentNode) o.element.remove(); }); labelsGroup.clear();
+}
+
+function showStep(step) {
+  const sc = step.scene;
+  const show = new Set(sc.show);
+  const adds = sc.add.map(([id, ex, ey, ez]) => ({ rec: build(id), explode: new THREE.Vector3(ex, ey, ez) }));
+  const addIds = new Set(sc.add.map((a) => a[0]));
+  // visibility + materials
+  for (const id in built) {
+    const r = built[id];
+    const vis = show.has(id) || addIds.has(id);
+    r.obj.visible = vis;
+    r.obj.position.copy(r.seat);
+    r.mats.forEach((m) => { m.emissive.setHex(0x000000); m.emissiveIntensity = 0; });
+  }
+  for (const id of show) build(id).obj.visible = true;
+  clearOverlay();
+  // bounds
+  const box = new THREE.Box3();
+  const focusBox = new THREE.Box3();
+  for (const id of show) box.union(built[id].box);
+  for (const a of adds) {
+    box.union(a.rec.box);
+    const ex = a.rec.box.clone().translate(toThree(a.explode.toArray()));
+    box.union(ex); focusBox.union(a.rec.box); focusBox.union(ex);
+  }
+  if (focusBox.isEmpty()) focusBox.copy(box);
+  // insertion arrows: solid, drawn on top, sitting in the gap between the
+  // exploded part and its seat (one per distinct explode vector / part)
+  const arrows = [];
+  if (sc.arrows !== false) for (const a of adds) {
+    if (a.explode.lengthSq() < 1) continue;
+    const c = a.rec.box.getCenter(new THREE.Vector3());               // three coords
+    const seatCenter = new THREE.Vector3(c.x, -c.z, c.y);             // back to OpenSCAD
+    const from = seatCenter.clone().addScaledVector(a.explode, 0.78);
+    const ar = makeArrow(from, a.explode.clone().negate().normalize(), a.explode.length() * 0.56);
+    overlay.add(ar); arrows.push(ar);
+  }
+  // callouts
+  for (const [x, y, z, text, ox = 0, oy = 0, oz = 40] of (sc.marks || [])) {
+    const p = new THREE.Vector3(x, y, z), q = new THREE.Vector3(x + ox, y + oy, z + oz);
+    overlay.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([p, q]), new THREE.LineBasicMaterial({ color: GREEN })));
+    overlay.add(at(new THREE.Mesh(new THREE.SphereGeometry(2.2, 12, 12), new THREE.MeshBasicMaterial({ color: GREEN })), x, y, z));
+    const el = document.createElement("div"); el.className = "callout"; el.textContent = text;
+    const lab = new CSS2DObject(el); lab.position.copy(q); labelsGroup.add(lab);
+  }
+  labelsGroup.visible = labelsOn;
+  stepState = { adds, box, focusBox, arrows, t: 0, anim: null, focus: sc.focus, focusPad: sc.focusPad ?? 45, view: sc.view || "iso" };
+  setXray(!!sc.xray, true);          // each step starts with its own default; the button overrides per step
+  setDemo(false, true);
+  document.getElementById("btnDemo").classList.remove("on");
+  document.getElementById("btnDemo").textContent = "▶ Motion demo";
+  applyExplode(0);
+  fitView(stepState.view, true);
+  if (!sc.stay) replay();
+}
+
+function applyExplode(t) {   // t: 0 exploded … 1 assembled
+  if (!stepState) return;
+  stepState.t = t;
+  const e = 1 - (1 - Math.cos(Math.PI * t)) / 2;   // ease-in-out
+  for (const a of stepState.adds) a.rec.obj.position.copy(a.rec.seat).addScaledVector(a.explode, e);
+  for (const ar of stepState.arrows) ar.visible = t < 0.985;
+  document.getElementById("explode").value = Math.round(t * 1000);
+}
+function replay() {
+  if (!stepState) return;
+  const start = performance.now() + 350, dur = 1500;
+  stepState.anim = (now) => {
+    const t = Math.max(0, Math.min(1, (now - start) / dur));
+    applyExplode(t);
+    if (t >= 1) stepState.anim = null;
+  };
+}
+function setExplode(t) { if (stepState) { stepState.anim = null; applyExplode(t); } }
+
+function fitView(name, immediate) {
+  if (!stepState) return;
+  const b = stepState.focus === "add" ? stepState.focusBox.clone().expandByScalar(stepState.focusPad) : stepState.box;
+  const center = b.getCenter(new THREE.Vector3());
+  const dir = toThree(Array.isArray(name) ? name : (VIEWS[name] || VIEWS.iso)).normalize();
+  // Fit the box's eight corners inside the frustum for this view direction
+  // (a bounding sphere wastes a third of the frame on flat assemblies).
+  const z = dir.clone(), up = new THREE.Vector3(0, 1, 0);
+  const x = new THREE.Vector3().crossVectors(up, z); if (x.lengthSq() < 1e-6) x.set(1, 0, 0); x.normalize();
+  const y = new THREE.Vector3().crossVectors(z, x);
+  const tv = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), th = tv * camera.aspect;
+  let dist = 60;
+  for (let i = 0; i < 8; i++) {
+    const c = new THREE.Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).sub(center);
+    const pz = c.dot(z);
+    dist = Math.max(dist, pz + Math.abs(c.dot(x)) / th, pz + Math.abs(c.dot(y)) / tv);
+  }
+  dist *= 1.1;
+  const pos = center.clone().addScaledVector(dir, dist);
+  camera.near = Math.max(1, dist / 100); camera.far = dist * 10 + 3000; camera.updateProjectionMatrix();
+  if (immediate && !camTween.active && !camTween.done) { camera.position.copy(pos); controls.target.copy(center); camTween.done = true; return; }
+  Object.assign(camTween, { active: true, t0: performance.now(), dur: 750, p0: camera.position.clone(), p1: pos, c0: controls.target.clone(), c1: center });
+}
+function setView(name) { fitView(name, false); }
+
+function setXray(on, silent) {
+  xray = on;
+  if (!stepState) return;
+  const addSet = new Set(stepState.adds.map((a) => a.rec));
+  for (const id in built) {
+    const r = built[id];
+    const ghost = on && !addSet.has(r);
+    r.mats.forEach((m) => {
+      const b = m.userData.base;
+      m.transparent = ghost || b.transparent; m.opacity = ghost ? Math.min(0.22, b.opacity) : b.opacity; m.depthWrite = ghost ? false : b.depthWrite;
+      m.needsUpdate = true;
+    });
+  }
+  if (!silent) document.getElementById("btnXray").classList.toggle("on", on);
+}
+function setLabels(on) { labelsOn = on; labelsGroup.visible = on; }
+function setDemo(on) { demo = on; if (!on) { demoT = 0; } }
+
+/* ---- loop -------------------------------------------------------------- */
+function resize() {
+  const w = stage.clientWidth, h = Math.max(300, Math.round(w * 0.68));
+  stage.style.height = h + "px";
+  renderer.setSize(w, h); labelRenderer.setSize(w, h);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage); resize();
+
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (stepState && stepState.anim) stepState.anim(now);
+  if (camTween.active) {
+    const u = Math.min(1, (now - camTween.t0) / camTween.dur), e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    camera.position.lerpVectors(camTween.p0, camTween.p1, e); controls.target.lerpVectors(camTween.c0, camTween.c1, e);
+    if (u >= 1) camTween.active = false;
+  }
+  // highlight pulse on this step's parts
+  if (stepState) {
+    const k = 0.32 + 0.22 * Math.sin(now / 320);
+    for (const a of stepState.adds) a.rec.mats.forEach((m) => { m.emissive.copy(ACCENT); m.emissiveIntensity = k; });
+  }
+  // motion demo
+  // Demo sweeps between the soft limits — this axis does not rotate continuously.
+  if (demo) {
+    demoT += dt;
+    groups.pan.rotation.z = THREE.MathUtils.degToRad(80) * Math.sin(demoT * 0.5);
+    tiltPivot.rotation.y = -THREE.MathUtils.degToRad(32) * Math.sin(demoT * 0.8) + THREE.MathUtils.degToRad(12);
+  }
+  else { groups.pan.rotation.z *= 0.9; tiltPivot.rotation.y *= 0.9; }
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+requestAnimationFrame(frame);
+
+window.dispatchEvent(new CustomEvent("viewer-ready", { detail: { showStep, replay, setExplode, setView, setXray, setLabels, setDemo } }));
+</script>
+</body>
+</html>
