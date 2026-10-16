@@ -58,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final top = MediaQuery.of(context).padding.top;
     final upload = client.upload;
     final saved = client.justSaved;
+    final text = ModeText.of(client.mode);
 
     return Scaffold(
       body: Stack(
@@ -85,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
             right: 14,
             child: StatusRing(
               state: client.state,
+              acquiringLabel: text.acquiring,
               connected: client.isConnected,
               acquiring:
                   client.state == CamState.tracking &&
@@ -105,8 +107,8 @@ class _HomeScreenState extends State<HomeScreen> {
           // acquiring for a while and vision still cannot see the climber
           if (client.state == CamState.tracking &&
               client.telemetry.acquireStalled)
-            const _Pill(
-              text: "Can't see you — step into view, facing the camera",
+            _Pill(
+              text: text.stalled,
               accent: SportColors.tracking,
               alignment: Alignment(0, -0.78),
             ),
@@ -124,6 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
             alignment: Alignment.bottomCenter,
             child: ControlBar(
               state: client.state,
+              text: text,
               enabled: client.isConnected,
               onSetPower: client.setPower,
               onStartTracking: client.startTracking,

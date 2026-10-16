@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { StateSnapshot } from "../lib/api";
+import { modeText } from "../lib/modeText";
 
 const props = defineProps<{ cam: StateSnapshot & { connected: boolean } }>();
 
@@ -14,14 +15,15 @@ const color = computed(() =>
   })[props.cam.state],
 );
 
-// Tag switched on, camera still turning to find the subject.
+// Tracking but not locked on yet: with UWB the camera is turning to where the
+// tag says the subject is; without UWB it is sweeping the room for a person.
 const acquiring = computed(
   () => props.cam.state === "tracking" && props.cam.telemetry?.phase === "acquiring",
 );
 
 const label = computed(() =>
   acquiring.value
-    ? "Acquiring subject…"
+    ? modeText(props.cam.mode).acquiring
     : ({
         off: "Off",
         idle: "On — not tracking",

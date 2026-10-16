@@ -1,12 +1,17 @@
 # 3D printing — requirements, materials and settings
 
 Everything SportCam needs you to print, what the printer has to be able to do,
-and what to buy. Eight parts, about **380 g of PETG**, roughly **35 hours** of
-machine time. No exotic printer required: a stock Ender 3, Prusa Mini, Bambu
-A1 or anything comparable will do all of it.
+and what to buy. No exotic printer required: a stock Ender 3, Prusa Mini,
+Bambu A1 or anything comparable will do all of it, for either build.
 
-Sources are in [`cad/`](../../cad/); the workflow for regenerating STLs is in
-[Appendix A](../appendix-a-cad-parts.md). The parts and their place in the
+| Build | Parts | PETG | Machine time |
+| --- | --- | --- | --- |
+| [With UWB](#with-uwb) | 8 (4 common + 2 arms, mast foot, mast cradle, wearable pod) | ≈ 380 g | ≈ 35 h |
+| [Without UWB](#without-uwb) | 4 (the common parts) | ≈ 280 g | ≈ 25 h |
+
+Sources are in each build's `cad/` ([with UWB](../../with_uwb/cad/),
+[without UWB](../../without_uwb/cad/)); the workflow for regenerating STLs is
+in [Appendix A](../appendix-a-cad-parts.md). The parts and their place in the
 build are in [02 — Mechanical design](../02-hardware-mechanical.md).
 
 ## Printer requirements
@@ -14,13 +19,13 @@ build are in [02 — Mechanical design](../02-hardware-mechanical.md).
 | Requirement | Minimum | Why |
 | --- | --- | --- |
 | Technology | FDM / FFF | all parts are designed for it |
-| Build volume | **170 × 150 × 80 mm** | the wearable pod is the widest part at 104 × 125 mm; the enclosure is 66 mm tall |
+| Build volume | **170 × 150 × 80 mm** | the enclosure is 139 × 143 mm and 66 mm tall; the UWB wearable pod is 104 × 125 mm |
 | Nozzle | 0.4 mm | every setting below assumes it. 0.6 works if you raise wall counts |
 | Hotend temperature | **250 °C** | PETG |
 | Heated bed | **80 °C** | PETG will not stay down without one |
 | Part cooling fan | yes, controllable | PETG wants it at 30–50 %, not 100 % |
 | Enclosure | not needed | PETG does not warp like ABS |
-| Extruder | either | bowden is fine. Direct drive only matters for the optional TPU pod |
+| Extruder | either | bowden is fine. Direct drive only matters for the optional TPU wearable pod (UWB build) |
 
 **Build volume is the only hard gate.** 170 × 150 mm clears every part
 with a little room; 180 × 180 is comfortable. Resin printers are the wrong
@@ -30,10 +35,10 @@ tool here — these are structural brackets, not miniatures.
 
 | Material | Qty | Notes |
 | --- | --- | --- |
-| **PETG, 1 kg, any colour** | 1 spool | the seven structural parts, ≈ 360 g. A 1 kg spool leaves plenty for reprints |
+| **PETG, 1 kg, any colour** | 1 spool | the structural parts: ≈ 360 g with UWB, ≈ 260 g without. A 1 kg spool leaves plenty for reprints |
 | **PETG, white or natural** | ≈ 50 g | the LED diffuser **only**. It has to pass light, so it cannot be your main colour unless that colour is white or natural. A 250 g sample spool is the cheap way to get it |
 | Glue stick (PVA) | 1 | see the warning below — this is a release agent, not an adhesive |
-| TPU 95A *(optional)* | ≈ 30 g | nicer wearable pod against the skin. Needs direct drive |
+| TPU 95A *(optional, UWB build)* | ≈ 30 g | nicer wearable pod against the skin. Needs direct drive |
 
 > **PETG sticks to smooth PEI too well.** On a bare smooth PEI sheet it can
 > fuse and tear chunks out of the surface when you remove the part. Put down a
@@ -46,18 +51,20 @@ load and softens around 60 °C. The lid holds the entire camera cantilevered
 off four bolts, and the whole thing lives on a tripod that may sit in a hot
 car. Use PETG. ABS or ASA are also fine if you have an enclosure.
 
-## The parts
+## The common parts
+
+Every build prints these four. Links go to the UWB build's sources; the
+camera-only build has the same files in `without_uwb/cad/`.
 
 | Part | Size (mm) | Walls | Infill | Layer | Est. mass | Est. time |
 | --- | --- | --- | --- | --- | --- | --- |
-| [Enclosure](../../cad/base_housing.scad) | 139 × 143 × 66 | 4 | 20 % | 0.2 | ≈ 132 g | ≈ 13 h |
-| [Lid](../../cad/lid.scad) | 135 × 135 × 9 | **5** | **40 %** | 0.2 | ≈ 92 g | ≈ 6 h |
-| [LED diffuser ring](../../cad/led_diffuser_ring.scad) | Ø 137 × 16 | **2** | **0 %** | 0.2 | ≈ 14 g | ≈ 2.5 h |
-| [Anchor arm](../../cad/anchor_arm.scad) ×2 | 80 × 28 × 24 | 4 | 25 % | 0.2 | ≈ 14 g each | ≈ 1.5 h each |
-| [Mast foot](../../cad/anchor_mast.scad) | 21 × 25 × 44 | 4 | 25 % | 0.2 | ≈ 11 g | ≈ 1.5 h |
-| [Mast cradle](../../cad/anchor_mast.scad) | 52 × 25 × 38 | 4 | 25 % | 0.2 | ≈ 14 g | ≈ 1.5 h |
-| [Battery tray](../../cad/battery_tray.scad) | 155 × 77 × 12 | 3 | 20 % | 0.2 | ≈ 38 g | ≈ 3.5 h |
-| [Wearable pod](../../cad/wearable_case.scad) | 104 × 125 × 31 | 2 | 20 % | 0.2 | ≈ 53 g | ≈ 4.5 h |
+| [Enclosure](../../with_uwb/cad/base_housing.scad) | 139 × 143 × 66 | 4 | 20 % | 0.2 | ≈ 132 g | ≈ 13 h |
+| [Lid](../../with_uwb/cad/lid.scad) | 135 × 135 × 9 | **5** | **40 %** | 0.2 | ≈ 92 g | ≈ 6 h |
+| [LED diffuser ring](../../with_uwb/cad/led_diffuser_ring.scad) | Ø 137 × 16 | **2** | **0 %** | 0.2 | ≈ 14 g | ≈ 2.5 h |
+| [Battery tray](../../with_uwb/cad/battery_tray.scad) | 155 × 77 × 12 | 3 | 20 % | 0.2 | ≈ 38 g | ≈ 3.5 h |
+
+The enclosure differs between builds only in its wall: the UWB one has three
+bosses for the arms and mast; the camera-only one is plain all round.
 
 Masses are computed from the STL solid volume at PETG's 1.27 g/cm³ and scaled
 for the walls and infill above. Times assume a 0.4 nozzle at 0.2 mm and
@@ -67,18 +74,15 @@ deciding how much filament to buy and which evening to start.
 ### Orientation and supports
 
 Every part is modelled in its print orientation. Drop it on the bed as it
-comes out of OpenSCAD and you need **no supports anywhere**, with one
-exception.
+comes out of OpenSCAD and you need **no supports anywhere** — except under
+the UWB enclosure's wall bosses ([below](#with-uwb)).
 
 | Part | Orientation | Supports |
 | --- | --- | --- |
-| Enclosure | open end up, as modelled | **Yes, but only under the three wall bosses.** They are 6 mm ledges on the outside wall at ±Y and −X, starting 10 mm up. Paint-on or support-blocker supports just there, or accept a slightly droopy underside nobody sees |
+| Enclosure | open end up, as modelled | none without UWB — the wall is plain; with UWB, see below |
 | Lid | as modelled, spigot on the bed | none — the 3 mm step bridges |
 | Diffuser ring | standing, as modelled | none. **Brim recommended**: it is a tall thin ring with a small footprint |
-| Anchor arm | flat, as modelled | none |
-| Mast foot, mast cradle | socket opening up, as modelled | none |
 | Battery tray | flat, as modelled | none |
-| Wearable pod | body and lid side by side, as modelled | none |
 
 ### Why the lid is different
 
@@ -115,32 +119,33 @@ worst because every string is visible once the LEDs are on.
 | Step | Tool | Where |
 | --- | --- | --- |
 | Remove brims, clean up strings | flush cutters, deburring tool | all parts |
-| Open every M3 clearance hole | 3.2 mm drill bit, by hand | enclosure, lid, arms, mast foot |
+| Open every M3 clearance hole | 3.2 mm drill bit, by hand | enclosure, lid (and, with UWB, arms and mast foot) |
 | Check the tripod bore fits your 3/8-16 insert | drill or step bit if it is larger than the 12.7 mm bore | enclosure floor |
-| Fit heat-set inserts | soldering iron, flat tip, ≈ 200 °C | 2 × M3 in each of the three wall bosses, 1 × M3 in each mast socket (8 total) |
-| Dry-fit before wiring | — | lid spigot in the enclosure mouth; an arm on each side boss; the foot on the back boss and the dowel in both sockets |
+| Dry-fit before wiring | — | lid spigot in the enclosure mouth; the bank in the tray |
 
-That is the only insert work in the build. Everything else is bolt-and-nut.
+The 3/8-16 brass tripod insert is epoxied. Without UWB there is no other
+insert work; everything else is bolt-and-nut. The UWB build adds heat-set
+inserts ([below](#with-uwb)).
 
 ## Measure before you print
 
-The full list, with what to do when a measurement is out of range, is in
-**[10 — Verification checklist](../10-verification.md#before-you-print)**.
-In short, four dimensions in [`cad/config.scad`](../../cad/config.scad) depend
-on parts you bought, and getting them wrong means reprinting:
+The full list, with what to do when a measurement is out of range, is in your
+build's **10 — Verification checklist**
+([with UWB](../../with_uwb/docs/10-verification.md#before-you-print),
+[without UWB](../../without_uwb/docs/10-verification.md#before-you-print)).
+Two dimensions in `<build>/cad/config.scad` depend on parts you bought in
+both builds, and getting them wrong means reprinting:
 
 1. **`ptz_bolt_min` / `ptz_bolt_max` — the important one.** Arducam publishes
    no drawing for the metal pan-tilt base and the footprint has changed
    between revisions, so the lid is cut with radial slots spanning 30–72 mm
    instead of fixed holes. Measure your base's bolt spacing and check it falls
    inside that range before you print a 6-hour part.
-2. **`bank_l` / `bank_w` / `bank_h`** — the camera's power bank, and
-   **`bank_tag_*`** — the small one in the wearable. Banks of the same
-   advertised capacity vary by 15 mm in every direction.
-3. **`uwb_l` / `uwb_w` / `uwb_hole_dx` / `uwb_hole_dy`** — the ULA1's outline
-   and mounting holes. The manual gives 40 × 25 mm but not the hole pattern.
+2. **`bank_l` / `bank_w` / `bank_h`** — the camera's power bank. Banks of the
+   same advertised capacity vary by 15 mm in every direction.
 
-Change them, re-run `./cad/render_all.sh`, and every part stays consistent.
+Change them, re-run `./<build>/cad/render_all.sh`, and every part stays
+consistent.
 
 ## Print order
 
@@ -148,7 +153,61 @@ If you want to start building before everything is done:
 
 1. **Enclosure** — longest print, and nothing else can be assembled without it.
 2. **Lid** — needed as soon as the Arducam base arrives.
-3. **Anchor arms** ×2 — can print while you wire the enclosure.
-4. **Diffuser ring** — only needed once the LED ring is in and aligned.
-5. **Battery tray** — last; measure your bank first.
-6. **Wearable pod** — independent of everything else, print whenever.
+3. **Diffuser ring** — only needed once the LED ring is in and aligned.
+4. **Battery tray** — last; measure your bank first.
+
+The UWB build slots its arms and pod in ([below](#print-order-with-uwb)).
+
+---
+
+## With UWB
+
+Four more parts on top of the common ones:
+
+| Part | Size (mm) | Walls | Infill | Layer | Est. mass | Est. time |
+| --- | --- | --- | --- | --- | --- | --- |
+| [Anchor arm](../../with_uwb/cad/anchor_arm.scad) ×2 | 80 × 28 × 24 | 4 | 25 % | 0.2 | ≈ 14 g each | ≈ 1.5 h each |
+| [Mast foot](../../with_uwb/cad/anchor_mast.scad) | 21 × 25 × 44 | 4 | 25 % | 0.2 | ≈ 11 g | ≈ 1.5 h |
+| [Mast cradle](../../with_uwb/cad/anchor_mast.scad) | 52 × 25 × 38 | 4 | 25 % | 0.2 | ≈ 14 g | ≈ 1.5 h |
+| [Wearable pod](../../with_uwb/cad/wearable_case.scad) | 104 × 125 × 31 | 2 | 20 % | 0.2 | ≈ 53 g | ≈ 4.5 h |
+
+### Orientation and supports, with UWB
+
+| Part | Orientation | Supports |
+| --- | --- | --- |
+| Enclosure | open end up, as modelled | **Yes, but only under the three wall bosses.** They are 6 mm ledges on the outside wall at ±Y and −X, starting 10 mm up. Paint-on or support-blocker supports just there, or accept a slightly droopy underside nobody sees |
+| Anchor arm | flat, as modelled | none |
+| Mast foot, mast cradle | socket opening up, as modelled | none |
+| Wearable pod | body and lid side by side, as modelled | none |
+
+### After printing, with UWB
+
+| Step | Tool | Where |
+| --- | --- | --- |
+| Fit heat-set inserts | soldering iron, flat tip, ≈ 200 °C | 2 × M3 in each of the three wall bosses, 1 × M3 in each mast socket (8 total) |
+| Dry-fit | — | an arm on each side boss; the foot on the back boss and the dowel in both sockets |
+
+That is the only heat-set insert work in the build.
+
+### Measure before you print, with UWB
+
+Two more dimensions in `with_uwb/cad/config.scad`:
+
+3. **`bank_tag_*`** — the small power bank in the wearable.
+4. **`uwb_l` / `uwb_w` / `uwb_hole_dx` / `uwb_hole_dy`** — the ULA1's outline
+   and mounting holes. The manual gives 40 × 25 mm but not the hole pattern.
+
+### Print order, with UWB
+
+Print the **anchor arms** ×2 after the lid — they can print while you wire
+the enclosure. The **wearable pod** is independent of everything else; print
+it whenever.
+
+---
+
+## Without UWB
+
+Just the four common parts — about 280 g of PETG and 25 hours. The enclosure
+needs no supports, and the tripod insert is the only insert work. The two
+measurements above are the whole measure-first list. Sources:
+[`without_uwb/cad/`](../../without_uwb/cad/).

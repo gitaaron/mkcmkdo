@@ -53,7 +53,7 @@ requests to seek inside a `<video>`. Both paths provide it.
 | Cost | free | ~$0 at light use (Blaze plan required for Functions) |
 
 Point the Pi at one by setting `UPLOAD_API_BASE` in
-`device/sportcam/config.py`:
+`<build>/device/sportcam/config.py`:
 
 ```python
 UPLOAD_API_BASE = "http://homeserver.local:8787"     # home
@@ -94,7 +94,7 @@ oldest).
 ## Connecting the camera to gym Wi-Fi from your phone
 
 The Pi has no keyboard, and gym Wi-Fi isn't in its config. So the head unit
-provisions itself through a **captive portal** (`device/sportcam/wifi_portal.py`,
+provisions itself through a **captive portal** (`<build>/device/sportcam/wifi_portal.py`,
 systemd unit `sportcam-wifi.service`):
 
 1. Power the camera on. If it can't reach a network within 60 s, it raises

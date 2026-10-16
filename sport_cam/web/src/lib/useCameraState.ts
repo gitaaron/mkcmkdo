@@ -16,6 +16,7 @@ interface CameraStore extends StateSnapshot {
 }
 
 const store = reactive<CameraStore>({
+  mode: undefined,
   state: "off",
   telemetry: {},
   deviceOnline: false,
@@ -51,6 +52,7 @@ function connect(): void {
       if (msg.type === "state") {
         announce(msg.state);
         Object.assign(store, {
+          mode: msg.mode,
           state: msg.state,
           telemetry: msg.telemetry ?? {},
           deviceOnline: msg.deviceOnline ?? false,

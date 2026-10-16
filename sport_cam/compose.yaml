@@ -10,10 +10,11 @@
 # Common tasks inside the workspace:
 #   npm run dev                        # app :5173 + API :8787 (watch mode)
 #   npm run docs                       # docs viewer :8090
-#   ./cad/render_all.sh                # OpenSCAD → cad/stl/*.stl
-#   python3 cad/render_previews.py     # STL preview PNGs → docs/images/parts/
-#   python3 schematics/render_diagrams.py    # design diagrams → docs/images/
-#   python3 schematics/render_schematics.py  # schemdraw schematics → docs/images/
+#   (BUILD = with_uwb or without_uwb)
+#   ./BUILD/cad/render_all.sh                    # OpenSCAD → BUILD/cad/stl/*.stl
+#   python3 BUILD/cad/render_previews.py         # STL previews → BUILD/docs/images/parts/
+#   python3 BUILD/schematics/render_diagrams.py  # design diagrams → BUILD/docs/images/
+#   python3 BUILD/schematics/render_schematics.py  # schematics → BUILD/docs/images/
 
 services:
   workspace:
@@ -28,6 +29,8 @@ services:
     working_dir: /workspace
     environment:
       SIM: "1"
+      # with_uwb | without_uwb — which build the server (and simulator) serves
+      TRACKING_MODE: ${TRACKING_MODE:-with_uwb}
       # pass the host's proxy config through (empty/no-op on proxy-less hosts;
       # needed when the host routes egress via a proxy, e.g. Docker sandboxes)
       HTTP_PROXY: ${HTTP_PROXY:-}

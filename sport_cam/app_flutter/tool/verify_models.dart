@@ -34,6 +34,16 @@ void main() {
   );
   check('null state falls back to off', camStateFrom(null) == CamState.off);
 
+  check(
+    'mode defaults to with UWB when the backend omits it',
+    trackingModeFrom(state['mode'] as String?) == TrackingMode.withUwb,
+  );
+  check(
+    'without_uwb mode parses and picks its wording',
+    trackingModeFrom('without_uwb') == TrackingMode.withoutUwb &&
+        ModeText.of(TrackingMode.withoutUwb).startTracking == 'Track & record',
+  );
+
   final t = Telemetry.fromJson(state['telemetry'] as Map<String, dynamic>?);
   check('telemetry parses', t.pan == 90.0 && t.tilt == 12.0 && t.distM == 4.2);
   check('telemetry tolerates null', Telemetry.fromJson(null).pan == null);

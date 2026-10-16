@@ -4,7 +4,8 @@ import '../models.dart';
 import '../theme.dart';
 
 /// Top-right camera-state indicator — same colours as the LED ring on the
-/// base: blue idle, green tracking (blinking while it acquires the subject),
+/// base: blue idle, green tracking (blinking while it acquires the subject —
+/// turning to the tag with UWB, sweeping the room without),
 /// pulsing red while recording.
 class StatusRing extends StatefulWidget {
   const StatusRing({
@@ -12,11 +13,13 @@ class StatusRing extends StatefulWidget {
     required this.state,
     required this.connected,
     this.acquiring = false,
+    this.acquiringLabel = 'Acquiring subject',
   });
 
   final CamState state;
   final bool connected;
   final bool acquiring;
+  final String acquiringLabel;
 
   @override
   State<StatusRing> createState() => _StatusRingState();
@@ -70,7 +73,7 @@ class _StatusRingState extends State<StatusRing>
     return Semantics(
       label:
           'Camera status: '
-          '${widget.acquiring ? 'Acquiring subject' : stateLabel(widget.state)}',
+          '${widget.acquiring ? widget.acquiringLabel : stateLabel(widget.state)}',
       child: FadeTransition(
         opacity: _pulse,
         child: Container(

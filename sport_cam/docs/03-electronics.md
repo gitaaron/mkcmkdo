@@ -3,8 +3,11 @@
 One board does the computing and one does the moving. There is no base
 controller any more: with the pan stepper gone, the ESP32, the TMC2209, the
 slip ring and the carrier PCB all left with it, and the status ring moved onto
-the Pi. What remains is a Raspberry Pi 4, the Arducam PTZ controller it talks
-to over I2C, three USB anchors, and a battery.
+the Pi. What remains in both builds is a Raspberry Pi 4, the Arducam PTZ
+controller it talks to over I2C, the LED ring, a battery gauge and a battery.
+The UWB build adds three USB anchors on the head and a wearable tag
+([With UWB](#with-uwb)); the camera-only build adds nothing and leaves the
+Pi's USB ports free ([Without UWB](#without-uwb)).
 
 ### Why a Pi 4 and not a Pi 5
 
@@ -14,36 +17,40 @@ and on a battery-powered camera whose main job is recording that is the single
 largest line in the power budget. A Pi 4 encodes 1080p for almost nothing.
 
 The Pi 5 is roughly two to two and a half times faster on CPU, which matters
-only for the person detector. With the third anchor fitted that detector only
-trims angles ranging has already set, and on a two-anchor build it drives
-tilt, which needs to keep up with about 1.7°/s of subject motion. Either way a
-few frames per second is enough ([04](04-tracking-system.md)). Paying four watts for detector headroom
-nobody needs costs about two hours of runtime.
+only for the person detector. A Pi 4 runs it at about 3 fps. How much that
+matters depends on the build: with UWB the detector only trims angles ranging
+has already set; without UWB it is the tracker's only sense. In both, a few
+frames per second is enough for a person moving at several metres — see each
+build's section below. Paying four watts for a Pi 5 costs about two hours of
+runtime.
 
 Three smaller things follow from the choice, all in the Pi 4's favour: the
 Arducam kit's 15-pin ribbon plugs straight in, so there is no adapter cable to
 buy; there is no `usb_max_current_enable` flag to set; and the board is about
 C$55 cheaper.
 
-Schematic sources live in `schematics/` — `render_schematics.py` (schemdraw)
-produces the PNGs below, and `schematics/interactive/index.html` is a zoomable
-view of the whole system (open it via `npm run docs` at
-http://localhost:8090/schematics/interactive/index.html — its libraries are
-vendored locally, no internet needed).
+Schematic sources live in each build's `schematics/` —
+`render_schematics.py` (schemdraw) produces the PNGs, and
+`schematics/interactive/index.html` is a zoomable view of the whole system
+(open it via `npm run docs` at
+http://localhost:8090/with_uwb/schematics/interactive/index.html or
+http://localhost:8090/without_uwb/schematics/interactive/index.html — its
+libraries are vendored locally, no internet needed).
 
 ## Head unit
 
-To actually wire it, follow the **[wiring guide](setup/wiring.md)**: every
-connection pin by pin, in order, with a check after each. This section
-explains the choices behind it.
+To actually wire it, follow your build's **wiring guide**
+([with UWB](../with_uwb/docs/setup/wiring.md),
+[without UWB](../without_uwb/docs/setup/wiring.md)): every connection pin by
+pin, in order, with a check after each. This section explains the choices
+behind it. Each build's head schematic is in its section below.
 
-![Head schematic](images/schematic-head.png)
+Connections common to both builds:
 
 | Signal | From → To | Notes |
 | --- | --- | --- |
 | CSI | Pi CSI → Arducam 15-pin FFC | the cable in the kit fits a Pi 4 directly; service loop under the lid |
 | PTZ I2C | Pi GPIO2/3 → PTZ controller | one board at **0x0C** drives pan, tilt, zoom and focus |
-| UWB anchors | 3 × Haorutech ULA1 via USB-A | **one** carries serial at 115200 (`/dev/ttyUSB0`) and reports every range; the other two need 5 V only. A Pi 4 has four USB-A ports, so this uses three of them |
 | LED data | Pi GPIO10 (SPI0 MOSI) → 74AHCT125 → WS2812B DIN | see the note below |
 | Battery gauge | INA260 (or INA226) on I2C **0x40** | sits on the 12 V side, between trigger and buck. Optional — see below |
 
@@ -59,7 +66,7 @@ Everything that moves is a register write on one I2C device:
 | `OPT_MOTOR_Y` | 0x06 | 0–180 | tilt servo, degrees |
 | `OPT_IRCUT` | 0x0C | 0/1 | IR-cut filter |
 
-`device/sportcam/ptz.py` wraps this. Power the controller board from the 5 V
+`<build>/device/sportcam/ptz.py` wraps this. Power the controller board from the 5 V
 rail directly rather than through the Pi's GPIO 5 V pin — two servos stalling
 is about 0.7 A, which you do not want crossing the header — and share ground.
 
@@ -67,7 +74,7 @@ is about 0.7 A, which you do not want crossing the header — and share ground.
 
 Data goes out of SPI0 MOSI (GPIO10), through a 74AHCT125 to lift 3.3 V logic
 to 5 V, into DIN. Enable SPI in `raspi-config` → Interface Options.
-`device/sportcam/led.py` uses `adafruit-circuitpython-neopixel-spi`.
+`<build>/device/sportcam/led.py` uses `adafruit-circuitpython-neopixel-spi`.
 
 A Pi 4 can also drive WS2812B the classic way, with `rpi_ws281x` on GPIO18
 using PWM and DMA. We do not, for one reason: that driver needs the whole
@@ -75,36 +82,23 @@ camera service to run as root. SPI does not. It is also the only method that
 would survive a move to a Pi 5, whose RP1 I/O controller does not expose the
 peripherals the PWM driver pokes.
 
-## Wearable
-
-![Wearable schematic](images/schematic-wearable.png)
-
-A ULA1 module (DWM1000 on-board) plugged into a small USB power bank. The
-module is 5 V USB only and has no battery connector, which is why the charge
-board and LiPo cell the old design used are gone. A 2 500 mAh bank runs it
-well past a full day.
-
-The pair / remote-record button and its status LED belonged to our own
-wearable sketch; porting them to the ULA1 needs the vendor's schematic for
-the free pins. Until then, recording starts from the phone.
-
 ## Power
-
-![Power tree](images/power-tree.png)
 
 SportCam runs off a **USB-C PD power bank**, so there is nothing to plug in.
 A PD trigger board negotiates 12 V from the bank, one buck makes the single
 5 V rail, and everything hangs off that:
 
 ```
-power bank ──PD trigger (12 V)──► INA226 ──► buck 12→5 V 8 A ──┬─► Pi 4 (USB-C)
+power bank ──PD trigger (12 V)──► INA260 ──► buck 12→5 V 8 A ──┬─► Pi 4 (USB-C)
                                                                ├─► PTZ controller + servos
-                                                               ├─► 3 × UWB anchors (Pi USB)
+                                                               ├─► (with UWB) 3 × UWB anchors (Pi USB)
                                                                └─► WS2812B ring
 ```
 
+Each build's power tree is drawn in its section below.
+
 Why not feed the Pi from the bank's 5 V port directly? Because the 5 V rail
-also carries the servos, three anchors and the LED ring, and most banks cap
+also carries the servos and the LED ring (and, with UWB, three anchors), and most banks cap
 their 5 V profile at 3 A. Pulling 12 V and stepping down locally gives the
 whole rail headroom and costs about 8 % in conversion.
 
@@ -114,9 +108,10 @@ whole rail headroom and costs about 8 % in conversion.
 | --- | --- | --- |
 | Raspberry Pi 4, 1080p hardware encode + 3 fps detect | 6.0 W | 7 W |
 | PTZ servos and lens motors | 1.0 W | 4 W |
-| 3 × ULA1 UWB anchors | 3.0 W | 3.8 W |
 | WS2812B ring at 45 % | 1.5 W | 2.9 W |
-| **5 V total** | **11.5 W** | ≈ 18 W |
+| **5 V total, without UWB** | **8.5 W** | ≈ 14 W |
+| *with UWB:* 3 × ULA1 UWB anchors | 3.0 W | 3.8 W |
+| **5 V total, with UWB** | **11.5 W** | ≈ 18 W |
 
 Of the Pi's six watts, roughly three is the board simply being on, one is
 JPEG-encoding the preview stream, one is the person detector and half a watt
@@ -131,17 +126,21 @@ and our buck back down. At roughly 91 % and 92 %, about **84 Wh of a 92 Wh
 bank reaches the 12 V rail** where the gauge sits. Stopping at the 7 %
 critical threshold leaves 78 Wh to spend:
 
-| Mode | Draw at 12 V | Runtime |
-| --- | --- | --- |
-| Tracking **and** recording | 12.5 W | **6.2 h** |
-| Tracking only | 12.0 W | 6.5 h |
-| Idle, streaming preview | 9.7 W | 8.0 h |
+| Mode | Draw at 12 V, with UWB | Runtime, with UWB | Draw at 12 V, without UWB | Runtime, without UWB |
+| --- | --- | --- | --- | --- |
+| Tracking **and** recording | 12.5 W | **6.2 h** | 9.2 W | **8.4 h** |
+| Tracking only | 12.0 W | 6.5 h | 8.7 W | 8.9 h |
+| Idle, streaming preview | 9.7 W | 8.0 h | 6.4 W | 12 h |
 
-The third anchor costs about a watt at 5 V, 1.1 W at 12 V, which is roughly
-35 minutes off every figure. Still well over the 4 h target. A **74 Wh
-(20 000 mAh) bank manages 5.0 h**,
-saves about C$25 and a couple of hundred grams, and is the sensible choice
-unless you want a full day between charges — the BOM lists it as the
+The three UWB anchors are the whole difference: about 3 W at 5 V, 3.3 W at
+12 V, roughly a third of the draw and about two hours of runtime. Both are
+well over the 4 h target. The camera-only figures are estimates from the load
+budget (5 V total ÷ 92 % buck efficiency), not measurements; measure your own
+unit with the gauge.
+
+A **74 Wh (20 000 mAh) bank** manages about **5.0 h with UWB, 6.7 h
+without**, saves about C$25 and a couple of hundred grams, and is the sensible
+choice unless you want a full day between charges — each BOM lists it as the
 alternative. Stay under 100 Wh if you ever want to fly with it.
 
 `BATTERY_WH` in `config.py` is therefore **84**, not the 92 on the label. The
@@ -157,7 +156,7 @@ roughly a watt off every mode.
 
 A power bank reports nothing about its own charge over PD, so SportCam
 measures instead. The sensor on the 12 V side is read every second;
-`device/sportcam/power.py` integrates watt-hours and reports a fraction
+`<build>/device/sportcam/power.py` integrates watt-hours and reports a fraction
 remaining, present draw, and an estimated minutes-left from a 60 s rolling
 average. That assumes a full pack when the gauge was last zeroed, so the app
 exposes a reset for when you clip on a fresh one.
@@ -170,7 +169,8 @@ equivalent if you already have one. Both sit at I2C 0x40.
 The gauge is **optional**. Set `POWER_MONITOR = "none"` and everything still
 runs; you lose the low-battery warning and the automatic save-and-park, so
 you watch the clock instead. Sourcing is the usual reason — see the
-[bill of materials](07-bill-of-materials.md#parts-that-are-hard-to-source-in-canada).
+bill of materials ([with UWB](../with_uwb/docs/07-bill-of-materials.md#parts-that-are-hard-to-source-in-canada),
+[without UWB](../without_uwb/docs/07-bill-of-materials.md#parts-that-are-hard-to-source-in-canada)).
 
 Two thresholds act on their own:
 
@@ -239,9 +239,76 @@ that plane.
 3. **Motion:** `python -m sportcam.ptzcheck` sweeps pan then tilt to the soft
    limits. Watch for the lens or the ribbon binding and adjust the limits in
    `config.py` before anything else.
-4. **Anchors:** the reporting one enumerates as ttyUSB and streams `mc …`
-   frames. Confirm all three ranges are present — validity mask `07` — before
-   trusting anything downstream. Mask `03` means A3 is not being ranged:
-   bearing still works, but tilt falls back to vision alone.
+4. **Tracking sensor:** build-specific — the anchors
+   ([with UWB](#bring-up-with-uwb)) or the vision search
+   ([without UWB](#bring-up-without-uwb)).
 5. **Integration:** full tracking run on the bench, then check the gauge's
    estimate against a stopwatch over the first half hour.
+
+---
+
+## With UWB
+
+![Head schematic, with UWB](../with_uwb/docs/images/schematic-head.png)
+
+One more connection on the head:
+
+| Signal | From → To | Notes |
+| --- | --- | --- |
+| UWB anchors | 3 × Haorutech ULA1 via USB-A | **one** carries serial at 115200 (`/dev/ttyUSB0`) and reports every range; the other two need 5 V only. A Pi 4 has four USB-A ports, so this uses three of them |
+
+**The detector's job.** With the third anchor fitted, the person detector only
+trims angles ranging has already set; on a two-anchor build it drives tilt,
+which needs to keep up with about 1.7°/s of subject motion. Either way a few
+frames per second is enough
+([04](../with_uwb/docs/04-tracking-system.md)).
+
+![Power tree, with UWB](../with_uwb/docs/images/power-tree.png)
+
+### Wearable
+
+![Wearable schematic](../with_uwb/docs/images/schematic-wearable.png)
+
+A ULA1 module (DWM1000 on-board) plugged into a small USB power bank. The
+module is 5 V USB only and has no battery connector, which is why the charge
+board and LiPo cell the old design used are gone. A 2 500 mAh bank runs it
+well past a full day.
+
+The pair / remote-record button and its status LED belonged to our own
+wearable sketch; porting them to the ULA1 needs the vendor's schematic for
+the free pins. Until then, recording starts from the phone.
+
+### Bring-up, with UWB
+
+**Anchors:** the reporting one enumerates as ttyUSB and streams `mc …`
+frames. Confirm all three ranges are present — validity mask `07` — before
+trusting anything downstream. Mask `03` means A3 is not being ranged:
+bearing still works, but tilt falls back to vision alone.
+
+---
+
+## Without UWB
+
+![Head schematic, without UWB](../without_uwb/docs/images/schematic-head.png)
+
+There are no radios, no anchors and no wearable: the camera is the only
+sensor, so the Pi's USB ports are left free. The common connections above are
+the whole head.
+
+**The detector's job.** Here the person detector is the *only* sense the
+tracker has, and a Pi 4 runs HOG at about 3 fps. That is enough for a person
+walking or climbing at several metres (a few hundred milliseconds of delay,
+handled by under-correcting gains — see
+[04](../without_uwb/docs/04-tracking-system.md)), and the 3 fps tuning is
+what makes the Pi 4 workable. A faster board, or a MobileNet-SSD detector, is
+the upgrade if you need to follow fast movers.
+
+![Power tree, without UWB](../without_uwb/docs/images/power-tree.png)
+
+### Bring-up, without UWB
+
+**Vision:** with the camera aimed at a person standing 3–5 m away, check the
+preview shows a sensible picture, then run a search from the app and confirm
+the sweep reverses cleanly at both pan limits before the ring ever goes
+green. Tune `DETECT_HIT_THRESHOLD` here
+([04](../without_uwb/docs/04-tracking-system.md#tuning)).

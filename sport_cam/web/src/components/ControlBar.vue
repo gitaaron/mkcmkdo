@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { api, type StateSnapshot } from "../lib/api";
+import { modeText } from "../lib/modeText";
 
 const props = defineProps<{ cam: StateSnapshot & { connected: boolean } }>();
 const busy = ref(false);
@@ -32,18 +33,19 @@ const stopTrackingWithConfirm = async () => {
 };
 
 const buttons = computed<Btn[]>(() => {
+  const text = modeText(props.cam.mode);
   switch (props.cam.state) {
     case "off":
       return [{ label: "Turn on", kind: "primary", action: () => api.setPower(true) }];
     case "idle":
       return [
         { label: "Turn off", kind: "neutral", action: () => api.setPower(false) },
-        { label: "Start tracking", kind: "primary", action: () => api.startTracking() },
+        { label: text.startTracking, kind: "primary", action: () => api.startTracking() },
       ];
     case "tracking":
       return [
         { label: "Turn off", kind: "neutral", action: () => api.setPower(false) },
-        { label: "Start recording", kind: "primary", action: () => api.startRecording() },
+        { label: text.startRecording, kind: "primary", action: () => api.startRecording() },
       ];
     case "recording":
       return [

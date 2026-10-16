@@ -29,6 +29,7 @@ class CameraClient extends ChangeNotifier {
   LinkMode _link = LinkMode.searching;
   CameraEndpoint? _endpoint;
   CamState _state = CamState.off;
+  TrackingMode _mode = TrackingMode.withUwb;
   Telemetry _telemetry = const Telemetry();
   List<Recording> _recordings = const [];
   UploadProgress? _upload;
@@ -43,6 +44,7 @@ class CameraClient extends ChangeNotifier {
   LinkMode get link => _link;
   CameraEndpoint? get endpoint => _endpoint;
   CamState get state => _state;
+  TrackingMode get mode => _mode;
   Telemetry get telemetry => _telemetry;
   List<Recording> get recordings => _recordings;
   UploadProgress? get upload => _upload;
@@ -136,6 +138,7 @@ class CameraClient extends ChangeNotifier {
     switch (msg['type']) {
       case 'state':
         _state = camStateFrom(msg['state'] as String?);
+        _mode = trackingModeFrom(msg['mode'] as String?);
         _telemetry = Telemetry.fromJson(
           msg['telemetry'] as Map<String, dynamic>?,
         );

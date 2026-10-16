@@ -1,5 +1,8 @@
 export type CamState = "off" | "idle" | "tracking" | "recording";
 
+/** Which hardware build the backend serves — set by TRACKING_MODE on the server. */
+export type TrackingMode = "with_uwb" | "without_uwb";
+
 export interface Telemetry {
   pan?: number;
   tilt?: number;
@@ -11,6 +14,7 @@ export interface Telemetry {
 }
 
 export interface StateSnapshot {
+  mode?: TrackingMode;   // absent from older backends → treated as with_uwb
   state: CamState;
   telemetry: Telemetry;
   deviceOnline: boolean;

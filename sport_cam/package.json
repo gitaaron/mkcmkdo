@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"npm:dev -w server\" \"npm:dev -w web\"",
+    "dev:with_uwb": "TRACKING_MODE=with_uwb npm run dev",
+    "dev:without_uwb": "TRACKING_MODE=without_uwb npm run dev",
     "docs": "node tools/docs-server.mjs",
     "build": "npm run build -w server && npm run build -w web",
     "test": "npm test -w server",

@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import VideoView from "./components/VideoView.vue";
 import StatusRing from "./components/StatusRing.vue";
 import ControlBar from "./components/ControlBar.vue";
 import LibraryView from "./components/LibraryView.vue";
 import { useCameraState, dismissToast } from "./lib/useCameraState";
+import { modeText } from "./lib/modeText";
 
 // Opening the app starts streaming: VideoView mounts immediately and the
 // WS state connection begins here.
 const cam = useCameraState();
 const showLibrary = ref(false);
+const text = computed(() => modeText(cam.mode));
 
 function openFromToast(): void {
   dismissToast();
@@ -27,7 +29,7 @@ function openFromToast(): void {
     </button>
 
     <div v-if="cam.state === 'tracking' && cam.telemetry.acquireStalled" class="hint" role="status">
-      Can't see you — step into view, facing the camera
+      {{ text.stalled }}
     </div>
 
     <div v-if="cam.upload" class="upload">

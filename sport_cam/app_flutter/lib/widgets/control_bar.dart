@@ -3,14 +3,16 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 
-/// Bottom buttons — same rules as the LED/web app:
-///   idle      → Turn off      · Start tracking
-///   tracking  → Turn off      · Start recording
+/// Bottom buttons — same rules as the LED/web app (right-hand labels depend
+/// on the build, see [ModeText]):
+///   idle      → Turn off      · Start tracking   | Track & record
+///   tracking  → Turn off      · Start recording  | Record now
 ///   recording → Stop recording · Stop tracking (confirms; it ends the clip)
 class ControlBar extends StatelessWidget {
   const ControlBar({
     super.key,
     required this.state,
+    this.text = ModeText.withUwb,
     required this.enabled,
     required this.onSetPower,
     required this.onStartTracking,
@@ -20,6 +22,7 @@ class ControlBar extends StatelessWidget {
   });
 
   final CamState state;
+  final ModeText text;
   final bool enabled;
   final void Function(bool on) onSetPower;
   final VoidCallback onStartTracking;
@@ -59,8 +62,8 @@ class ControlBar extends StatelessWidget {
     };
     final (String? rightLabel, VoidCallback? rightAction) = switch (state) {
       CamState.off => (null, null),
-      CamState.idle => ('Start tracking', onStartTracking),
-      CamState.tracking => ('Start recording', onStartRecording),
+      CamState.idle => (text.startTracking, onStartTracking),
+      CamState.tracking => (text.startRecording, onStartRecording),
       CamState.recording => (
         'Stop tracking',
         () => _confirmStopTracking(context),

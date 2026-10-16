@@ -11,6 +11,53 @@ CamState camStateFrom(String? s) => switch (s) {
   _ => CamState.off,
 };
 
+/// Which hardware build the camera is — the server's TRACKING_MODE, or the
+/// camera's own build when connected directly. Only the wording differs.
+enum TrackingMode { withUwb, withoutUwb }
+
+/// Missing or unknown (older backends) → with UWB, the original build.
+TrackingMode trackingModeFrom(String? s) =>
+    s == 'without_uwb' ? TrackingMode.withoutUwb : TrackingMode.withUwb;
+
+/// Text that differs between the two builds; everything else is shared.
+class ModeText {
+  const ModeText._({
+    required this.startTracking,
+    required this.startRecording,
+    required this.acquiring,
+    required this.stalled,
+  });
+
+  /// Primary button in idle.
+  final String startTracking;
+
+  /// Primary button while tracking.
+  final String startRecording;
+
+  /// Status label while tracking but not yet locked on.
+  final String acquiring;
+
+  /// Hint when acquiring has gone on too long.
+  final String stalled;
+
+  static const withUwb = ModeText._(
+    startTracking: 'Start tracking',
+    startRecording: 'Start recording',
+    acquiring: 'Acquiring subject',
+    stalled: "Can't see you — step into view, facing the camera",
+  );
+
+  static const withoutUwb = ModeText._(
+    startTracking: 'Track & record',
+    startRecording: 'Record now',
+    acquiring: 'Looking for a person',
+    stalled: "Can't find anyone — step into the room, facing the camera",
+  );
+
+  static ModeText of(TrackingMode mode) =>
+      mode == TrackingMode.withoutUwb ? withoutUwb : withUwb;
+}
+
 /// How the app is currently reaching the camera. Shown top-left.
 enum LinkMode {
   /// Searching the local network via mDNS.
@@ -68,10 +115,11 @@ class Telemetry {
   final double? tilt;
   final double? distM;
 
-  /// While tracking: 'acquiring' until the camera has locked on, then 'acquired'.
+  /// While tracking: 'acquiring' until the camera has locked on, then
+  /// 'acquired'. With UWB it is turning to the tag; without, sweeping the room.
   final String? phase;
 
-  /// Acquiring for a while and the camera still cannot see anyone.
+  /// Acquiring for a while and the camera still cannot see / has not found anyone.
   final bool acquireStalled;
 
   factory Telemetry.fromJson(Map<String, dynamic>? j) => Telemetry(

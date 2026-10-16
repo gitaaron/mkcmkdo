@@ -6,20 +6,21 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { Hub } from "./hub.js";
-import { MemoryStore } from "./state.js";
+import { MemoryStore, parseTrackingMode, type TrackingMode } from "./state.js";
 import { FrameBus } from "./stream.js";
 import { Recordings } from "./recordings.js";
 
-// The head can change state on its own: switching the tag on starts a
-// session, locking on starts recording, switching it off ends it. The server
-// has to adopt those changes, or the apps show stale state and the next
-// server → device message undoes them.
+// The head can change state on its own. With UWB: switching the tag on starts
+// a session, locking on starts recording, switching it off ends it. Without
+// UWB: locking on starts recording, giving up on an empty room ends the
+// search. The server has to adopt those changes, or the apps show stale state
+// and the next server → device message undoes them.
 
 let close: (() => void) | null = null;
 afterEach(() => close?.());
 
-async function setup() {
-  const store = new MemoryStore();
+async function setup(mode: TrackingMode = "with_uwb") {
+  const store = new MemoryStore(mode);
   const hub = new Hub(store, new FrameBus(),
     new Recordings(mkdtempSync(join(tmpdir(), "sportcam-hub-")), 1024 ** 3));
   const server = createServer();
@@ -72,5 +73,40 @@ describe("device-originated state", () => {
     send({ type: "stateReport", state: "dancing" });
     await settle();
     expect(store.get().state).toBe("idle");
+  });
+});
+
+describe("tracking mode", () => {
+  it("defaults to with_uwb and rejects an unknown mode", () => {
+    expect(parseTrackingMode(undefined)).toBe("with_uwb");
+    expect(parseTrackingMode("without_uwb")).toBe("without_uwb");
+    expect(() => parseTrackingMode("uwb")).toThrow(/TRACKING_MODE/);
+  });
+
+  it("carries the mode in every snapshot", () => {
+    expect(new MemoryStore("without_uwb").get().mode).toBe("without_uwb");
+    expect(new MemoryStore().patch({ state: "tracking" }).mode).toBe("with_uwb");
+  });
+
+  it("with_uwb: a long tag press toggles recording and a lost tag drops to idle", async () => {
+    const { store, send, settle } = await setup("with_uwb");
+    send({ type: "hello", device: "head", mode: "with_uwb" });
+    store.patch({ state: "tracking" });
+    send({ type: "tagButton", kind: "long" });
+    await settle();
+    expect(store.get().state).toBe("recording");
+    send({ type: "lost" });
+    await settle();
+    expect(store.get().state).toBe("idle");
+  });
+
+  it("without_uwb: ignores tag messages — there is no tag", async () => {
+    const { store, send, settle } = await setup("without_uwb");
+    send({ type: "hello", device: "head", mode: "without_uwb" });
+    store.patch({ state: "tracking" });
+    send({ type: "tagButton", kind: "long" });
+    send({ type: "lost" });
+    await settle();
+    expect(store.get().state).toBe("tracking");
   });
 });

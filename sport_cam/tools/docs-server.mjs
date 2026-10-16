@@ -51,6 +51,8 @@ const PAGE = `<!doctype html>
   nav a { display:block; color:var(--ink); text-decoration:none; padding:7px 10px; border-radius:8px;
           font-size:13.5px; margin-bottom:2px; }
   nav a:hover { background:#1b2740; }
+  nav h2 { font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+           margin:16px 10px 6px; }
   nav a.active { background:var(--acc); color:#fff; }
   main { flex:1; min-width:0; padding:32px 40px 80px; max-width:900px; }
   main img { max-width:100%; border-radius:8px; background:#fff; }
@@ -82,7 +84,9 @@ function currentDoc() {
 
 async function loadToc() {
   const docs = await (await fetch("/api/docs")).json();
-  toc.innerHTML = docs.map(d => d.path.endsWith(".md")
+  toc.innerHTML = docs.map(d => d.section
+    ? "<h2>" + d.section + "</h2>"
+    : d.path.endsWith(".md")
     ? '<a href="#' + d.path + '" data-path="' + d.path + '">' + d.title + "</a>"
     : '<a href="/' + d.path + '" target="_blank">' + d.title + " ↗</a>").join("");
   markActive();
@@ -149,19 +153,37 @@ loadToc().then(loadDoc);
 </body>
 </html>`;
 
-async function listDocs() {
-  const entries = [{ path: "README.md", title: "README" }];
-  const files = (await readdir(join(ROOT, "docs"))).filter((f) => f.endsWith(".md")).sort();
+// Every top-level .md in `dir`, titled by its first heading.
+async function mdEntries(dir) {
+  const files = (await readdir(join(ROOT, dir))).filter((f) => f.endsWith(".md")).sort();
+  const out = [];
   for (const f of files) {
-    const first = (await readFile(join(ROOT, "docs", f), "utf8")).split("\n")[0];
-    entries.push({ path: `docs/${f}`, title: first.replace(/^#\s*/, "") || f });
+    const first = (await readFile(join(ROOT, dir, f), "utf8")).split("\n")[0];
+    out.push({ path: `${dir}/${f}`, title: first.replace(/^#\s*/, "") || f });
   }
+  return out;
+}
+
+// Sidebar: what both builds share first, then one section per build.
+const BUILDS = [
+  { dir: "with_uwb", title: "With UWB" },
+  { dir: "without_uwb", title: "Without UWB" },
+];
+
+async function listDocs() {
+  const entries = [{ path: "README.md", title: "README" }, { section: "Common to both builds" }];
+  entries.push(...(await mdEntries("docs")));
   entries.push({ path: "docs/3d_printer/specifications.md", title: "3D printing specifications" });
-  entries.push({ path: "docs/setup/README.md", title: "Setup — start here" });
-  entries.push({ path: "docs/setup/assembly/index.html", title: "Setup 1: Assembly guide (interactive 3D)" });
-  entries.push({ path: "docs/setup/wiring.md", title: "Setup 1a: Wiring guide" });
-  entries.push({ path: "docs/setup/software_setup.md", title: "Setup 2: Software setup" });
-  entries.push({ path: "schematics/interactive/index.html", title: "Wiring schematic (interactive)" });
+  for (const b of BUILDS) {
+    entries.push({ section: b.title });
+    entries.push({ path: `${b.dir}/README.md`, title: `${b.title} — overview` });
+    entries.push(...(await mdEntries(`${b.dir}/docs`)));
+    entries.push({ path: `${b.dir}/docs/setup/README.md`, title: "Setup — start here" });
+    entries.push({ path: `${b.dir}/docs/setup/assembly/index.html`, title: "Setup 1: Assembly guide (interactive 3D)" });
+    entries.push({ path: `${b.dir}/docs/setup/wiring.md`, title: "Setup 1a: Wiring guide" });
+    entries.push({ path: `${b.dir}/docs/setup/software_setup.md`, title: "Setup 2: Software setup" });
+    entries.push({ path: `${b.dir}/schematics/interactive/index.html`, title: "Wiring schematic (interactive)" });
+  }
   return entries;
 }
 

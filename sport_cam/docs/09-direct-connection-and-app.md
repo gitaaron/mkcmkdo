@@ -8,7 +8,7 @@ the path.
 
 Previously every byte went phone → home server → camera. At the gym that
 path doesn't exist. So the head unit now runs its own copy of the API
-(`device/sportcam/local_api.py`) — the **third implementation of the same
+(`<build>/device/sportcam/local_api.py`) — the **third implementation of the same
 callable protocol**, identical to the home server's and Firebase's:
 
 | | Home server | Firebase | **Camera (direct)** |
@@ -22,15 +22,21 @@ callable protocol**, identical to the home server's and Firebase's:
 Because the protocol is the same, the app's code path is the same; only the
 base URL changes. State still lives in one place on the device
 (`Head.apply_state`), so a command from the phone, the home server, or the
-tag being switched on or off all take the same route and everyone is told the result —
+camera itself (the tag being switched on or off with UWB; the first lock-on
+without) all take the same route and everyone is told the result —
 app, LED ring, and server stay in lock-step.
+
+The camera's state includes `mode` (`with_uwb` or `without_uwb`, from its
+`config.TRACKING_MODE`), so a phone connected directly words its buttons for
+that build with no server involved — see
+[06 — Tracking mode](06-server-and-app.md#tracking-mode).
 
 Latency improves too: direct MJPEG on a LAN is ~80–120 ms versus ~250 ms
 through the relay, because the frames stop making a round trip.
 
 ## Discovery: mDNS / Bonjour
 
-The camera publishes `_sportcam._tcp.local` (`device/sportcam/discovery.py`)
+The camera publishes `_sportcam._tcp.local` (`<build>/device/sportcam/discovery.py`)
 with the API port and TXT records:
 
 ```
@@ -77,7 +83,7 @@ protocol.
 
 ## The app's screen
 
-![App UI](images/app-ui.png)
+![App UI (with UWB wording; the camera-only build shows "Track & record")](../with_uwb/docs/images/app-ui.png)
 
 Same layout as the web app, plus the connection badge:
 
@@ -88,9 +94,12 @@ Same layout as the web app, plus the connection badge:
   any time to re-scan.
 - **Top-right — camera state** (`StatusRing`): the LED-ring colours (blue
   idle, green tracking — blinking fast and labelled "Acquiring subject…"
-  until the camera locks on — pulsing red recording); hollow while
-  disconnected. A pill says "Can't see you — step into view, facing the
-  camera" if acquiring stalls.
+  (with UWB) or "Looking for a person…" (without) until the camera locks on —
+  pulsing red recording); hollow while disconnected. A pill says "Can't see
+  you — step into view, facing the camera" (with UWB) or "Can't find anyone —
+  step into the room, facing the camera" (without) if acquiring stalls. The
+  bottom buttons follow the same wording as the web app
+  ([06](06-server-and-app.md#web-app-web)).
 - **Chimes** (`lib/session_audio.dart`): rising when recording starts,
   falling when it stops — **also with the app in the background**, which is
   the usual case with the phone in a bag at the foot of the wall. While the

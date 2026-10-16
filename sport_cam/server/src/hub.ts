@@ -48,9 +48,9 @@ export class Hub {
         this.deviceConns.delete(conn);
         this.updatePresence();
       });
-      // No state push on connect: the head owns its state (the tag can start
-      // a session with no server in reach) and reports it right after its
-      // hello. Pushing ours first would stop a recording every time the
+      // No state push on connect: the head owns its state (the tag, or a
+      // lock-on, can start a session with no server in reach) and reports it
+      // right after its hello. Pushing ours first would stop a recording every time the
       // server restarted or the Wi-Fi blinked.
     });
   }
@@ -88,6 +88,14 @@ export class Hub {
     switch (msg.type) {
       case "hello":
         conn.kind = msg.device;
+        if (msg.mode && msg.mode !== this.store.get().mode) {
+          // A without_uwb head on a with_uwb server still works, but the apps
+          // would word everything for the wrong build. Say so loudly.
+          console.warn(
+            `[hub] head reports mode '${msg.mode}' but TRACKING_MODE is ` +
+              `'${this.store.get().mode}' — restart the server with TRACKING_MODE=${msg.mode}`,
+          );
+        }
         this.updatePresence();
         break;
       case "frame":
@@ -97,8 +105,9 @@ export class Hub {
         this.store.patch({ telemetry: msg as Telemetry });
         break;
       case "stateReport":
-        // The head changed state on its own — the tag switched on or off, a
-        // lock-on started recording, the battery ran low. Adopt it, so the
+        // The head changed state on its own — with_uwb: the tag switched on
+        // or off; either build: a lock-on started recording, the search gave
+        // up on an empty room, the battery ran low. Adopt it, so the
         // apps follow and the next server → device message does not undo it.
         if (["off", "idle", "tracking", "recording"].includes(msg.state) &&
             msg.state !== this.store.get().state) {
@@ -106,7 +115,8 @@ export class Hub {
         }
         break;
       case "tagButton":
-        // long press on the wearable toggles recording
+        // with_uwb only: long press on the wearable toggles recording
+        if (this.store.get().mode !== "with_uwb") break;
         if (msg.kind === "long") {
           const s = this.store.get().state;
           if (s === "tracking") this.store.patch({ state: "recording" });
@@ -114,7 +124,10 @@ export class Hub {
         }
         break;
       case "lost":
-        // head lost the tag past the timeout → back to idle (saves recording)
+        // with_uwb only: head lost the tag past the timeout → back to idle
+        // (saves recording). Without UWB a lost person means sweep again, which
+        // the head handles itself; it never drops to idle on its own.
+        if (this.store.get().mode !== "with_uwb") break;
         if (this.store.get().state !== "off") this.store.patch({ state: "idle" });
         break;
       case "uploadProgress":

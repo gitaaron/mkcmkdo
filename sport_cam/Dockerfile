@@ -1,7 +1,7 @@
 # SportCam development workspace.
 # Everything needed to build every artifact in this repo:
 #   node 22        — server + web app (npm run dev) + docs viewer (npm run docs)
-#   openscad       — cad/*.scad → cad/stl/*.stl        (cad/render_all.sh)
+#   openscad       — <build>/cad/*.scad → <build>/cad/stl/*.stl   (<build>/cad/render_all.sh)
 #   python3 + libs — schematics/diagrams PNGs, STL previews, sim frames
 FROM node:22-bookworm
 

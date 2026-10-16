@@ -1,13 +1,14 @@
 # Appendix B — Open-source printed-part alternatives
 
 If you'd rather remix proven community designs than print the parametric parts
-in [`cad/`](../cad/) ([Appendix A](appendix-a-cad-parts.md)), this doc maps each
+in `<build>/cad/` ([Appendix A](appendix-a-cad-parts.md)), this doc maps each
 SportCam printed part to open-source models on Printables / MakerWorld /
 Thingiverse, and is honest about what each substitution costs you.
 
 This build buys its motion as one assembly (the Arducam PTZ camera and metal
-pan-tilt base), so there is far less to substitute than there used to be. The
-printed parts are an enclosure, a lid, two arms, a tray and a pod.
+pan-tilt base), so there is far less to substitute than there used to be.
+Both builds print an enclosure, a lid, a diffuser ring and a tray; the UWB
+build adds two arms, a mast and a pod ([With UWB](#with-uwb)).
 
 ## Enclosure and lid
 
@@ -31,26 +32,16 @@ that. The enclosure, though, is just a round box with a light band.
 - [Parametric battery holder — Printables 309048](https://www.printables.com/model/309048-parametric-battery-holder) — generate to your bank's exact size.
 - [Tripod leg accessory clamp — Thingiverse 4536847](https://www.thingiverse.com/thing:4536847) — if you'd rather clamp to a leg than strap to the column.
 
-## UWB anchor arms
-
-No substitute exists. The arms set the 250 mm baseline that the bearing maths
-in [04](04-tracking-system.md) depends on, and they carry a specific board at
-a specific height. Print ours, or model your own to the same geometry — the
-one number that matters is the distance between the two antennas.
-
-## Wearable pod
-
-- [DIY smartwatch case for ESP32-C3 — MakerWorld 1749335](https://makerworld.com/en/models/1749335-diy-smartwatch-case-for-esp32-c3-0-96-oled) — comes with a printed armband in three sizes; the best starting point for an arm-worn remix, but the pod now has to hold a ULA1 module (40 × 25 mm) beside a small USB power bank, so the cavity needs rethinking rather than enlarging.
-- Search [yeggi: "makerfabs esp32 dw1000 uwb"](https://www.yeggi.com/q/makerfabs+esp32+dw1000+uwb/) — community cases for the exact UWB board appear and disappear; check before designing.
-
 ## If you want continuous pan back
 
 The parts below rebuild the pan stage this design deleted. Going this way
 means returning to a stepper, a driver, a slip ring and a second
 microcontroller, and rewriting `ptz.py` and `tracker.py` to command pan
-velocity rather than position — the geometry in
-[04](04-tracking-system.md#static-anchors-change-the-loop) goes back to
-anchors that rotate with the lens.
+velocity rather than position. With UWB, the geometry in
+[04](../with_uwb/docs/04-tracking-system.md#static-anchors-change-the-loop)
+goes back to anchors that rotate with the lens; without UWB, the search sweep
+in [04](../without_uwb/docs/04-tracking-system.md) would no longer be limited
+to ±80°, which is the point of doing it.
 
 | Model | Why it's interesting | What you give up |
 | --- | --- | --- |
@@ -61,3 +52,28 @@ anchors that rotate with the lens.
 For true continuous rotation you need a ring pulley whose bore clears a slip
 ring, which is the one piece none of these have. The git history of this
 repository has a parametric one (`cad/ring_pulley.scad`) if you want it back.
+
+---
+
+## With UWB
+
+### UWB anchor arms and mast
+
+No substitute exists. The arms set the 250 mm baseline that the bearing maths
+in [04](../with_uwb/docs/04-tracking-system.md) depends on, and they carry a
+specific board at a specific height. Print ours, or model your own to the
+same geometry — the one number that matters is the distance between the two
+antennas. The same goes for the mast's 250 mm height.
+
+### Wearable pod
+
+- [DIY smartwatch case for ESP32-C3 — MakerWorld 1749335](https://makerworld.com/en/models/1749335-diy-smartwatch-case-for-esp32-c3-0-96-oled) — comes with a printed armband in three sizes; the best starting point for an arm-worn remix, but the pod now has to hold a ULA1 module (40 × 25 mm) beside a small USB power bank, so the cavity needs rethinking rather than enlarging.
+- Search [yeggi: "makerfabs esp32 dw1000 uwb"](https://www.yeggi.com/q/makerfabs+esp32+dw1000+uwb/) — community cases for the exact UWB board appear and disappear; check before designing.
+
+---
+
+## Without UWB
+
+Nothing extra to substitute: the common parts above are the whole print list.
+Because the enclosure wall is plain, any round box with a light band works
+as a donor without having to add bosses.
