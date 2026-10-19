@@ -7,7 +7,8 @@
  *
  * Serves the repo statically and renders the markdown docs in a browser with
  * a sidebar, working images, and .md cross-links. Markdown is rendered
- * client-side with marked (CDN).
+ * client-side with marked, vendored in tools/vendor/ so the viewer works
+ * offline (re-fetch with tools/update-vendor.sh to upgrade).
  */
 import { createServer } from "node:http";
 import { readFile, readdir } from "node:fs/promises";
@@ -39,7 +40,7 @@ const PAGE = `<!doctype html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>SportCam docs</title>
-<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="/tools/vendor/marked.min.js"></script>
 <style>
   :root { --bg:#0d1420; --panel:#131c2c; --ink:#e8edf6; --muted:#7f8ea8; --acc:#2f6fed; --border:#243247; }
   * { box-sizing:border-box; }
