@@ -8,7 +8,7 @@ Twelve steps in five phases (prepare → enclosure → camera → power & cables
 finish), each with a live 3D rendering of exactly that step: parts already
 fitted in grey, the part being fitted highlighted in blue and animated along
 its insertion path, green arrows and callouts for direction and wiring, plus
-parts, tools and checks. Orbit by dragging, scroll to zoom, right-drag to pan.
+parts, tools and checks. Click any part or tool for a picture and a short description of what it is. Orbit by dragging, scroll to zoom, right-drag to pan.
 The viewer bar has an *exploded ↔ assembled* slider, preset views
 (Iso / Front / Side / Top / Under), **X-ray** and **Labels**; the last steps
 have a **Motion demo** that sweeps pan and tilt between their soft limits.
@@ -26,6 +26,7 @@ L labels.
 | `build_models.py` | regenerates `models.js` — run after `./cad/render_all.sh` |
 | `render_steps.py` | renders the offline fallback turntables into `renders/` |
 | `renders/` | fallback PNGs, used only when three.js can't load (no internet / no WebGL) |
+| `../../../../docs/assembly/catalog.js`, `catalog.css` | shared by both builds: the parts-and-tools catalogue. Names in a step's Parts and Tools lists become links that open a picture and a description ("what is an M2.5 × 6?"). Add an entry there when a step names something new |
 
 ## Regenerating after a CAD change
 
