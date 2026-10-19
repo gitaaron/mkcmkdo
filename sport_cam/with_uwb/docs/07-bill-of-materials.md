@@ -155,6 +155,8 @@ The short version: any FDM printer with a **170 × 150 × 80 mm** build volume,
 a 0.4 mm nozzle, a 250 °C hotend and an 80 °C bed. About **35 hours** of
 machine time. No supports anywhere except three small ledges on the enclosure.
 
+**Don't have a printer?** Top choice: the **Bambu Lab A1 Mini** ([Bambu Lab Canada](https://ca.store.bambulab.com/products/a1-mini), ≈ C$249–389). It also prints Croc charms. Other options and why: [Printers to buy](../../docs/3d_printer/specifications.md#printers-to-buy). Not counted in the totals.
+
 Regenerate STLs and previews with `./cad/render_all.sh` and
 `python3 cad/render_previews.py`.
 

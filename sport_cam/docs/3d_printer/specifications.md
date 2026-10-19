@@ -14,6 +14,11 @@ Sources are in each build's `cad/` ([with UWB](../../with_uwb/cad/),
 in [Appendix A](../appendix-a-cad-parts.md). The parts and their place in the
 build are in [02 — Mechanical design](../02-hardware-mechanical.md).
 
+The same printer is also meant for **Croc charms (Jibbitz)**, a separate
+project with its own requirements — see [Croc charms](#croc-charms-jibbitz)
+at the end, and [One printer for both](#one-printer-for-both) if you are
+buying a printer.
+
 ## Printer requirements
 
 | Requirement | Minimum | Why |
@@ -27,7 +32,7 @@ build are in [02 — Mechanical design](../02-hardware-mechanical.md).
 | Enclosure | not needed | PETG does not warp like ABS |
 | Extruder | either | bowden is fine. Direct drive only matters for the optional TPU wearable pod (UWB build) |
 
-**Build volume is the only hard gate.** 170 × 150 mm clears every part
+For SportCam alone, **build volume is the only hard gate.** 170 × 150 mm clears every part
 with a little room; 180 × 180 is comfortable. Resin printers are the wrong
 tool here — these are structural brackets, not miniatures.
 
@@ -211,3 +216,109 @@ Just the four common parts — about 280 g of PETG and 25 hours. The enclosure
 needs no supports, and the tripod insert is the only insert work. The two
 measurements above are the whole measure-first list. Sources:
 [`without_uwb/cad/`](../../without_uwb/cad/).
+
+---
+
+## Croc charms (Jibbitz)
+
+Small, detailed charms that push into the holes of a Croc. They do **not**
+need an expensive or high-end printer: a compact, modern desktop printer
+handles them easily.
+
+### Printer requirements for charms
+
+| Feature / spec | Recommended minimum | Why it matters for charms |
+| --- | --- | --- |
+| Build volume | **150 × 150 × 150 mm** (or larger) | charms are small (~25–35 mm); a compact bed keeps the printer cheap and small |
+| Nozzle | **0.4 mm** (standard) | works fine. Being able to swap to a **0.2 mm** nozzle is ideal for sharp micro-detail on small logos and faces |
+| Extruder | **direct drive** | **crucial for TPU** (flexible filament). Bowden extruders struggle or jam pushing the rubber-like material that makes durable stems |
+| Materials | **PLA, PETG, TPU** | PLA for quick detailed designs, PETG for impact and heat resistance, TPU for flexible charms or non-snap buttons |
+| Bed levelling | **auto bed levelling (ABL)** | small prints depend on a perfect first layer; ABL saves fighting manual calibration |
+| Bed surface | **textured PEI spring-steel sheet** | grips without tape or glue stick, and prints pop off when the sheet is flexed |
+
+### FDM, not resin
+
+Resin (SLA) printers give finer surface detail on tiny figurines, but resin
+is brittle and usually snaps when pushed into the stiff rubber holes of a
+Croc. **Use FDM (filament).** TPU or PETG charms survive daily wear.
+
+### Which printer
+
+Compact, modern direct-drive printers such as the **Bambu Lab A1 Mini** or
+the **Creality Ender-3 V3 SE / KE** series meet every spec above out of the
+box at an entry-level price.
+
+---
+
+## One printer for both
+
+Buying one printer for SportCam and the charms means meeting the stricter of
+each requirement:
+
+| Spec | SportCam | Croc charms | Buy |
+| --- | --- | --- | --- |
+| Build volume | 170 × 150 × 80 mm | 150 × 150 × 150 mm | **≥ 170 × 150 × 150 mm** — a 150 × 150 bed is too small for the SportCam battery tray (155 mm long) |
+| Nozzle | 0.4 mm | 0.4 mm, 0.2 mm swappable is ideal | 0.4 mm, with swappable nozzles |
+| Extruder | either | direct drive | **direct drive** |
+| Materials | PETG (TPU optional for the UWB wearable pod) | PLA, PETG, TPU | PLA, PETG, TPU — hotend to **250 °C** for PETG |
+| Heated bed | 80 °C | — | 80 °C |
+| Bed levelling | — | auto | **auto (ABL)** |
+| Bed surface | textured PEI, garolite, or glass with glue (not bare smooth PEI) | textured PEI | **textured PEI** spring steel |
+| Technology | FDM | FDM | FDM |
+
+### Printers to buy
+
+Every printer below meets the **Buy** column above. Specs are as listed by the
+makers; prices move with sales, so check the live page before ordering.
+
+| # | Printer | Build volume | Fits both? | Buy | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 1 | **Bambu Lab A1 Mini** — *top choice* | 180 × 180 × 180 mm | yes | [Bambu Lab Canada](https://ca.store.bambulab.com/products/a1-mini) · [Amazon.ca](https://www.amazon.ca/s?k=bambu+lab+a1+mini) | direct drive, full auto calibration, textured PEI included, tool-free nozzle swap (0.2 mm sold separately). Smallest and quietest of the list, and clears the 155 mm battery tray. ≈ C$249 on sale, C$389 list |
+| 2 | Bambu Lab A1 | 256 × 256 × 256 mm | yes | [Bambu Lab Canada](https://ca.store.bambulab.com/products/a1) · [Amazon.ca](https://www.amazon.ca/s?k=bambu+lab+a1+3d+printer) | the same machine with a bigger bed — pick it if you'll print anything larger than SportCam |
+| 3 | Creality Ender-3 V3 SE | 220 × 220 × 250 mm | yes, add a textured PEI sheet | [Creality](https://www.creality.com/products/creality-ender-3-v3-se) · [Amazon.ca](https://www.amazon.ca/s?k=creality+ender-3+v3+se) | cheapest route; direct drive and auto levelling. Ships with a coated sheet rather than textured PEI, so budget ≈ C$25 for a 235 mm textured PEI sheet |
+| 4 | Creality Ender-3 V3 KE | 220 × 220 × 240 mm | yes | [Creality](https://www.creality.com/products/creality-ender-3-v3-ke) · [Amazon.ca](https://www.amazon.ca/s?k=creality+ender-3+v3+ke) | faster, 300 °C hotend; check the listing for which bed sheet is included |
+
+### Pros and cons
+
+#### 1. Bambu Lab A1 Mini (top choice)
+
+| Pros | Cons |
+| --- | --- |
+| Works out of the box: auto bed levelling, flow and vibration calibration, all automatic | 180 × 180 mm bed clears every SportCam part, but leaves little room to batch them |
+| Textured PEI sheet included, so no extras to buy | Open frame, no enclosure or filter: keep it in a room with some fresh air, not a bedroom |
+| Tool-free nozzle swap; 0.2 mm nozzle for fine charm detail is a click-in part | 80 °C bed max: fine for PLA, PETG and TPU, rules out ABS/ASA |
+| Direct drive handles TPU | Bambu ecosystem: slicer, firmware and spare parts come from Bambu; cloud by default (LAN-only mode available) |
+| Quiet, small footprint, built-in camera to watch long prints | Its cantilevered gantry is stiff for its size, but it is not a printer to grow into large parts |
+| Optional AMS Lite for multi-colour charms | Cheapest at sale price; list price is noticeably higher |
+
+#### 2. Bambu Lab A1
+
+| Pros | Cons |
+| --- | --- |
+| Everything the A1 Mini has, on a 256 mm cube | Costs more than the Mini for no benefit on SportCam or charms |
+| Room to print several SportCam parts, or a tray of charms, at once | Bed slinger: needs roughly twice its depth in clear desk space as the bed moves |
+| 100 °C bed | Same Bambu-ecosystem and open-frame points as the Mini |
+| Room for future projects bigger than 180 mm | Had a heated-bed cable recall in 2024; units sold now ship with the fixed cable, but check a second-hand one |
+
+#### 3. Creality Ender-3 V3 SE
+
+| Pros | Cons |
+| --- | --- |
+| Usually the cheapest printer on this list | Doesn't come with a textured PEI sheet, so add ≈ C$25 for one |
+| Large 220 × 220 × 250 mm volume | Slower, and needs more hands-on tuning to print well than the Bambu printers |
+| Direct drive extruder and auto levelling | No Wi-Fi or camera: prints go over USB stick or SD card |
+| Open firmware, huge community, cheap generic spare parts | 260 °C hotend is enough for PETG, but has little margin |
+| | Nozzle swaps take tools and a hot hotend; louder than the Bambu printers |
+
+#### 4. Creality Ender-3 V3 KE
+
+| Pros | Cons |
+| --- | --- |
+| Faster than the SE, with a 300 °C hotend | Costs more than the SE, and gets close to the A1 Mini, which needs less setup |
+| Wi-Fi and Klipper-based firmware for remote control and tuning | Creality's firmware and app are less polished than Bambu's |
+| Large 220 × 220 × 240 mm volume | Bed sheet type varies by listing: check that it includes textured PEI |
+| Direct drive and auto levelling | Camera costs extra; louder than the Bambu printers |
+
+**Top choice: the Bambu Lab A1 Mini.** It meets every requirement in the
+table out of the box, at the lowest price, with the least setup. Get the
+A1 instead if you want room for bigger prints.
