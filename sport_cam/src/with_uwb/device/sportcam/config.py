@@ -163,6 +163,9 @@ ACQUIRE_STALLED_S = 15.0       # acquiring this long → the app says "can't see
 # tilt only needs to keep up with ~1.7 deg/s of subject motion.
 DETECT_FPS_TRACKING = 3.0
 DETECT_FPS_IDLE = 0.5
+IDLE_PERSON_HOLD_S = 4.0       # idle: a person stays "in frame" this long after the
+                               # last detection (two idle detections), so one
+                               # missed frame does not flip the idle sub-state
 
 # Ultra-wideband already knows where the subject is horizontally, so the
 # detector only has to answer "how high". Searching a vertical strip centred

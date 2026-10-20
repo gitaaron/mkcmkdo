@@ -3,10 +3,18 @@
 There is no ranging radio in this build: the camera is the only sense. The
 tracker is a small state machine,
 
+    (idle, no person in frame)       (idle, person in frame)
+               │ session start                │ session start
+               ▼                              ▼
     SEARCH ──person seen──► CENTRE ──N centred detections──► TRACK
        ▲                       │                                │
        └───── nobody seen ◄────┴──── missing RESEARCH_AFTER_S ◄─┘
 
+* **idle** — not a tracker mode: the session has not started. The head is
+  parked with the lens wide and `watch_idle()` runs the detector at
+  DETECT_FPS_IDLE, so the camera knows whether a person is in frame. A
+  session started with a person in frame skips SEARCH and begins in CENTRE
+  on that person.
 * **SEARCH** — lens wide, sweep pan end to end and step the tilt row at each
   turn-around, until the detector sees a person. The first one wins.
 * **CENTRE** — the sweep stops and the camera turns to put that person in the
@@ -43,13 +51,45 @@ class Tracker:
         self.ptz = ptz
         self.dist_m: float | None = None   # estimated from the person's size
         self.ever_locked = False           # has this session ever locked on?
+        self._idle_box: Box | None = None  # largest person seen while idle
+        self._idle_seen_at: float | None = None
         self.reset_lock()
 
     # ---- session ----------------------------------------------------------
     def reset_lock(self) -> None:
-        """Forget any subject and start a fresh search (new session)."""
+        """Forget any subject and start a new session.
+
+        Normally that is a fresh SEARCH. If idle had a person in frame, the
+        sweep is skipped and the session starts in CENTRE on that person; if
+        they have gone, CENTRE_TIMEOUT_S later it falls back to SEARCH.
+        """
+        now = time.monotonic()
+        box = self._idle_box if self.idle_person_in_frame else None
+        self._idle_box = self._idle_seen_at = None
         self.ever_locked = False
-        self._begin_search(time.monotonic(), direction=1 if self.ptz.pan_deg <= 0 else -1)
+        self._begin_search(now, direction=1 if self.ptz.pan_deg <= 0 else -1)
+        if box is not None:
+            self._first_sighting(now, box)
+
+    # ---- idle --------------------------------------------------------------
+    def watch_idle(self) -> None:
+        """One idle tick: keep the lens wide and note whether anyone is in frame.
+
+        Detection runs at DETECT_FPS_IDLE here. A person counts as in frame
+        until IDLE_PERSON_HOLD_S passes with no detection, so one missed frame
+        does not flip the idle sub-state.
+        """
+        self.ptz.set_zoom_mm(config.ZOOM_MIN_MM)    # retried: zoom is rate-limited
+        boxes, fresh = self.camera.person_boxes()
+        if fresh and boxes and self.ptz.zoom_mm <= config.ZOOM_MIN_MM:
+            self._idle_box = max(boxes, key=lambda b: b[2] * b[3])
+            self._idle_seen_at = time.monotonic()
+
+    @property
+    def idle_person_in_frame(self) -> bool:
+        """Idle sub-state: a person was detected within IDLE_PERSON_HOLD_S."""
+        return (self._idle_seen_at is not None
+                and time.monotonic() - self._idle_seen_at <= config.IDLE_PERSON_HOLD_S)
 
     def _begin_search(self, now: float, direction: int) -> None:
         self.mode = SEARCH

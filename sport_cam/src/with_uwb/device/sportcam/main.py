@@ -59,6 +59,7 @@ class Head:
         self._rec_path = ""
         self._rec_started = 0.0
         self._warned = ""          # which warning we last announced
+        self._idle_seen_at: float | None = None   # last person detection while idle
 
     # convenience for local_api/telemetry — pan and tilt are commanded angles
     @property
@@ -71,10 +72,33 @@ class Head:
 
     @property
     def phase(self) -> str | None:
-        """While tracking: "acquiring" until locked on, then "acquired"."""
+        """The sub-state.
+
+        idle: "person-in-frame" or "no-person-in-frame". Tracking: "acquiring"
+        until locked on, then "acquired".
+        """
+        if self.state == "idle":
+            return "person-in-frame" if self.idle_person_in_frame else "no-person-in-frame"
         if self.state not in ("tracking", "recording"):
             return None
         return "acquired" if self.tracker.locked else "acquiring"
+
+    @property
+    def idle_person_in_frame(self) -> bool:
+        """Idle sub-state: a person was detected within IDLE_PERSON_HOLD_S."""
+        return (self._idle_seen_at is not None
+                and time.monotonic() - self._idle_seen_at <= config.IDLE_PERSON_HOLD_S)
+
+    def watch_idle(self) -> None:
+        """One idle tick: keep the lens wide and note whether anyone is in frame.
+
+        The tag, not vision, starts and steers a session in this build, so
+        the idle sub-state is reported only; there is no sweep to skip.
+        """
+        self.ptz.set_zoom_mm(config.ZOOM_MIN_MM)    # retried: zoom is rate-limited
+        box, fresh = self.camera.person_bbox()
+        if fresh and box is not None and self.ptz.zoom_mm <= config.ZOOM_MIN_MM:
+            self._idle_seen_at = time.monotonic()
 
     @property
     def acquire_stalled(self) -> bool:
@@ -116,6 +140,7 @@ class Head:
         old, self.state = self.state, new
         if old not in ("tracking", "recording") and new in ("tracking", "recording"):
             self.tracker.reset_lock()     # a new session acquires afresh
+            self._idle_seen_at = None
         if old != "recording" and new == "recording":
             self._rec_path = self.camera.start_recording()
             self._rec_started = time.monotonic()
@@ -164,6 +189,8 @@ class Head:
                 await self.apply_state("idle")
                 await self.report_state()
         else:
+            if self.state == "idle":
+                self.watch_idle()             # person in frame?
             self.led.lost = False
         # The tag switching on (or the tracker locking on) can move the
         # state, through the same apply_state() as any other command.

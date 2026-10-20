@@ -71,7 +71,13 @@ class Head:
 
     @property
     def phase(self) -> str | None:
-        """While tracking: "acquiring" (sweeping / centring) until locked on, then "acquired"."""
+        """The sub-state.
+
+        idle: "person-in-frame" or "no-person-in-frame". Tracking: "acquiring"
+        (sweeping / centring) until locked on, then "acquired".
+        """
+        if self.state == "idle":
+            return "person-in-frame" if self.tracker.idle_person_in_frame else "no-person-in-frame"
         if self.state not in ("tracking", "recording"):
             return None
         return "acquired" if self.tracker.locked else "acquiring"
@@ -155,11 +161,13 @@ class Head:
             await asyncio.sleep(max(0.0, period - (time.monotonic() - t0)))
 
     async def control_tick(self) -> None:
-        """One 20 Hz tick: search / track, and advance the session."""
+        """One 20 Hz tick: watch (idle) / search / track, and advance the session."""
         if self.state in ("tracking", "recording"):
             self.tracker.step()
             self.led.lost = self.tracker.lost_for() > config.LOST_HOLD_S
         else:
+            if self.state == "idle":
+                self.tracker.watch_idle()     # person in frame? (a session started now skips the sweep)
             self.led.lost = False
         # A lock-on starting the recording, or an empty room ending the
         # search, move the state through the same apply_state() as any command.

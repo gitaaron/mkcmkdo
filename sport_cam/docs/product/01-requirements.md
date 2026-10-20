@@ -90,12 +90,14 @@ Session start and end are the same in both builds:
 ## State machine
 
 States, colours and transitions are shared; button labels and the acquiring
-label differ by build.
+label differ by build. `idle` and `tracking` each have two sub-states,
+reported to the app as telemetry `phase`.
 
 | State | LED | App status ring | Bottom buttons |
 | --- | --- | --- | --- |
 | `off` | off | grey | *(app shows reconnect screen)* |
-| `idle` | solid blue | blue | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
+| `idle`, no person in frame | solid blue | blue, "On — no one in frame" | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
+| `idle`, person in frame | solid blue | blue, "On — person in frame" | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
 | `tracking`, acquiring | green, chasing round the ring | green (fast blink), <!--with_uwb-->"Acquiring subject…"<!--/--><!--both--> / <!--/--><!--without_uwb-->"Looking for a person…"<!--/--> | **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/--> |
 | `tracking`, locked on | solid green | green | **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/--> |
 | `recording` | pulsing red | red (pulsing) | **Stop recording** · **Stop tracking** |
@@ -108,6 +110,11 @@ Where two labels are given: with UWB / without UWB.
 
 Rules:
 
+- `idle` sub-state: the head is parked (centred, lens wide) and the person
+  detector runs at 0.5 fps (`DETECT_FPS_IDLE`). **Person in frame** from a
+  detection until 4 s (`IDLE_PERSON_HOLD_S`) pass without one; otherwise
+  **no person in frame**. Telemetry `phase`: `person-in-frame` /
+  `no-person-in-frame`.
 - `recording` implies `tracking`. **Stop recording** → `tracking`. **Stop
   tracking** while recording stops both (confirmed in the app).
 - Subject missing > 2 s in `tracking`: hold position, LED flashes at 2 Hz.
@@ -165,6 +172,9 @@ ranges the tag at 20 Hz through body and clothing and points at the result.
 - Tag lost > 2 s in `tracking`: hold, LED flashes. Lost > 5 s: `idle`
   (any recording saved first). A subject crossing a pan soft limit behaves
   the same way.
+- The `idle` sub-state (person in frame / no person in frame) is reported to
+  the app only. The tag starts and steers a session; there is no sweep to
+  skip.
 
 ![App UI, with UWB](../../with_uwb/docs/images/app-ui.png)
 
@@ -175,7 +185,9 @@ ranges the tag at 20 Hz through body and clothing and points at the result.
 ![SportCam finding and tracking a climber by vision](../../without_uwb/docs/images/intro-scene.png)
 
 Nothing is worn. **Track & record** in the app starts a wide-angle pan
-sweep; the first person detected is centred, locked and recorded.
+sweep; the first person detected is centred, locked and recorded. If idle
+already has a person in frame, the sweep is skipped and that person is
+centred directly.
 
 ### Non-functional requirements, without UWB
 
@@ -187,10 +199,13 @@ sweep; the first person detected is centred, locked and recorded.
 ### A session, without UWB
 
 1. **Track & record** (app or the camera's local page). State `tracking`,
-   phase `acquiring` ("Looking for a person…"). Zoom wide; pan sweeps ±80° at
-   25°/s, stepping between two tilt rows at each end, until a person is
-   detected.
-2. **Centre, lock.** Sweep stops; the head centres the person. After two
+   phase `acquiring` ("Looking for a person…"). Entry depends on the idle
+   sub-state:
+   - **no person in frame:** search. Zoom wide; pan sweeps ±80° at 25°/s,
+     stepping between two tilt rows at each end, until a person is detected.
+   - **person in frame:** no search; straight to step 2 with the person idle
+     detected. Not seen again within 2 s (`CENTRE_TIMEOUT_S`): search.
+2. **Centre, lock.** Any sweep stops; the head centres the person. After two
    consecutive centred detections: **locked** (solid green). A session started
    from idle begins recording immediately. The first person found is kept;
    afterwards the tracker follows the detection nearest the last position,
@@ -211,6 +226,8 @@ sweep; the first person detected is centred, locked and recorded.
 
 ![State machine, without UWB](../../without_uwb/docs/images/state-machine.png)
 
+- `idle` → `tracking`: from **no person in frame** to search (sweep); from
+  **person in frame** to centre, skipping the sweep.
 - Person lost > 2 s in `tracking`: hold, LED flashes at 2 Hz; > 6 s: sweep
   again. The only automatic return to `idle` is a tracking-only session that
   found nobody in 180 s.

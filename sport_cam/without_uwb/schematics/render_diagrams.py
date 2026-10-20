@@ -227,7 +227,7 @@ def mechanical_layout():
 # 3. State machine
 # ----------------------------------------------------------------------------
 def state_machine():
-    fig, ax = new_fig(16.5, 7.4, "Camera state machine · LED colours")
+    fig, ax = new_fig(16.5, 8.4, "Camera state machine · LED colours")
     y = 3.3
     R = 0.66
 
@@ -250,9 +250,22 @@ def state_machine():
                                 fc="#f2fbf5", ec=GREEN, lw=2, ls="--", zorder=1))
     ax.text(5.95, 4.62, "TRACKING", fontsize=11, fontweight="bold", color=GREEN, ha="left", va="center")
 
+    # idle container: two sub-states
+    yp = 5.55                                   # "person in frame" row
+    ax.add_patch(FancyBboxPatch((2.55, 2.45), 1.7, 4.15, boxstyle="round,pad=0.08",
+                                fc="#f2f6ff", ec=BLUE, lw=2, ls="--", zorder=1))
+    ax.text(2.7, 6.38, "IDLE", fontsize=11, fontweight="bold", color=BLUE, ha="left", va="center")
+
     xs = dict(off=1.0, idle=3.4, search=7.1, centre=9.7, lock=12.3, rec=15.3)
     node(xs["off"], "OFF", GREY)
-    node(xs["idle"], "IDLE", BLUE)
+    node(xs["idle"], "no person\nin frame", BLUE, fs=8)
+    ax.add_patch(Circle((xs["idle"], yp), R, fc="white", ec=BLUE, lw=3, zorder=3))
+    ax.text(xs["idle"], yp, "person\nin frame", ha="center", va="center", fontsize=8,
+            fontweight="bold", color=BLUE, zorder=4)
+    link((xs["idle"] - 0.25, y + R), (xs["idle"] - 0.25, yp - R), "")
+    link((xs["idle"] + 0.25, yp - R), (xs["idle"] + 0.25, y + R), "")
+    ax.text(xs["idle"] - 0.32, (y + yp) / 2, "seen", fontsize=8, ha="right", va="center", color=INK)
+    ax.text(xs["idle"] + 0.32, (y + yp) / 2, "none\n4 s", fontsize=8, ha="left", va="center", color=INK)
     node(xs["search"], "SEARCH", GREEN, fs=9)
     node(xs["centre"], "CENTRE", GREEN, fs=9)
     node(xs["lock"], "LOCKED", GREEN, fs=9)
@@ -261,7 +274,14 @@ def state_machine():
     # main path
     link((xs["off"] + R, y + 0.25), (xs["idle"] - R, y + 0.25), "power\non", lofs=(2.2, y + 0.75))
     link((xs["idle"] - R, y - 0.25), (xs["off"] + R, y - 0.25), "turn off", lofs=(2.2, y - 0.7))
-    link((xs["idle"] + R, y), (xs["search"] - R, y), "Track &\nrecord", lofs=(4.95, y + 0.55))
+    link((xs["idle"] + R, y), (xs["search"] - R, y), "Track &\nrecord", lofs=(5.25, y + 0.55))
+    # person already in frame: straight to CENTRE, no sweep
+    ax.annotate("", xy=(xs["centre"], y + R), xytext=(xs["idle"] + R, yp), zorder=2,
+                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.5, shrinkA=0, shrinkB=0,
+                                connectionstyle="angle,angleA=0,angleB=90,rad=0"))
+    ax.text(6.9, yp + 0.3, "Track & record — person already in frame: skip the sweep",
+            fontsize=8.5, ha="center", va="center", color=INK, zorder=5,
+            bbox=dict(fc="white", ec="none", pad=1.2))
     link((xs["search"] + R, y), (xs["centre"] - R, y), "person\nseen", lofs=(8.4, y + 0.5))
     link((xs["centre"] + R, y), (xs["lock"] - R, y), "2 centred\ndetections", lofs=(11.0, y + 0.5))
     link((xs["lock"] + R, y), (xs["rec"] - 0.82, y), "auto-record\non lock", lofs=(13.8, y + 0.5))
@@ -276,15 +296,15 @@ def state_machine():
     ax.text(4.0, 1.12, "180 s and nobody ever found\n(not recording) → give up", fontsize=8.5,
             color=GREY, ha="center", va="center", bbox=dict(fc="white", ec="none", pad=1.2))
     # record now: IDLE -> RECORDING
-    link((xs["idle"], y + R), (xs["rec"] - 0.3, y + 0.8), "Record now (app button)", rad=-0.42,
-         color=RED, ls="--", lofs=(9.5, 6.05))
+    link((xs["idle"] + 0.3, 6.68), (xs["rec"], y + 0.82), "Record now (app button)", rad=-0.25,
+         color=RED, ls="--", lofs=(10.5, 7.3))
     # stop recording -> tracking
     link((xs["rec"] - 0.3, y - 0.8), (13.3, 2.35), "", rad=0.3, color=RED)
     ax.text(15.3, 1.95, "stop recording\n(keeps tracking)", fontsize=8.5, color=RED, ha="center",
             va="center", bbox=dict(fc="white", ec="none", pad=1.2))
 
     # per-state captions
-    cap = [(xs["off"], "LED off"), (xs["idle"], "LED solid blue\nnothing moving"),
+    cap = [(xs["off"], "LED off"), (xs["idle"], "LED solid blue, parked,\nlens wide, detector 0.5 fps"),
            (xs["search"], "lens wide, pan ±80°\nstepping tilt rows"),
            (xs["centre"], "turn to put the\nperson mid-frame"),
            (xs["lock"], "follow first person,\nvision only"),
@@ -372,6 +392,11 @@ def search_and_track():
     state(*T, 2.9, 1.3, "TRACK", "locked on the first person,\nfollow by vision only", RED)
 
     link((S[0] + 1.15, S[1] + 0.2), (C[0] - 1.15, C[1] + 0.2), "person seen", (10.25, 5.1))
+    # session start: where the loop is entered depends on idle's sub-state
+    link((S[0] - 0.5, S[1] + 1.45), (S[0] - 0.5, S[1] + 0.65), "start, nobody\nin frame",
+         (S[0] - 0.6, S[1] + 1.1), ha="right")
+    link((C[0] + 0.5, C[1] + 1.45), (C[0] + 0.5, C[1] + 0.65), "start, person in\nframe (no sweep)",
+         (C[0] + 0.6, C[1] + 1.1), ha="left")
     link((C[0] - 1.15, C[1] - 0.2), (S[0] + 1.15, S[1] - 0.2), "nobody seen\nfor 2 s", (10.25, 3.95))
     link((C[0] + 0.3, C[1] - 0.65), (T[0] + 1.0, T[1] + 0.65), "2 centred\ndetections", (12.5, 3.25),
          rad=-0.15)

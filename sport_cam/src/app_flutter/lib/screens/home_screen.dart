@@ -102,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
               state: client.state,
               acquiringLabel: text.acquiring,
               connected: client.isConnected,
+              phase: client.telemetry.phase,
               acquiring:
                   client.state == CamState.tracking &&
                   client.telemetry.phase == 'acquiring',

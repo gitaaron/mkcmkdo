@@ -35,8 +35,9 @@ Setup entry point:
 
 ### Without UWB
 
-- **Sensing:** vision only. **Track & record** starts a pan sweep; the first
-  person detected is centred, locked and recorded. Re-sweeps after 6 s
+- **Sensing:** vision only. **Track & record** starts a pan sweep (skipped if
+  a person is already in frame); the first person detected is centred,
+  locked and recorded. Re-sweeps after 6 s
   without a detection.
 - **Session control:** app buttons.
 - **Use when:** cost, size and runtime matter more than identity. Versus the

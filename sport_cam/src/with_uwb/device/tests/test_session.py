@@ -220,6 +220,7 @@ async def full_flow() -> None:
     config.ACQUIRE_SETTLE_S = 0.1
     config.LOST_HOLD_S = 0.2
     config.LOST_IDLE_S = 0.6
+    config.IDLE_PERSON_HOLD_S = 1.0
 
     pw, ph = config.PREVIEW_SIZE
     head = Head.__new__(Head)
@@ -236,6 +237,7 @@ async def full_flow() -> None:
     head.mdns = FakeMdns()
     head.cloud = CloudLink(head)       # not connected: writes are no-ops
     head._rec_path, head._rec_started = "", 0.0
+    head._idle_seen_at = None
 
     seen: list[tuple[str, str | None]] = []
 
@@ -250,6 +252,14 @@ async def full_flow() -> None:
 
     await tick_for(0.3)
     check("standby with the tag off", head.state == "idle" and not head.led.acquiring)
+    check("idle sub-state: person in frame", head.phase == "person-in-frame", f"{head.phase}")
+    bbox, head.camera._bbox = head.camera._bbox, None
+    await tick_for(config.IDLE_PERSON_HOLD_S + 0.5)
+    check("idle sub-state: no person in frame once they have gone for IDLE_PERSON_HOLD_S",
+          head.phase == "no-person-in-frame", f"{head.phase}")
+    head.camera._bbox = bbox
+    await tick_for(0.5)
+    check("…and back to person in frame", head.phase == "person-in-frame", f"{head.phase}")
 
     head.uwb.on_since, head.uwb.off_at = time.monotonic(), None
     await tick_for(0.25)
@@ -271,6 +281,9 @@ async def full_flow() -> None:
     dedup = [s for i, s in enumerate(order) if i == 0 or order[i - 1] != s]
     check("states ran idle → tracking → recording → idle",
           dedup == ["idle", "tracking", "recording", "idle"], f"{dedup}")
+    check("idle reports its sub-state; tracking does not",
+          all(p in ("person-in-frame", "no-person-in-frame") for s, p in seen if s == "idle")
+          and all(p in ("acquiring", "acquired") for s, p in seen if s != "idle"), f"{seen}")
     check("phase ran acquiring → acquired",
           ("tracking", "acquiring") in seen and ("recording", "acquired") in seen, f"{seen}")
 

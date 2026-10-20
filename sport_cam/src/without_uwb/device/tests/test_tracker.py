@@ -15,7 +15,9 @@ What is checked is what is easy to get wrong and impossible to eyeball:
   * a lone false positive does not lock;
   * following converges without overshoot, and follows someone who moves;
   * losing the person starts a new sweep;
-  * zoom frames the person, and focus distance comes from their size.
+  * zoom frames the person, and focus distance comes from their size;
+  * idle knows whether a person is in frame, and a session started then skips
+    the sweep.
 
     python3 device/tests/test_tracker.py
 """
@@ -296,6 +298,58 @@ def main() -> None:
     tr.reset_lock()
     check("reset_lock forgets the subject",
           tr.mode == "search" and not tr.ever_locked and tr.dist_m is None)
+
+    # ---- 9. idle: is anyone in frame? -----------------------------------------------
+    print("\nidle")
+    def idle_for(tr: Tracker, seconds: float) -> None:
+        end = CLOCK.t + seconds
+        while CLOCK.t < end:
+            CLOCK.t += 0.05
+            tr.watch_idle()
+
+    person = Person(20.0, dist=6.0)
+    tr, cam, ptz = world(person)
+    ptz.zoom_mm = 6.0                                  # left zoomed in by the last session
+    cam.set_detect_fps(config.DETECT_FPS_IDLE)
+    idle_for(tr, 3.0)
+    check("idle widens the lens", ptz.zoom_mm == config.ZOOM_MIN_MM, f"{ptz.zoom_mm}")
+    check("idle sub-state: person in frame", tr.idle_person_in_frame)
+    check("idle does not move the head", ptz.pan_deg == 0.0 and ptz.tilt_deg == 0.0)
+
+    cam.set_detect_fps(config.DETECT_FPS_TRACKING)
+    tr.reset_lock()
+    check("session start with a person in frame → CENTRE, no sweep", tr.mode == "centre", tr.mode)
+    pans = []
+    t = run(tr, 10, until=lambda: (pans.append(ptz.pan_deg), tr.locked)[1])
+    check("…locks within 2 s", tr.locked and t < 2.0, f"{t:.1f}s")
+    run(tr, 3, until=lambda: pans.append(ptz.pan_deg))
+    check("…and turns onto the person without sweeping",
+          abs(ptz.pan_deg - person.bearing) < 5.0
+          and min(pans) >= -0.5 and max(pans) <= person.bearing + 5.0,
+          f"pan {ptz.pan_deg:.1f}, range {min(pans):.1f}..{max(pans):.1f}")
+
+    person.visible = False
+    idle_for(tr, config.IDLE_PERSON_HOLD_S + 2.5)
+    check("idle sub-state: no person in frame once nobody is seen for IDLE_PERSON_HOLD_S",
+          not tr.idle_person_in_frame)
+
+    tr, cam, ptz = world(Person(70.0))                 # outside the wide field of view
+    cam.set_detect_fps(config.DETECT_FPS_IDLE)
+    idle_for(tr, 5.0)
+    check("idle sub-state: nobody in frame", not tr.idle_person_in_frame)
+    tr.reset_lock()
+    check("session start with nobody in frame → SEARCH (sweep)", tr.mode == "search", tr.mode)
+
+    gone = Person(-15.0)
+    tr, cam, ptz = world(gone)
+    cam.set_detect_fps(config.DETECT_FPS_IDLE)
+    idle_for(tr, 3.0)
+    gone.visible = False                               # leaves just as the session starts
+    cam.set_detect_fps(config.DETECT_FPS_TRACKING)
+    tr.reset_lock()
+    run(tr, config.CENTRE_TIMEOUT_S + 1.0)
+    check("person in idle frame gone at session start → CENTRE times out to SEARCH",
+          tr.mode == "search", tr.mode)
 
     print()
     if failures:

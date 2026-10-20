@@ -136,7 +136,9 @@ builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
   "state": "off" | "idle" | "tracking" | "recording",
   "stateBy": "device",                       // "app" when the API wrote a request
   "telemetry": { "pan": -12.5, "tilt": 10.0, "zoomMm": 7.4, "dist": 4.2,
-                 "phase": "acquiring" | "acquired" | null, "acquireStalled": false,
+                 "phase": "no-person-in-frame" | "person-in-frame"   // idle
+                        | "acquiring" | "acquired" | null,          // tracking / recording; off
+                 "acquireStalled": false,
                  "battery": 0.82, "batteryWatts": 14.6, "batteryMinutes": 191,
                  "batteryLevel": "ok", "storageMinutes": 212, … },
   "deviceSeenAt": <server time>,             // heartbeat, every HEARTBEAT_S (5 s)
@@ -240,7 +242,7 @@ Programs: camera service only.
 
 | Module | Function |
 | --- | --- |
-| `tracker.py` | SEARCH → CENTRE → TRACK state machine and loops from [05](../../without_uwb/docs/design/05-tracking-system.md): sweep, first-person lock-on with gate, pan/tilt goals and slew, vision-only framing, focus from apparent size |
+| `tracker.py` | SEARCH → CENTRE → TRACK state machine and loops from [05](../../without_uwb/docs/design/05-tracking-system.md): idle person-in-frame watch (`watch_idle()`; a session starts in CENTRE when someone is in frame), sweep, first-person lock-on with gate, pan/tilt goals and slew, vision-only framing, focus from apparent size |
 | `session.py` | `AutoSession`: first lock of a session started from idle starts recording; a tracking session with nobody found gives up after 180 s ([01](../product/01-requirements.md#a-session-without-uwb)) |
 
 `config.py` additionally holds the search and tracking gains, detector
@@ -256,10 +258,10 @@ settings, and zoom and focus curves. `camera.py` adds `person_boxes()`.
 - Tracker use of the boxes (search, lock-on, following, framing, focus from
   size): [05](../../without_uwb/docs/design/05-tracking-system.md#control-loops-all-run-on-the-pi-20-hz).
 
-Tests: `src/without_uwb/device/tests/test_tracker.py` (sweep and
-turn-arounds, two-detection lock, bystander gate, correction signs, slew
+Tests: `src/without_uwb/device/tests/test_tracker.py` (idle sub-state and
+sweep skip, sweep and turn-arounds, two-detection lock, bystander gate, correction signs, slew
 limits, framing: fill target, edge guard, stale relax); `test_session.py`
-(auto-record on lock, give-up rule).
+(auto-record on lock, give-up rule, idle → CENTRE with a person in frame).
 
 ### Firebase link, without UWB
 

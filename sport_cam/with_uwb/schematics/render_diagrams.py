@@ -285,6 +285,8 @@ def state_machine():
         ax.text((x1 + x2) / 2, ytxt, label, ha="center", fontsize=8.5, color=INK,
                 bbox=dict(fc="white", ec="none", pad=1))
 
+    ax.text(4.4, 0.75, "sub-states: person in frame /\nno person in frame", ha="center",
+            fontsize=8.5, color=BLUE)
     edge(1.6, 4.4, "power on", -0.35, 4.05)
     edge(4.4, 1.6, "turn off", -0.55, 0.9)
     edge(4.4, 7.2, "start tracking", -0.35, 4.05)

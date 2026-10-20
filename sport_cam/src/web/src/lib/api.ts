@@ -10,7 +10,7 @@ export interface Telemetry {
   tilt?: number;
   zoomMm?: number;
   dist?: number | null;
-  phase?: "acquiring" | "acquired" | null;
+  phase?: "person-in-frame" | "no-person-in-frame" | "acquiring" | "acquired" | null;
   acquireStalled?: boolean;
   battery?: number;
 }

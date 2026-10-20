@@ -123,6 +123,7 @@ async def full_flow() -> None:
 
     person = Person(55.0, dist=5.0)
     ptz = FakePtz()
+    ptz.park = lambda: (ptz.set_pan(0.0), ptz.set_tilt(0.0))    # as the real one: centre
     head = Head.__new__(Head)
     head.state = "idle"
     head.camera = RecCamera(ptz, [person])
@@ -149,8 +150,10 @@ async def full_flow() -> None:
             if until and until():
                 return
 
-    await tick_for(1.0)
+    await tick_for(3.0)
     check("idle: camera does not move", head.ptz.pan_deg == 0.0 and head.state == "idle")
+    check("idle sub-state: no person in frame (they are outside the wide view)",
+          head.phase == "no-person-in-frame", f"{head.phase}")
 
     # --- the app's track / record button -----------------------------------------
     await head.apply_state("tracking")
@@ -203,6 +206,23 @@ async def full_flow() -> None:
     dedup = [s for i, s in enumerate(order) if i == 0 or order[i - 1] != s]
     check("states ran idle → tracking → recording → tracking → idle",
           dedup == ["idle", "tracking", "recording", "tracking", "idle"], f"{dedup}")
+
+    # --- someone already in frame when the session starts ------------------------------
+    config.SEARCH_GIVE_UP_S = 180.0
+    person.visible, person.bearing = True, 15.0
+    await tick_for(3.0)
+    check("idle sub-state: person in frame", head.phase == "person-in-frame", f"{head.phase}")
+    await head.apply_state("tracking")
+    check("track / record with a person in frame → CENTRE, the sweep is skipped",
+          head.tracker.mode == "centre" and head.phase == "acquiring", head.tracker.mode)
+    pans: list[float] = []
+    t0 = CLOCK.t
+    await tick_for(10, until=lambda: (pans.append(head.ptz.pan_deg), head.state == "recording")[1])
+    check("…locks and records within 2 s, never sweeping away",
+          head.state == "recording" and CLOCK.t - t0 < 2.0
+          and min(pans) >= -0.5 and max(pans) <= person.bearing + 5.0,
+          f"{CLOCK.t - t0:.1f}s, pan {min(pans):.1f}..{max(pans):.1f}")
+    await head.apply_state("idle")
 
 
 def ring_animation() -> None:

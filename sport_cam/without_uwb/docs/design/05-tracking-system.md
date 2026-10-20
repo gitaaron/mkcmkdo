@@ -3,8 +3,9 @@
 ![Search and track](../images/search-and-track.png)
 
 Subject localisation by **vision only**: no tag, radio or anchors.
-**Track & record** starts a pan sweep; the person detector finds a person;
-the camera centres them, locks on and keeps them framed. Pan, tilt, zoom and
+**Track & record** starts a pan sweep (skipped if idle already has a person
+in frame); the person detector finds a person; the camera centres them, locks
+on and keeps them framed. Pan, tilt, zoom and
 focus are register writes to one I2C controller on the Pi
 ([03](../../../docs/design/03-mechanical-design.md),
 [04](../../../docs/design/04-electronics.md)); the loop runs on the device at
@@ -34,30 +35,31 @@ camera films the first person it finds ([limitations](#limitations)).
 ## The state machine
 
 ```
-                       Track & record
-   idle ────────────────────────────────────────►  SEARCH
-                                                    │  sweep pan ±80° at 25°/s,
-                                                    │  step tilt row at each turn,
-                                                    │  zoom wide, focus 5 m
-                          person seen               ▼
-                        ┌───────────────────────  CENTRE
-     nobody seen again  │   turn to put them        │
-     for 2 s ──► SEARCH │   in the middle           │ 2 consecutive centred detections
-                        └──────────────────────────►▼
-                                                   TRACK ── first lock starts recording
-                                                    │
+   idle, no person in frame ──Track & record──►  SEARCH   sweep pan ±80° at 25°/s,
+                                                   │      step tilt row at each turn,
+                                                   │      zoom wide, focus 5 m
+                                                   │ person seen
+                                                   ▼
+   idle, person in frame ───Track & record──────►  CENTRE   turn to put them in the middle
+             (skips the sweep)                     │        (nobody seen again for 2 s → SEARCH)
+                                                   │ 2 consecutive centred detections
+                                                   ▼
+                                                 TRACK ── first lock starts recording
+                                                   │
                           missing 2 s: hold, ring flashes
                           missing 6 s: ─────────────► SEARCH (toward the side they left)
 ```
 
 | Mode | Behaviour | Exit |
 | --- | --- | --- |
+| **idle**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_IDLE` (0.5 fps). Person in frame from a detection until `IDLE_PERSON_HOLD_S` (4 s) pass without one | **Track & record** → SEARCH (no person in frame) or CENTRE on the last detected person (person in frame) |
 | **SEARCH** | zoom wide; focus at `SEARCH_FOCUS_M` (5 m); pan sweeps end to end at `SEARCH_PAN_DPS` (25°/s); steps to the next of `SEARCH_TILT_ROWS_DEG` (5°, 22°) at each end | person detected → CENTRE. Tracking-only session, nobody ever found, `SEARCH_GIVE_UP_S` (180 s) elapsed → `idle` |
-| **CENTRE** | sweep stops; turn toward the largest person until the box centre is within `ACQUIRE_CENTRE_FRACTION` (20 %) of frame centre | `ACQUIRE_DETECTIONS` (2) consecutive centred detections → TRACK; nobody seen for `CENTRE_TIMEOUT_S` (2 s) → SEARCH |
+| **CENTRE** | sweep stops (or never ran); turn toward the largest person until the box centre is within `ACQUIRE_CENTRE_FRACTION` (20 %) of frame centre | `ACQUIRE_DETECTIONS` (2) consecutive centred detections → TRACK; nobody seen for `CENTRE_TIMEOUT_S` (2 s) → SEARCH |
 | **TRACK** | follow and frame the person; estimate distance for focus | missing for `RESEARCH_AFTER_S` (6 s) → SEARCH |
 
-Mapping to app states: SEARCH and CENTRE = `tracking`/`acquiring`; TRACK =
-`tracking`/`acquired`.
+Mapping to app states (telemetry `phase`): idle = `idle`/`no-person-in-frame`
+or `idle`/`person-in-frame`; SEARCH and CENTRE = `tracking`/`acquiring`;
+TRACK = `tracking`/`acquired`.
 
 Sweep timing:
 

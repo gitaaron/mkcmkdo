@@ -48,9 +48,11 @@ python3 src/without_uwb/device/tests/test_tracker.py
 python3 src/without_uwb/device/tests/test_session.py
 ```
 
-`test_tracker.py` covers the search sweep, lock-on, re-search and the control
+`test_tracker.py` covers the idle sub-states, the search sweep (and skipping
+it when a person is already in frame), lock-on, re-search and the control
 loops, and guards both of the tilt bugs below. `test_session.py` covers the
-Track & record session: auto-record on lock and the give-up timeout.
+Track & record session: auto-record on lock, the give-up timeout, and a
+session started with a person in frame.
 
 ## On the bench, before the first session
 
@@ -75,6 +77,7 @@ checks above pass. Press **Track & record** in the app to start each one.
 | --- | --- | --- | --- |
 | 1 | **Sweep covers the range and reverses at the limits** | stand out of view, press Track & record, watch the pan for one full pass | it should go from about −80° to +80° and back, on both tilt rows (`SEARCH_TILT_ROWS_DEG`), without the servo binding or buzzing at either end. Binding: narrow the limits in `config.py`; wrong direction: flip `PAN_SIGN` / `TILT_SIGN` |
 | 2 | **First-person lock** | walk into view while it sweeps | the sweep stops and the camera centres on the first person the HOG detector sees, ignoring a second person who arrives later |
+| 2a | **Idle sub-state and sweep skip** | press Stop tracking, then stand in view of the parked camera for 5 s; check the app's status ring label; press Track & record | label "On — person in frame" (and "On — no one in frame" a few seconds after you leave). Track & record turns straight to you and locks within ≈ 2 s, with no sweep. Not detected while idle: same fixes as check 3, in reverse (`DETECT_HIT_THRESHOLD` lower) |
 | 3 | **False-positive rate in your room** | leave the sweep running past a coat stand, hanging coats, a chair with clothes on it, a poster of a person | it should not lock onto them. If it does, raise `DETECT_HIT_THRESHOLD` (0.3 → 0.4) or `ACQUIRE_DETECTIONS` (2 → 3), then repeat the sweep |
 | 4 | **Lock-and-follow a walking person** | walk across the room, turn and come back | the person stays inside the frame by vision alone; tilt follows as well as pan. Overshoot or oscillation means `TRACK_PAN_GAIN` / `TRACK_TILT_GAIN` are too high ([05 — Tuning](../design/05-tracking-system.md#tuning)) |
 | 5 | **Auto-record on lock** | watch the ring and the app on the first lock | the ring goes from blue to breathing red and the app shows recording with no extra tap (`AUTO_RECORD_ON_LOCK`). The clip is saved when you stop |

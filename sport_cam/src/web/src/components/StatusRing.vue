@@ -21,12 +21,20 @@ const acquiring = computed(
   () => props.cam.state === "tracking" && props.cam.telemetry?.phase === "acquiring",
 );
 
+// Idle's sub-state: is anyone in frame? (older cameras don't report it)
+const idleLabel = computed(() => {
+  const phase = props.cam.telemetry?.phase;
+  if (phase === "person-in-frame") return "On — person in frame";
+  if (phase === "no-person-in-frame") return "On — no one in frame";
+  return "On — not tracking";
+});
+
 const label = computed(() =>
   acquiring.value
     ? modeText(props.cam.mode).acquiring
     : ({
         off: "Off",
-        idle: "On — not tracking",
+        idle: idleLabel.value,
         tracking: "Tracking",
         recording: "Recording",
       })[props.cam.state],

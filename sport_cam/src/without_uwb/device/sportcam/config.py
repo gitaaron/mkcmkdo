@@ -125,6 +125,9 @@ AUTO_RECORD_ON_LOCK = True
 # (cv2.dnn) is the upgrade path — `Camera._detect` is the only place to change.
 DETECT_FPS_TRACKING = 3.0
 DETECT_FPS_IDLE = 0.5
+IDLE_PERSON_HOLD_S = 4.0       # idle: a person stays "in frame" this long after the
+                               # last detection (two idle detections), so one
+                               # missed frame does not flip the idle sub-state
 DETECT_HIT_THRESHOLD = 0.3     # HOG SVM margin: higher = fewer false people.
                                # Tune on your own room; coat stands and chairs
                                # are the usual false positives.

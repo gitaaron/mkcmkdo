@@ -29,7 +29,8 @@ export interface Telemetry {
   tilt?: number;
   zoomMm?: number;
   dist?: number | null;  // with_uwb: from ranging; without_uwb: from the person's size in frame
-  phase?: "acquiring" | "acquired" | null;  // while tracking: found the subject yet?
+  /** idle: is a person in frame? tracking: found the subject yet? */
+  phase?: "person-in-frame" | "no-person-in-frame" | "acquiring" | "acquired" | null;
   acquireStalled?: boolean;  // acquiring a long time: nobody found / vision cannot see the subject
   tagPresent?: boolean;      // with_uwb only: the wearable is switched on and ranging
   battery?: number;          // fraction of the pack remaining, 0-1

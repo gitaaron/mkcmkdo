@@ -14,12 +14,14 @@ class StatusRing extends StatefulWidget {
     required this.connected,
     this.acquiring = false,
     this.acquiringLabel = 'Acquiring subject',
+    this.phase,
   });
 
   final CamState state;
   final bool connected;
   final bool acquiring;
   final String acquiringLabel;
+  final String? phase; // telemetry phase: idle's sub-state is in the label
 
   @override
   State<StatusRing> createState() => _StatusRingState();
@@ -67,13 +69,17 @@ class _StatusRingState extends State<StatusRing>
     super.dispose();
   }
 
+  String get _stateLabel => widget.state == CamState.idle
+      ? idleLabel(widget.phase)
+      : stateLabel(widget.state);
+
   @override
   Widget build(BuildContext context) {
     final color = SportColors.forState(widget.state);
     return Semantics(
       label:
           'Camera status: '
-          '${widget.acquiring ? widget.acquiringLabel : stateLabel(widget.state)}',
+          '${widget.acquiring ? widget.acquiringLabel : _stateLabel}',
       child: FadeTransition(
         opacity: _pulse,
         child: Container(

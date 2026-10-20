@@ -30,6 +30,13 @@ class SportColors {
   };
 }
 
+/// Idle's sub-state, from telemetry `phase`.
+String idleLabel(String? phase) => switch (phase) {
+  'person-in-frame' => 'On — person in frame',
+  'no-person-in-frame' => 'On — no one in frame',
+  _ => 'On — not tracking',
+};
+
 String stateLabel(CamState s) => switch (s) {
   CamState.off => 'Off',
   CamState.idle => 'On — not tracking',

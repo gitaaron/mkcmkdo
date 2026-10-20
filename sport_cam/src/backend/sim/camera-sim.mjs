@@ -103,6 +103,9 @@ await waitForEmulators();
 let state = "idle";
 let recStarted = 0;
 let trackingSince = 0;
+let acquireMs = 3000;
+// Idle sub-state: someone walks into frame for 10 s of every 20.
+const personInFrame = () => Math.floor(Date.now() / 10000) % 2 === 1;
 let pan = 0;
 let panDir = 1;
 let wh = 0;
@@ -124,7 +127,11 @@ console.log(`[sim] camera '${KEY}' online (${MODE}, ${frames.length} test frames
 function adopt(next) {
   const prev = state;
   state = next;
-  if (next === "tracking" && prev !== "recording") trackingSince = Date.now();
+  if (next === "tracking" && prev !== "recording") {
+    trackingSince = Date.now();
+    // Without UWB, a session started with a person in frame skips the sweep.
+    acquireMs = MODE === "without_uwb" && prev === "idle" && personInFrame() ? 1000 : 3000;
+  }
   if (next === "recording") recStarted = Date.now();
   if (prev === "recording" && next !== "recording") {
     const durationS = Math.round((Date.now() - recStarted) / 100) / 10;
@@ -168,7 +175,9 @@ setInterval(() => {
       tilt: 12,
       zoomMm: 7.4,
       dist: Math.round((4.2 + Math.sin(Date.now() / 3000)) * 100) / 100,
-      phase: tracking ? (Date.now() - trackingSince > 3000 ? "acquired" : "acquiring") : null,
+      phase: tracking
+        ? Date.now() - trackingSince > acquireMs ? "acquired" : "acquiring"
+        : state === "idle" ? (personInFrame() ? "person-in-frame" : "no-person-in-frame") : null,
       acquireStalled: false,
       ...(MODE === "with_uwb" ? { tagPresent: true } : {}),
       battery: Math.round(frac * 1000) / 1000,

@@ -24,6 +24,7 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | **mDNS / Bonjour** | how a phone finds the camera on the local Wi-Fi by name (`sportcam.local`) without knowing its IP address |
 | **MJPEG** | video sent as a stream of JPEG pictures; the camera's direct live view to phones on its Wi-Fi |
 | **PD (USB Power Delivery)** | the part of USB-C that lets a bank supply more than 5 V. The **PD trigger** board asks the bank for 12 V |
+| **Person in frame / no person in frame** | the two sub-states of `idle`: whether the person detector has seen someone in the last 4 s. <!--both-->Without UWB, starting a session with a person in frame skips the sweep<!--/--><!--without_uwb: Starting a session with a person in frame skips the sweep--><!--with_uwb: Reported to the app only; the tag starts and steers a session--> ([01](../product/01-requirements.md#state-machine)) |
 | **PETG** | the filament every structural part is printed in |
 | **PTZ** | pan, tilt and zoom. The **PTZ base** is the bought Arducam camera assembly; the **PTZ controller** is its board that drives the servos and lens motors |
 | **Slew limit** | a cap on how fast the camera may turn, so it glides between measurements instead of snapping |
