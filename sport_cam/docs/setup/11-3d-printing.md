@@ -1,29 +1,20 @@
 # 11 — 3D printing: requirements, materials and settings
 
-Everything SportCam needs you to print, what the printer has to be able to do,
-and what to buy. No exotic printer required: a stock Ender 3, Prusa Mini,
-Bambu A1 or anything comparable will do all of it, for either build.
+Printed parts, printer requirements, materials and settings for both builds.
+Any stock desktop FDM printer of Ender 3 / Prusa Mini / Bambu A1 class is
+sufficient.
 
 | Build | Parts | PETG | Machine time |
 | --- | --- | --- | --- |
 | [With UWB](#with-uwb) | 10 (5 common + 2 arms, mast foot, mast cradle, wearable pod) | ≈ 420 g | ≈ 40 h |
 | [Without UWB](#without-uwb) | 5 (the common parts) | ≈ 280 g | ≈ 26 h |
 
-Sizes below are for the part sizes assumed in
-[`cad/ordered_parts.toml`](../../cad/ordered_parts.toml). `cad/fit.py`
-re-sizes the enclosure, shelf, lid and diffuser to the parts you actually
-buy, so [`cad/FIT_REPORT.md`](../../cad/FIT_REPORT.md) has the current
-figures.
-
-Sources are in <!--both-->each build's<!--/--><!--with_uwb: the build's--><!--without_uwb: the build's--> `cad/` ([with UWB](../../with_uwb/cad/),
-[without UWB](../../without_uwb/cad/)); the workflow for regenerating STLs is
-in [Appendix A](../appendix/appendix-a-cad-parts.md). The parts and their place in the
-build are in [03 — Mechanical design](../design/03-mechanical-design.md).
-
-The same printer is also meant for **Croc charms (Jibbitz)**, a separate
-project with its own requirements — see [Croc charms](#croc-charms-jibbitz)
-at the end, and [One printer for both](#one-printer-for-both) if you are
-buying a printer.
+| Topic | Reference |
+| --- | --- |
+| Sizes | for the part sizes assumed in [`cad/ordered_parts.toml`](../../cad/ordered_parts.toml). `cad/fit.py` resizes the enclosure, shelf, lid and diffuser to measured parts; current figures in [`cad/FIT_REPORT.md`](../../cad/FIT_REPORT.md) |
+| Sources | `<build>/cad/` ([with UWB](../../with_uwb/cad/), [without UWB](../../without_uwb/cad/)); STL workflow in [Appendix A](../appendix/appendix-a-cad-parts.md) |
+| Part roles | [03 — Mechanical design](../design/03-mechanical-design.md) |
+| Croc charms (separate project, same printer) | [Croc charms](#croc-charms-jibbitz), [One printer for both](#one-printer-for-both) |
 
 ## Printer requirements
 
@@ -40,21 +31,14 @@ buying a printer.
 
 ### Design rule: every part prints on a Bambu Lab A1 Mini
 
-The reference printer for this project is the **Bambu Lab A1 Mini**
-(180 × 180 × 180 mm build volume). **Every printed part, in both builds, must
-fit on it in one piece**, so any change to the CAD has to keep it that way:
+Reference printer: **Bambu Lab A1 Mini** (180 × 180 × 180 mm). **Every
+printed part in both builds must fit on it in one piece** (requirement C5).
 
-- **No part may exceed 170 mm on any axis.** That is the 180 mm bed less
-  5 mm a side for a brim or skirt. The bed is a cube, so a part that is
-  under 170 mm on all three sides fits whichever way up it prints.
-- **Don't split a part to get round the limit.** Change the design instead;
-  a glued seam in the enclosure or the lid is a weak point under the camera.
-- **It's checked automatically.** `python3 cad/fit.py` measures every STL in
-  both builds, and fails if one is too big or comes out in more than one
-  piece. It also never widens the enclosure past what fits — 162 mm across
-  with UWB, where the arm bosses add 8 mm. It runs on every render, on every
-  commit that touches the CAD, and in CI
-  ([Appendix A](../appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)).
+| Rule | Detail |
+| --- | --- |
+| **≤ 170 mm on every axis** | 180 mm bed minus 5 mm per side for brim/skirt. Cubic volume: any orientation fits |
+| **No split parts** | redesign instead; a glued seam in the enclosure or lid is a structural weak point |
+| **Automated check** | `python3 cad/fit.py` measures every STL in both builds; fails on oversize or multi-piece parts. Caps the enclosure diameter (162 mm with UWB, where the arm bosses add 8 mm). Runs on every render, on CAD commits, and in CI ([Appendix A](../appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)) |
 
 Sizes with the assumed parts (bounding box, mm):
 
@@ -69,9 +53,9 @@ Sizes with the assumed parts (bounding box, mm):
 | Wearable pod | with UWB | 142 × 74 × 31 | 28 |
 | Anchor arm, mast foot, mast cradle | with UWB | ≤ 69 mm | 100+ |
 
-For SportCam alone, **build volume is the only hard gate.** 160 × 155 mm clears every part
-with the assumed sizes; the A1 Mini's 180 × 180 leaves room for bigger ones. Resin printers are the wrong
-tool here — these are structural brackets, not miniatures.
+- **Build volume is the only hard requirement:** 160 × 155 mm clears every
+  part at the assumed sizes; the A1 Mini's 180 × 180 leaves margin.
+- Resin printers are unsuitable (structural parts).
 
 ## What to buy
 
@@ -82,16 +66,17 @@ tool here — these are structural brackets, not miniatures.
 | Glue stick (PVA) | 1 | see the warning below — this is a release agent, not an adhesive |
 | TPU 95A *(optional, UWB build)* | ≈ 30 g | nicer wearable pod against the skin. Needs direct drive |
 
-> **PETG sticks to smooth PEI too well.** On a bare smooth PEI sheet it can
-> fuse and tear chunks out of the surface when you remove the part. Put down a
-> thin layer of glue stick first. It is there to stop the part bonding, which
-> is the opposite of what glue stick normally does. Textured PEI, garolite and
-> glass with glue are all fine.
+> **Warning — PETG on smooth PEI:** PETG can fuse to a bare smooth PEI sheet
+> and tear the surface on removal. Apply a thin layer of glue stick as a
+> **release agent**. Textured PEI, garolite, and glass with glue are safe.
 
-PLA will physically work and is easier to print, but it creeps under sustained
-load and softens around 60 °C. The lid holds the entire camera cantilevered
-off four bolts, and the whole thing lives on a tripod that may sit in a hot
-car. Use PETG. ABS or ASA are also fine if you have an enclosure.
+Material choice:
+
+| Material | Suitability |
+| --- | --- |
+| **PETG** | specified |
+| PLA | not recommended: creeps under sustained load, softens at ≈ 60 °C (lid cantilevers the camera; tripods get left in hot cars) |
+| ABS / ASA | acceptable with an enclosed printer |
 
 ## The common parts
 
@@ -108,19 +93,17 @@ are the with-UWB ones (camera-only in brackets where they differ).<!--/-->
 | [LED diffuser band](../../with_uwb/cad/led_diffuser_ring.scad) | **2** | **0 %** | 0.2 | ≈ 6 g | ≈ 1.5 h |
 | [Battery tray](../../with_uwb/cad/battery_tray.scad) | 3 | 20 % | 0.2 | ≈ 38 g | ≈ 3.5 h |
 
-The enclosure differs between builds in size, because `fit.py` solves each
-one, and in its wall. <!--with_uwb-->The UWB one has three bosses for the arms and mast, and
+Enclosure differences by build: size (solved per build by `fit.py`) and wall. <!--with_uwb-->The UWB one has three bosses for the arms and mast, and
 a slot for the anchor cables<!--/--><!--both-->; the camera-only one is plain all round<!--/--><!--without_uwb: The camera-only one is plain all round-->.
 
-Masses are computed from the STL solid volume at PETG's 1.27 g/cm³ and scaled
-for the walls and infill above. Times assume a 0.4 nozzle at 0.2 mm and
-ordinary speeds. **Your slicer is the authority on both** — these are for
-deciding how much filament to buy and which evening to start.
+Estimates: mass from STL volume at 1.27 g/cm³ (PETG), scaled for walls and
+infill; time for a 0.4 mm nozzle at 0.2 mm layers, default speeds. **The
+slicer's figures take precedence.**
 
 ### Orientation and supports
 
-Every part is modelled in its print orientation. Drop it on the bed as it
-comes out of OpenSCAD and you need **no supports anywhere**<!--with_uwb--> — except under
+Every part is modelled in print orientation. Printed as exported from
+OpenSCAD, **no supports are needed**<!--with_uwb--> — except under
 the UWB enclosure's wall bosses ([below](#with-uwb))<!--/-->.
 
 | Part | Orientation | Supports |
@@ -133,18 +116,15 @@ the UWB enclosure's wall bosses ([below](#with-uwb))<!--/-->.
 
 ### Why the lid is different
 
-It is the only part with raised settings, and the only one worth not cutting
-corners on. The Arducam base, the camera, the zoom lens and both servos all
-hang off four M3 bolts through this plate. Five walls and 40 % infill is the
-difference between a rigid mount and one that flexes every time the pan servo
-accelerates, which shows up as wobble in the footage.
+The only part with raised settings (5 walls, 40 % infill). It carries the
+Arducam base, camera, lens and both servos on four M3 bolts. Lower settings
+allow flex under pan acceleration, visible as wobble in the footage.
 
 ### Why the diffuser is different
 
-The opposite problem: it has to be as hollow as possible. Two walls, zero
-infill and **no top or bottom solid layers** is what turns 16 point sources
-into an even glowing band. If your slicer insists on solid layers, set top and
-bottom layers to 0 explicitly. Printed any denser, it reads as 16 bright dots.
+Must be as hollow as possible to diffuse 16 point sources into an even band:
+2 walls, 0 % infill, **0 top and bottom layers** (set explicitly if the slicer
+adds them). Denser prints show 16 distinct dots.
 
 ## Settings that are not per-part
 
@@ -157,9 +137,9 @@ bottom layers to 0 explicitly. Printed any denser, it reads as 16 bright dots.
 | Retraction | 4–6 mm bowden / 1–2 mm direct | PETG strings; dry filament matters more than retraction tuning |
 | Flow | ~95 % | PETG tends to over-extrude at default flow |
 
-Dry your filament if it has been open more than a few weeks. Wet PETG is the
-single most common cause of stringy, weak prints, and the diffuser shows it
-worst because every string is visible once the LEDs are on.
+Dry filament that has been open more than a few weeks. Wet PETG is the most
+common cause of stringing and weak parts; strings are most visible on the lit
+diffuser.
 
 ## After printing
 
@@ -171,33 +151,33 @@ worst because every string is visible once the LEDs are on.
 | Fit heat-set inserts | soldering iron, flat tip, ≈ 200 °C | M3: one in the top of each of the three shelf posts, and four pushed sideways into the lid's ring (7 total) |
 | Dry-fit before wiring | — | lid ring in the enclosure mouth; shelf on its posts; diffuser band over the window onto its ledge; the bank in the tray |
 
-The 3/8-16 brass tripod insert is epoxied.<!--with_uwb--> The UWB build adds more heat-set
-inserts ([below](#with-uwb)).<!--/-->
+The 3/8-16 brass tripod insert is epoxied, not heat-set.<!--with_uwb--> Additional UWB inserts:
+[below](#with-uwb).<!--/-->
 
 ## Measure before you print
 
-Measure the parts you've bought, put the numbers in
-[`cad/ordered_parts.toml`](../../cad/ordered_parts.toml) and run
-`python3 cad/fit.py`, before you print a 4-hour lid or an 18-hour enclosure.
-It re-solves the layout, re-renders every part and checks they fit. What to
-measure, and what each one changes, is the first table of your build's
-**15 — Verification checklist**
+Before printing (lid ≈ 4 h, enclosure ≈ 18 h): measure the bought parts,
+enter the values in [`cad/ordered_parts.toml`](../../cad/ordered_parts.toml),
+run `python3 cad/fit.py` (re-solves the layout, re-renders, checks fit). What
+to measure: first table of **15 — Verification checklist**
 ([with UWB](../../with_uwb/docs/setup/15-verification.md#before-you-print),
 [without UWB](../../without_uwb/docs/setup/15-verification.md#before-you-print)).
 
 ## Print order
 
-If you want to start building before everything is done:
+For building in parallel with printing:
 
-1. **Enclosure** — longest print, and nothing else can be assembled without it.
-2. **Shelf** — the LED ring and the Pi mount on it.
-3. **Lid** — needed as soon as the Arducam base arrives.
-4. **Diffuser band** — only needed once the LED ring is in.
-5. **Battery tray** — last; measure your bank first.
+| # | Part | Reason |
+| --- | --- | --- |
+| 1 | **Enclosure** | longest print; required for all assembly |
+| 2 | **Shelf** | carries the LED ring and the Pi |
+| 3 | **Lid** | needed when the Arducam base arrives |
+| 4 | **Diffuser band** | needed after the LED ring is fitted |
+| 5 | **Battery tray** | last; measure the bank first |
 
 <!--with_uwb-->
 
-The UWB build slots its arms and pod in ([below](#print-order-with-uwb)).
+UWB build: anchor arms and pod order in [Print order, with UWB](#print-order-with-uwb).
 
 <!--/-->
 
@@ -205,7 +185,7 @@ The UWB build slots its arms and pod in ([below](#print-order-with-uwb)).
 
 ## With UWB
 
-Four more parts on top of the common ones:
+Additional parts:
 
 | Part | Walls | Infill | Layer | Est. mass | Est. time |
 | --- | --- | --- | --- | --- | --- |
@@ -232,24 +212,22 @@ Four more parts on top of the common ones:
 
 ### Print order, with UWB
 
-Print the **anchor arms** ×2 after the lid — they can print while you wire
-the enclosure. The **wearable pod** is independent of everything else; print
-it whenever.
+- **Anchor arms** ×2: after the lid (print while wiring the enclosure).
+- **Wearable pod:** no dependencies; any time.
 
 ---
 
 ## Without UWB
 
-Just the five common parts — about 280 g of PETG and 26 hours. Nothing needs
-supports. Sources: [`without_uwb/cad/`](../../without_uwb/cad/).
+Common parts only: ≈ 280 g PETG, ≈ 26 h. No supports. Sources:
+[`without_uwb/cad/`](../../without_uwb/cad/).
 
 ---
 
 ## Croc charms (Jibbitz)
 
-Small, detailed charms that push into the holes of a Croc. They do **not**
-need an expensive or high-end printer: a compact, modern desktop printer
-handles them easily.
+Small detailed charms that push into Croc shoe holes. A compact entry-level
+desktop printer is sufficient.
 
 ### Printer requirements for charms
 
@@ -264,22 +242,19 @@ handles them easily.
 
 ### FDM, not resin
 
-Resin (SLA) printers give finer surface detail on tiny figurines, but resin
-is brittle and usually snaps when pushed into the stiff rubber holes of a
-Croc. **Use FDM (filament).** TPU or PETG charms survive daily wear.
+Resin (SLA) gives finer detail but is brittle and snaps when pushed into the
+rubber holes. **Use FDM**; TPU or PETG charms survive daily wear.
 
 ### Which printer
 
-Compact, modern direct-drive printers such as the **Bambu Lab A1 Mini** or
-the **Creality Ender-3 V3 SE / KE** series meet every spec above out of the
-box at an entry-level price.
+Compact direct-drive printers that meet every requirement above out of the
+box: **Bambu Lab A1 Mini**, **Creality Ender-3 V3 SE / KE**.
 
 ---
 
 ## One printer for both
 
-Buying one printer for SportCam and the charms means meeting the stricter of
-each requirement:
+Combined requirement (stricter of each):
 
 | Spec | SportCam | Croc charms | Buy |
 | --- | --- | --- | --- |
@@ -294,8 +269,7 @@ each requirement:
 
 ### Printers to buy
 
-Every printer below meets the **Buy** column above. Specs are as listed by the
-makers; prices move with sales, so check the live page before ordering.
+All meet the **Buy** column above. Manufacturer specs; prices vary with sales.
 
 | # | Printer | Build volume | Fits both? | Buy | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -345,6 +319,6 @@ makers; prices move with sales, so check the live page before ordering.
 | Large 220 × 220 × 240 mm volume | Bed sheet type varies by listing: check that it includes textured PEI |
 | Direct drive and auto levelling | Camera costs extra; louder than the Bambu printers |
 
-**Top choice: the Bambu Lab A1 Mini.** It meets every requirement in the
-table out of the box, at the lowest price, with the least setup. Get the
-A1 instead if you want room for bigger prints.
+**Recommendation: Bambu Lab A1 Mini** (purchased): meets every requirement
+out of the box, lowest price, least setup. The A1 if larger prints are
+needed.

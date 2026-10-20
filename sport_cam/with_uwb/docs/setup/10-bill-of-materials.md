@@ -1,40 +1,30 @@
 # 10 — Bill of materials (Canadian sourcing, Toronto / M2L 2E2)
 
-Everything to buy for the UWB build, with prices and Canadian sources. The
-Arducam PTZ camera supplies the sensor, the zoom lens and both motion axes,
-so it is the one expensive part; the rest is the Pi, the power chain, four
-UWB radios and the fasteners.
+Parts list for the UWB build: prices, Canadian sources, printed parts.
+Main cost item: the Arducam PTZ camera (sensor, zoom lens, both motion axes).
+Remainder: Pi, power chain, four UWB radios, fasteners.
 
-Sourcing strategy for delivery to **M2L 2E2 (North York, Toronto) in under two
-weeks**:
+Target: delivery to **M2L 2E2 (North York, Toronto) within two weeks**.
 
-- **Amazon.ca Prime** — 1–3 days for everything they stock. Listings churn, so
-  Amazon links are search links pinned to the exact part name; take a
-  Prime-badged result matching the name (avoid "ships from China" sellers —
-  those are the 3–4 week ones).
-- **[RobotShop Canada](https://ca.robotshop.com/)** — ships from Mirabel, QC.
-  The Canadian source for the Arducam PTZ kits.
-- **[PiShop.ca](https://www.pishop.ca/)** — official Canadian Raspberry Pi
-  reseller, ships from Ontario in 1–3 days. First choice for all Pi items.
-- **[Digi-Key Canada](https://www.digikey.ca/)** — 1–3 days to Toronto,
-  free shipping over C$100. Good backstop for anything Amazon is out of.
-- **Makerfabs (China, DHL)** — only if you use generic ESP32-UWB boards
-  instead of the ULA1 ([below](#why-the-ula1-radios)). DHL Express is 5–8
-  days to Toronto; add ~C$25 shipping and possibly ~13 % HST on import.
+| Supplier | Lead time | Use |
+| --- | --- | --- |
+| **Amazon.ca Prime** | 1–3 days | general parts. Links are searches on the exact part name (listings change); choose a Prime-badged match and avoid "ships from China" sellers (3–4 weeks) |
+| **[RobotShop Canada](https://ca.robotshop.com/)** | a few days (Mirabel, QC) | Arducam PTZ kits; ULA1 radios |
+| **[PiShop.ca](https://www.pishop.ca/)** | 1–3 days (Ontario) | official Raspberry Pi reseller; all Pi items |
+| **[Digi-Key Canada](https://www.digikey.ca/)** | 1–3 days | INA260; backstop for out-of-stock items. Free shipping over C$100 |
+| **Makerfabs** (China, DHL) | 5–8 days + ≈ C$25 shipping, possible ≈ 13 % HST | only for generic ESP32-UWB boards instead of the ULA1 ([below](#why-the-ula1-radios)) |
 
-Prices are approximate CAD street prices (Oct 2026), ±15%.
+Prices: approximate CAD street prices, Oct 2026, ±15 %.
 
-> **Before you print anything**, work through
-> [15 — Verification checklist](15-verification.md#before-you-print). Nine
-> measurements of parts you bought decide whether the printed parts fit them,
-> and the enclosure alone is an 18-hour print.
+> **Before printing:** complete
+> [15 — Verification checklist](15-verification.md#before-you-print).
+> Nine bought-part measurements determine whether the printed parts fit;
+> the enclosure is an 18-hour print.
 
-**Tracking what you have.** The **Status** column in each parts table says
-where a part is: **A** acquired, **O** ordered, **P** pending, blank for not
-ordered yet. The printed-parts table has an **Acquired** column instead: tick
-its ☐ once the part is printed.
+**Status column:** **A** acquired, **O** ordered, **P** pending, blank = not
+ordered. Printed-parts table: tick **Acquired** ☐ when printed.
 
-## The camera (this is the design)
+## Camera
 
 | #   | Status | Part                                                                    | Qty | ≈ CAD | Source                                                                                                                                                                        | Notes                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | --- | ------ | ----------------------------------------------------------------------- | --- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -42,11 +32,10 @@ its ☐ once the part is printed.
 
 ### Why the IMX477
 
-Arducam's cheaper 8 MP IMX219 PTZ kit (B0167B8) is discontinued, so the 12 MP
-IMX477 kit is the only option, and the design, CAD and software all assume
-it. Its larger sensor has bigger pixels, which helps in a dim gym. How far
-back it can frame a subject is in
-[05 — Camera placement](../design/05-tracking-system.md#camera-placement-envelope).
+- The 8 MP IMX219 PTZ kit (B0167B8) is discontinued; the 12 MP IMX477 kit is
+  the only option. Design, CAD and software assume it.
+- Larger pixels: better in dim gyms.
+- Reach: [05 — Camera placement](../design/05-tracking-system.md#camera-placement-envelope).
 
 ## Compute, tracking and status
 
@@ -70,9 +59,11 @@ back it can frame a subject is in
 | 13  | O      | Panel-mount rocker switch, 10 A                        | 1   | $8    | [Amazon.ca](https://www.amazon.ca/s?k=panel+mount+rocker+switch+12v)                                                                                             | between the trigger and the buck, so you are not unplugging USB-C to turn it off                                                                                                                                                                                                                                                                                                             |
 | 14  | A      | USB-C to USB-C cable, 30 cm                            | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=short+usb+c+to+usb+c+cable+30cm)                                                                                           | bank to trigger board, inside the build. Any standard C-to-C cable works: the trigger draws ≈ 1.7 A at 12 V, inside the 3 A every C-to-C cable carries, and PD negotiates over the CC wire that even charge-only cables have. 30 cm is for fit; a short phone cable you already own will do. **Not USB-A to C**, which carries no PD                                                         |
 
-The Pi draws from the 5 V rail through a USB-C pigtail. A Pi 4 needs no
-`config.txt` current flag for this; that requirement is specific to the Pi 5.
-If the IMX477 is not detected on first boot, add `dtoverlay=imx477`.
+Notes:
+
+- Pi power: 5 V rail via a USB-C pigtail. No `config.txt` current flag on a
+  Pi 4 (Pi 5 only).
+- IMX477 not detected on first boot: add `dtoverlay=imx477`.
 
 ## Wearable
 
@@ -83,14 +74,14 @@ If the IMX477 is not detected on first boot, add `dtoverlay=imx477`.
 
 ## Charging
 
-Both banks have their own charge circuitry. All they need is a USB charger and
-a cable, and **the phone chargers and cables you already own will do**. Items 28
-and 29 are optional, only buy them for faster charging, and they are not in the
+Both banks have built-in chargers; existing phone chargers and cables are
+sufficient. Items 28–29 are optional (faster charging) and excluded from the
 totals.
 
-The tag bank (item 15) charges from any phone charger in 1–2 h. The tripod bank
-(item 9) holds 92 Wh, ≈ 108 Wh from the wall after charging loss, so the charger
-sets the time:
+| Bank | Charge time |
+| --- | --- |
+| Tag bank (item 15) | 1–2 h from any phone charger |
+| Tripod bank (item 9), 92 Wh (≈ 108 Wh from the wall) | depends on the charger, below |
 
 | Charger | Time to full |
 | --- | --- |
@@ -98,27 +89,25 @@ sets the time:
 | USB-C phone charger, 20–25 W | ≈ 5 h. Fine overnight |
 | USB-C laptop or fast charger, 45 W+ | ≈ 2.5 h |
 
-For anything better than the first row the cable needs **USB-C on both ends**.
-USB-A to USB-C carries 5 V only, however fast the charger. Any ordinary C-to-C
-phone cable carries up to 60 W (3 A), and the bank cannot take more than that
-except from a 65 W charger, which saves a few minutes.
+Cable: **USB-C on both ends** for anything above the first row (USB-A to C
+carries 5 V only). A standard C-to-C cable carries 60 W (3 A); only a 65 W
+charger exceeds that, by a few minutes.
 
 | #   | Status | Part                                                     | Qty | ≈ CAD | Source                                                                         | Notes                                                                                                                                                                                                                                                                                                                                       |
 | --- | ------ | -------------------------------------------------------- | --- | ----- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 28  |        | *Optional:* USB-C PD GaN wall charger, 65 W, 1 × C + 1 × A  | 1   | $40   | [Amazon.ca](https://www.amazon.ca/s?k=65w+gan+charger+usb+c+usb+a+pd)          | USB-C port to the tripod bank (item 9), USB-A port to the tag bank (item 15). Only worth it if you have no USB-C charger of 20 W or more, or want ≈ 2 h refills. That needs the bank to accept 65 W *in*. Some 65 W banks only take 30–45 W in, so check the listing. Expect the C port to drop to ≈ 45 W while the A port is also in use |
 | 29  |        | *Optional:* USB-C to USB-C cable, 1 m                    | 1   | $12   | [Amazon.ca](https://www.amazon.ca/s?k=usb+c+to+usb+c+cable+1m)                 | charger to the tripod bank. Item 14 is 30 cm and lives in the build, so it is too short to charge from the wall. Any C-to-C phone cable does this job, and most banks ship with one. Buy only if you have none                                                                                                                              |
 
-The tag bank charges from the cable it ships with, usually USB-A to USB-C or
-USB-A to micro-USB. That is why item 28, if you buy it, has an A port.
+Item 28 has an A port for the tag bank's supplied cable (usually USB-A to C
+or micro-USB).
 
-If the tripod bank supports **pass-through charging** (it charges and
-discharges at the same time; the listing will say so), a USB-C charger also lets you
-run the camera from a wall socket at the gym with no runtime limit.
-
-**Already bought, not needed: Adafruit 4410** (Micro-Lipo charger, USB-C,
-Digi-Key 1528-4410-ND). It charges a bare single-cell LiPo; both banks have
-their own chargers, so it has no place in this build. Return it, or keep it
-for another project. It is not counted in the totals.
+- **Pass-through charging** (bank charges and discharges simultaneously;
+  stated in the listing): with a USB-C charger, the camera can run from mains
+  with no runtime limit.
+- **Adafruit 4410** (Micro-Lipo charger, Digi-Key 1528-4410-ND), already
+  bought: not used. It charges bare single-cell LiPos; both banks have
+  built-in chargers. Return or keep for another project. Excluded from the
+  totals.
 
 ## Wiring and fasteners
 
@@ -140,20 +129,17 @@ for another project. It is not counted in the totals.
 
 ## Printed parts
 
-Fabricated from items 25 and 25a (~420 g total). Printer requirements,
-per-part settings, orientation, supports and print times are in
-**[3D printing specifications](../../../docs/setup/11-3d-printing.md)** — read that
-before you buy filament or start an 18-hour enclosure.
+| Item | Value |
+| --- | --- |
+| Material | items 25 and 25a, ≈ 420 g |
+| Printer | FDM, ≥ 160 × 155 × 90 mm build volume (all parts fit a Bambu Lab A1 Mini), 0.4 mm nozzle, 250 °C hotend, 80 °C bed |
+| Machine time | ≈ 40 h |
+| Supports | only under the three wall bosses of the enclosure |
+| Settings, orientation, print order | [11 — 3D printing](../../../docs/setup/11-3d-printing.md) |
+| Printer purchase (not in totals) | Bambu Lab A1 Mini ([Bambu Lab Canada](https://ca.store.bambulab.com/products/a1-mini), ≈ C$249–389); alternatives: [Printers to buy](../../../docs/setup/11-3d-printing.md#printers-to-buy) |
 
-The short version: any FDM printer with a **160 × 155 × 90 mm** build volume
-(every part also fits a Bambu Lab A1 Mini, the reference printer), a 0.4 mm
-nozzle, a 250 °C hotend and an 80 °C bed. About **40 hours** of machine time.
-No supports anywhere except three small ledges on the enclosure.
-
-**Don't have a printer?** Top choice: the **Bambu Lab A1 Mini** ([Bambu Lab Canada](https://ca.store.bambulab.com/products/a1-mini), ≈ C$249–389). It also prints Croc charms. Other options and why: [Printers to buy](../../../docs/setup/11-3d-printing.md#printers-to-buy). Not counted in the totals.
-
-STLs, previews and this table's pictures are regenerated by `python3 cad/fit.py`
-(or `./cad/render_all.sh`, which runs it).
+STLs, previews and the images below are regenerated by `python3 cad/fit.py`
+(also run by `./cad/render_all.sh`).
 
 | Preview | Acquired | Part | Qty | Compiled STL | OpenSCAD source |
 | --- | --- | --- | --- | --- | --- |
@@ -181,96 +167,63 @@ STLs, previews and this table's pictures are regenerated by `python3 cad/fit.py`
 
 (≈ US$775 / US$800 at typical exchange + Canadian markup.)
 
-Of the full build: camera and power ≈ C$429 (items 1 and 9–14), compute and
-tracking ≈ C$369 (items 2–8), wearable, wiring, fasteners and filament
-≈ C$195 (items 15–25b, 27 and 27a). The optional charging items 28–29 are not
-included.
+| Group | Items | ≈ CAD |
+| --- | --- | --- |
+| Camera and power | 1, 9–14 | 429 |
+| Compute and tracking | 2–8 | 369 |
+| Wearable, wiring, fasteners, filament | 15–25b, 27, 27a | 195 |
+
+Optional charging items 28–29 excluded.
 
 ## Why the ULA1 radios
 
-Item 6 is the **Haorutech ULA1** rather than a generic ESP32-UWB board, mostly
-for availability: the generic boards have no dependable Canadian listing,
-while RobotShop stocks the ULA1 in Canada.
+Item 6 is the **Haorutech ULA1**, not a generic ESP32-UWB board. Primary
+reason: availability (stocked by RobotShop Canada; generic boards have no
+dependable Canadian listing). ≈ C$28 more per board.
 
-It costs about C$28 more per board, and it buys three more things:
+| Property | ULA1 | Generic boards (`dual-serial`) |
+| --- | --- | --- |
+| Range reporting | one RangeData frame with r₁, r₂, r₃ (one timestamp, as the maths in [05](../design/05-tracking-system.md) assumes) | independent serial streams (approximately simultaneous) |
+| Data connections | one anchor; the others need 5 V only | one per anchor |
+| Connector | USB-A plug on the board: plain extension cable | micro-USB (charge-only cable risk) |
+| Wearable | 5 V USB, no battery connector: runs from a USB bank (item 15); no charge board or LiPo | charge board and LiPo |
 
-- **Every range arrives in one frame.** The tag polls each anchor and
-  broadcasts a single RangeData message, so r₁, r₂ and r₃ share a
-  timestamp. The formulas in [05](../design/05-tracking-system.md) assume exactly
-  that; with independent serial streams it is only approximately true.
-- **Only one anchor needs a data connection.** The others just need 5 V.
-- **A USB-A plug on the board**, so the arm run is a plain extension cable
-  rather than a micro-USB cable that might be charge-only.
+`UWB_PROTOCOL = "dual-serial"` in `src/with_uwb/device/sportcam/config.py`
+selects the generic boards (supported and tested).
 
-It also makes the wearable simpler. The ULA1 is 5 V USB with no battery
-connector, so the tag runs off a small USB power bank (item 15), with no
-charge board or LiPo cell to source.
-
-If you would rather keep the cheaper generic boards, set
-`UWB_PROTOCOL = "dual-serial"` in `src/with_uwb/device/sportcam/config.py`; that path is
-still supported and tested.
-
-**Before you order all four**, check the first two boards on the bench: that
-they run the RTLS firmware (one frame with every range) and how fast they
-range. Both are rows 7–8 of the
-[verification checklist](15-verification.md#on-the-bench-before-the-first-session).
-Why the third anchor goes on a mast rather than beside the other two is in
+**Before ordering all four:** bench-check two boards for RTLS firmware (one
+frame with all ranges) and ranging rate:
+[verification checklist](15-verification.md#on-the-bench-before-the-first-session),
+rows 7–8. Why A3 is vertical:
 [05](../design/05-tracking-system.md#why-the-third-anchor-is-vertical).
 
 ## Parts that are hard to source in Canada
 
-Just one: the battery gauge. Use the INA260, or build without a gauge.
+One item: the battery gauge (item 12).
 
-### Item 12, the battery gauge — substitute the INA260
-
-Bare INA226 modules are a grey-market item here. The clean answer is the
-**[Adafruit INA260 breakout, part 4226](https://www.digikey.ca/en/products/result?keywords=adafruit%204226%20ina260), through Digi-Key Canada**: duty-free,
-customs pre-cleared, one to three days to Toronto, and free shipping once the
-order passes C$100. The INA260 alone does not reach that, so expect a small
-shipping charge, or put other parts on the same order. It's the better part
-anyway (see item 12), and it's the default:
-
-```python
-POWER_MONITOR = "ina260"      # src/with_uwb/device/sportcam/config.py — this is the default
-```
-
-**Do not use the ADS1115-plus-shunt route.** An ADS1115 cannot see a high-side
-shunt at 12 V: its inputs are rated to the supply rail plus 0.3 V, so 12 V of
-common mode is outside absolute maximum and will damage it. You could move the
-shunt low-side and add a divider for bus voltage, but that is three extra parts,
-a broken ground path and a worse measurement than a single chip that was
-designed for the job.
-
-**Or build without it.** The gauge is optional and the software knows it:
-
-```python
-POWER_MONITOR = "none"
-```
-
-Everything runs. You lose the low-battery warning and the automatic
-save-and-park at 7 %, so you watch the clock instead — the camera gives about
-6.2 hours. Add the sensor later without touching anything else.
+| Option | Detail |
+| --- | --- |
+| **INA260 (default)** | [Adafruit 4226 via Digi-Key Canada](https://www.digikey.ca/en/products/result?keywords=adafruit%204226%20ina260): duty-free, customs pre-cleared, 1–3 days. Free shipping over C$100 (combine with other parts). `POWER_MONITOR = "ina260"` |
+| INA226 module | grey-market in Canada. `POWER_MONITOR = "ina226"` plus `INA226_SHUNT_OHMS` |
+| **No gauge** | `POWER_MONITOR = "none"`. No low-battery warning or automatic save-and-park at 7 %; runtime ≈ 6.2 h by the clock. Can be added later with no other change |
+| ~~ADS1115 + shunt~~ | **do not use.** Inputs are rated to the supply rail + 0.3 V; 12 V common mode on a high-side shunt exceeds absolute maximum. A low-side shunt plus divider needs three extra parts, breaks the ground path, and measures worse |
 
 ## Two-week delivery plan
 
-Order everything the same day:
+Place all orders the same day:
 
-1. **Item 1, the camera — done.** Ordered direct from Arducam on 9 October,
-   express. That was the long pole; everything below arrives inside a week.
-2. **PiShop.ca** (items 2 and 3): 1–3 days.
-3. **Digi-Key.ca** (item 12, the INA260): no reliable domestic listing. See
-   [above](#parts-that-are-hard-to-source-in-canada). Nothing else in this
-   build comes from Digi-Key.
-4. **RobotShop.ca** (item 6, the four ULA1s): ships from Quebec in a few days.
-5. **Amazon.ca Prime** (everything else): 1–3 days per item.
+| # | Supplier | Items | Lead time |
+| --- | --- | --- | --- |
+| 1 | Arducam direct | 1 (camera) | **ordered 9 Oct, express** (longest lead item) |
+| 2 | PiShop.ca | 2, 3 | 1–3 days |
+| 3 | Digi-Key.ca | 12 (INA260; [above](#parts-that-are-hard-to-source-in-canada)) | 1–3 days |
+| 4 | RobotShop.ca | 6 (four ULA1s) | a few days |
+| 5 | Amazon.ca Prime | everything else | 1–3 days |
 
-**Read these listings closely.** They look identical in a photo and aren't:
+Listing details to verify:
 
-- **The power bank (item 9).** Its USB-C output must list **12 V**; some banks
-  skip that profile and the trigger then sits at 5 V. "65 W" on the box is
-  usually *output*; the *input* wattage sets how fast it recharges. Its
-  capacity is your runtime, so don't economise here.
-- **The buck (item 11).** It must be **adjustable**, so you can trim it, and
-  cheap units sag and brown the Pi out. Worth full price.
-- **The USB-C cable (item 14)** is the exception: any C-to-C cable carries the
-  12 V contract.
+| Item | Check |
+| --- | --- |
+| Power bank (9) | USB-C output lists **12 V** (without it the trigger stays at 5 V). "65 W" is usually *output*; *input* wattage sets recharge time. Capacity = runtime; don't economise |
+| Buck (11) | **adjustable** (must be trimmed); cheap units sag and brown out the Pi |
+| USB-C cable (14) | any C-to-C cable carries the 12 V contract |

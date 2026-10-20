@@ -1,8 +1,7 @@
 # Setup — start here (without UWB)
 
-These docs take you from ordering parts to a camera that films on its own.
-Follow them in order. 11 — 3D printing is shared by both builds; the rest
-are specific to this build.
+Build procedure from ordering to a working camera, in order. 11 — 3D
+printing is shared by both builds; the others are build-specific.
 
 | # | Doc | Covers | Time |
 | --- | --- | --- | --- |
@@ -13,22 +12,14 @@ are specific to this build.
 | 14 | [**Software setup**](14-software-setup.md) | Raspberry Pi OS, the camera software, bench checks, calibration, services, the app | ≈ 2 h |
 | 15 | [**Verification checklist**](15-verification.md) | what to measure before printing, check on arrival, confirm on the bench and in the first session | used alongside the docs above |
 
-Read the wiring guide before you start the assembly: the assembly guide makes
-its connections in the same order, at the step where each one goes in.
+| Rule | Detail |
+| --- | --- |
+| Read 12 before 13 | the assembly guide makes the wiring guide's connections in the same order, at the step each belongs to |
+| Measure before printing | [15 — Verification](15-verification.md#before-you-print): five measurements decide whether the prints fit the bought parts. Enter them in `cad/ordered_parts.toml` and run `python3 cad/fit.py` ([Appendix A](../../../docs/appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)) |
+| Assembly guide | single HTML page; open from disk or via `npm run docs`. Build scripts: [assembly/README.md](assembly/README.md) |
 
-Before you print anything, work through
-[15 — Verification](15-verification.md#before-you-print): five
-measurements decide whether the printed parts fit what you bought. Put them in
-`cad/ordered_parts.toml` and run `python3 cad/fit.py` (see
-[Appendix A](../../../docs/appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)).
-
-The assembly guide is a single HTML page. Open it straight from disk, or run
-`npm run docs` and pick it from the sidebar. Its build scripts are described
-in [assembly/README.md](assembly/README.md).
-
-**Where to run commands.** Commands that touch `cad/` or `docs/` are
-written relative to this build's folder, [`without_uwb/`](../../). Run them from
-there (`cd without_uwb`), or put `without_uwb/` in front of the path from the repo root;
-every script finds its files from its own location, so both work. The Pi
-software is in `src/without_uwb/device/`, and the parts both builds share (the
-Firebase backend, the apps) are elsewhere under `src/`.
+**Working directory.** Commands touching `cad/` or `docs/` are relative to
+[`without_uwb/`](../../): run from there (`cd without_uwb`), or prefix `without_uwb/` from the repo
+root (scripts resolve paths from their own location). Pi software:
+`src/without_uwb/device/`. Shared code (Firebase backend, apps): elsewhere under
+`src/`.

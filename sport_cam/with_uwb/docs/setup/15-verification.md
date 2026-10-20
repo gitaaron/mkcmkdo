@@ -1,26 +1,26 @@
 # 15 — Verification checklist
 
-Everything in this build that depends on a part you bought rather than a
-number we chose. It is ordered by **when you find out**, because the cost of
-being wrong rises sharply down the page: a dimension caught before printing
-costs nothing, the same dimension caught after can cost an 18-hour reprint.
+Checks for everything that depends on a bought part rather than a design
+value, ordered by **when the problem becomes detectable**. Cost of an error
+rises down the page: a dimension caught before printing costs nothing; after
+printing, up to an 18-hour reprint.
 
-Nothing here is optional reading. The [last section](#mistakes-this-design-has-already-made)
-lists four mistakes these checks would have caught.
+All sections are required. [Mistakes this design has already made](#mistakes-this-design-has-already-made)
+lists four errors these checks catch.
 
 ## Before you print
 
-These nine change the CAD. Measure them with the parts in your hand, put the
-numbers in [`cad/ordered_parts.toml`](../../../cad/ordered_parts.toml) with
-`measured = true`, and run `python3 cad/fit.py` from `sport_cam/`. It
-re-solves the layout around them, re-renders the parts and audits that
-everything fits; [`cad/FIT_REPORT.md`](../../../cad/FIT_REPORT.md) lists what it
-checked and which sizes are still assumed.
+Nine measurements that change the CAD. Procedure: measure the part, enter the
+value in [`cad/ordered_parts.toml`](../../../cad/ordered_parts.toml) with
+`measured = true`, run `python3 cad/fit.py` from `sport_cam/` (re-solves the
+layout, re-renders, audits fit).
+[`cad/FIT_REPORT.md`](../../../cad/FIT_REPORT.md) lists the checks and any sizes
+still assumed.
 
 | # | Measure | Why it matters | What fit.py does / what a mistake costs |
 | --- | --- | --- | --- |
 | 1 | **Arducam base bolt spacing** → `[ptz] bolt_spacing` | The lid carries the whole camera on four bolts. Arducam publishes no drawing and the footprint has changed between revisions, so the lid is cut with radial slots, 30–72 mm by default | `fit.py` stretches the slots to your spacing; set `bolt_l` to the screws you have and it relieves the lid under the slots if they're short. Reprinting the lid is the **four-hour** mistake — measure before the printer starts |
-| 2 | **Buck converter, PD trigger, battery gauge** → `[buck]`, `[pd_trigger]`, `[gauge]` | They sit on the enclosure floor round the tripod boss and the shelf posts, under the LED window. Modules of the same rating vary a lot | `fit.py` rearranges them, lifts the boards onto risers over the boss, or makes the enclosure taller or wider. An **18-hour** reprint if you skip it
+| 2 | **Buck converter, PD trigger, battery gauge** → `[buck]`, `[pd_trigger]`, `[gauge]` | They sit on the enclosure floor round the tripod boss and the shelf posts, under the LED window. Modules of the same rating vary a lot | `fit.py` rearranges them, lifts the boards onto risers over the boss, or makes the enclosure taller or wider. An **18-hour** reprint if you skip it |
 | 3 | **Rocker switch and barrel jack** → `[switch]`, `[jack]` | Their cut-outs go in the wall, and the switch clips need a thin enough panel | `fit.py` sizes the cut-outs and thins the wall round the switch |
 | 4 | **Pi heatsinks or fan case** → `[pi] heatsink_h` | The Pi sits on the shelf under the lid; a fan case is taller than stick-on heatsinks | `fit.py` makes the enclosure taller |
 | 5 | **Camera power bank** → `[power_bank]` | The battery tray is a pocket sized to it. Banks of the same advertised capacity vary by 15 mm in every direction | Reprint the tray (3.5 h) |
@@ -29,11 +29,10 @@ checked and which sizes are still assumed.
 | 8 | **USB extension ends** → `[usb_extension]` | The rigid socket end has to fit between each anchor's plug and the enclosure, or `fit.py` turns the boards across the arms; the plug end sets the size of the cable slot | Reprint the arms and cradle |
 | 9 | **Dowel diameter** → `[dowel] d` | The A3 mast sockets are bored to it. "½-inch" dowels vary by a few tenths of a millimetre | Reprint the foot and cradle (≈ 1.5 h each). Slightly loose is fine — the pinch screws take it up |
 
-The tripod insert, `[tripod_insert]`: the floor bore is cut to its outside
-diameter (12.7 mm assumed). Check yours slips in snugly and is no longer than
-the 8 mm boss; open the bore up with a drill rather than reprinting if it is
-larger. Then check both threads: a 3/8-16 screw straight into the insert, and
-a 1/4-20 one with the reducer bushing in.
+**Tripod insert** (`[tripod_insert]`): floor bore = insert outside diameter
+(12.7 mm assumed); insert length ≤ 8 mm (boss height). If the insert doesn't
+fit, enlarge the bore with a drill rather than reprinting. Check both
+threads: 3/8-16 screw into the insert; 1/4-20 screw with the bushing fitted.
 
 ## On arrival, before you wire anything
 

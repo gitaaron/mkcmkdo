@@ -1,7 +1,7 @@
 # Appendix A — CAD: printed parts
 
 Parametric OpenSCAD sources for every printed part live in <!--both-->each build's<!--/--><!--with_uwb: the build's--><!--without_uwb: the build's-->
-`cad/` folder — <!--with_uwb-->[`with_uwb/cad/`](../../with_uwb/cad/)<!--/--><!--both--> and<!--/--> <!--without_uwb-->[`without_uwb/cad/`](../../without_uwb/cad/)<!--/-->. Three kinds of number feed them:
+`cad/` folder — <!--with_uwb-->[`with_uwb/cad/`](../../with_uwb/cad/)<!--/--><!--both--> and<!--/--> <!--without_uwb-->[`without_uwb/cad/`](../../without_uwb/cad/)<!--/-->. Inputs:
 
 | What | Where | Who edits it |
 | --- | --- | --- |
@@ -9,14 +9,13 @@ Parametric OpenSCAD sources for every printed part live in <!--both-->each build
 | Design choices — wall thickness, clearances, window height, anchor baseline … | `<build>/cad/config.scad` | you, rarely |
 | The layout — enclosure size, where each board sits, which way the Pi faces, where the wall openings go | `<build>/cad/layout.scad` | **generated** by `cad/fit.py` |
 
-Compiled STLs are committed in `<build>/cad/stl/`; per-part previews and
-download links are in the build's BOM printed-parts table
+Compiled STLs: `<build>/cad/stl/` (committed). Previews and download links:
+BOM printed-parts table
 ([with UWB](../../with_uwb/docs/setup/10-bill-of-materials.md#printed-parts),
 [without UWB](../../without_uwb/docs/setup/10-bill-of-materials.md#printed-parts)).
 
-This is the **PTZ-base build**: the camera, both motion axes and the zoom lens
-are one bought assembly, so everything printed here is an enclosure, a shelf
-or a bracket.
+All motion comes from the bought PTZ assembly; every printed part is an
+enclosure, shelf or bracket.
 
 ## Fit the layout to your parts
 
@@ -25,22 +24,23 @@ cd sport_cam
 python3 cad/fit.py            # solve, regenerate, render, audit — both builds
 ```
 
-`fit.py` reads the part sizes and the design choices, then:
+`fit.py` reads the part sizes and design parameters, then:
 
-1. **Solves the layout.** The power boards go on the enclosure floor, clear of
-   the tripod boss, the shelf posts and each other, with the PD trigger's
-   socket at a USB-C inlet in the wall. The LED ring sits under the shelf, in
-   the band of the LED window, and the Pi sits on the shelf. It tries Pi
-   orientations and positions, wall positions for the inlet, switch and jack,
-   and post positions, and keeps the arrangement that needs the lowest
-   enclosure.
-2. **Finds another design if the parts don't fit.** If a board is too big to
-   go round the tripod boss, it raises the boards on printed risers over it.
-   Then it makes the enclosure taller, and then wider in 2 mm steps up to what
-   an A1 Mini can print.<!--with_uwb--> With UWB, it turns the anchor boards across the arms
-   if the extension cable's socket end has no room along them.<!--/--> It stretches
-   the lid's slots to the base's measured bolt spacing. If nothing works, it
-   names the part and the constraint.
+1. **Solves the layout.**
+   - Floor: power boards clear of the tripod boss, shelf posts and each
+     other; PD trigger socket at the wall USB-C inlet.
+   - LED ring under the shelf, within the LED window band; Pi on the shelf.
+   - Search space: Pi orientation and position, wall positions of inlet,
+     switch and jack, post positions. Objective: minimum enclosure height.
+2. **Falls back when parts don't fit**, in order:
+   - boards raised on printed risers over the tripod boss;
+   - taller enclosure;
+   - wider enclosure, 2 mm steps, up to the A1 Mini limit;<!--with_uwb-->
+   - with UWB: anchor boards turned across the arms if the extension socket
+     doesn't fit along them;<!--/-->
+   - lid slots stretched to the measured bolt spacing.
+
+   No solution: reports the part and the violated constraint.
 3. **Writes** `<build>/cad/layout.scad` (and `layout.json`, and the 3D
    guide's `layout.js`), and keeps the geometry constants in
    `src/<build>/device/sportcam/config.py` (<!--with_uwb-->`UWB_BASELINE_M`, `UWB_A3_BACK_M`,

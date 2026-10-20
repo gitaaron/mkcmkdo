@@ -1,60 +1,68 @@
 # SportCam — subject-tracking robotic camera tripod
 
-A camera on a motorized tripod head that pans **±80°**, tilts **−45° to +85°**,
-zooms optically, and automatically follows a person. It runs off a **USB-C
-power bank for a full session** with nothing plugged in. An LED ring on the
-enclosure and a companion app both show the system state
-(idle / tracking / recording).
+Motorized pan/tilt/zoom camera head on a standard tripod that follows a
+person and records them. Battery powered; status on an LED ring and in a
+companion app.
 
-It comes in two builds that share the camera, enclosure, power, Pi, backend and
-apps, and differ in how the camera finds the subject.
-[01 — Product requirements](docs/product/01-requirements.md#the-two-builds)
-compares them side by side. Pick one, then follow its **setup docs
-([with UWB](with_uwb/docs/setup/README.md) ·
-[without UWB](without_uwb/docs/setup/README.md))**. In the
-[docs viewer](#reading-the-docs) a toggle shows one build's docs at a time.
+| Spec | Value |
+| --- | --- |
+| Pan | ±80° (servo, soft-limited) |
+| Tilt | −45° to +85° |
+| Zoom | optical, 96° → 33° horizontal FOV (≈ 3.5×) |
+| Recording | 1080p H.264, 12 Mbit/s, on the Pi; uploaded to Firebase after each clip |
+| Power | USB-C PD power bank, 92 Wh: <!--with_uwb-->6.2 h<!--/--><!--both--> (with UWB) / <!--/--><!--without_uwb-->8.4 h<!--/--><!--both--> (without UWB)<!--/--> tracking and recording |
+| States | off, idle, tracking, recording ([01](docs/product/01-requirements.md#state-machine)) |
+| Control | web app and Flutter app; from anywhere through Firebase, or direct on the camera's Wi-Fi |
+
+## Builds
+
+Two builds share the camera, enclosure, power, Pi, backend and apps. They
+differ in how the subject is located. Comparison:
+[01 — The two builds](docs/product/01-requirements.md#the-two-builds).
+Setup entry point:
+[with UWB](with_uwb/docs/setup/README.md) ·
+[without UWB](without_uwb/docs/setup/README.md).
 
 ### With UWB
 
-The subject wears a matchbox-sized **UWB tag**. Three anchors on the head
-measure their distance to it 20 times a second, through the body and
-clothing, and the camera points where the distances say. Vision trims the
-aim, frames the shot with the zoom and confirms lock-on before recording.
-Switching the tag on starts a session; switching it off ends it.
-
-Pick it to film one person in a room with other people in it: the tag is how
-the camera tells your subject from a bystander. Its own docs and CAD are in
-[`with_uwb/`](with_uwb/), its code in [`src/with_uwb/`](src/with_uwb/).
+- **Sensing:** wearable UWB tag; three anchors on the head range it at
+  20 Hz. Bearing, elevation and distance come from the ranges. Vision trims
+  the aim, sets the zoom and confirms lock-on.
+- **Session control:** tag on starts a session; tag off ends it.
+- **Use when:** the subject must be told apart from bystanders.
+- **Locations:** docs and CAD in [`with_uwb/`](with_uwb/); code in
+  [`src/with_uwb/`](src/with_uwb/).
 
 ### Without UWB
 
-**Nothing to wear and nothing mounted around the head.** Tap **Track &
-record** in the app: the camera sweeps the room until its person detector
-sees someone, centres them, locks on and starts recording, then follows them
-by vision alone. Lose them for 6 s and it sweeps again.
-
-Pick it for simplicity, size and cost: about C$360 cheaper than the UWB
-build, two hours more runtime, five printed parts instead of ten. The trade:
-vision can't tell people apart, so in a busy room it follows whoever it found
-first. Its own docs and CAD are in [`without_uwb/`](without_uwb/), its code in
-[`src/without_uwb/`](src/without_uwb/).
+- **Sensing:** vision only. **Track & record** starts a pan sweep; the first
+  person detected is centred, locked and recorded. Re-sweeps after 6 s
+  without a detection.
+- **Session control:** app buttons.
+- **Use when:** cost, size and runtime matter more than identity. Versus the
+  UWB build: ≈ C$360 cheaper, ≈ 2 h more runtime, 5 printed parts instead of
+  10, nothing worn. Follows the first person found.
+- **Locations:** docs and CAD in [`without_uwb/`](without_uwb/); code in
+  [`src/without_uwb/`](src/without_uwb/).
 
 ## Documentation
 
-The docs are numbered in reading order and grouped in three folders, with the
-appendices last:
+Docs are numbered in reading order, in three folders plus appendices:
 
-- **Product**: what SportCam must do. Functional and non-functional requirements.
-- **Design**: how the system, mechanics, electronics and software meet them.
-- **Setup**: building it, from ordering and printing the parts to wiring,
-  assembly, software and checks.
+| Folder | Scope |
+| --- | --- |
+| Product | functional and non-functional requirements |
+| Design | system, mechanics, electronics, software |
+| Setup | ordering, printing, wiring, assembly, software, verification |
 
-Shared docs are in [`docs/`](docs/). A doc with build-specific detail covers
-the shared material first, then has a **With UWB** section and a **Without
-UWB** section. Docs that differ entirely between the builds live in the
-build's folder; in paths, `<build>` means `with_uwb` or `without_uwb`. New
-to the terms? [Appendix D](docs/appendix/appendix-d-glossary.md) explains
-them.
+Conventions:
+
+- Shared docs are in [`docs/`](docs/). A shared doc covers common material
+  first, then a **With UWB** and a **Without UWB** section.
+- Docs that differ entirely by build are in the build's folder. `<build>` in
+  paths means `with_uwb` or `without_uwb`.
+- Terms: [Appendix D — Glossary](docs/appendix/appendix-d-glossary.md).
+- In the [docs viewer](#reading-the-docs), a toggle shows one build at a time.
 
 | # | Doc | Where | Contents |
 | --- | --- | --- | --- |
@@ -85,18 +93,16 @@ them.
 
 ## Reading the docs
 
-Browse them on GitHub, or run the docs viewer, which lists every doc in the
-order above with diagrams inline and doc-to-doc links working. Its **With UWB
-/ Without UWB** toggle shows only the docs, sections, table rows and wording
-for the build you pick, and remembers your choice:
+On GitHub, or in the local docs viewer (sidebar in reading order, inline
+diagrams, working cross-links, and a **With UWB / Without UWB** toggle that
+filters docs, sections, table rows and wording; the choice persists):
 
 ```bash
 npm run docs       # → http://localhost:8090
 ```
 
-To run the whole system on your computer on the Firebase emulators
-(`npm install && npm run dev`), or deploy it, see
-[Appendix C](docs/appendix/appendix-c-development.md).
+Running the system on the Firebase emulators (`npm install && npm run dev`)
+and deploying: [Appendix C](docs/appendix/appendix-c-development.md).
 
 ## Repository layout
 

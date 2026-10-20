@@ -1,16 +1,14 @@
 # 14 — Software setup
 
-From a blank SD card to a camera that tracks, in order. Do the
-[assembly guide](assembly/index.html) and its [wiring guide](12-wiring.md) first; this picks up where its last
-step ("Power-on checks") leaves off. Each step says what *done* looks like.
-If one fails, the matching row in
-[15 — Verification](15-verification.md#on-the-bench-before-the-first-session) says why.
+Procedure from a blank SD card to a tracking camera. Each step ends with a
+**Done when** check; failures map to rows in
+[15 — Verification](15-verification.md#on-the-bench-before-the-first-session).
 
-**You need:** the assembled camera on its tripod; a 16 GB+ microSD card; a
-computer with [Raspberry Pi Imager](https://www.raspberrypi.com/software/); a
-tape measure; and a phone or laptop on the same Wi-Fi. About **1 hour**, most
-of it calibration. Nothing here is worn or measured out: the camera finds
-people by sight alone.
+| | |
+| --- | --- |
+| Prerequisite | [assembly guide](assembly/index.html) and [wiring guide](12-wiring.md) complete, through "Power-on checks" |
+| Equipment | the assembled camera on its tripod; 16 GB+ microSD; computer with [Raspberry Pi Imager](https://www.raspberrypi.com/software/); tape measure; phone or laptop on the same Wi-Fi |
+| Duration | ≈ **1 h**, mostly calibration |
 
 ## 1. Raspberry Pi OS
 
@@ -43,9 +41,9 @@ cd ~/sportcam/src/without_uwb/device
 sudo pip3 install --break-system-packages -r requirements.txt
 ```
 
-The packages go in system-wide because both services run the system
-`python3`, and the Wi-Fi portal runs as root. Picamera2 only comes from apt,
-so a virtualenv would need `--system-site-packages` and edited unit files.
+System-wide install rationale: both services use the system `python3`; the
+Wi-Fi portal runs as root; Picamera2 is apt-only (a virtualenv would need
+`--system-site-packages` and edited unit files).
 
 **Done when:** the offline tests pass:
 
@@ -55,21 +53,21 @@ for t in tests/test_*.py; do python3 $t | tail -1; done
 
 ## 3. Connect it to Firebase (optional)
 
-Firebase is what lets you use the app away from the camera's Wi-Fi, and
-where recordings go. Skip this step to run **stand-alone**: the phone app
-talks to the camera directly and recordings stay on the card
+Firebase provides remote access and the recordings library. Skipping this
+step gives **stand-alone** operation: direct phone connection only;
+recordings stay on the card
 ([09](../../../docs/design/09-direct-connection-and-app.md)).
 
-On your computer, once: `./scripts/firebase-setup.sh <project-id>`, then
+Once, on a computer: `./scripts/firebase-setup.sh <project-id>`, then
 `npm run deploy` ([08](../../../docs/design/08-recordings-and-cloud.md#deploying-the-firebase-backend)).
-The setup prints three values and saves the camera's key file. Copy the file
-to the Pi:
+Setup prints three values and writes the camera's key file. Copy the key
+file to the Pi:
 
 ```bash
 scp sportcam-firebase.json pi@sportcam.local:/home/pi/   # then delete it on your computer
 ```
 
-and set the values in `~/sportcam/src/without_uwb/device/sportcam/config.py`:
+Set the values in `~/sportcam/src/without_uwb/device/sportcam/config.py`:
 
 | Setting | Set it to |
 | --- | --- |
@@ -95,7 +93,7 @@ step 1.
 python3 -m sportcam.ptzcheck
 ```
 
-It sweeps each axis to its soft limits and back. In `config.py`:
+Sweeps each axis to its soft limits and back. Adjust in `config.py`:
 
 - narrow `PAN_MIN/MAX_DEG` or `TILT_MIN/MAX_DEG` if anything binds. The
   search sweeps the whole pan range, so the ends of it matter more than they
@@ -110,20 +108,17 @@ touching anything, and the lens is left centred.
 
 ## 5. Calibrate
 
-Do these in order. Each prints a line to paste into `config.py`, or tells you
-what to change there.
+In order. Each step prints a line for `config.py` or states the change.
 
-**a. Zoom curve.** This is manual; there is no tool for it yet.
-Stand a metre rule at a known distance, step the lens's raw zoom
-(`OPT_ZOOM`) across 3000–20000, and note the visible width at each stop.
-That gives the field of view, and the focal length follows from it; put the
-`(mm, raw)` pairs in `ZOOM_CURVE`. Until you do, `ZOOM_CURVE` is a straight
-line between the stops, and framing is roughly right but not exact. The lens
-is open-loop, so the camera drives both lens motors into their stops at boot
-before any of this means anything.
+**a. Zoom curve.** Manual (no tool yet). Place a metre rule at a known
+distance, step the raw zoom (`OPT_ZOOM`) across 3000–20000, and record the
+visible width at each stop → field of view → focal length. Enter the
+`(mm, raw)` pairs in `ZOOM_CURVE`. Default: a straight line between the
+stops (framing approximate). The lens is open-loop; both lens motors are
+homed against their stops at boot.
 
-**b. Focus grid.** Tape a high-contrast target (a printed chart or a
-newspaper) at each distance in turn, in the light you will film in, and run:
+**b. Focus grid.** High-contrast target (printed chart or newspaper)
+at each distance in turn, in the filming light:
 
 ```bash
 python3 -m sportcam.focuscal 2
@@ -146,11 +141,12 @@ sudo systemctl enable --now sportcam-head sportcam-wifi
 journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
 ```
 
-**Done when** the LED ring turns solid blue (idle). After any `config.py` edit,
-run `sudo systemctl restart sportcam-head`. A restart also resets the battery
-gauge to "full" (step 8.6), so don't restart mid-session on a part-used bank. **Stop the service**
-(`sudo systemctl stop sportcam-head`) before running `focuscal` or `ptzcheck`
-again, because they need the camera and motors to themselves.
+**Done when** the LED ring is solid blue (idle).
+
+| Operation | Command / note |
+| --- | --- |
+| Apply a `config.py` change | `sudo systemctl restart sportcam-head`. Also resets the battery gauge to "full" (step 8.6): don't restart mid-session on a part-used bank |
+| Before running `focuscal` or `ptzcheck` | `sudo systemctl stop sportcam-head` (they need exclusive access to the hardware) |
 
 ## 7. The app
 
@@ -206,11 +202,9 @@ tuning steps only mean something once the signs are right.
    (`RESEARCH_AFTER_S`) the camera should start sweeping again and re-lock on
    the first person it finds. If nobody is ever found it gives up to idle after
    `SEARCH_GIVE_UP_S` (180 s) when not recording.
-6. **Battery gauge.** The gauge cannot read the bank's charge; it counts
-   what has been used since the camera software started, and assumes the
-   bank was full then. So start on a freshly charged bank, and check its
-   minutes-left against a stopwatch over the first half hour. There is no
-   app button to re-zero it yet.
+6. **Battery gauge.** Counts energy used since the service started, assuming
+   a full bank at that point. Start on a fully charged bank; compare
+   minutes-left with a stopwatch over the first 30 min. No app reset control.
 
 If it keeps sweeping and the app says it can't find anyone, the camera is
 pointing somewhere you aren't, or the detector can't see you: recheck step 4,

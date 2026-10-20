@@ -1,8 +1,7 @@
 # 08 — Recordings, cloud backend & gym Wi-Fi
 
-How a climb gets from the camera's sensor to your phone's screen, wherever
-you are: the library lives in Firebase, so it's there at the gym and at home
-alike.
+Recording pipeline from the Pi to the Firebase library, backend deployment,
+and Wi-Fi provisioning at a new location.
 
 ## The recording lifecycle
 
@@ -16,125 +15,123 @@ stop recording
                        └─► app library streams it back, with seeking
 ```
 
-The delete happens only after `finalizeRecording` returns, which is the
-backend confirming the byte count. A failed or unconfirmed upload keeps the
-file, which is why the card needs both a retry sweep and a space guard.
-
-Design decision: **recordings live on the backend, not on the Pi.** The Pi
-is busy encoding and running the tracking loop, its SD card is small and
-wears out under video writes, and you pack the tripod away after a session —
-a library stranded on the camera goes dark. The cost is a short delay before
-"watch now": at the 12 Mbps record bitrate a 5-minute clip is ≈ 450 MB, so
-30–90 s on decent Wi-Fi. The app shows upload progress, then a
-**"Recording saved — watch now"** toast.
-
-True *instant* replay (playing a clip while it is still recording) would need
-fragmented MP4 or HLS. Deliberately out of scope for v1.
+- The local file is deleted only after `finalizeRecording` returns (byte
+  count confirmed). Failed or unconfirmed uploads keep the file; hence the
+  retry sweep and the space guard ([failure behaviour](#failure-behaviour)).
+- **Decision: recordings are stored in the backend, not on the Pi.**
+  Rationale: the Pi is busy encoding and tracking; the SD card is small and
+  wears under video writes; the camera is packed away after a session.
+- Cost: delay before playback. 12 Mbit/s → ≈ 450 MB per 5 min clip → 30–90 s
+  upload on typical Wi-Fi. The app shows progress, then a **"Recording saved
+  — watch now"** toast.
+- Out of scope (v1): playback during recording (would need fragmented MP4 or
+  HLS).
 
 ## The library in Firebase
 
-The camera uploads **straight to Cloud Storage**: the API only hands out a
-signed URL and checks the result, so the video never passes through a
-function (whose request size is capped at 32 MB anyway).
+Uploads go **directly to Cloud Storage** on a signed URL. The API issues URLs
+and verifies results; video never passes through a function (32 MB request
+limit).
 
-| Callable | Does |
+| Callable | Function |
 | --- | --- |
-| `createUploadUrl({name})` | a V4-signed Cloud Storage `PUT` URL, valid 30 min |
-| `finalizeRecording({name,bytes,durationS})` | checks the object exists and its size matches, writes `cameras/{key}/recordings/{name}` in Firestore, clears the app's upload bar |
-| `getRecordings()` | that collection, newest first (the web app subscribes to it instead) |
+| `createUploadUrl({name})` | V4-signed Cloud Storage `PUT` URL, valid 30 min |
+| `finalizeRecording({name,bytes,durationS})` | verifies the object exists and its size matches; writes `cameras/{key}/recordings/{name}`; clears the app's upload indicator |
+| `getRecordings()` | that collection, newest first (the web app subscribes instead) |
 | `GET /api/recordings/:name?k=<key>` | 302 to a signed Cloud Storage `GET` URL, valid 6 h |
 
-Range support is the detail that matters: phone browsers need HTTP range
-requests to seek inside a `<video>`, and Cloud Storage serves them.
+- **Range requests** are required for seeking in a phone `<video>`; Cloud
+  Storage supports them.
+- **Emulators:** no URL signing available. `createUploadUrl` returns the
+  function's own `PUT /api/recordings/upload/:name`, and playback streams
+  through the function with `Range` support. Transparent to the uploader.
 
-Under the emulators there is nothing to sign URLs with, so the function
-stands in: `createUploadUrl` returns its own `PUT /api/recordings/upload/:name`,
-and playback streams the object through the function, honouring `Range`. The
-camera's uploader doesn't know the difference.
-
-The camera finds the API through `UPLOAD_API_BASE` in
-`src/<build>/device/sportcam/config.py`, and names itself with `CAMERA_KEY`:
+Camera configuration (`src/<build>/device/sportcam/config.py`):
 
 ```python
 UPLOAD_API_BASE = "https://sportcam-aaron.web.app"
 CAMERA_KEY = "…"                                    # printed by firebase-setup.sh
 ```
 
-Leave them empty and the camera keeps its recordings on the card; the phone
-can still play them over the direct connection ([09](09-direct-connection-and-app.md)).
+Both empty: recordings stay on the card; phones can play them over the
+direct connection ([09](09-direct-connection-and-app.md)).
 
 ## Deploying the Firebase backend
 
-You run `./scripts/firebase-setup.sh <project-id>` once, then
-`npm run deploy` ([Appendix C](../appendix/appendix-c-development.md#deploying)
-has the commands). `firebase-setup.sh` creates the project and writes `src/backend/.firebaserc`;
-creates the Firestore database and the `<project>-recordings` bucket; lets
-the function sign URLs; creates the camera's service account (Firestore
-only) and saves its key as `sportcam-firebase.json` for you to copy to the
-Pi; and generates the camera key. It prints the lines for the camera's
-`config.py` and your app link. Without `gcloud` it prints the console steps
-instead. **One manual step Google requires:** upgrade the project to the
-Blaze plan — Cloud Functions won't deploy on Spark. Free-tier quotas still
-apply, so light personal use costs approximately nothing.
+Commands: `./scripts/firebase-setup.sh <project-id>` (once), then
+`npm run deploy` ([Appendix C](../appendix/appendix-c-development.md#deploying)).
+
+`firebase-setup.sh`:
+
+| Step | Result |
+| --- | --- |
+| Create project | `src/backend/.firebaserc` |
+| Create Firestore database and bucket | `<project>-recordings` |
+| Grant URL signing | function's service account gets Token Creator on itself |
+| Create camera service account | Firestore-only; key saved as `sportcam-firebase.json` (copy to the Pi) |
+| Generate camera key | printed with the `config.py` lines and the app link |
+| No `gcloud` installed | prints the equivalent console steps |
+
+**Manual step:** upgrade the project to the **Blaze** plan (required for Cloud
+Functions). Free-tier quotas still apply.
 
 `npm run deploy` (`scripts/firebase-deploy.sh`) builds the web app and the
-function and deploys functions, hosting and the Firestore and Storage rules
-from `src/backend`. What lands:
+function, then deploys functions, hosting and the Firestore and Storage rules
+from `src/backend`:
 
-- `https://<project>.web.app` — the app; open it with your `#key=…` link once
-  and the browser remembers the camera
-- `https://<project>.web.app/api/**` — the API, served by the single `api`
-  function (`src/backend/functions/src/app.ts`)
-- Firestore rules: a camera's document, preview and recordings are readable
-  by anyone holding its key; nobody can list cameras or write from a client.
-  Storage rules deny everything — clients only ever get short-lived signed URLs.
+| Endpoint / rule | Content |
+| --- | --- |
+| `https://<project>.web.app` | web app; opening the `#key=…` link once stores the key in the browser |
+| `https://<project>.web.app/api/**` | the API (`api` function, `src/backend/functions/src/app.ts`) |
+| Firestore rules | camera document, preview and recordings readable with the key; no listing; no client writes |
+| Storage rules | deny all; clients use short-lived signed URLs only |
 
-Storage layout: objects at `recordings/<camera key>/<name>.mp4` in the
-bucket, metadata at `cameras/<camera key>/recordings/<name>` in Firestore.
-Add a bucket lifecycle rule (e.g. delete after 365 days) if you want
-automatic cleanup.
+Storage layout:
 
-**What it costs to leave running.** The camera writes a heartbeat every 5 s
-(≈ 17 000 writes in a day it's switched on, inside Firestore's free 20 000)
-and previews only while an app is watching. Nothing runs when nobody is
-using it, so an idle project costs nothing.
+| Data | Location |
+| --- | --- |
+| Video | `recordings/<camera key>/<name>.mp4` in the bucket |
+| Metadata | `cameras/<camera key>/recordings/<name>` in Firestore |
+
+Automatic cleanup: add a bucket lifecycle rule (e.g. delete after 365 days).
+
+**Running cost.** Heartbeat every 5 s ≈ 17 000 Firestore writes per powered-on
+day (free tier: 20 000/day). Previews only while an app is watching. Idle
+project: no cost.
 
 ## Connecting the camera to gym Wi-Fi from your phone
 
-The Pi has no keyboard, and gym Wi-Fi isn't in its config. So the head unit
-provisions itself through a **captive portal** (`src/<build>/device/sportcam/wifi_portal.py`,
-systemd unit `sportcam-wifi.service`):
+The Pi has no keyboard or display. Provisioning is via a **captive portal**
+(`src/<build>/device/sportcam/wifi_portal.py`, unit `sportcam-wifi.service`):
 
-1. Power the camera on. If it can't reach a network within 60 s, it raises
-   its own hotspot: **`SportCam-Setup`**, password `sportcam123`.
-2. On your phone, join that network. Android/iOS usually pop the portal
-   automatically; otherwise open **`http://10.42.0.1`**.
-3. The page lists nearby networks with signal strength. Tap the gym's,
-   type its password, hit **Connect**.
-4. The Pi drops the hotspot and joins the gym network — NetworkManager
-   remembers it, so next visit it connects on its own. Wrong password?
-   The hotspot comes back so you can retry.
-5. Rejoin the gym Wi-Fi on your phone and open the app.
+1. Power on. No network within 60 s → hotspot **`SportCam-Setup`**, password
+   `sportcam123`.
+2. Join it from a phone. The portal usually opens automatically; otherwise
+   **`http://10.42.0.1`**.
+3. Select the network, enter the password, **Connect**.
+4. The Pi leaves the hotspot and joins the network; NetworkManager stores it
+   for next time. Wrong password: the hotspot returns.
+5. Rejoin the gym Wi-Fi on the phone and open the app.
 
-Implementation notes: uses `nmcli` (NetworkManager is standard on Raspberry
-Pi OS Bookworm), serves Android's `/generate_204` and iOS's
-`/hotspot-detect.html` probes so the portal auto-opens, and the service runs
-as root because changing network config requires it.
+| Implementation | Detail |
+| --- | --- |
+| Network control | `nmcli` (NetworkManager, standard on Raspberry Pi OS Bookworm) |
+| Portal auto-open | serves Android `/generate_204` and iOS `/hotspot-detect.html` |
+| Privileges | runs as root (network configuration) |
 
-**Gym networks with a browser login page** (captive portals of their own) are
-the one case this can't solve — the Pi has no browser to accept terms on. Use
-your phone's hotspot instead: create one named e.g. `SportCam-Hotspot`, join
-the Pi to it once via the portal, and it will reconnect automatically at
-every future session.
+**Limitation:** networks with their own browser login page can't be joined
+(no browser on the Pi). Workaround: a phone hotspot (e.g.
+`SportCam-Hotspot`), joined once via the portal; the Pi reconnects
+automatically afterwards.
 
 ## Failure behaviour
 
-| Situation | What happens |
+| Situation | Behaviour |
 | --- | --- |
-| Wi-Fi drops mid-upload | `upload_with_retry` retries with exponential backoff (5 s → 5 min, 8 attempts); the file stays on the Pi until confirmed |
-| Backend unreachable for the whole session | the ladder above gives up after ~15 min and keeps the file. `upload_loop` then re-attempts everything still on the card at start-up and every 15 min thereafter, oldest first, so the backlog drains as soon as a backend appears |
-| Card nearly full | at 20 min of recording space left the ring blinks orange and the app warns; at 5 min the camera refuses to start a new recording and stops a running one cleanly. See [04](04-electronics.md#the-sd-card) |
-| Backend unreachable at record time | Recording is unaffected — recording is local; only the upload needs the network |
-| Internet down at the gym | The camera keeps tracking and recording, and the phone still connects directly on the same Wi-Fi; the app from elsewhere shows the camera offline until it's back |
-| Partial upload | Cloud Storage only creates the object when the PUT completes, and `finalizeRecording` checks its size, so a half-file never appears in the library |
-| Size mismatch on finalize | `failed-precondition`; the Pi keeps the local copy and retries |
+| Wi-Fi drops mid-upload | `upload_with_retry`: exponential backoff 5 s → 5 min, 8 attempts; file kept until confirmed |
+| Backend unreachable for the whole session | retry ladder ends after ≈ 15 min; file kept. `upload_loop` retries everything on the card at start-up and every 15 min, oldest first |
+| Card nearly full | < 20 min of space: ring blinks orange, app warns. < 5 min: new recordings refused, a running one stopped cleanly ([04](04-electronics.md#the-sd-card)) |
+| Backend unreachable at record time | no effect on recording (local); only upload needs the network |
+| Internet down at the gym | tracking and recording continue; direct phone connection works on the same Wi-Fi; remote apps show the camera offline |
+| Partial upload | Cloud Storage creates the object only on PUT completion, and `finalizeRecording` checks size: no partial files in the library |
+| Size mismatch on finalize | `failed-precondition`; local copy kept, retried |

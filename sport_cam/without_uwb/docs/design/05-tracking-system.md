@@ -2,22 +2,18 @@
 
 ![Search and track](../images/search-and-track.png)
 
-SportCam finds and follows a person by **vision alone**. There is no tag, no
-radio and no anchor: the user taps **Track & record**, the camera sweeps the
-room until its person detector sees someone, centres them, locks on, and from
-then on keeps them framed. Pan, tilt, zoom and focus are all register writes
-to one I2C controller on the Pi ([03](../../../docs/design/03-mechanical-design.md),
-[04](../../../docs/design/04-electronics.md)), so the whole loop runs on the device, 20 times a
-second.
+Subject localisation by **vision only**: no tag, radio or anchors.
+**Track & record** starts a pan sweep; the person detector finds a person;
+the camera centres them, locks on and keeps them framed. Pan, tilt, zoom and
+focus are register writes to one I2C controller on the Pi
+([03](../../../docs/design/03-mechanical-design.md),
+[04](../../../docs/design/04-electronics.md)); the loop runs on the device at
+20 Hz.
 
 ## Why camera-only
 
-The other build, [with UWB](../../../with_uwb/docs/design/05-tracking-system.md),
-tells the camera where the subject is with ultra-wideband radio: a wearable
-tag ranged by three anchors on the camera head. It is precise and works
-through a body or a jacket. It also means a tag to wear and charge, three
-anchor boards, two printed arms, a mast and range calibration. This build
-drops all of it.
+Comparison with the [UWB build](../../../with_uwb/docs/design/05-tracking-system.md)
+(wearable tag ranged by three anchors on the head):
 
 <!--compare-->
 
@@ -32,11 +28,8 @@ drops all of it.
 | Fails when | pose or light defeats the detector; person hidden | body shadows the radio; tag switched off or flat |
 | Power | ≈ 3 W less at 5 V | |
 
-What you gain is a build with nothing to wear and half the parts. What you
-give up is identity: vision cannot tell one person from another, so the camera
-films whoever it finds first. See [limitations](#limitations); they are the
-price of the simplification and the rest of this document is about making the
-best of them.
+Trade-off: nothing worn and half the parts, at the cost of identity. The
+camera films the first person it finds ([limitations](#limitations)).
 
 ## The state machine
 
@@ -57,45 +50,33 @@ best of them.
                           missing 6 s: ─────────────► SEARCH (toward the side they left)
 ```
 
-| Mode | Camera does | Leaves when |
+| Mode | Behaviour | Exit |
 | --- | --- | --- |
-| **SEARCH** | zooms wide, focuses at `SEARCH_FOCUS_M` (5 m), sweeps pan end to end at `SEARCH_PAN_DPS` (25°/s), and at each turn-around steps to the next of `SEARCH_TILT_ROWS_DEG` (5°, 22°) | the detector sees a person → CENTRE. If tracking only (not recording), nobody was ever found and `SEARCH_GIVE_UP_S` (180 s) pass → app state `idle` |
-| **CENTRE** | stops sweeping, turns toward the largest person in view until their box centre is within `ACQUIRE_CENTRE_FRACTION` (20 %) of the middle of the frame | `ACQUIRE_DETECTIONS` (2) consecutive centred detections → TRACK; nobody seen for `CENTRE_TIMEOUT_S` (2 s) → SEARCH |
-| **TRACK** | follows the person (below), frames them, estimates distance for focus | missing for `RESEARCH_AFTER_S` (6 s) → SEARCH |
+| **SEARCH** | zoom wide; focus at `SEARCH_FOCUS_M` (5 m); pan sweeps end to end at `SEARCH_PAN_DPS` (25°/s); steps to the next of `SEARCH_TILT_ROWS_DEG` (5°, 22°) at each end | person detected → CENTRE. Tracking-only session, nobody ever found, `SEARCH_GIVE_UP_S` (180 s) elapsed → `idle` |
+| **CENTRE** | sweep stops; turn toward the largest person until the box centre is within `ACQUIRE_CENTRE_FRACTION` (20 %) of frame centre | `ACQUIRE_DETECTIONS` (2) consecutive centred detections → TRACK; nobody seen for `CENTRE_TIMEOUT_S` (2 s) → SEARCH |
+| **TRACK** | follow and frame the person; estimate distance for focus | missing for `RESEARCH_AFTER_S` (6 s) → SEARCH |
 
-The state the app sees is the usual `idle → tracking → recording`; SEARCH and
-CENTRE are the `acquiring` phase, TRACK is `acquired`. The sweep is slow on
-purpose. At the wide end the frame is 96° across, so 25°/s moves a quarter of
-the frame per second: a person is in view for several detections as the frame
-goes past, and does not smear. A full pass is 160° ÷ 25°/s ≈ 6.4 s, so both
-tilt rows are covered in about 13 s. The app's "can't see anyone" pill appears
-after `ACQUIRE_STALLED_S` (15 s), a little more than one full cycle.
+Mapping to app states: SEARCH and CENTRE = `tracking`/`acquiring`; TRACK =
+`tracking`/`acquired`.
+
+Sweep timing:
+
+| Quantity | Value | Consequence |
+| --- | --- | --- |
+| Frame width at the wide end | 96° | at 25°/s the frame moves ¼ width per second: several detections per person, no motion blur |
+| One pass | 160° ÷ 25°/s ≈ 6.4 s | both tilt rows ≈ 13 s |
+| "Can't see anyone" in the app | `ACQUIRE_STALLED_S` = 15 s | just over one full cycle |
 
 ### Lock-on rules
 
-- **The first person found wins.** At first sighting, if several people are
-  in view, the largest detection is taken.
-- **Two centred detections to lock.** A single-frame false positive — a coat
-  stand, a chair — costs a short pause: the camera turns toward it, doesn't
-  see it again, and after 2 s resumes the sweep. It cannot start a recording
-  of furniture.
-- **Recording starts on the first lock** (`AUTO_RECORD_ON_LOCK`), so the clip
-  is of the person, not of an empty room being swept. The user can stop
-  recording and tracking continues; the camera does not start a second
-  recording in the same session. Set `AUTO_RECORD_ON_LOCK = False` to make
-  recording a separate tap (**Record now**).
-- **Follow the nearest, not the biggest.** Once someone is being followed,
-  each detection is matched to the one nearest the last position, within a
-  gate of `TRACK_GATE_FRACTION` (45 % of frame width). Further away than that
-  is "not the same person" and is ignored, so a bystander walking past does
-  not steal the lock.
-- **Missing target.** After `LOST_HOLD_S` (2 s) the LED ring flashes at 2 Hz and
-  the camera holds still; recording is unaffected. After `RESEARCH_AFTER_S`
-  (6 s) it sweeps again, starting toward the side the person was last heading,
-  while recording continues. Zoom has been easing wide in the meantime.
-- **An empty room.** A tracking session (not recording) that has never found
-  anyone gives up after 180 s and returns to idle. A recording is never
-  abandoned this way.
+| Rule | Detail |
+| --- | --- |
+| **First person found wins** | at first sighting with several people in view, the largest detection is taken |
+| **Two centred detections to lock** | a single-frame false positive (coat stand, chair) causes a ≤ 2 s pause, then the sweep resumes; it can't start a recording |
+| **Recording starts on first lock** | `AUTO_RECORD_ON_LOCK`. Stopping the recording keeps tracking; no second auto-recording in the session. `False`: recording via **Record now** |
+| **Nearest, not largest, while tracking** | each detection is matched to the one nearest the last position, within `TRACK_GATE_FRACTION` (45 % of frame width). Detections outside the gate are ignored (bystanders) |
+| **Missing target** | `LOST_HOLD_S` (2 s): hold, ring flashes at 2 Hz. `RESEARCH_AFTER_S` (6 s): sweep toward the last direction of travel. Recording continues; zoom relaxes wide meanwhile |
+| **Empty room** | tracking-only session, nobody found for 180 s → `idle`. Never applied to a recording |
 
 ## Control loops (all run on the Pi, 20 Hz)
 
@@ -111,122 +92,47 @@ person boxes (3 fps, fresh only) ──► nearest-to-last (gate) ──► offs
       └──► apparent height, thin lens ──► distance (smoothed) ──► FOCUS_GRID lookup ──► OPT_FOCUS
 ```
 
-- **Pan and tilt.** The camera is steered by the person's offset from the
-  middle of the frame. On each **fresh** detection the pan goal moves by
-  `TRACK_PAN_GAIN` (0.6) times the offset converted to degrees through the
-  current field of view, and the tilt goal by `TRACK_TILT_GAIN` (0.5) times
-  its offset (pixel y grows downward, so a person low in the frame tilts the
-  camera down). Offsets under `TRACK_DEADBAND_FRACTION` (4 % of the frame) are
-  ignored. Between detections the servos *slew* toward the goals at no more
-  than `PAN_MAX_DPS` / `TILT_MAX_DPS`, so they glide instead of snapping.
-  Goals are clamped to the soft limits.
-- **Why the gains are under 1.** The detector is slow (about 3 fps) and each
-  measurement is already a few hundred milliseconds old when it arrives, by
-  which time the person has moved and the camera too. Correcting the full
-  error each time would overshoot and hunt. Under-correcting settles in a few
-  detections and costs a little lag on a fast mover.
-- **Each detection counts once.** The loop runs at 20 Hz and vision at 3, so
-  the tracker moves the goals only on a fresh detection
-  ([06 — Vision](../../../docs/design/06-device-software.md#vision-and-why-it-runs-slowly)).
-- **Zoom (framing).** The camera starts wide; vision then frames the shot,
-  filling 65 % of the frame, with a fast zoom-out guard near the edges and a
-  slow relax back to wide when the person isn't seen
-  ([06 — Framing and focus](../../../docs/design/06-device-software.md#framing-and-focus)).
-- **Focus from size.** There is no distance sensor, so distance is
-  *estimated* from how tall the person looks. By the thin lens, a body of
-  height H at distance d is f·H/d tall on the sensor; the tracker solves for d
-  using the current focal length f, the body's apparent height on the IMX477
-  (`SENSOR_H_MM`) and `SUBJECT_HEIGHT_M` = 1.7 m, clamps it to 1–30 m and
-  smooths it (`DIST_SMOOTHING` 0.3 per detection), because a person's pose
-  changes their apparent height from frame to frame. That `dist` is what the
-  app's telemetry shows. It is deliberately a guess about the body: a child or
-  a crouching climber reads as farther away than they are. Focus has depth of
-  field to spare at the wide end, where the camera spends most of its time, and
-  the error matters mainly at full tele. While searching, focus is held at
-  `SEARCH_FOCUS_M` (5 m), a room-sized guess.
+| Loop | Behaviour |
+| --- | --- |
+| **Pan / tilt** | on each fresh detection: pan goal += `TRACK_PAN_GAIN` (0.6) × offset (converted to degrees via the current FOV); tilt goal += `TRACK_TILT_GAIN` (0.5) × offset (pixel y grows downward: a low person tilts the camera down). Offsets < `TRACK_DEADBAND_FRACTION` (4 %) ignored. Servos slew toward the goals at ≤ `PAN_MAX_DPS` / `TILT_MAX_DPS`. Goals clamped to the soft limits |
+| **Gains < 1** | detections are ≈ 3 fps and a few hundred ms old on arrival; full correction overshoots. Under-correction settles in a few detections, with some lag on fast movers |
+| **Fresh only** | loop 20 Hz, vision 3 Hz: goals move only on a new detection ([06](../../../docs/design/06-device-software.md#vision-and-why-it-runs-slowly)) |
+| **Zoom** | starts wide; vision frames to 65 % with an edge guard and a slow relax to wide when unseen ([06](../../../docs/design/06-device-software.md#framing-and-focus)) |
+| **Focus from size** | distance estimated by the thin-lens relation: body height H at distance d images at f·H/d. Inputs: focal length f, apparent body height on the sensor (`SENSOR_H_MM`), `SUBJECT_HEIGHT_M` = 1.7 m. Clamped to `DIST_MIN_M`–`DIST_MAX_M` (1–30 m), smoothed by `DIST_SMOOTHING` (0.3 per detection). Reported as `dist` in telemetry. Biased by children, crouching and reaches; the error matters mainly at full zoom. During SEARCH, focus is fixed at `SEARCH_FOCUS_M` (5 m). Focus position from distance and focal length via `FOCUS_GRID` ([06](../../../docs/design/06-device-software.md#framing-and-focus)) |
+| **Detector** | OpenCV HOG on the 720p preview, downscaled to `DETECT_DOWNSCALE_W` (480 px); `DETECT_FPS_TRACKING` 3 fps in a session, `DETECT_FPS_IDLE` 0.5 otherwise; record stream untouched 1080p. `DETECT_HIT_THRESHOLD` (0.3): SVM margin; higher = fewer false positives, more misses. While locked, searches a strip of `DETECT_STRIP_FRACTION` (60 %) of frame width around the person; whole frame while searching. 3 fps suffices for climbing (≈ 1.7°/s seen from 10 m), not for running |
 
-  Focus then comes from that distance and the focal length, through
-  `FOCUS_GRID` ([06](../../../docs/design/06-device-software.md#framing-and-focus)).
-- **Detection.** OpenCV HOG on the 720p preview, downscaled to
-  `DETECT_DOWNSCALE_W` (480 px) wide, at `DETECT_FPS_TRACKING` (3 fps) while a
-  session runs and `DETECT_FPS_IDLE` (0.5) when not. The record stream is
-  untouched 1080p. `DETECT_HIT_THRESHOLD` (0.3) is the SVM margin: higher
-  gives fewer false people and misses more real ones. **While locked, the
-  detector searches only a vertical strip** of `DETECT_STRIP_FRACTION` (60 %)
-  of the frame width around the person, which cuts its time several-fold;
-  while searching it uses the whole frame.
-
-  Three frames per second sounds slow and is not for a climber, who rises
-  at about 1.7°/s seen from 10 m. A runner is another matter.
-
-  **Upgrade path:** if HOG is not good enough, a MobileNet-SSD person detector
-  through `cv2.dnn` fits in the same place. Only `Camera._detect()` changes;
-  it still returns a list of `(x, y, w, h)`.
+**Upgrade path:** MobileNet-SSD via `cv2.dnn` replaces HOG inside
+`Camera._detect()` only; the return type stays a list of `(x, y, w, h)`.
 
 ## Limitations
 
-Stated plainly, because they decide whether this build suits your use:
-
-- **It cannot tell people apart.** The first person found is the one
-  followed; a bystander already in view at that moment may be the one it picks
-  (the largest detection wins at first sighting). After a loss and re-search
-  the same rule applies, so a person walking between the camera and the subject
-  can take the lock. Clear the field of view when you press the button, and
-  start from the person you want filmed standing in front.
-- **HOG has blind spots.** It is best at upright, side- or front-on people in
-  decent light. It struggles with unusual poses (climbing overhangs, a
-  horizontal body, crouching), a person seen from behind in a bulky jacket,
-  partial occlusion, and poor or contrasty light. It can also false-positive
-  on coat stands and similar shapes, which the two-detection lock turns into
-  a brief pause, not a recording. Raising `DETECT_HIT_THRESHOLD` trades some
-  of one for the other.
-- **±80° of pan.** The camera cannot look behind itself and the sweep never
-  covers more than the front 160°. Aim the tripod at the area of interest.
-- **Distance is an estimate.** Zoom is framed from the person's size on the
-  sensor and focus from an assumed 1.7 m body; there is no ranging. Children,
-  crouching and long reaches all bias it.
-- **Recording starts on the first lock.** If the first person found is not the
-  one you wanted, stop recording and tracking from the app and start again.
-  With `AUTO_RECORD_ON_LOCK = False` you decide when it starts.
-- **Latency.** At 3 fps the camera lags a fast mover. Gains are tuned to avoid
-  oscillation rather than to follow a sprinter.
+| Limitation | Effect | Mitigation |
+| --- | --- | --- |
+| **No identity** | follows the first person found (largest detection at first sighting). After a loss and re-search the same rule applies; someone passing between camera and subject can take the lock | clear the view when starting; subject stands in front |
+| **HOG blind spots** | best on upright, side- or front-on people in good light. Weak on unusual poses (overhangs, horizontal body, crouching), back views in bulky clothing, partial occlusion, poor or high-contrast light. False positives on coat stands and similar | the two-detection lock turns false positives into a pause; `DETECT_HIT_THRESHOLD` trades misses against false positives |
+| **Pan ±80°** | can't look behind; the sweep covers the front 160° only | aim the tripod at the area of interest |
+| **Distance is estimated** | zoom from apparent size; focus from an assumed 1.7 m body. Biased by children, crouching, long reaches | — |
+| **Recording starts on first lock** | the wrong person may be recorded | stop and restart from the app, or `AUTO_RECORD_ON_LOCK = False` |
+| **Latency** | lags fast movers; gains tuned for stability, not sprinting | — |
 
 ## Camera placement envelope
 
-How far back can the tripod sit? Three constraints, and they bite at
-different distances:
+| # | Constraint | Limit |
+| --- | --- | --- |
+| 1 | **Resolution (zoom)** | 1.8 m subject at full zoom: 65 % of frame to ≈ 8.3 m, 40 % at 13.5 m, 18 % at 30 m; full body from ≈ 1.5 m ([03](../../../docs/design/03-mechanical-design.md#how-far-the-zoom-reaches)) |
+| 2 | **Geometry** | < 5 m from a tall wall: steep tilt (foreshortening) and high angular rates. At 8–12 m a 15 m route spans ≈ 50–60° of tilt |
+| 3 | **Search range** — binding for acquisition | the search runs at full wide. At 10 m the frame is ≈ 12.5 m tall, so a 1.7 m person is ≈ 14 % of it, at HOG's detection limit. **Reliable search to ≈ 8–10 m**; beyond that, start the subject closer (or entering from the side) and let the zoom follow them out. Pan ±80°: ≈ 22 m wide at 8 m |
 
-1. **Resolution — the zoom is the binding constraint.** At full zoom a 1.8 m
-   subject fills the 65 % framing target out to about 8.3 m, 40 % at 13.5 m
-   and 18 % at 30 m; full-body framing works from about 1.5 m. The full table
-   is in [03 — How far the zoom reaches](../../../docs/design/03-mechanical-design.md#how-far-the-zoom-reaches).
-2. **Geometry — closer isn't better.** Inside ~5 m of a tall wall the tilt
-   angle gets steep (foreshortened footage) and pan/tilt angular rates spike
-   on fast moves. At 8–12 m, a full 15 m route sweeps a comfortable ~50–60°
-   of tilt.
-
-3. **Pan range and the search.** The camera only pans ±80°, and it searches
-   zoomed all the way out. At 8 m back the sweep is about 22 m wide, which
-   covers any bouldering wall and most routes. But at the wide end the frame
-   is about 12.5 m tall at 10 m, so a 1.7 m person is only about 14 % of it,
-   right at the edge of what HOG finds. **Expect searching to work reliably
-   out to roughly 8–10 m**; beyond that, start the person closer (or walk in
-   from the side) and let the zoom follow them back out. Aim the lens at the
-   middle of what you are filming and give the far ends a check before you
-   start.
-
-**Rule of thumb: 6–12 m back is the sweet spot; 2 m to ~20 m works.** Past
-13.5 m the subject is simply smaller than the framing target. Past ~30 m the
-person is too small for the detector at any zoom.
+**Recommended: 6–12 m. Working range: 2–20 m.** Beyond 13.5 m the subject is
+below the framing target; beyond ≈ 30 m the person is too small to detect at
+any zoom.
 
 ## Calibration
 
-Nothing about the tracker itself needs calibrating; the lens and the servos
-it drives do. The zoom curve, the focus grid, and the centre and direction of
-both axes are calibrated the same way in both builds;
-[14 — Software setup](../setup/14-software-setup.md#5-calibrate) has the steps.
-A wrong `PAN_SIGN` or `TILT_SIGN` makes the camera run away from the subject,
-which looks like a tracking failure and isn't one.
+The tracker needs no calibration; the lens and servos do. Zoom curve, focus
+grid, and axis centre and direction are calibrated the same way in both
+builds: [14 — Software setup](../setup/14-software-setup.md#5-calibrate). A
+wrong `PAN_SIGN` or `TILT_SIGN` drives the camera away from the subject.
 
 ## Tuning
 

@@ -1,21 +1,21 @@
 # 15 — Verification checklist
 
-Everything in this build that depends on a part you bought rather than a
-number we chose. It is ordered by **when you find out**, because the cost of
-being wrong rises sharply down the page: a dimension caught before printing
-costs nothing, the same dimension caught after can cost a 14-hour reprint.
+Checks for everything that depends on a bought part rather than a design
+value, ordered by **when the problem becomes detectable**. Cost of an error
+rises down the page: a dimension caught before printing costs nothing; after
+printing, up to a 14-hour reprint.
 
-Nothing here is optional reading. The [last section](#mistakes-this-design-has-already-made)
-lists three mistakes these checks would have caught.
+All sections are required. [Mistakes this design has already made](#mistakes-this-design-has-already-made)
+lists three errors these checks catch.
 
 ## Before you print
 
-These five change the CAD. Measure them with the parts in your hand, put the
-numbers in [`cad/ordered_parts.toml`](../../../cad/ordered_parts.toml) with
-`measured = true`, and run `python3 cad/fit.py` from `sport_cam/`. It
-re-solves the layout around them, re-renders the parts and audits that
-everything fits; [`cad/FIT_REPORT.md`](../../../cad/FIT_REPORT.md) lists what it
-checked and which sizes are still assumed.
+Five measurements that change the CAD. Procedure: measure the part, enter the
+value in [`cad/ordered_parts.toml`](../../../cad/ordered_parts.toml) with
+`measured = true`, run `python3 cad/fit.py` from `sport_cam/` (re-solves the
+layout, re-renders, audits fit).
+[`cad/FIT_REPORT.md`](../../../cad/FIT_REPORT.md) lists the checks and any sizes
+still assumed.
 
 | # | Measure | Why it matters | What fit.py does / what a mistake costs |
 | --- | --- | --- | --- |
@@ -25,11 +25,10 @@ checked and which sizes are still assumed.
 | 4 | **Pi heatsinks or fan case** → `[pi] heatsink_h` | The Pi sits on the shelf under the lid; a fan case is taller than stick-on heatsinks | `fit.py` makes the enclosure taller |
 | 5 | **Camera power bank** → `[power_bank]` | The battery tray is a pocket sized to it. Banks of the same advertised capacity vary by 15 mm in every direction | Reprint the tray (3.5 h) |
 
-The tripod insert, `[tripod_insert]`: the floor bore is cut to its outside
-diameter (12.7 mm assumed). Check yours slips in snugly and is no longer than
-the 8 mm boss; open the bore up with a drill rather than reprinting if it is
-larger. Then check both threads: a 3/8-16 screw straight into the insert, and
-a 1/4-20 one with the reducer bushing in.
+**Tripod insert** (`[tripod_insert]`): floor bore = insert outside diameter
+(12.7 mm assumed); insert length ≤ 8 mm (boss height). If the insert doesn't
+fit, enlarge the bore with a drill rather than reprinting. Check both
+threads: 3/8-16 screw into the insert; 1/4-20 screw with the bushing fitted.
 
 ## On arrival, before you wire anything
 

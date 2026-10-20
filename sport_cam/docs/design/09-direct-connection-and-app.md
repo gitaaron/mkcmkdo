@@ -1,16 +1,15 @@
 # 09 — Direct phone ↔ camera connection & the native app
 
-Open the app on the same Wi-Fi as the camera and it finds it, streams live
-video, and controls it — with no cloud and no internet in the path, at full
-frame rate. Away from the camera, the same app reaches it through Firebase.
+On the camera's Wi-Fi the app discovers the camera, streams full-rate video
+and controls it with no cloud or internet in the path. Elsewhere the same app
+connects through Firebase.
 
 ## Why the camera serves its own API
 
-Firebase gets the app to the camera from anywhere, but only as far as the
-cloud reaches: a frame a second of preview, and nothing at all when the gym's
-internet is down. So the head unit also runs its own copy of the API
-(`src/<build>/device/sportcam/local_api.py`) — the **same callable protocol**
-as the Firebase function:
+Firebase access is limited to a ≈ 1 frame/s preview, and fails when the
+gym's internet is down. The camera therefore hosts its own copy of the API
+(`src/<build>/device/sportcam/local_api.py`) with the **same callable
+protocol** as the Firebase function:
 
 | | Firebase | **Camera (direct)** |
 | --- | --- | --- |
@@ -20,20 +19,16 @@ as the Firebase function:
 | Live state | Firestore document | `WS /ws` |
 | Works at the gym | needs internet | ✅ **needs nothing** |
 
-Because the protocol is the same, the app's calls are the same; only the
-base URL changes. State still lives in one place on the device
-(`Head.apply_state`), so a command from a phone connected directly, one
-arriving through Firebase, or the camera itself (<!--with_uwb-->the tag being switched on or
-off<!--/--><!--both--> with UWB; <!--/--><!--without_uwb-->the first lock-on<!--/--><!--both--> without<!--/-->) all take the same route and everyone
-is told the result — app, LED ring, and Firestore stay in lock-step.
-
-The camera's state includes `mode` (`with_uwb` or `without_uwb`, from its
-`config.TRACKING_MODE`), so a phone connected directly words its buttons for
-that build — see [07 — Tracking mode](07-backend-and-app.md#tracking-mode).
+- Same protocol, so the app's calls are identical; only the base URL changes.
+- Single state owner on the device (`Head.apply_state`). Direct commands,
+  Firebase commands and camera-initiated changes (<!--with_uwb-->tag on/off<!--/--><!--both--> with UWB; <!--/--><!--without_uwb-->first lock-on<!--/--><!--both--> without<!--/-->)
+  take the same path; app, LED ring and Firestore stay consistent.
+- State includes `mode` (`config.TRACKING_MODE`), so a direct client selects
+  the build's wording ([07 — Tracking mode](07-backend-and-app.md#tracking-mode)).
 
 ## Discovery: mDNS / Bonjour
 
-The camera publishes `_sportcam._tcp.local` (`src/<build>/device/sportcam/discovery.py`)
+Service `_sportcam._tcp.local` (`src/<build>/device/sportcam/discovery.py`),
 with the API port and TXT records:
 
 ```
@@ -41,44 +36,37 @@ name=SportCam   state=tracking   ver=1
 api=/api/call   stream=/api/stream.mjpeg
 ```
 
-It also answers to `sportcam.local`. The TXT `state` is refreshed on every
-transition, so a picker can show what each camera is doing *before*
-connecting. This matters because the Pi gets a new DHCP address at every
-gym — mDNS is what makes "open the app and it's there" work without typing
-IP addresses.
+- Also resolves as `sportcam.local`.
+- TXT `state` updates on every transition, so a picker can show each
+  camera's state before connecting.
+- Rationale: the Pi gets a new DHCP address on each network; mDNS removes
+  the need for IP addresses.
 
-The app's connection strategy (`camera_client.dart`), in order:
+Connection strategy (`camera_client.dart`), in order:
 
-1. **mDNS sweep** → connect directly (`LinkMode.direct`)
-2. **last known address** — some guest networks block multicast; the app
-   remembers the last camera that worked and tries it
-3. **Firebase** (`LinkMode.relay`) — when the app was built with the
-   backend's address and the camera key (`--dart-define`, [below](#running-and-testing-it)).
-   State is polled every 2 s and the live view is the camera's preview
-4. otherwise `LinkMode.offline`, retrying every 3 s
+| # | Method | Mode |
+| --- | --- | --- |
+| 1 | mDNS sweep → direct connection | `LinkMode.direct` |
+| 2 | last known address (for networks that block multicast) | `LinkMode.direct` |
+| 3 | Firebase, if built with the backend address and camera key (`--dart-define`, [below](#running-and-testing-it)). State polled every 2 s; live view is the preview | `LinkMode.relay` |
+| 4 | none; retry every 3 s | `LinkMode.offline` |
 
 ## Why the app is native (Flutter)
 
-The web app is fine through Firebase. For direct connection it hits two hard
-walls that are not matters of taste:
+The web app works through Firebase. For direct connection, browsers have two
+blocking limitations:
 
-1. **Browsers cannot do service discovery.** There is no mDNS/Bonjour API in
-   any browser. A web app can only try `http://sportcam.local:8787` and hope
-   the platform resolves `.local` — reliable on iOS/macOS, unreliable on
-   Android. It can never *enumerate* cameras or read their TXT state.
-2. **Mixed content.** The app served from Firebase over HTTPS is forbidden by
-   the browser from making plain-HTTP requests to the camera on the LAN. The
-   camera can't have a valid TLS certificate for a private IP either. A
-   native app has no such restriction.
+| Limitation | Detail |
+| --- | --- |
+| **No service discovery** | no mDNS/Bonjour API in browsers. A web app can only try `http://sportcam.local:8787` and rely on OS `.local` resolution (reliable on iOS/macOS, not on Android). It can't enumerate cameras or read TXT state |
+| **Mixed content** | an HTTPS page (Firebase Hosting) can't make plain-HTTP requests to the LAN. The camera can't hold a valid TLS certificate for a private IP |
 
-Given native, the rest follows: hardware-accelerated H.264 playback through
-ExoPlayer/AVPlayer, an MJPEG decoder that owns its socket (so a Wi-Fi blip
-reconnects in ~2 s instead of leaving a dead `<img>`), and room for
-background uploads and notifications later.
+Additional native benefits: hardware H.264 playback (ExoPlayer/AVPlayer); an
+MJPEG decoder that owns its socket (reconnects in ≈ 2 s after a Wi-Fi drop);
+background audio and notifications.
 
-**The Vue web app stays** — it's what Firebase Hosting serves, so it works on
-any phone or laptop with nothing installed. Both clients speak the same
-protocol.
+**The Vue web app is retained:** served by Firebase Hosting, it works on any
+device with nothing installed. Both clients use the same protocol.
 
 ## The app's screen
 
@@ -92,50 +80,32 @@ protocol.
 
 <!--without_uwb: ![App UI (with UWB wording; this build shows "Track & record")](../../with_uwb/docs/images/app-ui.png)-->
 
-Same layout as the web app, plus the connection badge:
+Same layout as the web app, plus a connection badge:
 
-- **Top-left — connection status** (`ConnectionBadge`): a coloured dot and
-  label showing how the app is reaching the camera. Green **"SportCam ·
-  Direct · 10.0.0.42"**, blue **"Firebase"** when reaching it from anywhere, amber pulsing
-  **"Searching…"** during discovery, red **"Offline — tap to retry"**. Tap it
-  any time to re-scan.
-- **Top-right — camera state** (`StatusRing`), the stalled-acquiring pill
-  and the **bottom buttons**: as in the web app
-  ([07](07-backend-and-app.md#web-app-srcweb)).
-- **Chimes** (`lib/session_audio.dart`): rising when recording starts,
-  falling when it stops — **also with the app in the background**, which is
-  the usual case with the phone in a bag at the foot of the wall. While the
-  app is connected to a camera it keeps itself awake: a foreground service
-  with a quiet "SportCam connected" notification on Android, the background
-  audio mode (a looping second of silence) on iOS. Both need a line or two of
-  platform setup — see [`src/app_flutter/README.md`](../../src/app_flutter/README.md).
-  The chimes mix over your music rather than stopping it, and on iOS they
-  play with the silent switch on.
-- **Below the badge** — the recordings button, badged with the clip count.
+| Element | Behaviour |
+| --- | --- |
+| **Top left — connection** (`ConnectionBadge`) | green **"SportCam · Direct · 10.0.0.42"**; blue **"Firebase"**; amber pulsing **"Searching…"**; red **"Offline — tap to retry"**. Tap to re-scan |
+| **Below the badge** | recordings button with clip-count badge |
+| **Top right, stalled-acquiring pill, bottom buttons** | as in the web app ([07](07-backend-and-app.md#web-app-srcweb)) |
+| **Chimes** (`lib/session_audio.dart`) | rising on record start, falling on stop, **including in the background**. While connected the app stays awake: Android foreground service with a "SportCam connected" notification; iOS background audio mode (looped silence). Mixes over music; plays with the iOS silent switch on. Platform setup: [`src/app_flutter/README.md`](../../src/app_flutter/README.md) |
 
 ## Running and testing it
 
-[`src/app_flutter/README.md`](../../src/app_flutter/README.md) has the
-commands: `flutter run` on its own finds the camera on the LAN, and two
-`--dart-define`s (the backend's address and the camera key, both printed by
-`firebase-setup.sh`) let it reach the camera through Firebase too. It also
-has the platform setup (iOS `NSBonjourServices`, Android multicast and
-cleartext permissions) without which discovery silently finds nothing, and
-the checks that run with no hardware and no Flutter SDK: a contract check
-drives the real camera API and the real Firebase function with the app's own
-model code.
+See [`src/app_flutter/README.md`](../../src/app_flutter/README.md):
+
+- `flutter run`: LAN discovery only.
+- Add `--dart-define` backend address and camera key (both printed by
+  `firebase-setup.sh`) for Firebase fallback.
+- Required platform setup: iOS `NSBonjourServices`; Android multicast and
+  cleartext permissions. Without it discovery silently finds nothing.
+- Checks without hardware or a Flutter SDK, including a contract check of
+  the app's model code against the real camera API and the real Firebase
+  function.
 
 ## Known limits
 
-- **Multicast-blocked networks** (some corporate/guest Wi-Fi) break
-  discovery; the app falls back to the remembered address, and
-  `sportcam.local` still works if the platform resolves it.
-- **MJPEG costs bandwidth** (~2–4 Mbps at 720p15). Fine on a LAN. The WebRTC
-  path (MediaMTX on the Pi, `WHEP_URL` in `config.py`) is the upgrade for
-  lower bitrate and latency; the app already receives the URL in the state
-  payload.
-- **No authentication on the local API.** Anyone on the same Wi-Fi can
-  control the camera. Acceptable for a home LAN or phone hotspot; if you
-  care at a public gym, run the camera on your own hotspot rather than the
-  gym's network. Checking the camera key's header, as the Firebase API does,
-  would be the natural fix.
+| Limit | Impact | Mitigation |
+| --- | --- | --- |
+| **Multicast blocked** (some guest/corporate Wi-Fi) | discovery fails | remembered address; `sportcam.local` if the OS resolves it |
+| **MJPEG bandwidth** (≈ 2–4 Mbit/s at 720p15) | fine on a LAN | WebRTC via MediaMTX (`WHEP_URL`); the app already receives the URL in the state |
+| **No authentication on the local API** | anyone on the same Wi-Fi can control the camera | use a private hotspot at public venues. Fix: check the camera-key header, as the Firebase API does |

@@ -1,21 +1,19 @@
 # Appendix B — Open-source printed-part alternatives
 
-If you'd rather remix proven community designs than print the parametric parts
-in `<build>/cad/` ([Appendix A](appendix-a-cad-parts.md)), this doc maps each
-SportCam printed part to open-source models on Printables / MakerWorld /
-Thingiverse, and is honest about what each substitution costs you.
+Open-source alternatives (Printables, MakerWorld, Thingiverse) to the
+parametric parts in `<build>/cad/` ([Appendix A](appendix-a-cad-parts.md)),
+with the cost of each substitution.
 
-SportCam buys its motion as one assembly (the Arducam PTZ camera and metal
-pan-tilt base), so only the enclosure, the LED diffuser and the trays are
-worth substituting.
+Motion is a bought assembly (Arducam PTZ camera and pan-tilt base);
+substitution candidates are the enclosure, LED diffuser and trays.
 Both builds print an enclosure, a lid, a diffuser ring and a tray<!--with_uwb-->; the UWB
 build adds two arms, a mast and a pod ([With UWB](#with-uwb))<!--/-->.
 
 ## Enclosure and lid
 
-The lid is the one part not worth replacing: it is cut to carry the Arducam
-base on slots and pass the ribbon through the middle, and nothing generic does
-that. The enclosure, though, is just a round box with a light band.
+- **Lid:** no substitute. It carries the Arducam base on slots and passes
+  the ribbon through its centre.
+- **Enclosure:** a round box with a light band; candidates below.
 
 - [Parametric Raspberry Pi 4B case — Printables 204101](https://www.printables.com/model/204101-parametric-raspberry-pi-4b-case-30mm-fan-with-vert) — if you would rather bolt a stock Pi case inside a bigger shell than use our standoffs. It has a 30 mm fan: set the Pi's height in `cad/ordered_parts.toml` to the case's and re-run `cad/fit.py`.
 - [Motorized Turntable, 3 versions — MakerWorld 1013366](https://makerworld.com/en/models/1013366-motorized-turntable-3-versions) — its base shell is a good donor for a round enclosure with a deck, if you want something chunkier than ours.
@@ -35,10 +33,9 @@ that. The enclosure, though, is just a round box with a light band.
 
 ## If you want continuous pan
 
-The parts below are a starting point for a pan stage that turns all the way
-round. Going this way means adding a stepper, a driver, a slip ring and a
-second microcontroller, and rewriting `ptz.py` and `tracker.py` to command pan
-velocity rather than position. <!--with_uwb-->With UWB, the geometry in
+Starting points for a continuous-rotation pan stage. Required changes: add a
+stepper, driver, slip ring and second microcontroller; rewrite `ptz.py` and
+`tracker.py` for velocity rather than position control. <!--with_uwb-->With UWB, the geometry in
 [05](../../with_uwb/docs/design/05-tracking-system.md#static-anchors-change-the-loop)
 changes to anchors that rotate with the lens<!--/--><!--both-->; <!--/--><!--without_uwb: Without UWB,--><!--both-->without UWB,<!--/--><!--without_uwb--> the search sweep
 in [05](../../without_uwb/docs/design/05-tracking-system.md) would no longer be limited
@@ -49,10 +46,9 @@ to ±80°, which is the point of doing it<!--/-->.
 | [Pan Tilt Mount (NEMA 17), talal_malik — Printables 1180365](https://www.printables.com/model/1180365-pan-tilt-mount-nema-17-stepper-motor) | Two NEMA17s + 3:1 GT2 pulleys, compact, well documented. Replaces both axes | No slip ring → pan is wiring-limited to ~±180°, not continuous |
 | [Lazy Susan motorized turntable converter — MakerWorld 228118](https://makerworld.com/en/models/228118-experimental-lazy-susan-motorized-turntable-conver) | Bolts a drive onto a stock lazy-susan bearing | A turntable, not a camera mount — you design the rest |
 
-For true continuous rotation you need a ring pulley whose bore clears a slip
-ring, which is the one piece none of these have. An earlier design of
-SportCam had a parametric one, `cad/ring_pulley.scad`; it's still in the
-repository's git history.
+Missing from all of these: a ring pulley whose bore clears a slip ring. A
+parametric one (`cad/ring_pulley.scad`, from an earlier SportCam design) is in
+the repository's git history.
 
 ---
 
@@ -60,11 +56,10 @@ repository's git history.
 
 ### UWB anchor arms and mast
 
-No substitute exists. The arms set the 250 mm baseline that the bearing maths
-in [05](../../with_uwb/docs/design/05-tracking-system.md) depends on, and they carry a
-specific board at a specific height. Print ours, or model your own to the
-same geometry — the one number that matters is the distance between the two
-antennas. The same goes for the mast's 250 mm height.
+No substitute. The arms set the 250 mm baseline used by the bearing maths
+([05](../../with_uwb/docs/design/05-tracking-system.md)) and carry a specific board
+at a specific height. Custom designs must keep the antenna spacing (250 mm)
+and the mast height (250 mm).
 
 ### Wearable pod
 
@@ -75,6 +70,5 @@ antennas. The same goes for the mast's 250 mm height.
 
 ## Without UWB
 
-Nothing extra to substitute: the common parts above are the whole print list.
-Because the enclosure wall is plain, any round box with a light band works
-as a donor without having to add bosses.
+No additional parts. The plain enclosure wall means any round box with a
+light band can be used as a donor without adding bosses.

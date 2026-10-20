@@ -1,9 +1,8 @@
 # Appendix C — Development workflow
 
-Running the whole system on your computer on the Firebase emulators,
-deploying it, the Docker workspace with every tool installed, the docs
-viewer, and the commands that regenerate the diagrams. The CAD side (fitting
-the layout to your parts, rendering STLs) is in [Appendix A](appendix-a-cad-parts.md).
+Local development on the Firebase emulators, deployment, the Docker
+workspace, the docs viewer, and diagram regeneration. CAD workflow:
+[Appendix A](appendix-a-cad-parts.md).
 
 ## Where the code is
 
@@ -16,12 +15,12 @@ src/
   without_uwb/    Pi software (device/)
 ```
 
-The npm workspaces are `src/backend`, `src/backend/functions` and `src/web`;
-every `npm` command below runs from the repo root.
+npm workspaces: `src/backend`, `src/backend/functions`, `src/web`. Run all
+`npm` commands from the repo root.
 
 ## Quick start: the emulators
 
-Needs Node 22 and Java 17+ (for the Firestore and Storage emulators).
+Requirements: Node 22; Java 17+ (Firestore and Storage emulators).
 
 ```bash
 npm install
@@ -40,27 +39,27 @@ That starts, together:
 | Emulator UI | http://localhost:4000 | watch `cameras/dev-camera-key` change as you press buttons |
 | Simulated camera | `src/backend/sim/camera-sim.mjs` | test frames, telemetry, a sample recording |
 
-The simulated camera talks to the emulators exactly as the Pi talks to
-Firebase: it keeps `cameras/dev-camera-key` current, adopts the app's
-requests, posts preview frames while the app watches, and when a recording
-stops it uploads `sim/sample.mp4` through `createUploadUrl` → `PUT` →
-`finalizeRecording`. In dev the web app uses that key without asking. The
-first run downloads the emulators (a few hundred MB, cached in
-`~/.cache/firebase`).
+Simulated camera: same protocol as the Pi. Maintains `cameras/dev-camera-key`,
+adopts app requests, posts preview frames while watched, and on recording
+stop uploads `sim/sample.mp4` via `createUploadUrl` → `PUT` →
+`finalizeRecording`. The dev web app uses this key automatically.
 
-The camera's build sets the apps' wording, and in dev `TRACKING_MODE` picks
-the simulated camera's (`npm run dev:without_uwb` for the camera-only build;
-the wording for each is in
-[01 — State machine](../product/01-requirements.md#state-machine)).
+- First run downloads the emulators (a few hundred MB; cached in
+  `~/.cache/firebase`).
+- Build of the simulated camera: `TRACKING_MODE` (`npm run dev:without_uwb`
+  for camera-only). Wording per build:
+  [01 — State machine](../product/01-requirements.md#state-machine).
 
 ### A real camera against the emulators
 
-To try a Pi against your computer before deploying, set in its `config.py`
-`FIREBASE_PROJECT = "demo-sportcam"`, a `CAMERA_KEY` of your choice and
-`UPLOAD_API_BASE = "http://<your-computer>:5001/demo-sportcam/us-central1/api"`,
-and start it with `FIRESTORE_EMULATOR_HOST=<your-computer>:8080`. No
-credentials are needed against the emulators. Open the web app with
-`http://<your-computer>:5173/#key=<that key>`.
+| Setting (Pi `config.py` / environment) | Value |
+| --- | --- |
+| `FIREBASE_PROJECT` | `"demo-sportcam"` |
+| `CAMERA_KEY` | any value |
+| `UPLOAD_API_BASE` | `"http://<your-computer>:5001/demo-sportcam/us-central1/api"` |
+| environment | `FIRESTORE_EMULATOR_HOST=<your-computer>:8080` |
+
+No credentials needed. Web app: `http://<your-computer>:5173/#key=<that key>`.
 
 ### Tests
 
@@ -81,17 +80,16 @@ npx firebase login
 npm run deploy                             # build + deploy functions, hosting, rules
 ```
 
-Then put the values the setup printed in the camera's `config.py` (your
-build's [14 — Software setup](../../with_uwb/docs/setup/14-software-setup.md)).
-Everything about the cloud side — what lands, the camera key, cost — is in
-[08 — Recordings, cloud & gym Wi-Fi](../design/08-recordings-and-cloud.md#deploying-the-firebase-backend).
+Then enter the printed values in the camera's `config.py`
+([14 — Software setup](../../with_uwb/docs/setup/14-software-setup.md)).
+Deployed resources, camera key, cost:
+[08](../design/08-recordings-and-cloud.md#deploying-the-firebase-backend).
 
 ## Docker workspace (all toolchain requirements pre-installed)
 
-`compose.yaml` + `Dockerfile` define a dev workspace with **Node 22, Java 17
-(for the emulators), OpenSCAD, and the Python render stack** (schemdraw,
-matplotlib, pillow, numpy-stl) baked in — this is the environment
-`sbx_run_claude.sh` brings up:
+`compose.yaml` + `Dockerfile`: dev workspace with **Node 22, Java 17,
+OpenSCAD and the Python render stack** (schemdraw, matplotlib, pillow,
+numpy-stl). Used by `sbx_run_claude.sh`:
 
 ```bash
 docker compose up -d workspace      # build image, npm install, idle ready
@@ -99,13 +97,11 @@ TRACKING_MODE=without_uwb docker compose up -d workspace   # …simulating the c
 docker compose exec workspace bash  # shell with every tool available
 ```
 
-Ports 5173 (app), 5001 / 8080 / 9199 (emulators), 4000 (emulator UI) and
-8090 (docs) are published to the host; the repo is bind-mounted at
-`/workspace` (node_modules live in named volumes so host and container
-installs don't clash). Inside the workspace, all repo tasks work as
-documented: `npm run dev`, `npm test`, `npm run docs`,
-`./with_uwb/cad/render_all.sh`, `python3 with_uwb/cad/render_previews.py`,
-and the `<build>/schematics/render_*.py` scripts.
+| Aspect | Detail |
+| --- | --- |
+| Published ports | 5173 (app), 5001 / 8080 / 9199 (emulators), 4000 (emulator UI), 8090 (docs) |
+| Repo | bind-mounted at `/workspace`; `node_modules` in named volumes (no host/container conflicts) |
+| Supported tasks | `npm run dev`, `npm test`, `npm run docs`, `./<build>/cad/render_all.sh`, `python3 <build>/cad/render_previews.py`, `<build>/schematics/render_*.py` |
 
 ## Browsing the docs
 
@@ -113,20 +109,18 @@ and the `<build>/schematics/render_*.py` scripts.
 npm run docs       # → http://localhost:8090
 ```
 
-Zero-dependency viewer (`tools/docs-server.mjs` and `tools/docs-viewer.js`,
-needs only Node — no npm install, no internet: `marked` is vendored in
-`tools/vendor/`). The sidebar follows the docs' reading order: the README,
-then Product, Design, Setup and the appendices. Markdown renders with the PNG
-diagrams inline; doc-to-doc links navigate inside the viewer, code/STL links
-open raw in a new tab. Pages are deep-linkable — e.g. bookmark the UWB build's
-BOM at `http://localhost:8090/#with_uwb/docs/setup/10-bill-of-materials.md`.
-Set `DOCS_PORT` if 8090 clashes. Runs happily alongside `npm run dev` (app
-:5173, emulators :5001/:8080/:9199/:4000).
+| Aspect | Detail |
+| --- | --- |
+| Implementation | `tools/docs-server.mjs` + `tools/docs-viewer.js`; Node only (no npm install); `marked` vendored in `tools/vendor/` (offline) |
+| Sidebar | reading order: README, Product, Design, Setup, appendices |
+| Links | doc-to-doc links stay in the viewer; code/STL links open raw in a new tab |
+| Deep links | e.g. `http://localhost:8090/#with_uwb/docs/setup/10-bill-of-materials.md` |
+| Port | 8090; override with `DOCS_PORT`. Coexists with `npm run dev` |
+| Code changes | restart `npm run docs` after editing `tools/docs-server.mjs` (sidebar is built by the server) |
 
-**The build toggle.** The **With UWB / Without UWB** switch at the top of the
-sidebar shows the docs for one build at a time, and the browser remembers
-which (it's stored per browser, so it survives a reload). In the build you
-aren't viewing it hides:
+**Build toggle.** **With UWB / Without UWB** switch at the top of the
+sidebar; one build at a time; persisted per browser (`localStorage`). Hidden
+for the non-selected build:
 
 - that build's own docs in the sidebar; switching while reading one (say the
   wiring guide) opens the other build's copy of it
@@ -138,12 +132,11 @@ aren't viewing it hides:
   link that has no copy switches the toggle when you follow it
 - wording marked in the markdown, below
 
-Tables that exist to compare the builds keep both: put a `<!--compare-->` line
-before the table.
+Comparison tables keep both builds: precede the table with a
+`<!--compare-->` line.
 
-Where a shared doc's sentence mentions both builds, mark it with HTML
-comments, which GitHub hides, so GitHub still reads as the doc for both
-builds:
+Mixed-build sentences in shared docs are marked with HTML comments (hidden
+by GitHub, so GitHub shows the combined text):
 
 | Marker | Shown on GitHub | Shown in the viewer |
 | --- | --- | --- |
@@ -158,10 +151,12 @@ Runtime is about **<!--with_uwb-->6.2 h<!--/--><!--both--> with UWB, <!--/--><!-
 See <!--both-->each build's section<!--/--><!--with_uwb: [With UWB](#with-uwb)--><!--without_uwb: [Without UWB](#without-uwb)--> below.
 ```
 
-GitHub reads a line that starts with a comment as raw HTML, so a marker never
-starts a line inside a paragraph; to mark a whole paragraph, put each marker
-on a line of its own with blank lines around it. Markers don't nest, and the
-`<!--with_uwb: …-->` form can't contain `--`. `python3 tools/check-build-markers.py`
+Rules: a marker never starts a line inside a paragraph, list item or table
+row (GitHub renders such a line as raw HTML); for a whole paragraph, put
+each marker on its own line with blank lines around. Markers don't nest. The
+`<!--with_uwb: …-->` form can't contain `--`. In lists, a build-specific item
+can instead start with **With UWB** / **Without UWB** in bold; in tables, a
+row whose first two cells name one build is hidden automatically. `python3 tools/check-build-markers.py`
 checks all of this (the pre-commit hook runs it when a doc changes), and
 `--show with_uwb <doc>` prints a doc as one build sees it.
 

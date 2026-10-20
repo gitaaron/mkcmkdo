@@ -1,40 +1,31 @@
 # 10 — Bill of materials (Canadian sourcing, Toronto / M2L 2E2)
 
-Everything to buy for the camera-only build, with prices and Canadian
-sources. There is no tag and no anchor: the camera finds and follows a person
-by vision alone. The Arducam PTZ camera supplies the sensor, the zoom lens and
-both motion axes, so it is the one expensive part; the rest is the Pi, the
-power chain and the fasteners. What this build leaves out of the
-[UWB build](../../../with_uwb/docs/setup/10-bill-of-materials.md) is listed under
+Parts list for the camera-only build: prices, Canadian sources, printed parts.
+No tag or anchors. Main cost item: the Arducam PTZ camera (sensor, zoom lens,
+both motion axes). Remainder: Pi, power chain, fasteners. Differences from the
+[UWB build](../../../with_uwb/docs/setup/10-bill-of-materials.md):
 [Compared with the UWB build](#compared-with-the-uwb-build).
 
-Sourcing strategy for delivery to **M2L 2E2 (North York, Toronto) in under two
-weeks**:
+Target: delivery to **M2L 2E2 (North York, Toronto) within two weeks**.
 
-- **Amazon.ca Prime** — 1–3 days for everything they stock. Listings churn, so
-  Amazon links are search links pinned to the exact part name; take a
-  Prime-badged result matching the name (avoid "ships from China" sellers —
-  those are the 3–4 week ones).
-- **[RobotShop Canada](https://ca.robotshop.com/)** — ships from Mirabel, QC.
-  The Canadian source for the Arducam PTZ kits.
-- **[PiShop.ca](https://www.pishop.ca/)** — official Canadian Raspberry Pi
-  reseller, ships from Ontario in 1–3 days. First choice for all Pi items.
-- **[Digi-Key Canada](https://www.digikey.ca/)** — 1–3 days to Toronto,
-  free shipping over C$100. Good backstop for anything Amazon is out of.
+| Supplier | Lead time | Use |
+| --- | --- | --- |
+| **Amazon.ca Prime** | 1–3 days | general parts. Links are searches on the exact part name (listings change); choose a Prime-badged match and avoid "ships from China" sellers (3–4 weeks) |
+| **[RobotShop Canada](https://ca.robotshop.com/)** | a few days (Mirabel, QC) | Arducam PTZ kits |
+| **[PiShop.ca](https://www.pishop.ca/)** | 1–3 days (Ontario) | official Raspberry Pi reseller; all Pi items |
+| **[Digi-Key Canada](https://www.digikey.ca/)** | 1–3 days | INA260; backstop for out-of-stock items. Free shipping over C$100 |
 
-Prices are approximate CAD street prices (Oct 2026), ±15%.
+Prices: approximate CAD street prices, Oct 2026, ±15 %.
 
-> **Before you print anything**, work through
-> [15 — Verification checklist](15-verification.md#before-you-print). Five
-> measurements of parts you bought decide whether the printed parts fit them,
-> and the enclosure alone is a 14-hour print.
+> **Before printing:** complete
+> [15 — Verification checklist](15-verification.md#before-you-print).
+> Five bought-part measurements determine whether the printed parts fit;
+> the enclosure is a 14-hour print.
 
-**Tracking what you have.** The **Status** column in each parts table says
-where a part is: **A** acquired, **O** ordered, **P** pending, blank for not
-ordered yet. The printed-parts table has an **Acquired** column instead: tick
-its ☐ once the part is printed.
+**Status column:** **A** acquired, **O** ordered, **P** pending, blank = not
+ordered. Printed-parts table: tick **Acquired** ☐ when printed.
 
-## The camera (this is the design)
+## Camera
 
 | #   | Status | Part                                                                    | Qty | ≈ CAD | Source                                                                                                                                                                        | Notes                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | --- | ------ | ----------------------------------------------------------------------- | --- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -42,11 +33,10 @@ its ☐ once the part is printed.
 
 ### Why the IMX477
 
-Arducam's cheaper 8 MP IMX219 PTZ kit (B0167B8) is discontinued, so the 12 MP
-IMX477 kit is the only option, and the design, CAD and software all assume
-it. Its larger sensor has bigger pixels, which helps in a dim gym. How far
-back it can frame a subject is in
-[05 — Camera placement](../design/05-tracking-system.md#camera-placement-envelope).
+- The 8 MP IMX219 PTZ kit (B0167B8) is discontinued; the 12 MP IMX477 kit is
+  the only option. Design, CAD and software assume it.
+- Larger pixels: better in dim gyms.
+- Reach: [05 — Camera placement](../design/05-tracking-system.md#camera-placement-envelope).
 
 ## Compute and status
 
@@ -69,19 +59,18 @@ back it can frame a subject is in
 | 13  | O      | Panel-mount rocker switch, 10 A                        | 1   | $8    | [Amazon.ca](https://www.amazon.ca/s?k=panel+mount+rocker+switch+12v)                                                                                             | between the trigger and the buck, so you are not unplugging USB-C to turn it off                                                                                                                                                                                                                                                                                                             |
 | 14  | A      | USB-C to USB-C cable, 30 cm                            | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=short+usb+c+to+usb+c+cable+30cm)                                                                                           | bank to trigger board, inside the build. Any standard C-to-C cable works: the trigger draws ≈ 1.7 A at 12 V, inside the 3 A every C-to-C cable carries, and PD negotiates over the CC wire that even charge-only cables have. 30 cm is for fit; a short phone cable you already own will do. **Not USB-A to C**, which carries no PD                                                         |
 
-The Pi draws from the 5 V rail through a USB-C pigtail. A Pi 4 needs no
-`config.txt` current flag for this; that requirement is specific to the Pi 5.
-If the IMX477 is not detected on first boot, add `dtoverlay=imx477`.
+Notes:
+
+- Pi power: 5 V rail via a USB-C pigtail. No `config.txt` current flag on a
+  Pi 4 (Pi 5 only).
+- IMX477 not detected on first boot: add `dtoverlay=imx477`.
 
 ## Charging
 
-The bank has its own charge circuitry. All it needs is a USB charger and a
-cable, and **the phone charger and cable you already own will do**. Items 28
-and 29 are optional, only buy them for faster charging, and they are not in the
-totals.
-
-The tripod bank (item 9) holds 92 Wh, ≈ 108 Wh from the wall after charging loss, so the charger
-sets the time:
+The bank has a built-in charger; an existing phone charger and cable are
+sufficient. Items 28–29 are optional (faster charging) and excluded from the
+totals. Tripod bank (item 9), 92 Wh (≈ 108 Wh from the wall), charge time by
+charger:
 
 | Charger | Time to full |
 | --- | --- |
@@ -89,25 +78,22 @@ sets the time:
 | USB-C phone charger, 20–25 W | ≈ 5 h. Fine overnight |
 | USB-C laptop or fast charger, 45 W+ | ≈ 2.5 h |
 
-For anything better than the first row the cable needs **USB-C on both ends**.
-USB-A to USB-C carries 5 V only, however fast the charger. Any ordinary C-to-C
-phone cable carries up to 60 W (3 A), and the bank cannot take more than that
-except from a 65 W charger, which saves a few minutes.
+Cable: **USB-C on both ends** for anything above the first row (USB-A to C
+carries 5 V only). A standard C-to-C cable carries 60 W (3 A); only a 65 W
+charger exceeds that, by a few minutes.
 
 | #   | Status | Part                                                     | Qty | ≈ CAD | Source                                                                         | Notes                                                                                                                                                                                                                                                                                                                                       |
 | --- | ------ | -------------------------------------------------------- | --- | ----- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 28  |        | *Optional:* USB-C PD GaN wall charger, 65 W  | 1   | $40   | [Amazon.ca](https://www.amazon.ca/s?k=65w+gan+charger+usb+c+usb+a+pd)          | USB-C port to the tripod bank (item 9). Only worth it if you have no USB-C charger of 20 W or more, or want ≈ 2 h refills. That needs the bank to accept 65 W *in*. Some 65 W banks only take 30–45 W in, so check the listing. |
 | 29  |        | *Optional:* USB-C to USB-C cable, 1 m                    | 1   | $12   | [Amazon.ca](https://www.amazon.ca/s?k=usb+c+to+usb+c+cable+1m)                 | charger to the tripod bank. Item 14 is 30 cm and lives in the build, so it is too short to charge from the wall. Any C-to-C phone cable does this job, and most banks ship with one. Buy only if you have none                                                                                                                              |
 
-If the tripod bank supports **pass-through charging** (it charges and
-discharges at the same time; the listing will say so), a USB-C charger also lets you
-run the camera from a wall socket at the gym with no runtime limit.
-
-**Already bought and not needed: Adafruit 4410** (Micro-Lipo charger, USB-C,
-Digi-Key 1528-4410-ND). It charges a bare single-cell LiPo, which this build
-does not have. A power bank has its own charger, so the 4410 cannot charge the
-bank and has no place in this build. Return it, or keep it for a future
-project with a bare LiPo cell. It is not counted in the totals.
+- **Pass-through charging** (bank charges and discharges simultaneously;
+  stated in the listing): with a USB-C charger, the camera can run from mains
+  with no runtime limit.
+- **Adafruit 4410** (Micro-Lipo charger, Digi-Key 1528-4410-ND), already
+  bought: not used. It charges bare single-cell LiPos; the bank has
+  built-in chargers. Return or keep for another project. Excluded from the
+  totals.
 
 ## Wiring and fasteners
 
@@ -124,22 +110,20 @@ project with a bare LiPo cell. It is not counted in the totals.
 | 25b |        | Glue stick (PVA)                                                        | 1   | $4    | [Amazon.ca](https://www.amazon.ca/s?k=glue+stick+3d+printer+bed)                  | a **release agent**, not an adhesive: PETG fuses to bare smooth PEI and tears the sheet                                                                                                                                                           |
 | 26  |        | Aluminium tripod (1/4-20 or 3/8-16 head)                                | 1   | $35   | [Amazon.ca](https://www.amazon.ca/s?k=aluminum+camera+tripod)                     | skip if you own one — any standard tripod fits. The head is about 30 cm across and 28 cm tall, so a compact one does                                                                                                                                                                            |
 | 27  |        | Build consumables: 2-part epoxy, threadlocker, zip ties, double-sided foam tape, 3 mm foam | —   | $15   | [Amazon.ca](https://www.amazon.ca/s?k=2+part+epoxy+threadlocker+zip+ties)         | epoxy for the 3/8-16 insert; 1 mm foam tape sticks the power boards to the floor and the LED ring under the shelf |
+
 ## Printed parts
 
-Fabricated from items 25 and 25a (~280 g total). Printer requirements,
-per-part settings, orientation, supports and print times are in
-**[3D printing specifications](../../../docs/setup/11-3d-printing.md)** — read that
-before you buy filament or start a 14-hour enclosure.
+| Item | Value |
+| --- | --- |
+| Material | items 25 and 25a, ≈ 280 g |
+| Printer | FDM, ≥ 160 × 155 × 90 mm build volume (all parts fit a Bambu Lab A1 Mini), 0.4 mm nozzle, 250 °C hotend, 80 °C bed |
+| Machine time | ≈ 26 h |
+| Supports | none |
+| Settings, orientation, print order | [11 — 3D printing](../../../docs/setup/11-3d-printing.md) |
+| Printer purchase (not in totals) | Bambu Lab A1 Mini ([Bambu Lab Canada](https://ca.store.bambulab.com/products/a1-mini), ≈ C$249–389); alternatives: [Printers to buy](../../../docs/setup/11-3d-printing.md#printers-to-buy) |
 
-The short version: any FDM printer with a **160 × 155 × 90 mm** build volume
-(every part also fits a Bambu Lab A1 Mini, the reference printer), a 0.4 mm
-nozzle, a 250 °C hotend and an 80 °C bed. About **26 hours** of machine time.
-No supports anywhere.
-
-**Don't have a printer?** Top choice: the **Bambu Lab A1 Mini** ([Bambu Lab Canada](https://ca.store.bambulab.com/products/a1-mini), ≈ C$249–389). It also prints Croc charms. Other options and why: [Printers to buy](../../../docs/setup/11-3d-printing.md#printers-to-buy). Not counted in the totals.
-
-STLs, previews and this table's pictures are regenerated by `python3 cad/fit.py`
-(or `./cad/render_all.sh`, which runs it).
+STLs, previews and the images below are regenerated by `python3 cad/fit.py`
+(also run by `./cad/render_all.sh`).
 
 | Preview | Acquired | Part | Qty | Compiled STL | OpenSCAD source |
 | --- | --- | --- | --- | --- | --- |
@@ -155,56 +139,36 @@ STLs, previews and this table's pictures are regenerated by `python3 cad/fit.py`
 | --- | --- |
 | **Full build** (12 MP PTZ + 92 Wh battery, camera-only), own tripod | **≈ C$716** |
 | Full build + tripod (item 26) | ≈ C$751 |
-| With a 74 Wh bank instead (5.0 h) | subtract ≈ C$25 |
+| With a 74 Wh bank instead (6.7 h) | subtract ≈ C$25 |
 | Without the battery gauge (`POWER_MONITOR = "none"`) | subtract ≈ C$22 |
 | Optional charging kit (items 28–29), if your own chargers are too slow | add ≈ C$52 |
 
 (≈ US$515 / US$540 at typical exchange + Canadian markup.)
 
-Of the full build: camera and power ≈ C$439 (items 1 and 9–14: 293 + 80 + 10 +
-16 + 22 + 8 + 10), compute and status ≈ C$141 (items 2–4, 7 and 8: 95 + 12 +
-14 + 14 + 6), wiring, fasteners and filament ≈ C$136 (items 18, 19, 21–25b and
-27: 20 + 10 + 10 + 20 + 12 + 8 + 25 + 12 + 4 + 15). 439 + 141 + 136 = 716. The
-optional charging items 28–29 are not included.
+| Group | Items | ≈ CAD |
+| --- | --- | --- |
+| Camera and power | 1, 9–14 (293 + 80 + 10 + 16 + 22 + 8 + 10) | 439 |
+| Compute and status | 2–4, 7, 8 (95 + 12 + 14 + 14 + 6) | 141 |
+| Wiring, fasteners, filament | 18, 19, 21–25b, 27 (20 + 10 + 10 + 20 + 12 + 8 + 25 + 12 + 4 + 15) | 136 |
+| **Total** | | **716** |
+
+Optional charging items 28–29 excluded.
 
 ## Parts that are hard to source in Canada
 
-Just one: the battery gauge. Use the INA260, or build without a gauge.
+One item: the battery gauge (item 12).
 
-### Item 12, the battery gauge — substitute the INA260
-
-Bare INA226 modules are a grey-market item here. The clean answer is the
-**[Adafruit INA260 breakout, part 4226](https://www.digikey.ca/en/products/result?keywords=adafruit%204226%20ina260), through Digi-Key Canada**: duty-free,
-customs pre-cleared, one to three days to Toronto, and free shipping once the
-order passes C$100. The INA260 alone does not reach that, so expect a small
-shipping charge, or put other parts on the same order. It's the better part
-anyway (see item 12), and it's the default:
-
-```python
-POWER_MONITOR = "ina260"      # src/without_uwb/device/sportcam/config.py — this is the default
-```
-
-**Do not use the ADS1115-plus-shunt route.** An ADS1115 cannot see a high-side
-shunt at 12 V: its inputs are rated to the supply rail plus 0.3 V, so 12 V of
-common mode is outside absolute maximum and will damage it. You could move the
-shunt low-side and add a divider for bus voltage, but that is three extra parts,
-a broken ground path and a worse measurement than a single chip that was
-designed for the job.
-
-**Or build without it.** The gauge is optional and the software knows it:
-
-```python
-POWER_MONITOR = "none"
-```
-
-Everything runs. You lose the low-battery warning and the automatic
-save-and-park at 7 %, so you watch the clock instead — the camera gives about
-8.4 hours. Add the sensor later without touching anything else.
+| Option | Detail |
+| --- | --- |
+| **INA260 (default)** | [Adafruit 4226 via Digi-Key Canada](https://www.digikey.ca/en/products/result?keywords=adafruit%204226%20ina260): duty-free, customs pre-cleared, 1–3 days. Free shipping over C$100 (combine with other parts). `POWER_MONITOR = "ina260"` |
+| INA226 module | grey-market in Canada. `POWER_MONITOR = "ina226"` plus `INA226_SHUNT_OHMS` |
+| **No gauge** | `POWER_MONITOR = "none"`. No low-battery warning or automatic save-and-park at 7 %; runtime ≈ 8.4 h by the clock. Can be added later with no other change |
+| ~~ADS1115 + shunt~~ | **do not use.** Inputs are rated to the supply rail + 0.3 V; 12 V common mode on a high-side shunt exceeds absolute maximum. A low-side shunt plus divider needs three extra parts, breaks the ground path, and measures worse |
 
 ## Compared with the UWB build
 
-The [UWB build](../../../with_uwb/docs/setup/10-bill-of-materials.md) costs ≈ C$1079 with your own tripod. This build
-leaves out:
+[UWB build](../../../with_uwb/docs/setup/10-bill-of-materials.md): ≈ C$1079
+excluding tripod. Omitted here:
 
 | Removed | ≈ CAD |
 | --- | --- |
@@ -215,32 +179,28 @@ leaves out:
 | ½-inch hardwood dowel (item 27a) | $5 |
 | **Total saved** | **$363** |
 
-C$1079 − C$363 = **C$716**. Also gone, but not itemised because the kit prices
-are kept unchanged: heat-set inserts, the M3 hardware that only the arms and
-mast used, and the UWB boards' M2.5 standoffs. There are five printed parts
-instead of ten (no anchor arms, mast foot, mast cradle or wearable pod):
-about 140 g less PETG and 14 h less machine time, and the enclosure wall is
-plain, with no bosses and no supports.
+C$1079 − C$363 = **C$716**.
+
+Also omitted, not itemised (kit prices unchanged): heat-set inserts, M3
+hardware for the arms and mast, the radios' M2.5 standoffs. Printed parts: 5
+instead of 10 (no anchor arms, mast foot, mast cradle, wearable pod); ≈ 140 g
+less PETG, ≈ 14 h less printing; plain enclosure wall, no supports.
 
 ## Two-week delivery plan
 
-Order everything the same day:
+Place all orders the same day:
 
-1. **Item 1, the camera — done.** Ordered direct from Arducam on 9 October,
-   express. That was the long pole; everything below arrives inside a week.
-2. **PiShop.ca** (items 2 and 3): 1–3 days.
-3. **Digi-Key.ca** (item 12, the INA260): no reliable domestic listing. See
-   [above](#parts-that-are-hard-to-source-in-canada). Nothing else in this
-   build comes from Digi-Key.
-4. **Amazon.ca Prime** (everything else): 1–3 days per item.
+| # | Supplier | Items | Lead time |
+| --- | --- | --- | --- |
+| 1 | Arducam direct | 1 (camera) | **ordered 9 Oct, express** (longest lead item) |
+| 2 | PiShop.ca | 2, 3 | 1–3 days |
+| 3 | Digi-Key.ca | 12 (INA260; [above](#parts-that-are-hard-to-source-in-canada)) | 1–3 days |
+| 4 | Amazon.ca Prime | everything else | 1–3 days |
 
-**Read these listings closely.** They look identical in a photo and aren't:
+Listing details to verify:
 
-- **The power bank (item 9).** Its USB-C output must list **12 V**; some banks
-  skip that profile and the trigger then sits at 5 V. "65 W" on the box is
-  usually *output*; the *input* wattage sets how fast it recharges. Its
-  capacity is your runtime, so don't economise here.
-- **The buck (item 11).** It must be **adjustable**, so you can trim it, and
-  cheap units sag and brown the Pi out. Worth full price.
-- **The USB-C cable (item 14)** is the exception: any C-to-C cable carries the
-  12 V contract.
+| Item | Check |
+| --- | --- |
+| Power bank (9) | USB-C output lists **12 V** (without it the trigger stays at 5 V). "65 W" is usually *output*; *input* wattage sets recharge time. Capacity = runtime; don't economise |
+| Buck (11) | **adjustable** (must be trimmed); cheap units sag and brown out the Pi |
+| USB-C cable (14) | any C-to-C cable carries the 12 V contract |
