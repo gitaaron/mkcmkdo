@@ -75,8 +75,9 @@ python3 cad/fit.py            # solve, regenerate, render, audit — both builds
 - A git pre-commit hook (`npm run hooks:install`, once per clone) runs
   `--check` on any commit that touches `cad/`, a build's `cad/` or a device
   config.
-- CI (`.github/workflows/sportcam-cad-fit.yml`) runs `--check --deep` on
-  pushes and pull requests.
+- Claude Code's Stop hook (`tools/claude-check.sh`, see
+  [Appendix C](appendix-c-development.md#automated-checks)) runs `--check
+  --deep` whenever a session changes the CAD, a part size or a device config.
 
 Requires Python 3.11+ and, for rendering, OpenSCAD. Inside the project's
 Docker workspace (`compose.yaml`) both are pre-installed.

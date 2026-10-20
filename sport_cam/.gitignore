@@ -5,6 +5,7 @@ dist/
 __pycache__/
 *.pyc
 .venv/
+.venv-test/
 recordings/
 src/backend/.firebaserc
 .firebase/

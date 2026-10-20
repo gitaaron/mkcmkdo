@@ -38,7 +38,7 @@ printed part in both builds must fit on it in one piece** (requirement C5).
 | --- | --- |
 | **≤ 170 mm on every axis** | 180 mm bed minus 5 mm per side for brim/skirt. Cubic volume: any orientation fits |
 | **No split parts** | redesign instead; a glued seam in the enclosure or lid is a structural weak point |
-| **Automated check** | `python3 cad/fit.py` measures every STL in both builds; fails on oversize or multi-piece parts. Caps the enclosure diameter (162 mm with UWB, where the arm bosses add 8 mm). Runs on every render, on CAD commits, and in CI ([Appendix A](../appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)) |
+| **Automated check** | `python3 cad/fit.py` measures every STL in both builds; fails on oversize or multi-piece parts. Caps the enclosure diameter (162 mm with UWB, where the arm bosses add 8 mm). Runs on every render, on CAD commits, and when a Claude Code session ends with CAD changes ([Appendix A](../appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)) |
 
 Sizes with the assumed parts (bounding box, mm):
 

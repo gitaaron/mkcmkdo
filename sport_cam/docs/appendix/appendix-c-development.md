@@ -72,6 +72,29 @@ for t in src/<build>/device/tests/test_*.py; do python3 $t | tail -1; done   # a
 
 The Flutter app's checks are in [`src/app_flutter/README.md`](../../src/app_flutter/README.md#verification-without-a-flutter-sdk).
 
+### Automated checks
+
+No CI service. Checks run locally, through Claude Code and git:
+
+| Trigger | Runs | On failure |
+| --- | --- | --- |
+| **Claude Code Stop hook** (`.claude/settings.json` at the repo root → `tools/claude-check.sh`) | the checks for the files changed since the last commit (table below) | blocks the end of Claude's turn and returns the failures, so Claude fixes the code. After 3 failed attempts on the same failures it stops and tells the user |
+| `npm run check` (`tools/claude-check.sh all`) | every check | exit 1 with the failure output |
+| git pre-commit hook (`npm run hooks:install`) | build-marker check on `.md` changes; `cad/fit.py --check` on CAD changes | commit blocked |
+
+| Changed paths | Check |
+| --- | --- |
+| `*.md`, `tools/check-build-markers.py` | `python3 tools/check-build-markers.py` |
+| `cad/`, `<build>/cad/`, `src/<build>/device/sportcam/config.py` | `python3 cad/fit.py --check --deep` (`--deep` only with OpenSCAD installed) |
+| `src/backend/`, `src/web/`, `package*.json` | `npm run typecheck` |
+| `src/backend/` | `npm test` (needs Java for the emulators; skipped without) |
+| `src/<build>/device/` | every `src/<build>/device/tests/test_*.py`, in `.venv-test/` (created on first use with `uv`, or `python3 -m venv`) |
+| `src/app_flutter/` | `dart run tool/verify_models.dart` (skipped without a Dart SDK) |
+| `tools/docs-server.mjs`, `tools/docs-viewer.js` | `node --check` |
+
+A tree state that passed is remembered (hash of the diff, in `.git/`), so
+Claude isn't re-tested on every stop when nothing changed.
+
 ## Deploying
 
 ```bash

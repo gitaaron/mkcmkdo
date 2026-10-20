@@ -80,7 +80,8 @@ r₃² = R² + 2·y·back + back² − 2·z·up + up²
   image in their plane, which leans back atan(89/250) ≈ 20° from vertical. A
   subject well below *and* far to the side of the camera can fall behind that
   plane and resolve to the mirror. Worst case within the pan/tilt limits:
-  pan ±80°, 45° down, **5.7°** error (1° with a 400 mm mast). Exact elsewhere.
+  pan ±80°, 45° down, **≈ 6.3°** error with A3 89 mm back (≈ 1.2° with a 400 mm
+  mast); the solver returns the mirror image exactly. Exact elsewhere.
 - **Noise** (Monte Carlo, σ_range = 10 cm, 5 m): raw elevation spread
   **27–35° from level to 65°**, comparable to bearing (≈ 38° in the same run)
   because the vertical baseline equals the horizontal one; it does not grow

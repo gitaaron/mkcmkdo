@@ -2,7 +2,7 @@
   "name": "sportcam",
   "private": true,
   "version": "0.1.0",
-  "description": "Subject-tracking robotic camera tripod \u2014 Firebase backend + companion app",
+  "description": "Subject-tracking robotic camera tripod — Firebase backend + companion app",
   "workspaces": [
     "src/backend",
     "src/backend/functions",
@@ -15,6 +15,7 @@
     "docs": "node tools/docs-server.mjs",
     "build": "npm run build -w @sportcam/backend && npm run build -w @sportcam/web",
     "test": "npm test -w @sportcam/backend",
+    "check": "tools/claude-check.sh all",
     "typecheck": "npm run typecheck -w @sportcam/functions && npm run typecheck -w @sportcam/web",
     "deploy": "./scripts/firebase-deploy.sh",
     "cad:fit": "python3 cad/fit.py",

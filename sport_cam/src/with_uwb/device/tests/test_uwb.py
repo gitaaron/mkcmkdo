@@ -107,24 +107,37 @@ def main() -> None:
     # Three anchors cannot tell a point from its mirror in the plane through
     # them, which leans back atan(back/up) from vertical. A subject on the
     # far side of that plane — well below the camera *and* far to one side —
-    # resolves to the mirror. Exact everywhere in front of it; within a few
-    # degrees in the corner behind it (pan ±80°, 45° down: 5.7° at 250 mm).
-    worst = worst_corner = 0.0
+    # resolves to the mirror. Exact everywhere in front of it; in the corner
+    # behind it the solver must return exactly the mirror image's elevation.
+    # How far that is from the truth depends on the geometry (pan ±80°, 45°
+    # down: ≈ 6.3° with A3 89 mm back and 250 mm up), so the check is against
+    # the mirror, not a fixed bound.
+    norm = math.hypot(up, back)
+    normal = (0.0, -up / norm, -back / norm)   # the anchor plane passes through the origin
+
+    def mirror_elevation(p: tuple[float, float, float]) -> float:
+        k = 2 * sum(pi * ni for pi, ni in zip(p, normal))
+        q = [pi - k * ni for pi, ni in zip(p, normal)]
+        return math.degrees(math.asin(q[2] / math.dist(q, (0.0, 0.0, 0.0))))
+
+    worst = worst_mirror = worst_corner = 0.0
     for az in (-80, -75, -30, 0, 30, 75, 80):
         for el in (-45, -40, -10, 0, 20, 45, 65, 80):
             for dist in (2.0, 8.0, 25.0):
-                got = solve_elevation(*ranges_to(az, el, dist), b, back, up)
-                err = abs(math.degrees(got) - el)
+                got = math.degrees(solve_elevation(*ranges_to(az, el, dist), b, back, up))
                 a, e = math.radians(az), math.radians(el)
                 in_front = math.cos(e) * math.cos(a) * up + math.sin(e) * back > 0
                 if in_front:
-                    worst = max(worst, err)
+                    worst = max(worst, abs(got - el))
                 else:
-                    worst_corner = max(worst_corner, err)
+                    p = (dist * math.cos(e) * math.sin(a), dist * math.cos(e) * math.cos(a),
+                         dist * math.sin(e))
+                    worst_mirror = max(worst_mirror, abs(got - mirror_elevation(p)))
+                    worst_corner = max(worst_corner, abs(got - el))
     check("elevation exact in front of the anchor plane (noise-free)", worst < 0.01,
           f"worst error {worst:.3f} deg")
-    check("elevation within 6° in the mirrored corner", worst_corner < 6.0,
-          f"worst error {worst_corner:.3f} deg")
+    check("mirrored corner resolves to the mirror image exactly", worst_mirror < 0.01,
+          f"worst error {worst_mirror:.3f} deg (true error there: {worst_corner:.1f} deg)")
 
     r1, r2, r3 = ranges_to(0, 30, 10)
     check("tag above the bar → positive elevation",
