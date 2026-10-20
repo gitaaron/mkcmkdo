@@ -6,13 +6,11 @@ the person detector all live on the Pi. The camera talks to Firebase
 through its own Firestore document, [described below](#firebase-link), and
 serves phones on its Wi-Fi directly ([09](09-direct-connection-and-app.md)).
 
-The Pi software is **per build**, because it drives different hardware:
-[`src/with_uwb/device/`](../../src/with_uwb/device/) ranges a tag;
-[`src/without_uwb/device/`](../../src/without_uwb/device/) sweeps and tracks by vision.
-Most modules are the same in both; this doc covers those first, then each
+The Pi software is **per build**, because it drives different hardware: <!--with_uwb-->[`src/with_uwb/device/`](../../src/with_uwb/device/) ranges a tag<!--/--><!--both-->;<!--/--> <!--without_uwb-->[`src/without_uwb/device/`](../../src/without_uwb/device/) sweeps and tracks by vision<!--/-->.
+Most modules are the same in both; this doc covers those first, then <!--both-->each
 build's own modules in its section ([With UWB](#with-uwb),
-[Without UWB](#without-uwb)). The UWB build also runs a second program, on the
-wearable tag.
+[Without UWB](#without-uwb))<!--/--><!--with_uwb: the build's own modules in [With UWB](#with-uwb)--><!--without_uwb: the build's own modules in [Without UWB](#without-uwb)-->.<!--with_uwb--> The UWB build also runs a second program, on the
+wearable tag.<!--/-->
 
 ## Camera service — Raspberry Pi 4 (`src/<build>/device/`)
 
@@ -36,8 +34,8 @@ builds:
 | `discovery.py` | mDNS advertisement as `_sportcam._tcp` |
 | `config.py` | all tunables, including `TRACKING_MODE` (this build's name, reported to Firebase and phones) and the Firebase settings (`FIREBASE_PROJECT`, `CAMERA_KEY`, `UPLOAD_API_BASE`) |
 
-`tracker.py` and `session.py` exist in both but differ completely, and the UWB
-build adds `uwb.py` and `rangecal.py` — see the build sections.
+`tracker.py` and `session.py` exist in both but differ completely<!--with_uwb-->, and the UWB
+build adds `uwb.py` and `rangecal.py`<!--/--> — see <!--both-->the build sections<!--/--><!--with_uwb: [With UWB](#with-uwb)--><!--without_uwb: [Without UWB](#without-uwb)-->.
 
 Install on the Pi (the clone holds both builds; run the one you built):
 
@@ -128,7 +126,7 @@ ring and blinks orange once a second over whatever colour the state is.
 
 `cloud.py` keeps one Firestore document current, `cameras/{CAMERA_KEY}`
 ([07](07-backend-and-app.md#how-the-pieces-talk)). It is common to both
-builds; the UWB build adds `tagPresent` to the telemetry.
+builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
 
 ```jsonc
 // cameras/{CAMERA_KEY} — written by the camera

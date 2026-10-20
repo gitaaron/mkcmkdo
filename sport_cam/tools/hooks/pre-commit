@@ -1,16 +1,29 @@
 #!/bin/sh
-# SportCam pre-commit hook: whenever a commit touches the CAD, the bought-part
-# sizes or the geometry constants in a device config, re-run the fit check.
-# It fails if a part doesn't fit, or if the generated layout / STLs are stale.
+# SportCam pre-commit hook:
+# - whenever a commit touches a doc, check its build markers (the docs
+#   viewer's With UWB / Without UWB toggle — tools/check-build-markers.py);
+# - whenever it touches the CAD, the bought-part sizes or the geometry
+#   constants in a device config, re-run the fit check. It fails if a part
+#   doesn't fit, or if the generated layout / STLs are stale.
 #
 # Installed by:  npm run hooks:install   (from sport_cam/)
 # which sets git's core.hooksPath to this folder.
+root=$(git rev-parse --show-toplevel)
+app="$root/sport_cam"
+[ -d "$app" ] || app="$root"
+
+if git diff --cached --name-only | grep -qE '\.md$'; then
+    if ! python3 "$app/tools/check-build-markers.py"; then
+        echo
+        echo "Commit blocked: fix the build markers above (see Appendix C — The build toggle)."
+        exit 1
+    fi
+fi
+
 changed=$(git diff --cached --name-only | grep -E '(^|/)sport_cam/(cad/|[^/]+/cad/|src/[^/]+/device/sportcam/config\.py)|^(cad/|[^/]+/cad/)' || true)
 [ -z "$changed" ] && exit 0
 
-root=$(git rev-parse --show-toplevel)
-fit="$root/sport_cam/cad/fit.py"
-[ -f "$fit" ] || fit="$root/cad/fit.py"
+fit="$app/cad/fit.py"
 echo "SportCam: CAD or part sizes changed — running cad/fit.py --check"
 if ! python3 "$fit" --check; then
     echo

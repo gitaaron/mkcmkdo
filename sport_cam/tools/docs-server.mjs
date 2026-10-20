@@ -6,9 +6,11 @@
  *   → http://localhost:8090
  *
  * Serves the repo statically and renders the markdown docs in a browser with
- * a sidebar, working images, and .md cross-links. Markdown is rendered
- * client-side with marked, vendored in tools/vendor/ so the viewer works
- * offline (re-fetch with tools/update-vendor.sh to upgrade).
+ * a sidebar, working images, .md cross-links and a With UWB / Without UWB
+ * toggle that shows one build's docs at a time (tools/docs-viewer.js says
+ * what it hides). Markdown is rendered client-side with marked, vendored in
+ * tools/vendor/ so the viewer works offline (re-fetch with
+ * tools/update-vendor.sh to upgrade).
  */
 import { createServer } from "node:http";
 import { readFile, readdir } from "node:fs/promises";
@@ -69,93 +71,32 @@ const PAGE = `<!doctype html>
   main th { background:var(--panel); }
   main blockquote { border-left:3px solid var(--acc); margin:0; padding:2px 16px; color:var(--muted); }
   .err { color:#d64541; }
+  .build-label { font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+                 margin:0 10px 6px; }
+  .toggle { display:flex; gap:2px; padding:3px; margin-bottom:6px; background:var(--bg);
+            border:1px solid var(--border); border-radius:10px; }
+  .toggle button { flex:1; border:0; border-radius:7px; padding:7px 4px; background:none; color:var(--muted);
+                   font:600 13px/1.2 inherit; font-family:inherit; cursor:pointer; }
+  .toggle button:hover { color:var(--ink); }
+  .toggle button[aria-pressed="true"] { background:var(--acc); color:#fff; }
+  .toggle button:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
 </style>
 </head>
 <body>
-<nav><h1>📷 SportCam</h1><div id="toc">loading…</div></nav>
+<nav>
+  <h1>📷 SportCam</h1>
+  <div class="build-label" id="build-label">Showing the build</div>
+  <div id="build-toggle" class="toggle" role="group" aria-labelledby="build-label"></div>
+  <div id="toc">loading…</div>
+</nav>
 <main id="content"></main>
-<script>
-const toc = document.getElementById("toc");
-const content = document.getElementById("content");
-let pendingAnchor = null;
-
-function currentDoc() {
-  return decodeURIComponent(location.hash.slice(1)) || "README.md";
-}
-
-async function loadToc() {
-  const docs = await (await fetch("/api/docs")).json();
-  toc.innerHTML = docs.map(d => d.section
-    ? "<h2>" + d.section + "</h2>"
-    : d.path.endsWith(".md")
-    ? '<a href="#' + d.path + '" data-path="' + d.path + '">' + d.title + "</a>"
-    : '<a href="/' + d.path + '" target="_blank">' + d.title + " ↗</a>").join("");
-  markActive();
-}
-
-function markActive() {
-  const cur = currentDoc();
-  for (const a of toc.querySelectorAll("a"))
-    a.classList.toggle("active", a.dataset.path === cur);
-}
-
-async function loadDoc() {
-  const path = currentDoc();
-  markActive();
-  const res = await fetch("/" + path);
-  if (!res.ok) { content.innerHTML = '<p class="err">not found: ' + path + "</p>"; return; }
-  content.innerHTML = marked.parse(await res.text());
-  const base = path.includes("/") ? path.slice(0, path.lastIndexOf("/") + 1) : "";
-  // GitHub-style heading ids, so section anchors work
-  const slug = (s) => s.toLowerCase().replace(/[^\\w\\s-]/g, "").trim().replace(/\\s+/g, "-");
-  for (const h of content.querySelectorAll("h1,h2,h3,h4")) h.id = h.id || slug(h.textContent);
-  // resolve relative images against the doc's directory
-  for (const img of content.querySelectorAll("img")) {
-    const src = img.getAttribute("src");
-    if (src && !src.startsWith("http") && !src.startsWith("/"))
-      img.src = "/" + base + src;
-  }
-  // .md cross-links stay inside the viewer; in-page anchors scroll;
-  // everything else opens normally
-  for (const a of content.querySelectorAll("a")) {
-    const href = a.getAttribute("href");
-    if (!href) continue;
-    if (href.startsWith("http")) { a.target = "_blank"; continue; }
-    if (href.startsWith("#")) {   // in-page anchor — don't fight the hash router
-      const target = href.slice(1);
-      a.addEventListener("click", (ev) => {
-        ev.preventDefault();
-        document.getElementById(target)?.scrollIntoView({ behavior: "smooth" });
-      });
-      continue;
-    }
-    const [clean, anchor] = href.split("#");
-    if (clean.endsWith(".md")) {
-      const resolved = new URL(clean, "http://x/" + base).pathname.slice(1);
-      a.href = "#" + resolved;
-      if (anchor) a.addEventListener("click", () => { pendingAnchor = anchor; });
-    } else {
-      a.href = "/" + new URL(clean, "http://x/" + base).pathname.slice(1);
-      a.target = "_blank";
-    }
-  }
-  if (pendingAnchor) {
-    document.getElementById(pendingAnchor)?.scrollIntoView();
-    pendingAnchor = null;
-  } else {
-    window.scrollTo(0, 0);
-  }
-  document.title = "SportCam docs — " + path;
-}
-
-window.addEventListener("hashchange", loadDoc);
-loadToc().then(loadDoc);
-</script>
+<script src="/tools/docs-viewer.js"></script>
 </body>
 </html>`;
 
-// Every .md in `dir` (if it exists), titled by its first heading.
-async function mdEntries(dir, suffix = "") {
+// Every .md in `dir` (if it exists), titled by its first heading. `build`
+// tags a build's own docs, so the viewer's toggle can show one build at a time.
+async function mdEntries(dir, build = null) {
   let files;
   try {
     files = (await readdir(join(ROOT, dir))).filter((f) => f.endsWith(".md") && f !== "README.md");
@@ -165,39 +106,36 @@ async function mdEntries(dir, suffix = "") {
   const out = [];
   for (const f of files) {
     const first = (await readFile(join(ROOT, dir, f), "utf8")).split("\n")[0];
-    out.push({ path: `${dir}/${f}`, title: (first.replace(/^#\s*/, "") || f) + suffix });
+    out.push({ path: `${dir}/${f}`, title: first.replace(/^#\s*/, "") || f, build });
   }
   return out;
 }
 
-const BUILDS = [
-  { dir: "with_uwb", title: "With UWB" },
-  { dir: "without_uwb", title: "Without UWB" },
-];
+const BUILDS = ["with_uwb", "without_uwb"];
 
 // Docs are numbered in reading order; sort by number, then by build, so a
-// build-specific doc appears once per build at its place in the order.
+// build-specific doc appears at its place in the order.
 const byNumber = (a, b) => a.path.split("/").pop().localeCompare(b.path.split("/").pop()) || a.path.localeCompare(b.path);
 
-// Sidebar: README and the build overviews, then Product, Design, Setup and
+// Sidebar: README and the build overview, then Product, Design, Setup and
 // the appendices — the order of the README's table of contents.
 async function listDocs() {
   const entries = [{ path: "README.md", title: "README" }];
-  for (const b of BUILDS) entries.push({ path: `${b.dir}/README.md`, title: `${b.title} — overview` });
+  for (const b of BUILDS) entries.push({ path: `${b}/README.md`, title: "Build overview", build: b });
   for (const [folder, title] of [["product", "Product"], ["design", "Design"], ["setup", "Setup"]]) {
     entries.push({ section: title });
     if (folder === "setup")
-      for (const b of BUILDS) entries.push({ path: `${b.dir}/docs/setup/README.md`, title: `Setup — start here (${b.title})` });
+      for (const b of BUILDS) entries.push({ path: `${b}/docs/setup/README.md`, title: "Setup — start here", build: b });
     const list = [...(await mdEntries(`docs/${folder}`))];
     for (const b of BUILDS) {
-      list.push(...(await mdEntries(`${b.dir}/docs/${folder}`, ` (${b.title})`)));
+      list.push(...(await mdEntries(`${b}/docs/${folder}`, b)));
       if (folder === "setup")
-        list.push({ path: `${b.dir}/docs/setup/13-assembly.html`, href: `${b.dir}/docs/setup/assembly/index.html`, title: `13 — Assembly guide, interactive 3D (${b.title})` });
+        list.push({ path: `${b}/docs/setup/13-assembly.html`, href: `${b}/docs/setup/assembly/index.html`, title: "13 — Assembly guide, interactive 3D", build: b });
     }
     list.sort(byNumber);
     entries.push(...list.map(({ href, ...e }) => (href ? { ...e, path: href } : e)));
     if (folder === "setup")
-      for (const b of BUILDS) entries.push({ path: `${b.dir}/schematics/interactive/index.html`, title: `Wiring schematic, interactive (${b.title})` });
+      for (const b of BUILDS) entries.push({ path: `${b}/schematics/interactive/index.html`, title: "Wiring schematic, interactive", build: b });
   }
   entries.push({ section: "Appendices" });
   entries.push(...(await mdEntries("docs/appendix")).sort(byNumber));

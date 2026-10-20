@@ -7,8 +7,8 @@ Thingiverse, and is honest about what each substitution costs you.
 
 This build buys its motion as one assembly (the Arducam PTZ camera and metal
 pan-tilt base), so there is far less to substitute than there used to be.
-Both builds print an enclosure, a lid, a diffuser ring and a tray; the UWB
-build adds two arms, a mast and a pod ([With UWB](#with-uwb)).
+Both builds print an enclosure, a lid, a diffuser ring and a tray<!--with_uwb-->; the UWB
+build adds two arms, a mast and a pod ([With UWB](#with-uwb))<!--/-->.
 
 ## Enclosure and lid
 
@@ -37,11 +37,11 @@ that. The enclosure, though, is just a round box with a light band.
 The parts below rebuild the pan stage this design deleted. Going this way
 means returning to a stepper, a driver, a slip ring and a second
 microcontroller, and rewriting `ptz.py` and `tracker.py` to command pan
-velocity rather than position. With UWB, the geometry in
+velocity rather than position. <!--with_uwb-->With UWB, the geometry in
 [05](../../with_uwb/docs/design/05-tracking-system.md#static-anchors-change-the-loop)
-goes back to anchors that rotate with the lens; without UWB, the search sweep
+goes back to anchors that rotate with the lens<!--/--><!--both-->; <!--/--><!--without_uwb: Without UWB,--><!--both-->without UWB,<!--/--><!--without_uwb--> the search sweep
 in [05](../../without_uwb/docs/design/05-tracking-system.md) would no longer be limited
-to ±80°, which is the point of doing it.
+to ±80°, which is the point of doing it<!--/-->.
 
 | Model | Why it's interesting | What you give up |
 | --- | --- | --- |

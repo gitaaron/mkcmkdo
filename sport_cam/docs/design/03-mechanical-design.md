@@ -1,9 +1,9 @@
 # 03 — Mechanical design
 
 Both builds share the same head: tripod, battery tray, enclosure, lid, PTZ
-base and camera. The UWB build adds two anchor arms, a mast and a wearable
-pod — see [With UWB](#with-uwb). The camera-only build adds nothing — see
-[Without UWB](#without-uwb).
+base and camera. <!--with_uwb-->The UWB build adds two anchor arms, a mast and a wearable
+pod — see [With UWB](#with-uwb).<!--/--><!--both--> <!--/--><!--without_uwb-->The camera-only build adds nothing — see
+[Without UWB](#without-uwb).<!--/-->
 
 SportCam is built around the **Arducam IMX477 PTZ camera with metal pan-tilt
 base** (B0167B12). That one part supplies the camera, the motorized zoom lens,
@@ -26,13 +26,13 @@ tilt tower in this design. Everything printed is an enclosure or a bracket.
    tripod leg or the centre column as low as is convenient. Hanging the
    heaviest single item low is what keeps the thing from being tippy. Its
    cable runs up to a USB-C inlet low in the enclosure wall.
-3. **Enclosure** (3D-printed; Ø 141 × 84 mm with UWB, Ø 135 × 73 mm without,
+3. **Enclosure** (3D-printed; <!--with_uwb-->Ø 141 × 84 mm<!--/--><!--both--> with UWB, <!--/--><!--without_uwb-->Ø 135 × 73 mm<!--/--><!--both--> without<!--/-->,
    as solved for the assumed part sizes — see [Layout](#layout-inside-the-enclosure)).
    Inside, in three layers: the power boards on the floor; the WS2812B LED
    ring under a printed shelf, lighting a window all the way round so status is
    visible from any direction; the Raspberry Pi 4 on the shelf. Nothing in here
-   moves. The wall differs by build: three bosses for arms and a mast, and a
-   slot for the anchor cables, with UWB; plain all round without.
+   moves. <!--both-->The wall differs by build: three bosses for arms and a mast, and a
+   slot for the anchor cables, with UWB; plain all round without.<!--/--><!--with_uwb: The wall has three bosses for the arms and mast, and a slot for the anchor cables.--><!--without_uwb: The wall is plain all round.-->
 4. **Lid** (3D-printed, 5 mm): structural. It carries the entire camera, so it
    is the one printed part worth extra walls. The Arducam base bolts to it
    through four radial slots; the camera ribbon and the servo lead drop through
@@ -43,8 +43,8 @@ tilt tower in this design. Everything printed is an enclosure or a bracket.
    Zoom and focus are driven by the lens's own steppers, commanded over the
    same I2C bus as the two servos.
 
-That is the whole camera-only head. The UWB build adds anchor arms and a mast
-on top of this stack ([below](#with-uwb)).
+That is the whole <!--both-->camera-only <!--/-->head.<!--with_uwb--> The UWB build adds anchor arms and a mast
+on top of this stack ([below](#with-uwb)).<!--/-->
 
 ## Layout inside the enclosure
 
@@ -76,16 +76,16 @@ The last result is in [`cad/FIT_REPORT.md`](../../cad/FIT_REPORT.md).
 **What the 160° pan costs you.** There are no end stops on a continuous axis,
 so the old build could follow a subject through a full circle and always take
 the shorter way round. This one cannot. A subject crossing a soft limit is
-lost: the camera stops and holds — then, with UWB, falls back to idle after
-5 s; without UWB, sweeps again after a few seconds (the search covers the
-same ±80°, so it can never look behind itself). Point the lens at the thing
+lost: the camera stops and holds — then<!--with_uwb-->, with UWB, falls back to idle after
+5 s<!--/--><!--both-->; without UWB,<!--/--><!--without_uwb--> sweeps again after a few seconds (the search covers the
+same ±80°, so it can never look behind itself)<!--/-->. Point the lens at the thing
 you are filming — a wall, a pitch, a mat — and this never comes up. Expect to
 care if people circulate around the tripod.
 
 **Tilt is enough for climbing.** A 15 m top-out filmed from 7 m back is about
 65° of elevation, comfortably inside +85°. At +85° and full wide zoom, the
-top edge of the frame looks about 27° past vertical. (With UWB the A3 board
-sits just outside that; see [below](#with-uwb).)
+top edge of the frame looks about 27° past vertical.<!--with_uwb--> (With UWB the A3 board
+sits just outside that; see [below](#with-uwb).)<!--/-->
 
 ## Design rules that matter
 
@@ -93,7 +93,7 @@ sits just outside that; see [below](#with-uwb).)
   above it is cantilevered off those four slots.
 - **Mass balance barely matters now** because the pan axis carries only the
   camera, but the *tripod* still cares: keep the battery tray low and spread
-  the legs (and spread them wider once the UWB arms and mast are on).
+  the legs<!--with_uwb--> (and spread them wider once the UWB arms and mast are on)<!--/-->.
 - **Cable service loop**: the camera ribbon and the servo lead cross the pan
   axis, so leave ~80 mm of slack coiled under the lid. Sweep both axes to their
   limits by hand before you tidy the loop, not after.
@@ -101,17 +101,26 @@ sits just outside that; see [below](#with-uwb).)
 
 ## Printed / fabricated parts list
 
+<!--both-->
+
 Common to both builds:
+
+<!--/-->
 
 | Part | Qty | Notes |
 | --- | --- | --- |
-| Enclosure | 1 | size solved by `cad/fit.py`; only the UWB one has wall bosses and a cable slot |
+| Enclosure | 1 | size solved by `cad/fit.py`<!--both-->; only the UWB one has wall bosses and a cable slot<!--/--><!--with_uwb: ; with wall bosses and a cable slot--> |
 | Pi shelf | 1 | rests on three posts in the enclosure wall; white or natural helps the LED light |
 | LED diffuser band | 1 | white PETG, 2 walls, 0 % infill; slides over the outside of the window |
 | Lid | 1 | 5 walls, 40 % — it carries the camera |
 | Battery tray | 1 | sized by `cad/fit.py` to the power bank in `cad/ordered_parts.toml` |
 
+<!--with_uwb-->
+
 The UWB build adds arms, a mast and a wearable pod ([below](#printed-parts-with-uwb)).
+
+<!--/-->
+
 Every part prints in one piece on a Bambu Lab A1 Mini (≤ 170 mm on each side);
 `cad/fit.py` checks it.
 Settings, orientation and materials are in
@@ -126,12 +135,12 @@ Each build has an **interactive assembly guide** that walks the build in 3D —
 [with UWB](../../with_uwb/docs/setup/assembly/index.html),
 [without UWB](../../without_uwb/docs/setup/assembly/index.html) (open the file, or
 use the docs viewer's sidebar): enclosure electronics, lid and camera,
-battery, cabling and bring-up — plus, with UWB, the anchor arms and the A3
-mast — with the part being fitted highlighted and animated into place.
+battery, cabling and bring-up<!--with_uwb--> — plus, with UWB, the anchor arms and the A3
+mast<!--/--> — with the part being fitted highlighted and animated into place.
 
 ## CAD sources
 
-All printed parts have parametric OpenSCAD sources in each build's `cad/`
+All printed parts have parametric OpenSCAD sources in <!--both-->each build's<!--/--><!--with_uwb: the build's--><!--without_uwb: the build's--> `cad/`
 ([with UWB](../../with_uwb/cad/), [without UWB](../../without_uwb/cad/)) —
 see **[Appendix A — CAD: printed parts](../appendix/appendix-a-cad-parts.md)** for the
 fit-and-render workflow, per-part print settings, and the measure-before-printing

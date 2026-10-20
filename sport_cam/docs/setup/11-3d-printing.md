@@ -15,7 +15,7 @@ re-sizes the enclosure, shelf, lid and diffuser to the parts you actually
 buy, so [`cad/FIT_REPORT.md`](../../cad/FIT_REPORT.md) has the current
 figures.
 
-Sources are in each build's `cad/` ([with UWB](../../with_uwb/cad/),
+Sources are in <!--both-->each build's<!--/--><!--with_uwb: the build's--><!--without_uwb: the build's--> `cad/` ([with UWB](../../with_uwb/cad/),
 [without UWB](../../without_uwb/cad/)); the workflow for regenerating STLs is
 in [Appendix A](../appendix/appendix-a-cad-parts.md). The parts and their place in the
 build are in [03 — Mechanical design](../design/03-mechanical-design.md).
@@ -62,9 +62,9 @@ Sizes with the assumed parts (bounding box, mm):
 | --- | --- | --- | --- |
 | Enclosure | with UWB | 147 × 149 × 84 | 21 |
 | Enclosure | without UWB | 139 × 139 × 73 | 31 |
-| Pi shelf | with UWB / without | 132 × 117 × 3 / 128 × 87 × 3 | 38+ |
-| Lid | with UWB / without | 141 × 141 × 11 / 135 × 135 × 11 | 29+ |
-| LED diffuser band | with UWB / without | Ø 145 × 16 / Ø 139 × 16 | 25+ |
+| Pi shelf | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->132 × 117 × 3<!--/--><!--both--> / <!--/--><!--without_uwb-->128 × 87 × 3<!--/--> | 38+ |
+| Lid | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->141 × 141 × 11<!--/--><!--both--> / <!--/--><!--without_uwb-->135 × 135 × 11<!--/--> | 29+ |
+| LED diffuser band | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->Ø 145 × 16<!--/--><!--both--> / <!--/--><!--without_uwb-->Ø 139 × 16<!--/--> | 25+ |
 | Battery tray | both | 155 × 77 × 12 | 15 |
 | Wearable pod | with UWB | 142 × 74 × 31 | 28 |
 | Anchor arm, mast foot, mast cradle | with UWB | ≤ 69 mm | 100+ |
@@ -77,7 +77,7 @@ tool here — these are structural brackets, not miniatures.
 
 | Material | Qty | Notes |
 | --- | --- | --- |
-| **PETG, 1 kg, any colour** | 1 spool | the structural parts: ≈ 380 g with UWB, ≈ 240 g without. A 1 kg spool leaves plenty for reprints |
+| **PETG, 1 kg, any colour** | 1 spool | the structural parts: ≈ <!--with_uwb-->380 g<!--/--><!--both--> with UWB, ≈ <!--/--><!--without_uwb-->240 g<!--/--><!--both--> without<!--/-->. A 1 kg spool leaves plenty for reprints |
 | **PETG, white or natural** | ≈ 40 g | the LED diffuser band, which has to pass light, and ideally the shelf, whose underside bounces the ring's light out. They can't be your main colour unless that colour is white or natural. A 250 g sample spool is the cheap way to get it |
 | Glue stick (PVA) | 1 | see the warning below — this is a release agent, not an adhesive |
 | TPU 95A *(optional, UWB build)* | ≈ 30 g | nicer wearable pod against the skin. Needs direct drive |
@@ -95,21 +95,21 @@ car. Use PETG. ABS or ASA are also fine if you have an enclosure.
 
 ## The common parts
 
-Every build prints these five. Links go to the UWB build's sources; the
+Every build prints these five.<!--both--> Links go to the UWB build's sources; the
 camera-only build has the same files in `without_uwb/cad/`. Sizes are the
-with-UWB ones (camera-only in brackets where they differ).
+with-UWB ones (camera-only in brackets where they differ).<!--/-->
 
 | Part | Size (mm) | Walls | Infill | Layer | Est. mass | Est. time |
 | --- | --- | --- | --- | --- | --- | --- |
-| [Enclosure](../../with_uwb/cad/base_housing.scad) | 147 × 149 × 84 (139 × 139 × 73) | 4 | 20 % | 0.2 | ≈ 180 g (145 g) | ≈ 18 h (14 h) |
-| [Pi shelf](../../with_uwb/cad/shelf.scad) | 132 × 117 × 3 (128 × 87 × 3) | 3 | 20 % | 0.2 | ≈ 32 g | ≈ 2.5 h |
-| [Lid](../../with_uwb/cad/lid.scad) | 141 × 141 × 11 (135 × 135 × 11) | **5** | **40 %** | 0.2 | ≈ 65 g (60 g) | ≈ 4 h |
-| [LED diffuser band](../../with_uwb/cad/led_diffuser_ring.scad) | Ø 145 × 16 (Ø 139 × 16) | **2** | **0 %** | 0.2 | ≈ 6 g | ≈ 1.5 h |
+| [Enclosure](../../with_uwb/cad/base_housing.scad) | <!--with_uwb-->147 × 149 × 84<!--/--><!--both--> (<!--/--><!--without_uwb-->139 × 139 × 73<!--/--><!--both-->)<!--/--> | 4 | 20 % | 0.2 | <!--with_uwb-->≈ 180 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->145 g<!--/--><!--both-->)<!--/--> | <!--with_uwb-->≈ 18 h<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->14 h<!--/--><!--both-->)<!--/--> |
+| [Pi shelf](../../with_uwb/cad/shelf.scad) | <!--with_uwb-->132 × 117 × 3<!--/--><!--both--> (<!--/--><!--without_uwb-->128 × 87 × 3<!--/--><!--both-->)<!--/--> | 3 | 20 % | 0.2 | ≈ 32 g | ≈ 2.5 h |
+| [Lid](../../with_uwb/cad/lid.scad) | <!--with_uwb-->141 × 141 × 11<!--/--><!--both--> (<!--/--><!--without_uwb-->135 × 135 × 11<!--/--><!--both-->)<!--/--> | **5** | **40 %** | 0.2 | <!--with_uwb-->≈ 65 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->60 g<!--/--><!--both-->)<!--/--> | ≈ 4 h |
+| [LED diffuser band](../../with_uwb/cad/led_diffuser_ring.scad) | <!--with_uwb-->Ø 145 × 16<!--/--><!--both--> (<!--/--><!--without_uwb-->Ø 139 × 16<!--/--><!--both-->)<!--/--> | **2** | **0 %** | 0.2 | ≈ 6 g | ≈ 1.5 h |
 | [Battery tray](../../with_uwb/cad/battery_tray.scad) | 155 × 77 × 12 | 3 | 20 % | 0.2 | ≈ 38 g | ≈ 3.5 h |
 
 The enclosure differs between builds in size, because `fit.py` solves each
-one, and in its wall. The UWB one has three bosses for the arms and mast, and
-a slot for the anchor cables; the camera-only one is plain all round.
+one, and in its wall. <!--with_uwb-->The UWB one has three bosses for the arms and mast, and
+a slot for the anchor cables<!--/--><!--both-->; the camera-only one is plain all round<!--/--><!--without_uwb: The camera-only one is plain all round-->.
 
 Masses are computed from the STL solid volume at PETG's 1.27 g/cm³ and scaled
 for the walls and infill above. Times assume a 0.4 nozzle at 0.2 mm and
@@ -119,12 +119,12 @@ deciding how much filament to buy and which evening to start.
 ### Orientation and supports
 
 Every part is modelled in its print orientation. Drop it on the bed as it
-comes out of OpenSCAD and you need **no supports anywhere** — except under
-the UWB enclosure's wall bosses ([below](#with-uwb)).
+comes out of OpenSCAD and you need **no supports anywhere**<!--with_uwb--> — except under
+the UWB enclosure's wall bosses ([below](#with-uwb))<!--/-->.
 
 | Part | Orientation | Supports |
 | --- | --- | --- |
-| Enclosure | open end up, as modelled | none without UWB. The LED window is cut in bays with a thin rib every 22 mm, so the wall above it bridges short spans; the ledge under the window has a 45° underside; the shelf posts grow straight up out of the wall. With UWB, see below |
+| Enclosure | open end up, as modelled | <!--without_uwb-->none<!--/--><!--both--> without UWB<!--/--><!--with_uwb: see [below](#with-uwb) for the bosses; otherwise none-->. The LED window is cut in bays with a thin rib every 22 mm, so the wall above it bridges short spans; the ledge under the window has a 45° underside; the shelf posts grow straight up out of the wall<!--both-->. With UWB, see below<!--/--> |
 | Pi shelf | flat, as modelled | none |
 | Lid | **flip it: top face on the bed**, locating ring up | none |
 | Diffuser band | standing, as modelled | none. **Brim recommended**: it is a tall thin ring with a small footprint |
@@ -165,13 +165,13 @@ worst because every string is visible once the LEDs are on.
 | Step | Tool | Where |
 | --- | --- | --- |
 | Remove brims, clean up strings | flush cutters, deburring tool | all parts |
-| Open every M3 clearance hole | 3.2 mm drill bit, by hand | enclosure lid-screw holes, shelf, lid slots (and, with UWB, arms and mast foot) |
+| Open every M3 clearance hole | 3.2 mm drill bit, by hand | enclosure lid-screw holes, shelf, lid slots<!--with_uwb--> (and, with UWB, arms and mast foot)<!--/--> |
 | Check the tripod bore fits your 3/8-16 insert | drill or step bit if it is larger than the bore | enclosure floor |
 | Fit heat-set inserts | soldering iron, flat tip, ≈ 200 °C | M3: one in the top of each of the three shelf posts, and four pushed sideways into the lid's ring (7 total) |
 | Dry-fit before wiring | — | lid ring in the enclosure mouth; shelf on its posts; diffuser band over the window onto its ledge; the bank in the tray |
 
-The 3/8-16 brass tripod insert is epoxied. The UWB build adds more heat-set
-inserts ([below](#with-uwb)).
+The 3/8-16 brass tripod insert is epoxied.<!--with_uwb--> The UWB build adds more heat-set
+inserts ([below](#with-uwb)).<!--/-->
 
 ## Measure before you print
 
@@ -204,7 +204,11 @@ If you want to start building before everything is done:
 4. **Diffuser band** — only needed once the LED ring is in.
 5. **Battery tray** — last; measure your bank first.
 
+<!--with_uwb-->
+
 The UWB build slots its arms and pod in ([below](#print-order-with-uwb)).
+
+<!--/-->
 
 ---
 

@@ -23,8 +23,8 @@ as the Firebase function:
 Because the protocol is the same, the app's calls are the same; only the
 base URL changes. State still lives in one place on the device
 (`Head.apply_state`), so a command from a phone connected directly, one
-arriving through Firebase, or the camera itself (the tag being switched on or
-off with UWB; the first lock-on without) all take the same route and everyone
+arriving through Firebase, or the camera itself (<!--with_uwb-->the tag being switched on or
+off<!--/--><!--both--> with UWB; <!--/--><!--without_uwb-->the first lock-on<!--/--><!--both--> without<!--/-->) all take the same route and everyone
 is told the result — app, LED ring, and Firestore stay in lock-step.
 
 The camera's state includes `mode` (`with_uwb` or `without_uwb`, from its
@@ -82,7 +82,15 @@ protocol.
 
 ## The app's screen
 
+<!--both-->
+
 ![App UI (with UWB wording; the camera-only build shows "Track & record")](../../with_uwb/docs/images/app-ui.png)
+
+<!--/-->
+
+<!--with_uwb: ![App UI](../../with_uwb/docs/images/app-ui.png)-->
+
+<!--without_uwb: ![App UI (with UWB wording; this build shows "Track & record")](../../with_uwb/docs/images/app-ui.png)-->
 
 Same layout as the web app, plus the connection badge:
 
@@ -92,11 +100,11 @@ Same layout as the web app, plus the connection badge:
   **"Searching…"** during discovery, red **"Offline — tap to retry"**. Tap it
   any time to re-scan.
 - **Top-right — camera state** (`StatusRing`): the LED-ring colours (blue
-  idle, green tracking — blinking fast and labelled "Acquiring subject…"
-  (with UWB) or "Looking for a person…" (without) until the camera locks on —
-  pulsing red recording); hollow while disconnected. A pill says "Can't see
-  you — step into view, facing the camera" (with UWB) or "Can't find anyone —
-  step into the room, facing the camera" (without) if acquiring stalls. The
+  idle, green tracking — blinking fast and labelled <!--with_uwb-->"Acquiring subject…"<!--/--><!--both-->
+  (with UWB) or <!--/--><!--without_uwb-->"Looking for a person…"<!--/--><!--both--> (without)<!--/--> until the camera locks on —
+  pulsing red recording); hollow while disconnected. A pill says <!--with_uwb-->"Can't see
+  you — step into view, facing the camera"<!--/--><!--both--> (with UWB) or <!--/--><!--without_uwb-->"Can't find anyone —
+  step into the room, facing the camera"<!--/--><!--both--> (without)<!--/--> if acquiring stalls. The
   bottom buttons follow the same wording as the web app
   ([07](07-backend-and-app.md#web-app-srcweb)).
 - **Chimes** (`lib/session_audio.dart`): rising when recording starts,

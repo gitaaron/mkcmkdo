@@ -4,10 +4,10 @@ One board does the computing and one does the moving. There is no base
 controller any more: with the pan stepper gone, the ESP32, the TMC2209, the
 slip ring and the carrier PCB all left with it, and the status ring moved onto
 the Pi. What remains in both builds is a Raspberry Pi 4, the Arducam PTZ
-controller it talks to over I2C, the LED ring, a battery gauge and a battery.
+controller it talks to over I2C, the LED ring, a battery gauge and a battery.<!--with_uwb-->
 The UWB build adds three USB anchors on the head and a wearable tag
-([With UWB](#with-uwb)); the camera-only build adds nothing and leaves the
-Pi's USB ports free ([Without UWB](#without-uwb)).
+([With UWB](#with-uwb))<!--/--><!--both-->; the<!--/--><!--without_uwb:  The--><!--without_uwb--> camera-only build adds nothing and leaves the
+Pi's USB ports free ([Without UWB](#without-uwb))<!--/-->.
 
 ### Why a Pi 4 and not a Pi 5
 
@@ -18,10 +18,10 @@ largest line in the power budget. A Pi 4 encodes 1080p for almost nothing.
 
 The Pi 5 is roughly two to two and a half times faster on CPU, which matters
 only for the person detector. A Pi 4 runs it at about 3 fps. How much that
-matters depends on the build: with UWB the detector only trims angles ranging
-has already set; without UWB it is the tracker's only sense. In both, a few
-frames per second is enough for a person moving at several metres — see each
-build's section below. Paying four watts for a Pi 5 costs about two hours of
+matters depends on the build: <!--with_uwb-->with UWB the detector only trims angles ranging
+has already set<!--/--><!--both-->; <!--/--><!--without_uwb-->without UWB it is the tracker's only sense<!--/-->.<!--both--> In both, a<!--/--><!--with_uwb:  A--><!--without_uwb:  A--> few
+frames per second is enough for a person moving at several metres — see <!--both-->each
+build's section<!--/--><!--with_uwb: [With UWB](#with-uwb)--><!--without_uwb: [Without UWB](#without-uwb)--> below. Paying four watts for a Pi 5 costs about two hours of
 runtime.
 
 Three smaller things follow from the choice, all in the Pi 4's favour: the
@@ -29,12 +29,10 @@ Arducam kit's 15-pin ribbon plugs straight in, so there is no adapter cable to
 buy; there is no `usb_max_current_enable` flag to set; and the board is about
 C$55 cheaper.
 
-Schematic sources live in each build's `schematics/` —
+Schematic sources live in <!--both-->each build's<!--/--><!--with_uwb: the build's--><!--without_uwb: the build's--> `schematics/` —
 `render_schematics.py` (schemdraw) produces the PNGs, and
 `schematics/interactive/index.html` is a zoomable view of the whole system
-(open it via `npm run docs` at
-http://localhost:8090/with_uwb/schematics/interactive/index.html or
-http://localhost:8090/without_uwb/schematics/interactive/index.html — its
+(open it via `npm run docs` at <!--with_uwb-->http://localhost:8090/with_uwb/schematics/interactive/index.html<!--/--><!--both--> or<!--/--> <!--without_uwb-->http://localhost:8090/without_uwb/schematics/interactive/index.html<!--/--> — its
 libraries are vendored locally, no internet needed).
 
 ## Head unit
@@ -43,9 +41,9 @@ To actually wire it, follow your build's **wiring guide**
 ([with UWB](../../with_uwb/docs/setup/12-wiring.md),
 [without UWB](../../without_uwb/docs/setup/12-wiring.md)): every connection pin by
 pin, in order, with a check after each. This section explains the choices
-behind it. Each build's head schematic is in its section below.
+behind it. <!--both-->Each build's head schematic is in its section below.<!--/--><!--with_uwb: The head schematic is in [With UWB](#with-uwb) below.--><!--without_uwb: The head schematic is in [Without UWB](#without-uwb) below.-->
 
-Connections common to both builds:
+Connections <!--both-->common to both builds<!--/--><!--with_uwb: every build has--><!--without_uwb: every build has-->:
 
 | Signal | From → To | Notes |
 | --- | --- | --- |
@@ -95,10 +93,18 @@ power bank ──PD trigger (12 V)──► INA260 ──► buck 12→5 V 8 A �
                                                                └─► WS2812B ring
 ```
 
+<!--both-->
+
 Each build's power tree is drawn in its section below.
 
+<!--/-->
+
+<!--with_uwb: The power tree is drawn in [With UWB](#with-uwb) below.-->
+
+<!--without_uwb: The power tree is drawn in [Without UWB](#without-uwb) below.-->
+
 Why not feed the Pi from the bank's 5 V port directly? Because the 5 V rail
-also carries the servos and the LED ring (and, with UWB, three anchors), and most banks cap
+also carries the servos and the LED ring<!--with_uwb--> (and, with UWB, three anchors)<!--/-->, and most banks cap
 their 5 V profile at 3 A. Pulling 12 V and stepping down locally gives the
 whole rail headroom and costs about 8 % in conversion.
 
@@ -132,14 +138,35 @@ critical threshold leaves 78 Wh to spend:
 | Tracking only | 12.0 W | 6.5 h | 8.7 W | 8.9 h |
 | Idle, streaming preview | 9.7 W | 8.0 h | 6.4 W | 12 h |
 
+<!--both-->
+
 The three UWB anchors are the whole difference: about 3 W at 5 V, 3.3 W at
 12 V, roughly a third of the draw and about two hours of runtime. Both are
 well over the 4 h target. The camera-only figures are estimates from the load
 budget (5 V total ÷ 92 % buck efficiency), not measurements; measure your own
 unit with the gauge.
 
-A **74 Wh (20 000 mAh) bank** manages about **5.0 h with UWB, 6.7 h
-without**, saves about C$25 and a couple of hundred grams, and is the sensible
+<!--/-->
+
+<!--with_uwb:
+
+The three UWB anchors are about 3 W at 5 V and 3.3 W at 12 V: roughly a
+third of the draw, and about two hours of runtime. It is well over the 4 h
+target.
+
+-->
+
+<!--without_uwb:
+
+Without the UWB build's three anchors the camera draws about a third less,
+and runs about two hours longer. It is well over the 4 h target. The figures
+are estimates from the load budget (5 V total ÷ 92 % buck efficiency), not
+measurements; measure your own unit with the gauge.
+
+-->
+
+A **74 Wh (20 000 mAh) bank** manages about **<!--with_uwb-->5.0 h<!--/--><!--both--> with UWB, <!--/--><!--without_uwb-->6.7 h<!--/--><!--both-->
+without<!--/-->**, saves about C$25 and a couple of hundred grams, and is the sensible
 choice unless you want a full day between charges — each BOM lists it as the
 alternative. Stay under 100 Wh if you ever want to fly with it.
 
@@ -239,9 +266,8 @@ that plane.
 3. **Motion:** `python -m sportcam.ptzcheck` sweeps pan then tilt to the soft
    limits. Watch for the lens or the ribbon binding and adjust the limits in
    `config.py` before anything else.
-4. **Tracking sensor:** build-specific — the anchors
-   ([with UWB](#bring-up-with-uwb)) or the vision search
-   ([without UWB](#bring-up-without-uwb)).
+4. **Tracking sensor:** build-specific — <!--both-->the anchors<!--/--><!--with_uwb: the anchors--><!--without_uwb: the vision search--> <!--both-->([with UWB](#bring-up-with-uwb)) or the vision search
+   ([without UWB](#bring-up-without-uwb))<!--/--><!--with_uwb: ([bring-up, with UWB](#bring-up-with-uwb))--><!--without_uwb: ([bring-up, without UWB](#bring-up-without-uwb))-->.
 5. **Integration:** full tracking run on the bench, then check the gauge's
    estimate against a stopwatch over the first half hour.
 

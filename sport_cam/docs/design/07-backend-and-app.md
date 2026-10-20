@@ -72,6 +72,8 @@ Which build a camera is comes from **the camera itself** (`TRACKING_MODE` in
 `mode`, and the apps word their buttons from it — there is nothing to set on
 the backend:
 
+<!--compare-->
+
 | `mode` | Build | |
 | --- | --- | --- |
 | `with_uwb` | [with UWB](../../with_uwb/README.md) | the subject wears a tag; the tag starts and ends sessions |
@@ -155,22 +157,21 @@ Behaviour (the requirements are in [01 — Product requirements](../product/01-r
 - **Opening the app starts the live view** — `VideoView` mounts immediately;
   no play button.
 - Status ring top-right: grey `off` / blue `idle` / green `tracking`
-  (blinking fast until the camera locks on, labelled "Acquiring subject…" with
-  UWB or "Looking for a person…" without, while it sweeps and centres) /
+  (blinking fast until the camera locks on, labelled <!--with_uwb-->"Acquiring subject…"<!--/--><!--both--> with
+  UWB or <!--/--><!--without_uwb-->"Looking for a person…"<!--/--><!--both--> without<!--/-->, while it sweeps and centres) /
   pulsing red `recording`; it also doubles as the connection indicator
-  (hollow while the camera is offline). If acquiring stalls, a pill says
-  "Can't see you — step into view, facing the camera" (with UWB) or "Can't
-  find anyone — step into the room, facing the camera" (without UWB, after
-  15 s with nobody found).
+  (hollow while the camera is offline). If acquiring stalls, a pill says <!--with_uwb-->"Can't see you — step into view, facing the camera"<!--/--><!--both--> (with UWB) or<!--/--><!--without_uwb--> "Can't
+  find anyone — step into the room, facing the camera" (<!--/--><!--both-->without UWB, <!--/--><!--without_uwb-->after
+  15 s with nobody found)<!--/-->.
 - **Chimes** (`lib/chime.ts`): a rising two-note chime when recording starts
   and a falling one when it stops, synthesised with Web Audio. Browsers only
   allow sound after a tap, so the first tap on the page arms it. A background
   tab on a computer still chimes; a phone browser suspends background pages,
   so for chimes with the phone in your bag use the native app ([09](09-direct-connection-and-app.md)).
 - Bottom buttons by state:
-  - `idle` → **Turn off** · **Start tracking** (with UWB) / **Track & record**
-    (without UWB: starts the search; recording begins on the first lock-on)
-  - `tracking` → **Turn off** · **Start recording** / **Record now**
+  - `idle` → **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> (with UWB) / <!--/--><!--without_uwb-->**Track & record**
+    (<!--/--><!--both-->without UWB: <!--/--><!--without_uwb-->starts the search; recording begins on the first lock-on)<!--/-->
+  - `tracking` → **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/-->
   - `recording` → **Stop recording** · **Stop tracking** (confirm dialog,
     since it also stops the recording)
 - All buttons just `call()` a function; the UI never assumes success — it

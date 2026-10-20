@@ -2,7 +2,7 @@
 
 How the requirements in [01 — Product requirements](../product/01-requirements.md)
 are split across hardware and software. The parts both builds share come first,
-then each build in its own section:
+then <!--both-->each build in its own section<!--/--><!--with_uwb: the build's own section--><!--without_uwb: the build's own section-->:
 
 - **[With UWB](#with-uwb)**: a wearable tag and three anchors on the head.
 - **[Without UWB](#without-uwb)**: the camera is the only sensor.
@@ -23,11 +23,15 @@ Every build has a camera unit, a cloud backend and a companion app:
 
 | Subsystem | Compute | Role |
 | --- | --- | --- |
-| **Camera unit** | Raspberry Pi 4 | Camera + zoom lens, pan/tilt servos, LED ring, battery gauge, video encode/stream, person detection, tracking control loop — plus, with UWB, three anchors |
+| **Camera unit** | Raspberry Pi 4 | Camera + zoom lens, pan/tilt servos, LED ring, battery gauge, video encode/stream, person detection, tracking control loop<!--with_uwb--> — plus, with UWB, three anchors<!--/--> |
 | **Backend** | Firebase: one Cloud Function (TypeScript), Firestore, Cloud Storage, Hosting | The API, each camera's live state and preview, the recording library, serves the web app. Nothing runs at home. One backend for both builds |
 | **Companion app** | Vue 3 web app (Firebase Hosting) / Flutter | Live view + control, from anywhere or directly on the camera's Wi-Fi. One app for both builds |
 
+<!--with_uwb-->
+
 The UWB build adds a fourth subsystem, the **wearable tag**.
+
+<!--/-->
 
 ## Key decisions
 

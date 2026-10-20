@@ -51,6 +51,8 @@ first run downloads the emulators (a few hundred MB, cached in
 The camera's build sets the apps' wording, and in dev `TRACKING_MODE` picks
 the simulated camera's:
 
+<!--compare-->
+
 | | `with_uwb` | `without_uwb` |
 | --- | --- | --- |
 | Primary button in idle | **Start tracking** | **Track & record** |
@@ -139,16 +141,57 @@ app is one client with two possible backends. See
 npm run docs       # → http://localhost:8090
 ```
 
-Zero-dependency viewer (`tools/docs-server.mjs`, needs only Node — no npm
-install). The sidebar follows the docs' reading order: the README, then
-Product, Design, Setup and the appendices, with each build-specific doc listed
-once per build. Markdown renders with the PNG diagrams inline; doc-to-doc links
-navigate inside the viewer, code/STL links open raw in a new tab. Pages are
-deep-linkable — e.g. bookmark the UWB build's BOM at
-`http://localhost:8090/#with_uwb/docs/setup/10-bill-of-materials.md`. Set
-`DOCS_PORT` if 8090 clashes. Runs happily alongside `npm run dev` (app :5173,
-emulators :5001/:8080/:9199/:4000). Markdown rendering pulls the `marked` library from a CDN, so the
-first load needs internet; everything else is served from the repo.
+Zero-dependency viewer (`tools/docs-server.mjs` and `tools/docs-viewer.js`,
+needs only Node — no npm install, no internet: `marked` is vendored in
+`tools/vendor/`). The sidebar follows the docs' reading order: the README,
+then Product, Design, Setup and the appendices. Markdown renders with the PNG
+diagrams inline; doc-to-doc links navigate inside the viewer, code/STL links
+open raw in a new tab. Pages are deep-linkable — e.g. bookmark the UWB build's
+BOM at `http://localhost:8090/#with_uwb/docs/setup/10-bill-of-materials.md`.
+Set `DOCS_PORT` if 8090 clashes. Runs happily alongside `npm run dev` (app
+:5173, emulators :5001/:8080/:9199/:4000).
+
+**The build toggle.** The **With UWB / Without UWB** switch at the top of the
+sidebar shows the docs for one build at a time, and the browser remembers
+which (it's stored per browser, so it survives a reload). In the build you
+aren't viewing it hides:
+
+- that build's own docs in the sidebar; switching while reading one (say the
+  wiring guide) opens the other build's copy of it
+- sections headed **With UWB** / **Without UWB**, or "*something*, with UWB"
+- list items that start with the build's name, table columns headed by it,
+  and table rows whose first two cells name it
+- the other half of a "with UWB · without UWB" link pair; links into the
+  other build's docs point at your build's copy where there is one, and a
+  link that has no copy switches the toggle when you follow it
+- wording marked in the markdown, below
+
+Tables that exist to compare the builds keep both: put a `<!--compare-->` line
+before the table.
+
+Where a shared doc's sentence mentions both builds, mark it with HTML
+comments, which GitHub hides, so GitHub still reads as the doc for both
+builds:
+
+| Marker | Shown on GitHub | Shown in the viewer |
+| --- | --- | --- |
+| `<!--with_uwb-->…<!--/-->` | yes | with UWB |
+| `<!--without_uwb-->…<!--/-->` | yes | without UWB |
+| `<!--both-->…<!--/-->` | yes | never: wording for both builds |
+| `<!--with_uwb: …-->` | no | with UWB, in place of a `both` passage |
+| `<!--without_uwb: …-->` | no | without UWB, in place of a `both` passage |
+
+```markdown
+Runtime is about **<!--with_uwb-->6.2 h<!--/--><!--both--> with UWB, <!--/--><!--without_uwb-->8.4 h<!--/--><!--both--> without<!--/-->**.
+See <!--both-->each build's section<!--/--><!--with_uwb: [With UWB](#with-uwb)--><!--without_uwb: [Without UWB](#without-uwb)--> below.
+```
+
+GitHub reads a line that starts with a comment as raw HTML, so a marker never
+starts a line inside a paragraph; to mark a whole paragraph, put each marker
+on a line of its own with blank lines around it. Markers don't nest, and the
+`<!--with_uwb: …-->` form can't contain `--`. `python3 tools/check-build-markers.py`
+checks all of this (the pre-commit hook runs it when a doc changes), and
+`--show with_uwb <doc>` prints a doc as one build sees it.
 
 Each build's **interactive wiring schematic** is served by the same command:
 

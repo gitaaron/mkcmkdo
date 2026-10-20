@@ -17,7 +17,8 @@ apps, and differ in how the camera finds the subject:
 [01 — Product requirements](docs/product/01-requirements.md#the-two-builds)
 compares the two. Pick one, then follow its
 **setup docs ([with UWB](with_uwb/docs/setup/README.md) ·
-[without UWB](without_uwb/docs/setup/README.md))**.
+[without UWB](without_uwb/docs/setup/README.md))**. In the
+[docs viewer](#reading-the-docs) a toggle shows one build's docs at a time.
 
 ## Documentation
 
@@ -42,7 +43,7 @@ build's folder; in paths, `<build>` means `with_uwb` or `without_uwb`.
 | 02 | [System architecture](docs/design/02-system-architecture.md) | shared | Subsystems, key decisions, each build's architecture |
 | 03 | [Mechanical design](docs/design/03-mechanical-design.md) | shared | PTZ base, enclosure, shelf and lid, layout inside, ranges of motion, printed parts |
 | 04 | [Electronics](docs/design/04-electronics.md) | shared | Why a Pi 4, PTZ controller, LED ring, power budget and runtime, SD card, bring-up |
-| 05 | Tracking system: [with UWB](with_uwb/docs/design/05-tracking-system.md) · [without UWB](without_uwb/docs/design/05-tracking-system.md) | per build | UWB geometry, anchors and control loops · search sweep, lock-on and vision loops |
+| 05 | Tracking system: [with UWB](with_uwb/docs/design/05-tracking-system.md) · [without UWB](without_uwb/docs/design/05-tracking-system.md) | per build | <!--with_uwb-->UWB geometry, anchors and control loops<!--/--><!--both--> · <!--/--><!--without_uwb-->search sweep, lock-on and vision loops<!--/--> |
 | 06 | [Device software](docs/design/06-device-software.md) | shared | Pi camera service, motion, vision, status ring, the Firebase link |
 | 07 | [Backend & app](docs/design/07-backend-and-app.md) | shared | Firebase (one function, Firestore, Storage), the camera key, the API, the Vue app |
 | 08 | [Recordings, cloud & gym Wi-Fi](docs/design/08-recordings-and-cloud.md) | shared | Upload → library pipeline, Firebase backend, phone-driven Wi-Fi setup |
@@ -66,7 +67,9 @@ interactive wiring schematic ([with UWB](with_uwb/schematics/interactive/index.h
 ## Reading the docs
 
 Browse them on GitHub, or run the docs viewer, which lists every doc in the
-order above with diagrams inline and doc-to-doc links working:
+order above with diagrams inline and doc-to-doc links working. Its **With UWB
+/ Without UWB** toggle shows only the docs, sections, table rows and wording
+for the build you pick, and remembers your choice:
 
 ```bash
 npm run docs       # → http://localhost:8090
@@ -93,7 +96,7 @@ src/                all the code and apps
   without_uwb/      Pi software (device/)
 cad/                ordered_parts.toml + fit.py: fits both builds' CAD to the parts you bought
 scripts/            firebase-setup.sh / firebase-deploy.sh
-tools/              docs viewer (npm run docs), git hooks
+tools/              docs viewer (npm run docs) + its build-marker check, git hooks
 
 with_uwb/           the UWB-tracked build — README.md is its overview
   docs/design/      05 — tracking system

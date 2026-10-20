@@ -1,8 +1,7 @@
 # Appendix A — CAD: printed parts
 
-Parametric OpenSCAD sources for every printed part live in each build's
-`cad/` folder — [`with_uwb/cad/`](../../with_uwb/cad/) and
-[`without_uwb/cad/`](../../without_uwb/cad/). Three kinds of number feed them:
+Parametric OpenSCAD sources for every printed part live in <!--both-->each build's<!--/--><!--with_uwb: the build's--><!--without_uwb: the build's-->
+`cad/` folder — <!--with_uwb-->[`with_uwb/cad/`](../../with_uwb/cad/)<!--/--><!--both--> and<!--/--> <!--without_uwb-->[`without_uwb/cad/`](../../without_uwb/cad/)<!--/-->. Three kinds of number feed them:
 
 | What | Where | Who edits it |
 | --- | --- | --- |
@@ -38,14 +37,14 @@ python3 cad/fit.py            # solve, regenerate, render, audit — both builds
 2. **Finds another design if the parts don't fit.** If a board is too big to
    go round the tripod boss, it raises the boards on printed risers over it.
    Then it makes the enclosure taller, and then wider in 2 mm steps up to what
-   an A1 Mini can print. With UWB, it turns the anchor boards across the arms
-   if the extension cable's socket end has no room along them. It stretches
+   an A1 Mini can print.<!--with_uwb--> With UWB, it turns the anchor boards across the arms
+   if the extension cable's socket end has no room along them.<!--/--> It stretches
    the lid's slots to the base's measured bolt spacing. If nothing works, it
    names the part and the constraint.
 3. **Writes** `<build>/cad/layout.scad` (and `layout.json`, and the 3D
    guide's `layout.js`), and keeps the geometry constants in
-   `src/<build>/device/sportcam/config.py` (`UWB_BASELINE_M`, `UWB_A3_BACK_M`,
-   `UWB_A3_UP_M`, `LED_COUNT`) in step.
+   `src/<build>/device/sportcam/config.py` (<!--with_uwb-->`UWB_BASELINE_M`, `UWB_A3_BACK_M`,
+   `UWB_A3_UP_M`, <!--/-->`LED_COUNT`) in step.
 4. **Renders** every STL through `<build>/cad/render_all.sh`, and refreshes
    the guide's meshes and preview images if `numpy-stl` and `matplotlib` are
    installed.

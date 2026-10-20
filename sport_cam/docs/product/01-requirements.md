@@ -24,11 +24,13 @@ up the wall. The LED ring on the base glows green (tracking) or pulses red
 (recording), and the same status shows in the companion app streaming the
 live view to a phone. The session films itself.
 
-How the camera knows where the climber is depends on the build — see
-[With UWB](#with-uwb) and [Without UWB](#without-uwb) below, each with its own
-picture of the scene.
+How the camera knows where the climber is depends on the build —
+see <!--both-->[With UWB](#with-uwb) and [Without UWB](#without-uwb) below, each with its own
+picture of the scene.<!--/--><!--with_uwb: [With UWB](#with-uwb) below, with its picture of the scene.--><!--without_uwb: [Without UWB](#without-uwb) below, with its picture of the scene.-->
 
 ## The two builds
+
+<!--compare-->
 
 | | [**With UWB**](../../with_uwb/README.md) | [**Without UWB**](../../without_uwb/README.md) |
 | --- | --- | --- |
@@ -52,14 +54,14 @@ camera-only build for simplicity, size and cost.
    **optical zoom** (96° → 33°, ≈ 3.5×). Both axes and the lens come from the
    Arducam PTZ base, which is what keeps the build to a weekend — see
    [03](../design/03-mechanical-design.md) for what that trades away.
-2. **F2 — Follows a person.** The camera **follows a human subject** — by UWB
-   tag or by vision alone, depending on the build — and zooms to keep them
+2. **F2 — Follows a person.** The camera **follows a human subject** — by <!--both-->UWB
+   tag or by vision alone, depending on the build<!--/--><!--with_uwb: the UWB tag they wear--><!--without_uwb: vision alone--> — and zooms to keep them
    framed.
 3. **F3 — Records a session on its own.** Recording starts once the camera
    has locked on to the subject and stops at the end of the session, with a
    saved clip even if the battery runs out ([concept of operations](#concept-of-operations)).
 4. **F4 — LED status ring** on the unit showing the states: on-but-not-tracking,
-   acquiring (turning to the tag, or searching), tracking, recording, and low
+   acquiring (<!--with_uwb-->turning to the tag<!--/--><!--both-->, or <!--/--><!--without_uwb-->searching<!--/-->), tracking, recording, and low
    battery ([state machine](#state-machine)).
 5. **F5 — Companion app**: opens straight into the live stream, state-dependent
    bottom buttons, circular status indicator (top-right) matching the LED
@@ -79,9 +81,9 @@ camera-only build for simplicity, size and cost.
 ## Non-functional requirements
 
 Hard limits the design has to stay inside. A change that breaks one of these
-needs a reason in the doc that makes it. C1 and C2 differ by build and are in
-each build's section ([with UWB](#non-functional-requirements-with-uwb),
-[without UWB](#non-functional-requirements-without-uwb)); the rest are shared.
+needs a reason in the doc that makes it. C1 and C2 differ by build and are
+in <!--both-->each build's section ([with UWB](#non-functional-requirements-with-uwb),
+[without UWB](#non-functional-requirements-without-uwb))<!--/--><!--with_uwb: [the build's section](#non-functional-requirements-with-uwb)--><!--without_uwb: [the build's section](#non-functional-requirements-without-uwb)-->; the rest are shared.
 
 | # | Requirement | Value | Why | Where it is set |
 | --- | --- | --- | --- | --- |
@@ -101,10 +103,9 @@ The beginning and end of a session are the same in both builds:
 1. **Power on** → the Pi boots, joins Wi-Fi, checks in with Firebase.
    State = **IDLE** (LED solid blue). Opening the app immediately shows the
    live stream.
-2. **Start, lock on, follow** — this is where the builds differ:
-   [with UWB](#a-session-with-uwb) the tag starts and ends the session;
-   [without UWB](#a-session-without-uwb) the app starts it and the camera
-   searches. In both, the camera enters **TRACKING** in phase **acquiring**
+2. **Start, lock on, follow** — this is where the builds
+   differ: <!--with_uwb-->[with UWB](#a-session-with-uwb) the tag starts and ends the session<!--/--><!--both-->; <!--/--><!--without_uwb-->[without UWB](#a-session-without-uwb)
+   the app starts it and the camera searches<!--/-->. In both, the camera enters **TRACKING** in phase **acquiring**
    (green light chasing round the ring), and once the person detector has
    confirmed a person it records (LED breathing red, the app chimes). While
    recording, vision zooms so the subject fills about 65 % of the frame, with
@@ -116,18 +117,22 @@ The beginning and end of a session are the same in both builds:
 
 ## State machine
 
-The states, colours and transitions are the same in both builds; only the
-wording of two buttons and the acquiring label changes.
+The states, colours and transitions are the same in both builds<!--both-->; only the
+wording of two buttons and the acquiring label changes<!--/-->.
 
 | State | LED | App status ring | Bottom buttons |
 | --- | --- | --- | --- |
 | `off` | off | grey | *(app shows reconnect screen)* |
-| `idle` | solid blue | blue | **Turn off** · **Start tracking** / **Track & record** |
-| `tracking`, acquiring | green, chasing round the ring | green (fast blink), "Acquiring subject…" / "Looking for a person…" | **Turn off** · **Start recording** / **Record now** |
-| `tracking`, locked on | solid green | green | **Turn off** · **Start recording** / **Record now** |
+| `idle` | solid blue | blue | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
+| `tracking`, acquiring | green, chasing round the ring | green (fast blink), <!--with_uwb-->"Acquiring subject…"<!--/--><!--both--> / <!--/--><!--without_uwb-->"Looking for a person…"<!--/--> | **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/--> |
+| `tracking`, locked on | solid green | green | **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/--> |
 | `recording` | pulsing red | red (pulsing) | **Stop recording** · **Stop tracking** |
 
+<!--both-->
+
 Where two labels are given, the first is with UWB and the second without.
+
+<!--/-->
 
 Rules common to both:
 
