@@ -16,9 +16,9 @@ The lid is the one part not worth replacing: it is cut to carry the Arducam
 base on slots and pass the ribbon through the middle, and nothing generic does
 that. The enclosure, though, is just a round box with a light band.
 
-- [Raspberry Pi 5 case, parametric — Printables 1036702](https://www.printables.com/model/1036702-raspberry-pi-5-case) — if you would rather bolt a stock Pi case inside a bigger shell than use our standoffs.
+- [Parametric Raspberry Pi 4B case — Printables 204101](https://www.printables.com/model/204101-parametric-raspberry-pi-4b-case-30mm-fan-with-vert) — if you would rather bolt a stock Pi case inside a bigger shell than use our standoffs. It has a 30 mm fan: set the Pi's height in `cad/ordered_parts.toml` to the case's and re-run `cad/fit.py`.
 - [Motorized Turntable, 3 versions — MakerWorld 1013366](https://makerworld.com/en/models/1013366-motorized-turntable-3-versions) — its base shell is a good donor for a round enclosure with a deck, if you want something chunkier than ours.
-- [Project box generator, parametric — Printables 149967](https://www.printables.com/model/149967-parametric-project-box) — square alternative; you lose the 360° light band, which is most of why ours is round.
+- [Universal parametric project box — Printables 60749](https://www.printables.com/model/60749-universal-parametric-project-box) — square alternative; you lose the 360° light band, which is most of why ours is round.
 
 ## LED status ring
 
@@ -28,8 +28,8 @@ that. The enclosure, though, is just a round box with a light band.
 
 ## Battery tray
 
-- [Universal power bank holder — Printables 455094](https://www.printables.com/model/455094-power-bank-holder) — strap-mount tray; check it fits a 150 × 72 × 30 mm bank before printing.
-- [Parametric battery holder — Printables 309048](https://www.printables.com/model/309048-parametric-battery-holder) — generate to your bank's exact size.
+- [Power bank holder with a universal tripod mount — Printables 1094558](https://www.printables.com/model/1094558-holder-for-a-power-bank-with-a-universal-mount-for) — mounts a bank on a photo tripod; check it fits a 150 × 72 × 30 mm bank before printing.
+- [Parametric container generator, OpenSCAD — Printables 208305](https://www.printables.com/model/208305-parametric-battery-holder-9v-default-openscad-cust) — made for a 9 V battery, but its OpenSCAD parameters generate a holder to your bank's exact size.
 - [Tripod leg accessory clamp — Thingiverse 4536847](https://www.thingiverse.com/thing:4536847) — if you'd rather clamp to a leg than strap to the column.
 
 ## If you want continuous pan back
@@ -46,7 +46,6 @@ to ±80°, which is the point of doing it.
 | Model | Why it's interesting | What you give up |
 | --- | --- | --- |
 | [Pan Tilt Mount (NEMA 17), talal_malik — Printables 1180365](https://www.printables.com/model/1180365-pan-tilt-mount-nema-17-stepper-motor) | Two NEMA17s + 3:1 GT2 pulleys, compact, well documented. Replaces both axes | No slip ring → pan is wiring-limited to ~±180°, not continuous |
-| [NEMA 17 Pan Tilt (archived), link.state — Printables 511349](https://www.printables.com/model/511349-nema-17-pan-tilt-archived) | Built around a 4" lazy-susan bearing; sturdy for a heavy head | Same ±180° wiring limit; archived, no support |
 | [Lazy Susan motorized turntable converter — MakerWorld 228118](https://makerworld.com/en/models/228118-experimental-lazy-susan-motorized-turntable-conver) | Bolts a drive onto a stock lazy-susan bearing | A turntable, not a camera mount — you design the rest |
 
 For true continuous rotation you need a ring pulley whose bore clears a slip
