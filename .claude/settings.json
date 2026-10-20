@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=\"${CLAUDE_PROJECT_DIR:-.}\"; for s in \"$d/sport_cam/tools/claude-check.sh\" \"$d/tools/claude-check.sh\"; do [ -x \"$s\" ] && exec \"$s\"; done; exit 0",
+            "timeout": 900,
+            "statusMessage": "Running SportCam checks…"
+          }
+        ]
+      }
+    ]
+  }
+}
