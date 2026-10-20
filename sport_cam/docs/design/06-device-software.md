@@ -173,7 +173,7 @@ Programs: camera service and wearable tag firmware.
 | --- | --- |
 | `uwb.py` | range parsing (ULA1 frames, or the `dual-serial` sketch), bearing maths, Kalman → (θ, d) |
 | `tracker.py` | control loops from [05](../../with_uwb/docs/design/05-tracking-system.md): pan/tilt from ranging, CV bias trims, framing, focus from distance, lock-on test |
-| `session.py` | tag-driven sessions: tag on → tracking (acquiring) → recording on lock-on; tag off → idle ([01](../product/01-requirements.md#a-session-with-uwb)) |
+| `session.py` | tag-driven sessions: tag on → tracking (acquiring) → recording on lock-on; tag off → idle ([01](../product/01-requirements.md#state-machine-with-uwb)) |
 | `rangecal.py` | `python3 -m sportcam.rangecal <metres>`: per-anchor range bias and noise with the tag on the boresight; prints `RANGE_BIAS_M` |
 
 `config.py` additionally holds the anchor geometry and calibration biases.
@@ -243,7 +243,7 @@ Programs: camera service only.
 | Module | Function |
 | --- | --- |
 | `tracker.py` | SEARCH → CENTRE → TRACK state machine and loops from [05](../../without_uwb/docs/design/05-tracking-system.md): idle person-in-frame watch (`watch_idle()`; a session starts in CENTRE when someone is in frame), sweep, first-person lock-on with gate, pan/tilt goals and slew, vision-only framing, focus from apparent size |
-| `session.py` | `AutoSession`: first lock of a session started from idle starts recording; a tracking session with nobody found gives up after 180 s ([01](../product/01-requirements.md#a-session-without-uwb)) |
+| `session.py` | `AutoSession`: first lock of a session started from idle starts recording; a tracking session with nobody found gives up after 180 s ([01](../product/01-requirements.md#state-machine-without-uwb)) |
 
 `config.py` additionally holds the search and tracking gains, detector
 settings, and zoom and focus curves. `camera.py` adds `person_boxes()`.

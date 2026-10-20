@@ -176,7 +176,7 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
   stop the clip.
 - A subject beyond a soft limit is locked from the limit.
 - In a tag-started session, lock-on starts recording
-  ([01](../../../docs/product/01-requirements.md#a-session-with-uwb)).
+  ([01](../../../docs/product/01-requirements.md#state-machine-with-uwb)).
 
 ## Camera placement envelope
 
@@ -236,5 +236,5 @@ the camera for most of the climb. A back-mounted tag is rarely body-shadowed.
 | --- | --- |
 | Role | ranging **initiator**: polls each anchor, broadcasts the collected ranges |
 | Power | independent USB bank; 2 500 mAh lasts > 1 day |
-| Control | power switch only. On starts a session, off ends it; the camera detects ranging start and stop ([01](../../../docs/product/01-requirements.md#a-session-with-uwb), `src/with_uwb/device/sportcam/session.py`) |
+| Control | power switch only. On starts a session, off ends it; the camera detects ranging start and stop ([01](../../../docs/product/01-requirements.md#state-machine-with-uwb), `src/with_uwb/device/sportcam/session.py`) |
 | LED | blinks green while ranging. Battery level: the bank's own indicator |
