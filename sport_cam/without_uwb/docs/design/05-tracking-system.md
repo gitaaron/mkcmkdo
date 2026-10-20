@@ -125,28 +125,13 @@ person boxes (3 fps, fresh only) ──► nearest-to-last (gate) ──► offs
   which time the person has moved and the camera too. Correcting the full
   error each time would overshoot and hunt. Under-correcting settles in a few
   detections and costs a little lag on a fast mover.
-- **Each detection counts once.** The loop runs at 20 Hz and vision at 3.
-  Acting on the cached box every tick would apply one measurement about seven
-  times and multiply the gain sevenfold. `Camera.person_boxes()` returns a
-  freshness flag, and the tracker moves the goals only when it is true.
-- **Zoom (framing).** The camera starts wide. Each detection measures how much
-  of the frame the person fills — the larger of their height and width
-  fractions, measured on the body rather than the padded HOG box (about
-  `PERSON_IN_BOX_H` 75 % of its height and `PERSON_IN_BOX_W` 55 % of its width)
-  — and moves the zoom `ZOOM_VISION_GAIN` (35 %) of the way, in log terms,
-  toward `ZOOM_FILL_TARGET` (**65 %**). That leaves about 17 % of the frame as
-  margin on every side for aim error and sudden moves; a climber stretched
-  sideways is framed by their span. Two safeguards:
-  - **Guard.** If the body comes within `ZOOM_GUARD_EDGE` (3 %) of any edge, or
-    fills more than `ZOOM_GUARD_FILL` (85 %), the zoom steps out by
-    `ZOOM_GUARD_STEP` (0.8) at once, whatever the fill loop says. HOG cannot
-    see a body that is already clipped, so the guard acts on the approach.
-  - **Stale relax.** With no detection for `ZOOM_STALE_S` (2 s) — an overhang,
-    a turned back — vision has nothing to say, so the zoom eases back toward
-    wide at `ZOOM_STALE_RELAX` (30 %) per second. Wider is the safe direction.
-
-  Zoom moves are rate-limited (`ZOOM_RATE_LIMIT_S`) and ignore changes under
-  `ZOOM_MIN_STEP_MM`, so the shot does not "breathe".
+- **Each detection counts once.** The loop runs at 20 Hz and vision at 3, so
+  the tracker moves the goals only on a fresh detection
+  ([06 — Vision](../../../docs/design/06-device-software.md#vision-and-why-it-runs-slowly)).
+- **Zoom (framing).** The camera starts wide; vision then frames the shot,
+  filling 65 % of the frame, with a fast zoom-out guard near the edges and a
+  slow relax back to wide when the person isn't seen
+  ([06 — Framing and focus](../../../docs/design/06-device-software.md#framing-and-focus)).
 - **Focus from size.** There is no distance sensor, so distance is
   *estimated* from how tall the person looks. By the thin lens, a body of
   height H at distance d is f·H/d tall on the sensor; the tracker solves for d
@@ -160,14 +145,8 @@ person boxes (3 fps, fresh only) ──► nearest-to-last (gate) ──► offs
   the error matters mainly at full tele. While searching, focus is held at
   `SEARCH_FOCUS_M` (5 m), a room-sized guess.
 
-  Focus then comes from distance *and* focal length. Depth of field is
-  generous at the wide end and shallow at the tele end — focused at 10 m at
-  10.6 mm, roughly 6–20 m is sharp — so `config.FOCUS_GRID` holds measured
-  focus positions per focal length per distance, and `ptz.focus_raw`
-  interpolates between them in 1/distance, which is how lens extension
-  actually varies. A deadband of 0.02 dioptres keeps the motor still on
-  estimate noise, and a zoom move refocuses immediately. **The shipped grid is
-  flat until you calibrate it** (calibration step 2).
+  Focus then comes from that distance and the focal length, through
+  `FOCUS_GRID` ([06](../../../docs/design/06-device-software.md#framing-and-focus)).
 - **Detection.** OpenCV HOG on the 720p preview, downscaled to
   `DETECT_DOWNSCALE_W` (480 px) wide, at `DETECT_FPS_TRACKING` (3 fps) while a
   session runs and `DETECT_FPS_IDLE` (0.5) when not. The record stream is
@@ -177,10 +156,8 @@ person boxes (3 fps, fresh only) ──► nearest-to-last (gate) ──► offs
   of the frame width around the person, which cuts its time several-fold;
   while searching it uses the whole frame.
 
-  Three frames per second sounds slow and is not. A climber rises at about
-  0.3 m/s, which from 10 m is 1.7°/s, and with the subject framed at 65 % there
-  is a margin of about 17 % of the frame on each side — several seconds of
-  tolerance. A runner is another matter.
+  Three frames per second sounds slow and is not for a climber, who rises
+  at about 1.7°/s seen from 10 m. A runner is another matter.
 
   **Upgrade path:** if HOG is not good enough, a MobileNet-SSD person detector
   through `cv2.dnn` fits in the same place. Only `Camera._detect()` changes;
@@ -219,28 +196,10 @@ Stated plainly, because they decide whether this build suits your use:
 How far back can the tripod sit? Three constraints, and they bite at
 different distances:
 
-1. **Resolution — the zoom is the binding constraint.** The Arducam PTZ lens
-   covers 96° to 33° horizontally, which on the IMX477's 16:9 frame is a
-   vertical field of 64° down to 18.9°. At full zoom the frame is 0.333 · d
-   tall, so a 1.8 m subject occupies `5.4 / d` of frame height:
-
-   | Distance | Subject height in frame, full zoom | Verdict |
-   | --- | --- | --- |
-   | 3 m | fills frame — zoom out to fit | close-up work |
-   | 6 m | 90 % | tight |
-   | 8.3 m | 65 % (the vision framing target) | **last distance at target framing** |
-   | 10 m | 54 % | excellent |
-   | 13.5 m | 40 % | good |
-   | 20 m | 27 % | usable, visibly wider shot |
-   | 30 m | 18 % | subject small; HOG still finds a body (it needs ≈ 15 % of frame height) but sees it less reliably |
-
-   Framing degrades gracefully past ~8 m rather than failing: the lens is at
-   full zoom and the person simply fills less of the frame. At the wide
-   end a full body fits from about 1.5 m out, so close range is never the
-   constraint.
-
-   The table is derived from the lens's published field of view (roughly
-   2.8–10.6 mm on this sensor); confirm it in the zoom calibration below.
+1. **Resolution — the zoom is the binding constraint.** At full zoom a 1.8 m
+   subject fills the 65 % framing target out to about 8.3 m, 40 % at 13.5 m
+   and 18 % at 30 m; full-body framing works from about 1.5 m. The full table
+   is in [03 — How far the zoom reaches](../../../docs/design/03-mechanical-design.md#how-far-the-zoom-reaches).
 2. **Geometry — closer isn't better.** Inside ~5 m of a tall wall the tilt
    angle gets steep (foreshortened footage) and pan/tilt angular rates spike
    on fast moves. At 8–12 m, a full 15 m route sweeps a comfortable ~50–60°
@@ -262,28 +221,12 @@ person is too small for the detector at any zoom.
 
 ## Calibration
 
-Nothing about the tracker itself needs calibrating; what is calibrated is the
-lens and the servos it drives.
-
-1. **Zoom curve**: `ptz.py` interpolates focal length from the measured
-   `(mm, raw)` pairs in `config.ZOOM_CURVE`, which ship as a straight line
-   between the stops. To measure yours, put a metre rule at a known distance,
-   step `OPT_ZOOM` across 3000–20000, and record the visible width at each
-   stop — that gives field of view, and focal length follows. The lens is
-   open-loop, so `Ptz.home()` drives both motors into their stops at boot
-   before any of this means anything.
-2. **Focus grid**: tape a high-contrast target at 2 m and run
-   `python -m sportcam.focuscal 2`; repeat at 5, 10 and 30 m. At five focal
-   lengths it sweeps the focus motor, keeps the sharpest position (variance
-   of the Laplacian over the frame centre), and prints a `FOCUS_GRID` to
-   paste into `config.py`. Do it after the zoom curve, in the light you will
-   film in.
-3. **Centre and direction, both axes**: run `python -m sportcam.ptzcheck`.
-   It sweeps each axis to its soft limits so you can confirm `PAN_CENTER_RAW`
-   and `TILT_CENTER_RAW` really centre the lens (straight ahead of the enclosure, and
-   level), and that neither `PAN_SIGN` nor `TILT_SIGN` is mirrored. A wrong
-   sign makes the camera run away from the subject, which looks like a
-   tracking failure and is not one.
+Nothing about the tracker itself needs calibrating; the lens and the servos
+it drives do. The zoom curve, the focus grid, and the centre and direction of
+both axes are calibrated the same way in both builds;
+[14 — Software setup](../setup/14-software-setup.md#5-calibrate) has the steps.
+A wrong `PAN_SIGN` or `TILT_SIGN` makes the camera run away from the subject,
+which looks like a tracking failure and isn't one.
 
 ## Tuning
 

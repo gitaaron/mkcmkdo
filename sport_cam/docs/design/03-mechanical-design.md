@@ -86,6 +86,29 @@ care if people circulate around the tripod.
 top edge of the frame looks about 27° past vertical.<!--with_uwb--> (With UWB the A3 board
 sits just outside that; see [below](#with-uwb).)<!--/-->
 
+### How far the zoom reaches
+
+The lens covers 96° to 33° horizontally, which on the IMX477's 16:9 frame is
+a vertical field of 64° down to 18.9°. At full zoom the frame is 0.333 · d
+tall at distance d, so a 1.8 m subject fills `5.4 / d` of its height:
+
+| Distance | Subject height in frame, full zoom | Verdict |
+| --- | --- | --- |
+| 3 m | fills the frame — zoom out to fit | close-up work |
+| 6 m | 90 % | tight |
+| 8.3 m | 65 % (the framing target) | **last distance at target framing** |
+| 10 m | 54 % | excellent |
+| 13.5 m | 40 % | good |
+| 20 m | 27 % | usable, visibly wider shot |
+| 30 m | 18 % | small; the person detector needs about 15 % to see a body |
+
+Past about 8 m framing degrades gracefully rather than failing: the lens is
+at full zoom and the person simply fills less of the frame. At the wide end
+a full body fits from about 1.5 m out, so close range is never the limit.
+The figures come from the lens's published field of view (roughly 2.8–10.6 mm
+on this sensor); the zoom calibration in 14 — Software setup confirms them for
+your lens.
+
 ## Design rules that matter
 
 - **The lid is the structure.** Print it at 5 walls, 40 % infill. Everything
@@ -96,34 +119,22 @@ sits just outside that; see [below](#with-uwb).)<!--/-->
 - **Cable service loop**: the camera ribbon and the servo lead cross the pan
   axis, so leave ~80 mm of slack coiled under the lid. Sweep both axes to their
   limits by hand before you tidy the loop, not after.
-- Print structural parts in **PETG** (20 % infill, 4 walls); the lid heavier.
 
-## Printed / fabricated parts list
+## Printed parts and CAD
 
-<!--both-->
+Every build prints five parts: the enclosure, the Pi shelf, the LED diffuser
+band, the lid and the battery tray.<!--with_uwb--> The UWB build adds two anchor arms,
+the mast foot and cradle, and the wearable pod.<!--/--> Each prints in one piece on a
+Bambu Lab A1 Mini (≤ 170 mm on each side), and `cad/fit.py` checks it.
 
-Common to both builds:
-
-<!--/-->
-
-| Part | Qty | Notes |
-| --- | --- | --- |
-| Enclosure | 1 | size solved by `cad/fit.py`<!--both-->; only the UWB one has wall bosses and a cable slot<!--/--><!--with_uwb: ; with wall bosses and a cable slot--> |
-| Pi shelf | 1 | rests on three posts in the enclosure wall; white or natural helps the LED light |
-| LED diffuser band | 1 | white PETG, 2 walls, 0 % infill; slides over the outside of the window |
-| Lid | 1 | 5 walls, 40 % — it carries the camera |
-| Battery tray | 1 | sized by `cad/fit.py` to the power bank in `cad/ordered_parts.toml` |
-
-<!--with_uwb-->
-
-The UWB build adds arms, a mast and a wearable pod ([below](#printed-parts-with-uwb)).
-
-<!--/-->
-
-Every part prints in one piece on a Bambu Lab A1 Mini (≤ 170 mm on each side);
-`cad/fit.py` checks it.
-Settings, orientation and materials are in
-[3D printing specifications](../setup/11-3d-printing.md).
+- **What to print**, with previews and STL links: the bill of materials
+  ([with UWB](../../with_uwb/docs/setup/10-bill-of-materials.md#printed-parts),
+  [without UWB](../../without_uwb/docs/setup/10-bill-of-materials.md#printed-parts)).
+- **How to print it** (settings, orientation, supports, times):
+  [11 — 3D printing](../setup/11-3d-printing.md).
+- **The OpenSCAD sources** in each build's `cad/`, and how `cad/fit.py` sizes
+  them to the parts you bought:
+  [Appendix A](../appendix/appendix-a-cad-parts.md).
 
 ## Assembly
 
@@ -133,19 +144,6 @@ Each build has an **interactive assembly guide** that walks the build in 3D —
 use the docs viewer's sidebar): enclosure electronics, lid and camera,
 battery, cabling and bring-up<!--with_uwb--> — plus, with UWB, the anchor arms and the A3
 mast<!--/--> — with the part being fitted highlighted and animated into place.
-
-## CAD sources
-
-All printed parts have parametric OpenSCAD sources in <!--both-->each build's<!--/--><!--with_uwb: the build's--><!--without_uwb: the build's--> `cad/`
-([with UWB](../../with_uwb/cad/), [without UWB](../../without_uwb/cad/)) —
-see **[Appendix A — CAD: printed parts](../appendix/appendix-a-cad-parts.md)** for the
-fit-and-render workflow, per-part print settings, and the measure-before-printing
-checklist.
-
-The one dimension worth measuring twice is the **Arducam base's bolt pattern**.
-Arducam publishes no drawing and it has changed between revisions, so the lid
-is cut with slots spanning 30–72 mm rather than fixed holes. Mark through the
-slots and bolt it down.
 
 ---
 
@@ -181,29 +179,15 @@ the tilt axis, so it stays just out of shot; a taller mast would not, and then
 - **UWB anchors** go at the ends of two printed arms, antennas level with
   *each other* and clear of the enclosure. The baseline sets bearing
   resolution: 250 mm is the compact choice, about 9° filtered against 7° at
-  400 mm ([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)). If you have
-  room, raise `uwb_half_base` in `with_uwb/cad/config.scad` and
-  `UWB_BASELINE_M` to match. A3's height above them, `uwb_v_base` /
-  `UWB_A3_UP_M`, sets elevation resolution the same way; keep it at least
-  250 mm or the blind corner described in
-  [05](../../with_uwb/docs/design/05-tracking-system.md#elevation-from-the-third-anchor) grows.
+  400 mm ([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)). A3's
+  height above them sets elevation resolution the same way. Keep both at
+  least 250 mm, or the noise and the blind corner described in
+  [05](../../with_uwb/docs/design/05-tracking-system.md#elevation-from-the-third-anchor)
+  grow quickly. Widening them if you have room is in
+  [Appendix A](../appendix/appendix-a-cad-parts.md#with-uwb).
 - **Nothing metal near an antenna.** That is why the mast is wood. An
   aluminium tube under A3 detunes it and biases its range, and every
   centimetre of r₃ bias is over two degrees of elevation at 10 m.
-
-### Printed parts, with UWB
-
-In addition to the common parts:
-
-| Part | Qty | Notes |
-| --- | --- | --- |
-| UWB anchor arms | 2 | ≈ 70 mm, bolt to the ±Y wall bosses; M3 inserts go in the bosses. The ULA1 lies across the pad, plug to the back |
-| A3 mast foot | 1 | bolts to the −X wall boss; M3 insert in the socket for a pinch screw |
-| A3 mast cradle | 1 | caps the dowel, carries the third ULA1; M3 insert for a pinch screw |
-| ½-inch hardwood dowel | 1 | bought, cut to 246 mm — the mast itself |
-| Wearable case + strap loop | 1 | fits a ULA1 module plugged straight into the end of a small USB power bank |
-
-About 420 g of PETG and 40 hours of machine time in total.
 
 ---
 
@@ -219,8 +203,3 @@ cramped room (see [constraints](../product/01-requirements.md#non-functional-req
 **Tilt and the search.** The search only uses two shallow tilt rows (5° and
 22°), so the rest of the tilt range is there for following the person once
 found.
-
-### Printed parts, without UWB
-
-Just the five common parts: enclosure, Pi shelf, diffuser band, lid and
-battery tray. About 280 g of PETG and 26 hours of machine time.

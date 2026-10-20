@@ -100,12 +100,47 @@ make the camera hunt. The tracker acts only on a **fresh** detection.
 `src/<build>/device/tests/test_ptz.py` covers the focus lookup in both builds; all device
 tests run on any machine (`python3 tests/test_<name>.py`).
 
+### Framing and focus
+
+Both builds frame the shot and focus the same way; only the first guess
+differs (see your build's 05).
+
+- **Framing.** Each fresh detection measures how much of the frame the person
+  fills: the larger of their height and width fractions, measured on the body
+  rather than the padded detector box (`PERSON_IN_BOX_H` 75 % of its height,
+  `PERSON_IN_BOX_W` 55 % of its width). The zoom then moves `ZOOM_VISION_GAIN`
+  (35 %) of the way, in log terms, toward `ZOOM_FILL_TARGET` (**65 %**). That
+  leaves about 17 % of the frame as margin on every side for aim error and
+  sudden moves; a climber stretched sideways is framed by their span.
+  - **Guard.** If the body comes within `ZOOM_GUARD_EDGE` (3 %) of any edge,
+    or fills more than `ZOOM_GUARD_FILL` (85 %), the zoom steps out by
+    `ZOOM_GUARD_STEP` (0.8) at once, whatever the fill loop says. The
+    detector can't see a body that is already clipped, so the guard acts on
+    the approach.
+  - **Stale relax.** With no detection for `ZOOM_STALE_S` (2 s) — an
+    overhang, a turned back — the zoom eases wider at `ZOOM_STALE_RELAX`
+    (30 %) per second. Wider is the safe direction.
+
+  Zoom moves are rate-limited (`ZOOM_RATE_LIMIT_S`) and ignore changes under
+  `ZOOM_MIN_STEP_MM`, so the shot doesn't "breathe".
+- **Focus** comes from the subject's distance *and* the focal length. Depth
+  of field is generous at the wide end and shallow at full zoom (focused at
+  10 m at 10.6 mm, roughly 6–20 m is sharp), so a curve keyed on focal length
+  alone is soft at most distances. `config.FOCUS_GRID` holds measured focus
+  positions per focal length per distance, and `ptz.focus_raw` interpolates
+  between them in 1/distance, which is how lens extension actually varies. A
+  deadband of 0.02 dioptres (about ±2 m at 10 m) keeps the motor still on
+  distance noise, and a zoom move refocuses at once. **The shipped grid is
+  flat**, so focus follows zoom alone until you run `focuscal`, which sweeps
+  the focus motor at five focal lengths and keeps the sharpest position
+  (variance of the Laplacian over the frame centre).
+
 ### Status ring
 
-16 × WS2812B over SPI0 MOSI: `idle` solid blue, `tracking` while acquiring a
-green light chasing round once a second, `tracking` once locked on solid green,
-`recording` 1 Hz breathing red, lost subject 2 Hz flash, low battery dims the
-ring and blinks orange once a second over whatever colour the state is.
+`led.py` drives the 16 × WS2812B ring over SPI0 MOSI, showing the colours in
+[01 — State machine](../product/01-requirements.md#state-machine): a 2 Hz
+flash for a lost subject, and an orange blink once a second over the state's
+colour for low battery or a nearly full card.
 
 ## Firebase link
 
@@ -175,25 +210,17 @@ cd ~/sportcam/src/with_uwb/device && python3 -m sportcam.rangecal 5
 
 ### Vision, with UWB
 
-With the third anchor fitted, ranging gives both angles and the person
-detector does three jobs: it cancels a slow bias on pan and on tilt, it
-frames the shot, and it verifies lock-on before a tag-started session
-records. On a two-anchor build (`UWB_ANCHORS = 2`) it is the only source of
-tilt, because a horizontal baseline carries no elevation information. Tilt
-only has to keep up with roughly 1.7°/s of subject motion.
+`Camera.person_bbox()` returns `(bbox, fresh)`, and the tracker turns the
+ranged bearing into the pixel column the detector searches around. What
+vision does in this build — trimming the ranged angles, framing, and
+confirming lock-on — and why the camera holds rather than chasing a
+bystander when ranging drops out, is in
+[05](../../with_uwb/docs/design/05-tracking-system.md#control-loops-all-run-on-the-pi-20-hz).
 
-The search strip comes from ranging: the tracker turns the known bearing into
-a pixel column, so the detector looks at about 40 % of frame width.
-`Camera.person_bbox()` returns `(bbox, fresh)`.
-
-`src/with_uwb/device/tests/test_tracker.py` covers the fresh-only rule, the strip
-hint, the slew limits, tilt from the third anchor, the sign of every vertical
-correction, and vision framing (fill target, edge guard, stale relax).
-`test_session.py` covers lock-on and the tag-driven session flow.
-
-When ranging drops out the camera **holds** rather than letting vision chase
-whoever is in frame. The detector cannot tell your subject from a bystander;
-the tag can, and that is the reason the tag exists.
+`src/with_uwb/device/tests/test_tracker.py` covers the fresh-only rule, the
+strip hint, the slew limits, tilt from the third anchor, the sign of every
+vertical correction, and vision framing (fill target, edge guard, stale
+relax). `test_session.py` covers lock-on and the tag-driven session flow.
 
 ### Where ranges come from
 
@@ -206,15 +233,11 @@ the tag can, and that is the reason the tag exists.
   is what the angle maths assumes. One USB data connection, not three. A
   frame missing only A3 still gives a bearing; it just carries no elevation.
 
-  **Flash the `RTLS_Tag` and `RTLS_Anchor` sketches, not `RangingTag` and
-  `RangingAnchor`.** The vendor ships both pairs and they behave differently:
-  the Ranging pair completes one tag-to-anchor exchange and reports that
-  single distance, while the RTLS pair ranges to every anchor in turn and then
-  broadcasts the collected RangeData. Only the second produces the frame this
-  parser reads, and only the second lets one anchor report for all three.
-  Load the wrong pair and you will see a stream carrying one range where
-  three are expected — at which point either reflash, or switch to
-  `dual-serial`.
+  Only the vendor's **`RTLS_Tag` / `RTLS_Anchor`** sketches produce that
+  frame; the `Ranging` pair reports one distance at a time. A stream carrying
+  one range where three are expected means the wrong pair is loaded: reflash
+  ([14 — Software setup, step 1](../../with_uwb/docs/setup/14-software-setup.md#1-flash-the-radios-on-your-computer))
+  or switch to `dual-serial`.
 - **`dual-serial`** — one port per anchor running our own DS-TWR sketch
   ([`src/with_uwb/firmware/uwb_anchor/`](../../src/with_uwb/firmware/uwb_anchor/)),
   printing `R,<tag>,<range_m>`. Vendor-agnostic, but the ranges are
@@ -262,31 +285,19 @@ returns every detected person.
 
 ### Vision, without UWB
 
-Vision is the only sensor. The person detector does everything the tracker
-knows: it finds the first person while sweeping, tells the tracker where they
-are in the frame, and its box size gives the framing and the focus distance.
-
-- **3 fps** is `DETECT_FPS_TRACKING`. HOG on a Pi 4 takes a few hundred
-  milliseconds per frame.
-- **The search strip** is the followed person's column once locked, about
-  60 % of frame width (`DETECT_STRIP_FRACTION`). While sweeping the whole
-  frame is searched.
-
-`Camera.person_boxes()` returns `(boxes, fresh)`: every detected person as
-`(x, y, w, h)`, and whether this list is a new measurement. The detector
-itself is isolated in `Camera._detect()`: swapping HOG for a MobileNet-SSD
-through `cv2.dnn` changes that method and nothing else.
+Vision is the only sensor. `Camera.person_boxes()` returns `(boxes, fresh)`:
+every detected person as `(x, y, w, h)`, and whether this list is a new
+measurement. The detector itself is isolated in `Camera._detect()`, so
+swapping HOG for a MobileNet-SSD through `cv2.dnn` changes that method and
+nothing else. How the tracker uses the boxes — search, lock-on, following,
+framing and focus from size — is in
+[05](../../without_uwb/docs/design/05-tracking-system.md#control-loops-all-run-on-the-pi-20-hz).
 
 `src/without_uwb/device/tests/test_tracker.py` covers the sweep and its
 turn-arounds, the two-detection lock, the gate against bystanders, the sign
 of every correction, the slew limits, and vision framing (fill target, edge
 guard, stale relax). `test_session.py` covers auto-record on lock and the
 give-up rule.
-
-Vision cannot tell people apart. The tracker follows whoever it found first,
-keeps to the detection nearest the last position, and sweeps again when it
-loses them; see
-[limitations](../../without_uwb/docs/design/05-tracking-system.md#limitations).
 
 ### Firebase link, without UWB
 

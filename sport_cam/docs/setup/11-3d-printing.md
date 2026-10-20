@@ -95,17 +95,18 @@ car. Use PETG. ABS or ASA are also fine if you have an enclosure.
 
 ## The common parts
 
-Every build prints these five.<!--both--> Links go to the UWB build's sources; the
-camera-only build has the same files in `without_uwb/cad/`. Sizes are the
-with-UWB ones (camera-only in brackets where they differ).<!--/-->
+Every build prints these five; their sizes are in the
+[table above](#design-rule-every-part-prints-on-a-bambu-lab-a1-mini).<!--both--> Links go to the UWB build's sources; the
+camera-only build has the same files in `without_uwb/cad/`. Masses and times
+are the with-UWB ones (camera-only in brackets where they differ).<!--/-->
 
-| Part | Size (mm) | Walls | Infill | Layer | Est. mass | Est. time |
-| --- | --- | --- | --- | --- | --- | --- |
-| [Enclosure](../../with_uwb/cad/base_housing.scad) | <!--with_uwb-->147 × 149 × 84<!--/--><!--both--> (<!--/--><!--without_uwb-->139 × 139 × 73<!--/--><!--both-->)<!--/--> | 4 | 20 % | 0.2 | <!--with_uwb-->≈ 180 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->145 g<!--/--><!--both-->)<!--/--> | <!--with_uwb-->≈ 18 h<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->14 h<!--/--><!--both-->)<!--/--> |
-| [Pi shelf](../../with_uwb/cad/shelf.scad) | <!--with_uwb-->132 × 117 × 3<!--/--><!--both--> (<!--/--><!--without_uwb-->128 × 87 × 3<!--/--><!--both-->)<!--/--> | 3 | 20 % | 0.2 | ≈ 32 g | ≈ 2.5 h |
-| [Lid](../../with_uwb/cad/lid.scad) | <!--with_uwb-->141 × 141 × 11<!--/--><!--both--> (<!--/--><!--without_uwb-->135 × 135 × 11<!--/--><!--both-->)<!--/--> | **5** | **40 %** | 0.2 | <!--with_uwb-->≈ 65 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->60 g<!--/--><!--both-->)<!--/--> | ≈ 4 h |
-| [LED diffuser band](../../with_uwb/cad/led_diffuser_ring.scad) | <!--with_uwb-->Ø 145 × 16<!--/--><!--both--> (<!--/--><!--without_uwb-->Ø 139 × 16<!--/--><!--both-->)<!--/--> | **2** | **0 %** | 0.2 | ≈ 6 g | ≈ 1.5 h |
-| [Battery tray](../../with_uwb/cad/battery_tray.scad) | 155 × 77 × 12 | 3 | 20 % | 0.2 | ≈ 38 g | ≈ 3.5 h |
+| Part | Walls | Infill | Layer | Est. mass | Est. time |
+| --- | --- | --- | --- | --- | --- |
+| [Enclosure](../../with_uwb/cad/base_housing.scad) | 4 | 20 % | 0.2 | <!--with_uwb-->≈ 180 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->145 g<!--/--><!--both-->)<!--/--> | <!--with_uwb-->≈ 18 h<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->14 h<!--/--><!--both-->)<!--/--> |
+| [Pi shelf](../../with_uwb/cad/shelf.scad) | 3 | 20 % | 0.2 | ≈ 32 g | ≈ 2.5 h |
+| [Lid](../../with_uwb/cad/lid.scad) | **5** | **40 %** | 0.2 | <!--with_uwb-->≈ 65 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->60 g<!--/--><!--both-->)<!--/--> | ≈ 4 h |
+| [LED diffuser band](../../with_uwb/cad/led_diffuser_ring.scad) | **2** | **0 %** | 0.2 | ≈ 6 g | ≈ 1.5 h |
+| [Battery tray](../../with_uwb/cad/battery_tray.scad) | 3 | 20 % | 0.2 | ≈ 38 g | ≈ 3.5 h |
 
 The enclosure differs between builds in size, because `fit.py` solves each
 one, and in its wall. <!--with_uwb-->The UWB one has three bosses for the arms and mast, and
@@ -175,24 +176,14 @@ inserts ([below](#with-uwb)).<!--/-->
 
 ## Measure before you print
 
-The full list, with what to do when a measurement is out of range, is in your
-build's **15 — Verification checklist**
+Measure the parts you've bought, put the numbers in
+[`cad/ordered_parts.toml`](../../cad/ordered_parts.toml) and run
+`python3 cad/fit.py`, before you print a 4-hour lid or an 18-hour enclosure.
+It re-solves the layout, re-renders every part and checks they fit. What to
+measure, and what each one changes, is the first table of your build's
+**15 — Verification checklist**
 ([with UWB](../../with_uwb/docs/setup/15-verification.md#before-you-print),
 [without UWB](../../without_uwb/docs/setup/15-verification.md#before-you-print)).
-Measure the parts you've bought, put the numbers in
-[`cad/ordered_parts.toml`](../../cad/ordered_parts.toml) with
-`measured = true`, and run `python3 cad/fit.py`. It re-solves the layout,
-re-renders every part and checks they fit before you print a 4-hour lid or an
-18-hour enclosure. The ones that matter most in both builds:
-
-1. **`[ptz] bolt_spacing` — the important one.** Arducam publishes no drawing
-   for the metal pan-tilt base and the footprint has changed between
-   revisions, so the lid is cut with radial slots: 30–72 mm, stretched to
-   your spacing if it is outside that.
-2. **`[buck]`, `[gauge]`, `[pd_trigger]`** — power modules of the same rating
-   vary a lot, and they decide how the floor is laid out.
-3. **`[power_bank]`** — the camera's power bank. Banks of the same advertised
-   capacity vary by 15 mm in every direction.
 
 ## Print order
 
@@ -216,12 +207,12 @@ The UWB build slots its arms and pod in ([below](#print-order-with-uwb)).
 
 Four more parts on top of the common ones:
 
-| Part | Size (mm) | Walls | Infill | Layer | Est. mass | Est. time |
-| --- | --- | --- | --- | --- | --- | --- |
-| [Anchor arm](../../with_uwb/cad/anchor_arm.scad) ×2 | 69 × 40 × 24 | 4 | 25 % | 0.2 | ≈ 16 g each | ≈ 1.7 h each |
-| [Mast foot](../../with_uwb/cad/anchor_mast.scad) | 21 × 25 × 44 | 4 | 25 % | 0.2 | ≈ 11 g | ≈ 1.5 h |
-| [Mast cradle](../../with_uwb/cad/anchor_mast.scad) | 52 × 25 × 38 | 4 | 25 % | 0.2 | ≈ 14 g | ≈ 1.5 h |
-| [Wearable pod](../../with_uwb/cad/wearable_case.scad) | 142 × 74 × 31 | 2 | 20 % | 0.2 | ≈ 44 g | ≈ 4 h |
+| Part | Walls | Infill | Layer | Est. mass | Est. time |
+| --- | --- | --- | --- | --- | --- |
+| [Anchor arm](../../with_uwb/cad/anchor_arm.scad) ×2 | 4 | 25 % | 0.2 | ≈ 16 g each | ≈ 1.7 h each |
+| [Mast foot](../../with_uwb/cad/anchor_mast.scad) | 4 | 25 % | 0.2 | ≈ 11 g | ≈ 1.5 h |
+| [Mast cradle](../../with_uwb/cad/anchor_mast.scad) | 4 | 25 % | 0.2 | ≈ 14 g | ≈ 1.5 h |
+| [Wearable pod](../../with_uwb/cad/wearable_case.scad) | 2 | 20 % | 0.2 | ≈ 44 g | ≈ 4 h |
 
 ### Orientation and supports, with UWB
 
@@ -239,17 +230,6 @@ Four more parts on top of the common ones:
 | Fit heat-set inserts | soldering iron, flat tip, ≈ 200 °C | 2 × M3 in each of the three wall bosses, 1 × M3 in each mast socket (8 more, 15 in all) |
 | Dry-fit | — | an arm on each side boss; the foot on the back boss and the dowel in both sockets |
 
-### Measure before you print, with UWB
-
-More entries in `cad/ordered_parts.toml`:
-
-4. **`[tag_bank]`** — the small power bank in the wearable; the pod is sized
-   to it with the ULA1 plugged into its end.
-5. **`[ula1]`** — the ULA1's outline, mounting holes and USB plug. The manual
-   gives 40 × 25 mm but not the hole pattern.
-6. **`[usb_extension]`** — the ends of the anchor extension cables. They
-   decide which way the boards lie on the arms and size the cable slot.
-
 ### Print order, with UWB
 
 Print the **anchor arms** ×2 after the lid — they can print while you wire
@@ -261,8 +241,7 @@ it whenever.
 ## Without UWB
 
 Just the five common parts — about 280 g of PETG and 26 hours. Nothing needs
-supports. The measurements above are the whole measure-first list. Sources:
-[`without_uwb/cad/`](../../without_uwb/cad/).
+supports. Sources: [`without_uwb/cad/`](../../without_uwb/cad/).
 
 ---
 

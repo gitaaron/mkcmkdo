@@ -53,7 +53,7 @@ The app's connection strategy (`camera_client.dart`), in order:
 2. **last known address** — some guest networks block multicast; the app
    remembers the last camera that worked and tries it
 3. **Firebase** (`LinkMode.relay`) — when the app was built with the
-   backend's address and the camera key (`--dart-define`, [below](#running-it)).
+   backend's address and the camera key (`--dart-define`, [below](#running-and-testing-it)).
    State is polled every 2 s and the live view is the camera's preview
 4. otherwise `LinkMode.offline`, retrying every 3 s
 
@@ -99,13 +99,8 @@ Same layout as the web app, plus the connection badge:
   Direct · 10.0.0.42"**, blue **"Firebase"** when reaching it from anywhere, amber pulsing
   **"Searching…"** during discovery, red **"Offline — tap to retry"**. Tap it
   any time to re-scan.
-- **Top-right — camera state** (`StatusRing`): the LED-ring colours (blue
-  idle, green tracking — blinking fast and labelled <!--with_uwb-->"Acquiring subject…"<!--/--><!--both-->
-  (with UWB) or <!--/--><!--without_uwb-->"Looking for a person…"<!--/--><!--both--> (without)<!--/--> until the camera locks on —
-  pulsing red recording); hollow while disconnected. A pill says <!--with_uwb-->"Can't see
-  you — step into view, facing the camera"<!--/--><!--both--> (with UWB) or <!--/--><!--without_uwb-->"Can't find anyone —
-  step into the room, facing the camera"<!--/--><!--both--> (without)<!--/--> if acquiring stalls. The
-  bottom buttons follow the same wording as the web app
+- **Top-right — camera state** (`StatusRing`), the stalled-acquiring pill
+  and the **bottom buttons**: as in the web app
   ([07](07-backend-and-app.md#web-app-srcweb)).
 - **Chimes** (`lib/session_audio.dart`): rising when recording starts,
   falling when it stops — **also with the app in the background**, which is
@@ -117,43 +112,18 @@ Same layout as the web app, plus the connection badge:
   The chimes mix over your music rather than stopping it, and on iOS they
   play with the silent switch on.
 - **Below the badge** — the recordings button, badged with the clip count.
-- **Bottom** — the same state-dependent buttons, driving the same callables
-  over whichever connection is active.
 
-## Running it
+## Running and testing it
 
-```bash
-cd src/app_flutter
-flutter pub get
-flutter run                                            # LAN only: finds the camera directly
-flutter run --dart-define=SPORTCAM_FALLBACK=https://<project>.web.app \
-            --dart-define=SPORTCAM_CAMERA_KEY=<CAMERA_KEY>   # and from anywhere
-```
-
-`firebase-setup.sh` prints both values. Against the emulators from
-`npm run dev`, the fallback is `http://<your-computer>:5001/demo-sportcam/us-central1/api`
-and the key `dev-camera-key`.
-
-Platform setup (iOS `NSBonjourServices`, Android multicast + cleartext
-permissions) is in [`src/app_flutter/README.md`](../../src/app_flutter/README.md) —
-without those, discovery silently finds nothing.
-
-## Testing without hardware or a Flutter SDK
-
-```bash
-python3 src/<build>/device/tests/test_local_api.py   # 20 checks: API, MJPEG, WS, mDNS
-python3 src/<build>/device/tests/stub_device.py &    # stubbed hardware, real protocol
-cd src/app_flutter
-dart run tool/verify_models.dart                     # parsing checks
-dart run tool/verify_against_device.dart             # cross-language contract, direct
-dart run tool/verify_against_device.dart \
-    http://127.0.0.1:5001/demo-sportcam/us-central1/api dev-camera-key   # …and through Firebase
-```
-
-The contract check is the interesting one: it drives the real Python camera
-API — or the real Firebase function on the emulators, with `npm run dev`
-running — using the app's own Dart model code, so a protocol drift between
-the phone and either backend fails the check.
+[`src/app_flutter/README.md`](../../src/app_flutter/README.md) has the
+commands: `flutter run` on its own finds the camera on the LAN, and two
+`--dart-define`s (the backend's address and the camera key, both printed by
+`firebase-setup.sh`) let it reach the camera through Firebase too. It also
+has the platform setup (iOS `NSBonjourServices`, Android multicast and
+cleartext permissions) without which discovery silently finds nothing, and
+the checks that run with no hardware and no Flutter SDK: a contract check
+drives the real camera API and the real Firebase function with the app's own
+model code.
 
 ## Known limits
 

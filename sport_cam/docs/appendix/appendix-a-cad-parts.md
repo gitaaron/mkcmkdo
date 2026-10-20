@@ -81,53 +81,27 @@ python3 cad/fit.py            # solve, regenerate, render, audit — both builds
 Requires Python 3.11+ and, for rendering, OpenSCAD. Inside the project's
 Docker workspace (`compose.yaml`) both are pre-installed.
 
-## Print settings, materials and printer requirements
-
-Per-part settings are summarised below, but the full treatment — printer
-requirements, filament to buy, orientation, where support is needed, print
-times and the PETG-on-PEI trap — is in
-**[3D printing specifications](../setup/11-3d-printing.md)**.
-
 ## Common parts
 
-In both builds' `cad/`:
+In both builds' `cad/`. Print settings for each are in
+[11 — 3D printing](../setup/11-3d-printing.md#the-common-parts):
 
-| File | Part | Print settings |
-| --- | --- | --- |
-| `base_housing.scad` | Enclosure: three shelf posts merged into the wall, the LED window all the way round with a ledge below it for the diffuser band, USB-C inlet, switch cut-out (wall thinned for its clips), 5 V jack hole, low and high vents, four radial lid-screw holes, tripod boss for a 3/8-16 insert, risers when needed. The wall differs by build — see below | PETG, 4 walls, 20 % |
-| `shelf.scad` | Pi shelf: rests on the posts (3 × M3 × 8 into inserts), Pi holes for M2.5 nylon standoffs, a cut-away side for the cables, a centre mark for the LED ring underneath | PETG, 3 walls, 20 %; white or natural helps the light |
-| `lid.scad` | Top plate carrying the Arducam pan-tilt base; slotted bolt pattern, central cable opening, a locating ring underneath with four radial M3 inserts | PETG, **5 walls, 40 %** — this part holds the camera up |
-| `led_diffuser_ring.scad` | Translucent band that slides over the outside of the LED window | white/natural PETG, 2 walls, 0 % infill |
-| `battery_tray.scad` | Saddle for the USB-C power bank, strap slots | PETG, 3 walls, 20 % |
+| File | Part |
+| --- | --- |
+| `base_housing.scad` | Enclosure: three shelf posts merged into the wall, the LED window all the way round with a ledge below it for the diffuser band, USB-C inlet, switch cut-out (wall thinned for its clips), 5 V jack hole, low and high vents, four radial lid-screw holes, tripod boss for a 3/8-16 insert, risers when needed. The wall differs by build — see below |
+| `shelf.scad` | Pi shelf: rests on the posts (3 × M3 × 8 into inserts), Pi holes for M2.5 nylon standoffs, a cut-away side for the cables, a centre mark for the LED ring underneath |
+| `lid.scad` | Top plate carrying the Arducam pan-tilt base; slotted bolt pattern, central cable opening, a locating ring underneath with four radial M3 inserts |
+| `led_diffuser_ring.scad` | Translucent band that slides over the outside of the LED window |
+| `battery_tray.scad` | Saddle for the USB-C power bank, strap slots |
 
 ## Before printing — measure these
 
-The same list lives in your build's 15 — Verification checklist
+Measure every part as it arrives, put the numbers in
+[`cad/ordered_parts.toml`](../../cad/ordered_parts.toml) with `measured = true`
+on each, and re-run `fit.py`. Which sizes matter, and what each one changes,
+is the first table of your build's 15 — Verification checklist
 ([with UWB](../../with_uwb/docs/setup/15-verification.md#before-you-print),
-[without UWB](../../without_uwb/docs/setup/15-verification.md#before-you-print)),
-together with the on-arrival and bench checks.
-
-Measure every part as it arrives and put the numbers in
-[`cad/ordered_parts.toml`](../../cad/ordered_parts.toml), setting
-`measured = true` on each; `fit.py` re-solves around them. The ones that move
-the design most, in both builds:
-
-- **`[ptz] bolt_spacing` — the important one.** Arducam publishes no drawing
-  for the B0167B12 metal base and the footprint has changed between
-  revisions. The lid is cut with radial slots, 30–72 mm by default, stretched
-  to your spacing if it is outside that. Bolt it down with M3 and nuts; set
-  `bolt_l` to the screws you have, and the lid is relieved under the slots if
-  they are short.
-- **`[buck]`, `[gauge]`, `[pd_trigger]`** — power modules of the same rating
-  vary a lot. A bigger buck can push the boards onto risers or make the
-  enclosure wider.
-- **`[power_bank]`** — the tray is a pocket sized to it. Banks of the same
-  capacity vary by 15 mm in every direction.
-- **`[tripod_insert] od / l`** — the floor bore is cut to the insert's outside
-  diameter for an epoxied slip fit, and it must be no longer than the 8 mm
-  boss.
-- **`[pi] heatsink_h`** — a fan case is taller than stick-on heatsinks and
-  makes the enclosure taller.
+[without UWB](../../without_uwb/docs/setup/15-verification.md#before-you-print)).
 
 Prefer remixing community designs instead? See
 [Appendix B — Open-source printed-part alternatives](appendix-b-open-source-parts.md).
@@ -141,24 +115,11 @@ Prefer remixing community designs instead? See
 **slot high in the wall** behind the Pi's USB ports, where the three anchor
 cables come in. Three more files:
 
-| File | Part | Print settings |
-| --- | --- | --- |
-| `anchor_arm.scad` | Static UWB anchor arm (×2); bolts to the M3 inserts in the ±Y bosses. The board pad runs along or across the arm, whichever way `fit.py` turned the ULA1s | print flat, 4+ walls |
-| `anchor_mast.scad` | A3 mast: `part="foot"` bolts to the −X boss and holds a ½" dowel; `part="cradle"` caps it and carries the board. Echoes the dowel cut length (246 mm with the defaults) | socket up, 4+ walls; one M3 insert per socket |
-| `wearable_case.scad` | Wearable pod body + lid, strap bars, USB-C slot; sized by `fit.py` for the ULA1 plugged straight into the end of its bank | PETG, 2 walls; TPU also works nicely |
-
-More to measure, in `cad/ordered_parts.toml`:
-
-- `[ula1]` — the ULA1's outline, hole pattern and how far its USB plug
-  sticks out. The manual gives 40 × 25 mm but not the mounting holes.
-- `[usb_extension]` — the rigid socket end of your extension cables, and the
-  plug end. These decide whether the anchor boards can lie along the arms.
-  With the assumed sizes they can't, so they lie across them. They also set
-  the size of the cable slot.
-- `[dowel] d` — "½-inch" dowels run a few tenths either side of 12.7 mm; the
-  sockets add `clr` on top, and the pinch screws take up the rest.
-- `[tag_bank]` — the wearable's bank. The pod is sized to it plus the ULA1
-  plugged into its end.
+| File | Part |
+| --- | --- |
+| `anchor_arm.scad` | Static UWB anchor arm (×2); bolts to the M3 inserts in the ±Y bosses. The board pad runs along or across the arm, whichever way `fit.py` turned the ULA1s |
+| `anchor_mast.scad` | A3 mast: `part="foot"` bolts to the −X boss and holds a ½" dowel; `part="cradle"` caps it and carries the board. Echoes the dowel cut length (246 mm with the defaults) |
+| `wearable_case.scad` | Wearable pod body + lid, strap bars, USB-C slot; sized by `fit.py` for the ULA1 plugged straight into the end of its bank |
 
 One dimension worth *choosing* rather than measuring: `uwb_half_base`. It is
 set to 125 mm (a 250 mm baseline) to keep the head compact — see
@@ -177,5 +138,4 @@ below 250 mm on either.
 
 The camera-only variant: just the five common parts, and
 `without_uwb/cad/base_housing.scad` has a **plain wall all round** — no
-bosses, no cable slot, no supports. Nothing more to measure than the common
-list.
+bosses, no cable slot, no supports.

@@ -113,10 +113,14 @@ touching anything, and the lens is left centred.
 Do these in order. Each prints a line to paste into `config.py`, or tells you
 what to change there.
 
-**a. Zoom curve.** This is manual; there is no tool for it yet. See
-[05 — Calibration](../design/05-tracking-system.md#calibration). Until you do it,
-`ZOOM_CURVE` is a straight-line guess, and framing is roughly right but not
-exact.
+**a. Zoom curve.** This is manual; there is no tool for it yet.
+Stand a metre rule at a known distance, step the lens's raw zoom
+(`OPT_ZOOM`) across 3000–20000, and note the visible width at each stop.
+That gives the field of view, and the focal length follows from it; put the
+`(mm, raw)` pairs in `ZOOM_CURVE`. Until you do, `ZOOM_CURVE` is a straight
+line between the stops, and framing is roughly right but not exact. The lens
+is open-loop, so the camera drives both lens motors into their stops at boot
+before any of this means anything.
 
 **b. Focus grid.** Tape a high-contrast target (a printed chart or a
 newspaper) at each distance in turn, in the light you will film in, and run:

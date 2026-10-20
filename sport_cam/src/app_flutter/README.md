@@ -49,15 +49,22 @@ tool/
 
 ## Verification without a Flutter SDK
 
-Both `tool/` scripts run on a plain Dart SDK:
+Both `tool/` scripts run on a plain Dart SDK. From the repo root:
 
 ```bash
-dart run tool/verify_models.dart          # 17 parsing checks
-
-# contract check against the real camera protocol:
-python3 ../device/tests/stub_device.py &  # stubbed hardware, real API
-dart run tool/verify_against_device.dart
+python3 src/<build>/device/tests/test_local_api.py   # the camera's own API: callables, MJPEG, WS, mDNS
+python3 src/<build>/device/tests/stub_device.py &    # stubbed hardware, real protocol
+cd src/app_flutter
+dart run tool/verify_models.dart                     # parsing checks
+dart run tool/verify_against_device.dart             # contract check against the camera, direct
+dart run tool/verify_against_device.dart \
+    http://127.0.0.1:5001/demo-sportcam/us-central1/api dev-camera-key   # …and through Firebase (npm run dev running)
 ```
+
+The contract check is the one that matters: it drives the real Python camera
+API, or the real Firebase function on the emulators, with the app's own Dart
+model code, so a protocol drift between the phone and either backend fails
+it.
 
 ## Platform setup notes
 

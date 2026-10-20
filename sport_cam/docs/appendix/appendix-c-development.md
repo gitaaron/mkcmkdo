@@ -49,17 +49,9 @@ first run downloads the emulators (a few hundred MB, cached in
 `~/.cache/firebase`).
 
 The camera's build sets the apps' wording, and in dev `TRACKING_MODE` picks
-the simulated camera's:
-
-<!--compare-->
-
-| | `with_uwb` | `without_uwb` |
-| --- | --- | --- |
-| Primary button in idle | **Start tracking** | **Track & record** |
-| Primary button while tracking | **Start recording** | **Record now** |
-| Status while acquiring | "Acquiring subject…" | "Looking for a person…" |
-
-Details: [07 — Backend & app](../design/07-backend-and-app.md#tracking-mode).
+the simulated camera's (`npm run dev:without_uwb` for the camera-only build;
+the wording for each is in
+[01 — State machine](../product/01-requirements.md#state-machine)).
 
 ### A real camera against the emulators
 
@@ -79,7 +71,7 @@ python3 src/<build>/device/tests/test_cloud.py       # the Pi's Firebase link, a
 for t in src/<build>/device/tests/test_*.py; do python3 $t | tail -1; done   # all the Pi's offline tests
 ```
 
-The Flutter app's checks are in [09](../design/09-direct-connection-and-app.md#testing-without-hardware-or-a-flutter-sdk).
+The Flutter app's checks are in [`src/app_flutter/README.md`](../../src/app_flutter/README.md#verification-without-a-flutter-sdk).
 
 ## Deploying
 
@@ -93,10 +85,6 @@ Then put the values the setup printed in the camera's `config.py` (your
 build's [14 — Software setup](../../with_uwb/docs/setup/14-software-setup.md)).
 Everything about the cloud side — what lands, the camera key, cost — is in
 [08 — Recordings, cloud & gym Wi-Fi](../design/08-recordings-and-cloud.md#deploying-the-firebase-backend).
-
-At the gym, power the camera on, join its `SportCam-Setup` hotspot from your
-phone, open `http://10.42.0.1`, and pick the gym's network — the Pi remembers
-it thereafter.
 
 ## Docker workspace (all toolchain requirements pre-installed)
 
@@ -118,22 +106,6 @@ installs don't clash). Inside the workspace, all repo tasks work as
 documented: `npm run dev`, `npm test`, `npm run docs`,
 `./with_uwb/cad/render_all.sh`, `python3 with_uwb/cad/render_previews.py`,
 and the `<build>/schematics/render_*.py` scripts.
-
-## Connecting straight to the camera
-
-On the same Wi-Fi as the camera (gym network, home LAN, or the camera's own
-hotspot), the **Flutter app** finds it over mDNS and connects **directly** —
-full-rate video and control with no internet:
-
-```bash
-cd src/app_flutter && flutter pub get && flutter run
-```
-
-A badge in the top-left shows how the app is reaching the camera (Direct /
-Firebase / Searching / Offline). The camera serves the same callable API as
-the Firebase function (`src/<build>/device/sportcam/local_api.py`), so the
-app is one client with two possible backends. See
-[09 — Direct connection & native app](../design/09-direct-connection-and-app.md).
 
 ## Browsing the docs
 

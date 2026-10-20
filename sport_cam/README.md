@@ -7,18 +7,37 @@ enclosure and a companion app both show the system state
 (idle / tracking / recording).
 
 It comes in two builds that share the camera, enclosure, power, Pi, backend and
-apps, and differ in how the camera finds the subject:
-
-- **[With UWB](with_uwb/README.md)**: the subject wears a UWB tag that the
-  camera ranges. It tells your subject from a bystander.
-- **[Without UWB](without_uwb/README.md)**: vision only. Nothing to wear, smaller
-  and cheaper, but it follows whoever it finds first.
-
+apps, and differ in how the camera finds the subject.
 [01 — Product requirements](docs/product/01-requirements.md#the-two-builds)
-compares the two. Pick one, then follow its
-**setup docs ([with UWB](with_uwb/docs/setup/README.md) ·
+compares them side by side. Pick one, then follow its **setup docs
+([with UWB](with_uwb/docs/setup/README.md) ·
 [without UWB](without_uwb/docs/setup/README.md))**. In the
 [docs viewer](#reading-the-docs) a toggle shows one build's docs at a time.
+
+### With UWB
+
+The subject wears a matchbox-sized **UWB tag**. Three anchors on the head
+measure their distance to it 20 times a second, through the body and
+clothing, and the camera points where the distances say. Vision trims the
+aim, frames the shot with the zoom and confirms lock-on before recording.
+Switching the tag on starts a session; switching it off ends it.
+
+Pick it to film one person in a room with other people in it: the tag is how
+the camera tells your subject from a bystander. Its own docs and CAD are in
+[`with_uwb/`](with_uwb/), its code in [`src/with_uwb/`](src/with_uwb/).
+
+### Without UWB
+
+**Nothing to wear and nothing mounted around the head.** Tap **Track &
+record** in the app: the camera sweeps the room until its person detector
+sees someone, centres them, locks on and starts recording, then follows them
+by vision alone. Lose them for 6 s and it sweeps again.
+
+Pick it for simplicity, size and cost: about C$360 cheaper than the UWB
+build, two hours more runtime, five printed parts instead of ten. The trade:
+vision can't tell people apart, so in a busy room it follows whoever it found
+first. Its own docs and CAD are in [`without_uwb/`](without_uwb/), its code in
+[`src/without_uwb/`](src/without_uwb/).
 
 ## Documentation
 
@@ -62,10 +81,7 @@ them.
 | B | [Open-source printed parts](docs/appendix/appendix-b-open-source-parts.md) | shared | Community STL alternatives and what each trade costs |
 | C | [Development workflow](docs/appendix/appendix-c-development.md) | shared | Where the code is, running everything on the Firebase emulators, tests, deploying, Docker workspace, docs viewer |
 | D | [Glossary](docs/appendix/appendix-d-glossary.md) | shared | The terms the docs use, from *acquiring* to *WS2812B* |
-
-Also in each build's folder: an
-interactive wiring schematic ([with UWB](with_uwb/schematics/interactive/index.html) ·
-[without UWB](without_uwb/schematics/interactive/index.html)).
+| | Interactive wiring schematic: [with UWB](with_uwb/schematics/interactive/index.html) · [without UWB](without_uwb/schematics/interactive/index.html) | per build | Zoomable view of the whole system (best through `npm run docs`) |
 
 ## Reading the docs
 
@@ -95,18 +111,20 @@ src/                all the code and apps
   backend/          Firebase: the api function, Firestore/Storage rules, the simulated camera — runs on the emulators locally
   web/              Vue 3 web app (Vite, served by Firebase Hosting)
   app_flutter/      native phone app: mDNS discovery + direct camera connection, Firebase from anywhere
-  with_uwb/         Pi software (device/), anchor firmware (firmware/), UWB tag firmware (wearable/)
-  without_uwb/      Pi software (device/)
+  with_uwb/         Pi software (device/: PTZ, UWB ranging, tag sessions, the Firebase link),
+                    our own DS-TWR anchor sketch (firmware/, for the dual-serial protocol; ULA1s run
+                    the vendor's firmware), optional ESP32-UWB tag sketch (wearable/)
+  without_uwb/      Pi software (device/: PTZ, vision search and tracking, auto-record sessions, the Firebase link)
 cad/                ordered_parts.toml + fit.py: fits both builds' CAD to the parts you bought
 scripts/            firebase-setup.sh / firebase-deploy.sh
 tools/              docs viewer (npm run docs) + its build-marker check, git hooks
 
-with_uwb/           the UWB-tracked build — README.md is its overview
+with_uwb/           the UWB build's own docs and CAD
   docs/design/      05 — tracking system
-  docs/setup/       10, 12–15 — BOM, wiring, assembly guide (assembly/), software setup, verification
+  docs/setup/       README (start here), 10, 12–15 — BOM, wiring, assembly guide (assembly/), software setup, verification
   docs/images/      rendered diagrams and part previews
-  cad/              OpenSCAD sources (+ render_all.sh → STL), incl. anchor arms, mast, wearable pod
-  schematics/       diagram/schematic sources → docs/images/; interactive/ wiring viewer
+  cad/              OpenSCAD sources (+ render_all.sh → stl/), incl. anchor arms, mast, wearable pod
+  schematics/       render_diagrams.py, render_schematics.py → docs/images/; interactive/ wiring viewer
 
-without_uwb/        the camera-only build — same layout
+without_uwb/        the camera-only build — same layout, without the anchor and wearable parts
 ```

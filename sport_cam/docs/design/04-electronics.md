@@ -189,10 +189,6 @@ gauge measures what passes the 12 V rail, so that is what it has to be told is
 available; setting it to the nameplate makes every estimate about 10 %
 optimistic. Use 67 for a 74 Wh bank.
 
-The biggest remaining lever is the preview stream, not the recording. Dropping
-`MJPEG_FPS` or only streaming when a phone is actually connected would take
-roughly a watt off every mode.
-
 ### Knowing what is left
 
 A power bank reports nothing about its own charge over PD, so SportCam
@@ -242,49 +238,41 @@ carry spare banks and stay offline for days. Write speed is a non-issue:
 over. Buy a real card from a known brand; counterfeits are the commonest
 cause of Pi corruption.
 
-What does bite is **failed uploads**. Film a session with no backend
-reachable and those clips stay on the card. Two safeguards handle it:
+What does bite is **failed uploads**: film a session with no backend
+reachable and those clips stay on the card until an upload succeeds
+([08 — Failure behaviour](08-recordings-and-cloud.md#failure-behaviour)). So
+**`storage.py` guards the space**, with the same shape as the battery
+gauge. Below **20 minutes** of recording room the ring blinks orange and the
+app warns. Below **5 minutes** the camera refuses to start a recording and
+stops a running one cleanly. A 500 MB reserve is never spent on video,
+because filesystems corrupt at zero.
 
-- **`upload_loop` drains the backlog.** The per-recording retry ladder gives
-  up after about 15 minutes, so everything still on the card is re-attempted
-  at start-up and every 15 minutes after, oldest first, skipped while
-  recording. Without this a stranded clip is never looked at again.
-- **`storage.py` guards the space**, with the same shape as the battery
-  gauge. Below **20 minutes** of recording room the ring blinks orange and
-  the app warns. Below **5 minutes** the camera refuses to start a recording
-  and stops a running one cleanly. A 500 MB reserve is never spent on video,
-  because filesystems corrupt at zero.
-
-That last part matters because the encoder has no graceful failure. It writes
-until the card returns ENOSPC and leaves a truncated file. Stopping
-deliberately leaves one you can watch.
+Stopping deliberately matters because the encoder has no graceful failure: it
+writes until the card returns ENOSPC and leaves a truncated file. A clean stop
+leaves one you can watch.
 
 ### Saving power
 
-`config.py` carries the levers. The detector drops to 0.5 fps when nothing
-is being tracked and the ring dims on low battery, both automatically. Beyond
-that: lower `MJPEG_FPS`, drop `RECORD_SIZE` to 720p, or cap the Pi's clock.
+The detector drops to 0.5 fps when nothing is being tracked and the ring dims
+on low battery, both automatically. The biggest lever left is the preview
+stream, not the recording: lowering `MJPEG_FPS`, or only streaming while a
+phone is connected, takes roughly a watt off every mode. Beyond that, drop
+`RECORD_SIZE` to 720p or cap the Pi's clock. All of these are in
+`config.py`.
 
 Grounds: single star point at the buck output; everything on the head shares
 that plane.
 
 ## Bring-up order
 
-1. **Bench, no camera:** power the buck from the trigger → **trim it to
-   5.1 V under a 4 A dummy load** → check the gauge appears at
-   `i2cdetect -y 1`. Do this before the Pi is ever connected. Open-circuit
-   voltage tells you nothing; a module reading 5.1 V unloaded can sag to
-   4.8 V and brown the Pi out.
-2. **Pi:** boots, `rpicam-hello` shows the camera, `i2cdetect -y 1` shows
-   `0c` and `40`, SPI enabled, ring cycles its three colours. If the IMX477 is
-   not detected, add `dtoverlay=imx477` to `/boot/firmware/config.txt`.
-3. **Motion:** `python -m sportcam.ptzcheck` sweeps pan then tilt to the soft
-   limits. Watch for the lens or the ribbon binding and adjust the limits in
-   `config.py` before anything else.
-4. **Tracking sensor:** build-specific — <!--both-->the anchors<!--/--><!--with_uwb: the anchors--><!--without_uwb: the vision search--> <!--both-->([with UWB](#bring-up-with-uwb)) or the vision search
-   ([without UWB](#bring-up-without-uwb))<!--/--><!--with_uwb: ([bring-up, with UWB](#bring-up-with-uwb))--><!--without_uwb: ([bring-up, without UWB](#bring-up-without-uwb))-->.
-5. **Integration:** full tracking run on the bench, then check the gauge's
-   estimate against a stopwatch over the first half hour.
+Bring the electronics up one stage at a time, checking each before the next:
+trim the buck to 5.1 V under load before anything is connected to it, then
+the Pi, the I2C devices, the LED ring, the PTZ controller and camera<!--with_uwb-->, and
+the anchors<!--/-->. Your build's 12 — Wiring guide
+([with UWB](../../with_uwb/docs/setup/12-wiring.md#wiring-order-with-checks),
+[without UWB](../../without_uwb/docs/setup/12-wiring.md#wiring-order-with-checks))
+has each step and its check; 15 — Verification lists the bench checks after
+that.
 
 ---
 
@@ -315,13 +303,6 @@ module takes 5 V over USB and has no battery connector, so the bank is its
 battery. A 2 500 mAh bank runs it well past a full day. It has no buttons:
 switching it on starts a session, and switching it off ends one.
 
-### Bring-up, with UWB
-
-**Anchors:** the reporting one enumerates as ttyUSB and streams `mc …`
-frames. Confirm all three ranges are present — validity mask `07` — before
-trusting anything downstream. Mask `03` means A3 is not being ranged:
-bearing still works, but tilt falls back to vision alone.
-
 ---
 
 ## Without UWB
@@ -341,11 +322,3 @@ what makes the Pi 4 workable. A faster board, or a MobileNet-SSD detector, is
 the upgrade if you need to follow fast movers.
 
 ![Power tree, without UWB](../../without_uwb/docs/images/power-tree.png)
-
-### Bring-up, without UWB
-
-**Vision:** with the camera aimed at a person standing 3–5 m away, check the
-preview shows a sensible picture, then run a search from the app and confirm
-the sweep reverses cleanly at both pan limits before the ring ever goes
-green. Tune `DETECT_HIT_THRESHOLD` here
-([05](../../without_uwb/docs/design/05-tracking-system.md#tuning)).

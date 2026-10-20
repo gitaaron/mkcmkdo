@@ -6,20 +6,11 @@ Hosting for the web app. Once it's deployed, nothing runs at home. The same
 backend and the same app serve both builds.
 
 Locally the whole backend runs on the **Firebase emulators**, with a
-simulated camera standing in for the Pi:
-
-```bash
-npm install
-npm run dev                  # emulators (functions, Firestore, Storage) + simulated camera + web app :5173
-npm run dev:without_uwb      # the same, with the simulated camera as the camera-only build
-npm test                     # the API's tests, against their own emulators
-```
-
-The function rebuilds on save and the emulator reloads it; Vite hot-reloads
-the app and proxies `/api` to the functions emulator, so the app only ever
-talks to its own origin, exactly as it does on Hosting. The emulator UI at
-http://localhost:4000 shows the camera's document change as you press
-buttons. Running and deploying it all: [Appendix C](../appendix/appendix-c-development.md).
+simulated camera standing in for the Pi: `npm install && npm run dev`. The
+function rebuilds on save, Vite hot-reloads the app and proxies `/api` to the
+functions emulator, so the app only ever talks to its own origin, exactly as
+it does on Hosting. Running, testing and deploying it all is in
+[Appendix C](../appendix/appendix-c-development.md).
 
 ## How the pieces talk
 
@@ -76,8 +67,8 @@ the backend:
 
 | `mode` | Build | |
 | --- | --- | --- |
-| `with_uwb` | [with UWB](../../with_uwb/README.md) | the subject wears a tag; the tag starts and ends sessions |
-| `without_uwb` | [without UWB](../../without_uwb/README.md) | vision only; the camera sweeps for a person and locks on |
+| `with_uwb` | [with UWB](../../README.md#with-uwb) | the subject wears a tag; the tag starts and ends sessions |
+| `without_uwb` | [without UWB](../../README.md#without-uwb) | vision only; the camera sweeps for a person and locks on |
 
 The apps read `mode` from the snapshot and pick their wording from it
 (`src/web/src/lib/modeText.ts`, `ModeText` in `src/app_flutter/lib/models.dart`).
@@ -152,28 +143,23 @@ src/web/src/
   lib/modeText.ts        the wording that differs between with_uwb and without_uwb
 ```
 
-Behaviour (the requirements are in [01 — Product requirements](../product/01-requirements.md#companion-app)):
+Behaviour (requirement F5 in [01](../product/01-requirements.md#functional-requirements)):
 
 - **Opening the app starts the live view** — `VideoView` mounts immediately;
   no play button.
-- Status ring top-right: grey `off` / blue `idle` / green `tracking`
-  (blinking fast until the camera locks on, labelled <!--with_uwb-->"Acquiring subject…"<!--/--><!--both--> with
-  UWB or <!--/--><!--without_uwb-->"Looking for a person…"<!--/--><!--both--> without<!--/-->, while it sweeps and centres) /
-  pulsing red `recording`; it also doubles as the connection indicator
-  (hollow while the camera is offline). If acquiring stalls, a pill says <!--with_uwb-->"Can't see you — step into view, facing the camera"<!--/--><!--both--> (with UWB) or<!--/--><!--without_uwb--> "Can't
+- **The status ring** (top right) and **the bottom buttons** follow the
+  camera's state, with the colours, labels and buttons in
+  [01 — State machine](../product/01-requirements.md#state-machine). The
+  ring is hollow while the camera is offline. If acquiring stalls, a pill
+  says <!--with_uwb-->"Can't see you — step into view, facing the camera"<!--/--><!--both--> (with UWB) or<!--/--><!--without_uwb--> "Can't
   find anyone — step into the room, facing the camera" (<!--/--><!--both-->without UWB, <!--/--><!--without_uwb-->after
-  15 s with nobody found)<!--/-->.
+  15 s with nobody found)<!--/-->. **Stop tracking** while recording asks to
+  confirm, since it also stops the recording.
 - **Chimes** (`lib/chime.ts`): a rising two-note chime when recording starts
   and a falling one when it stops, synthesised with Web Audio. Browsers only
   allow sound after a tap, so the first tap on the page arms it. A background
   tab on a computer still chimes; a phone browser suspends background pages,
   so for chimes with the phone in your bag use the native app ([09](09-direct-connection-and-app.md)).
-- Bottom buttons by state:
-  - `idle` → **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> (with UWB) / <!--/--><!--without_uwb-->**Track & record**
-    (<!--/--><!--both-->without UWB: <!--/--><!--without_uwb-->starts the search; recording begins on the first lock-on)<!--/-->
-  - `tracking` → **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/-->
-  - `recording` → **Stop recording** · **Stop tracking** (confirm dialog,
-    since it also stops the recording)
 - All buttons just `call()` a function; the UI never assumes success — it
   waits for the camera's document to change, so app, LED ring, and any second
   phone stay in lock-step.
@@ -211,4 +197,4 @@ against the real Firestore and Storage emulators:
 
 The camera's side is tested in `src/<build>/device/tests/test_cloud.py`, and
 the Flutter app checks it parses what the API returns with
-`dart run tool/verify_against_device.dart <api> <key>` ([09](09-direct-connection-and-app.md#testing-without-hardware-or-a-flutter-sdk)).
+`dart run tool/verify_against_device.dart <api> <key>` ([`src/app_flutter/README.md`](../../src/app_flutter/README.md#verification-without-a-flutter-sdk)).

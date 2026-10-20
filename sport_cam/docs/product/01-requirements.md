@@ -32,7 +32,7 @@ picture of the scene.<!--/--><!--with_uwb: [With UWB](#with-uwb) below, with its
 
 <!--compare-->
 
-| | [**With UWB**](../../with_uwb/README.md) | [**Without UWB**](../../without_uwb/README.md) |
+| | [**With UWB**](../../README.md#with-uwb) | [**Without UWB**](../../README.md#without-uwb) |
 | --- | --- | --- |
 | How it finds the subject | the subject wears a UWB tag; three anchors on the head range it 20×/s | vision only: the camera sweeps the room and locks on to the first person it sees |
 | Starting a session | switch the tag on | tap **Track & record** in the app |
@@ -65,7 +65,7 @@ camera-only build for simplicity, size and cost.
    battery ([state machine](#state-machine)).
 5. **F5 — Companion app**: opens straight into the live stream, state-dependent
    bottom buttons, circular status indicator (top-right) matching the LED
-   colours ([companion app](#companion-app)).
+   colours ([07 — Web app](../design/07-backend-and-app.md#web-app-srcweb)).
 6. **F6 — Use it from anywhere.** The app reaches the camera, shows its
    state and a live preview, and drives it from any phone or computer with
    internet, not only on the camera's Wi-Fi. **One backend and one app serve
@@ -146,12 +146,6 @@ Rules common to both:
   whatever it last reported. An app's command is a request the camera acts
   on and then reports; the camera may also change state itself (and reports
   that the same way).
-
-## Companion app
-
-Single screen: full-bleed live video, circular status indicator top-right
-(same colours as the LED ring), two bottom buttons that change with state.
-See [07 — Backend & app](../design/07-backend-and-app.md).
 
 ---
 

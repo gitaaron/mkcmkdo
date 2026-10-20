@@ -65,13 +65,9 @@ can still play them over the direct connection ([09](09-direct-connection-and-ap
 
 ## Deploying the Firebase backend
 
-```bash
-npm install && npx firebase login
-./scripts/firebase-setup.sh sportcam-aaron   # project, Firestore, bucket, camera account, camera key
-npm run deploy                               # build web app + function, deploy everything
-```
-
-`firebase-setup.sh` creates the project and writes `src/backend/.firebaserc`;
+You run `./scripts/firebase-setup.sh <project-id>` once, then
+`npm run deploy` ([Appendix C](../appendix/appendix-c-development.md#deploying)
+has the commands). `firebase-setup.sh` creates the project and writes `src/backend/.firebaserc`;
 creates the Firestore database and the `<project>-recordings` bucket; lets
 the function sign URLs; creates the camera's service account (Firestore
 only) and saves its key as `sportcam-firebase.json` for you to copy to the
@@ -138,7 +134,6 @@ every future session.
 | Wi-Fi drops mid-upload | `upload_with_retry` retries with exponential backoff (5 s → 5 min, 8 attempts); the file stays on the Pi until confirmed |
 | Backend unreachable for the whole session | the ladder above gives up after ~15 min and keeps the file. `upload_loop` then re-attempts everything still on the card at start-up and every 15 min thereafter, oldest first, so the backlog drains as soon as a backend appears |
 | Card nearly full | at 20 min of recording space left the ring blinks orange and the app warns; at 5 min the camera refuses to start a new recording and stops a running one cleanly. See [04](04-electronics.md#the-sd-card) |
-| Upload never succeeds | File is kept locally; it uploads on the next successful attempt after reconnect |
 | Backend unreachable at record time | Recording is unaffected — recording is local; only the upload needs the network |
 | Internet down at the gym | The camera keeps tracking and recording, and the phone still connects directly on the same Wi-Fi; the app from elsewhere shows the camera offline until it's back |
 | Partial upload | Cloud Storage only creates the object when the PUT completes, and `finalizeRecording` checks its size, so a half-file never appears in the library |

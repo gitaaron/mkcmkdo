@@ -117,11 +117,10 @@ const BUILDS = ["with_uwb", "without_uwb"];
 // build-specific doc appears at its place in the order.
 const byNumber = (a, b) => a.path.split("/").pop().localeCompare(b.path.split("/").pop()) || a.path.localeCompare(b.path);
 
-// Sidebar: README and the build overview, then Product, Design, Setup and
-// the appendices — the order of the README's table of contents.
+// Sidebar: the README, then Product, Design, Setup and the appendices —
+// the order of the README's table of contents.
 async function listDocs() {
   const entries = [{ path: "README.md", title: "README" }];
-  for (const b of BUILDS) entries.push({ path: `${b}/README.md`, title: "Build overview", build: b });
   for (const [folder, title] of [["product", "Product"], ["design", "Design"], ["setup", "Setup"]]) {
     entries.push({ section: title });
     if (folder === "setup")

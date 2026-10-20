@@ -72,7 +72,7 @@ function buildOfText(text) {
   return w === wo ? null : w ? "with_uwb" : "without_uwb";
 }
 
-// The build an in-page anchor belongs to: #with-uwb, #printed-parts-with-uwb…
+// The build an in-page anchor belongs to: #with-uwb, #design-rules-with-uwb…
 function buildOfAnchor(anchor) {
   const m = /(?:^|-)(with|without)-uwb$/.exec(anchor);
   return m ? m[1] + "_uwb" : null;
@@ -113,7 +113,7 @@ function markActive() {
 }
 
 // Switch builds. With `follow`, a build-specific doc is swapped for the other
-// build's copy of it (or that build's overview when there is none); a shared
+// build's copy of it (or the README when there is none); a shared
 // doc re-renders in place, staying at the same section where it still exists.
 function setBuild(next, { follow = false, render: rerender = true } = {}) {
   if (next === build) return;
@@ -126,7 +126,7 @@ function setBuild(next, { follow = false, render: rerender = true } = {}) {
   if (follow && from && from !== build) {
     const twin = path.replace(from, build);
     const known = docs.some((d) => d.path === twin);
-    location.hash = known ? twin : `${build}/README.md`;
+    location.hash = known ? twin : "README.md";
     return;
   }
   if (rerender && source !== null && !from) {

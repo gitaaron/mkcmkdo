@@ -177,35 +177,14 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
   between control ticks instead of snapping. Everything is a local I2C write.
 - **Zoom**: distance gives the first setting — an assumed 1.8 m subject at
   45 % of frame height, deliberately loose because it is a guess about the
-  body. **Vision then frames the shot.** Each detection measures how much of
-  the frame the person actually fills — the larger of their height and width
-  fractions, measured on the body rather than the padded HOG box (about 75 %
-  of its height and 55 % of its width) — and moves the zoom 35 % of the way
-  (in log terms) toward `ZOOM_FILL_TARGET`, **65 %**. That leaves about 17 %
-  of the frame as margin on every side for aim error and sudden moves; a
-  climber stretched sideways is framed by their span. Two safeguards:
-  - **Guard.** If the body comes within 3 % of any edge, or fills more than
-    85 %, the zoom steps out by 0.8 at once, whatever the fill loop says.
-    HOG cannot see a body that is already clipped, so the guard acts on the
-    approach.
-  - **Stale relax.** With no detection for 2 s — an overhang, a back-on
-    reach — vision has nothing to say, so the zoom eases back to the looser
-    distance framing at 30 % per second. Wider is the safe direction.
-
-  The vision scale is limited to 0.5–2.5× the distance zoom and held to what
-  the lens can actually do at either end, so it never winds up. Zoom moves
-  are still deadbanded and rate-limited so the shot doesn't "breathe".
-- **Focus**: from distance *and* focal length. Depth of field is generous
-  at the wide end and shallow at the tele end — focused at 10 m at 10.6 mm,
-  roughly 6–20 m is sharp — so a curve keyed on focal length alone is soft
-  at most distances. `config.FOCUS_GRID` holds measured focus positions per
-  focal length per distance, and `ptz.focus_raw` interpolates between them
-  in 1/distance, which is how lens extension actually varies. Ranging
-  already knows the distance, so this is focus without hunting. A deadband
-  of 0.02 dioptres (about ±2 m at 10 m) keeps the motor still on ranging
-  noise, and a zoom move refocuses immediately. **The shipped grid is flat
-  until you calibrate it**, so focus follows zoom alone until then; see
-  calibration step 5.
+  body. **Vision then frames the shot**, filling 65 % of the frame, with a
+  fast zoom-out guard near the edges
+  ([06 — Framing and focus](../../../docs/design/06-device-software.md#framing-and-focus)).
+  The vision correction is limited to 0.5–2.5× the distance zoom and to what
+  the lens can do at either end, so it never winds up.
+- **Focus**: from the ranged distance and the focal length, through
+  `FOCUS_GRID` ([06](../../../docs/design/06-device-software.md#framing-and-focus)).
+  Ranging already knows the distance, so this is focus without hunting.
 - **Tilt**: with A3, tilt is an absolute position like pan. φ is measured at
   the anchor plane, but the lens is 98 mm higher on the tilt axis, so the
   tracker rebuilds the subject's height and horizontal distance and takes
@@ -218,19 +197,12 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
   comes from vision: the bounding-box centre feeds a PID on `OPT_MOTOR_Y`.
 
   Detector = OpenCV HOG on the 720p preview at **3 fps**, dropping to
-  0.5 fps when idle; the record stream is untouched 1080p.
-
-  Three frames per second sounds slow and is not. A climber rises at about
-  0.3 m/s, which from 10 m is 1.7°/s, and with the subject framed at 65 %
-  there is a margin of about 17 % of the frame on each side — several
-  seconds of tolerance. What matters far more than the rate is that each detection is
-  integrated **once**: the control loop runs at 20 Hz, so acting on a cached
-  box every tick would multiply the tilt gain sevenfold and make the axis
-  hunt. `camera.person_bbox()` returns a freshness flag for exactly this.
-
-  The detector also searches only a **vertical strip**. Ranging has already
-  settled the horizontal question, so the tracker converts the bearing into a
-  pixel column and crops to roughly 40 % of frame width around it.
+  0.5 fps when idle; the record stream is untouched 1080p. That is plenty: a
+  climber rises at about 0.3 m/s, which from 10 m is 1.7°/s, and the 17 %
+  framing margin gives several seconds of tolerance. Each detection is used
+  **once**, and only a vertical strip about 40 % of the frame wide around the
+  ranged bearing is searched
+  ([06 — Vision](../../../docs/design/06-device-software.md#vision-and-why-it-runs-slowly)).
 - **Lost tag**: > 2 s without ranges → hold position, LED flashes; > 5 s →
   drop to `idle` (recording is stopped/saved first). This is also how a
   session ends when the climber switches the tag off.
@@ -263,28 +235,10 @@ different distances:
    limit is the ranging link itself: in a multipath-heavy gym (steel,
    concrete) reliable 20 Hz DS-TWR holds to **~25–35 m**; outdoors with clear
    line of sight the same DW1000 modules reach 50 m+.
-2. **Resolution — the zoom is the binding constraint.** The Arducam PTZ lens
-   covers 96° to 33° horizontally, which on the IMX477's 16:9 frame is a
-   vertical field of 64° down to 18.9°. At full zoom the frame is 0.333 · d
-   tall, so a 1.8 m subject occupies `5.4 / d` of frame height:
-
-   | Distance | Subject height in frame, full zoom | Verdict |
-   | --- | --- | --- |
-   | 3 m | fills frame — zoom out to fit | close-up work |
-   | 6 m | 90 % | tight |
-   | 8.3 m | 65 % (the vision framing target) | **last distance at target framing** |
-   | 10 m | 54 % | excellent |
-   | 13.5 m | 40 % | good |
-   | 20 m | 27 % | usable, visibly wider shot |
-   | 30 m | 18 % | subject small; CV still locks (it needs ≈ 15 % to see a body) |
-
-   Framing degrades gracefully past ~8 m rather than failing: the lens is at
-   full zoom and the person simply fills less of the frame. At the wide
-   end a full body fits from about 1.5 m out, so close range is never the
-   constraint.
-
-   The table is derived from the lens's published field of view (roughly
-   2.8–10.6 mm on this sensor); confirm it in the zoom calibration below.
+2. **Resolution — the zoom is the binding constraint.** At full zoom a 1.8 m
+   subject fills the 65 % framing target out to about 8.3 m, 40 % at 13.5 m
+   and 18 % at 30 m; full-body framing works from about 1.5 m. The full table
+   is in [03 — How far the zoom reaches](../../../docs/design/03-mechanical-design.md#how-far-the-zoom-reaches).
 3. **Geometry — closer isn't better.** Inside ~5 m of a tall wall the tilt
    angle gets steep (foreshortened footage) and pan/tilt angular rates spike
    on fast moves. At 8–12 m, a full 15 m route sweeps a comfortable ~50–60°
@@ -320,27 +274,13 @@ UWB link gives out before the pixels do.
    `UWB_A3_BACK_M`. The defaults, 0.250 and 0.089 (kept in step with the CAD by `cad/fit.py`), are what the printed
    mast gives with the dowel cut to 246 mm and pushed fully home. Then stand
    the tag level with the anchors at 5 m: elevation should read about 0°.
-4. **Zoom curve**: `ptz.py` interpolates focal length from the measured
-   `(mm, raw)` pairs in `config.ZOOM_CURVE`, which ship as a straight line
-   between the stops. To measure yours, put a metre rule at a known distance,
-   step `OPT_ZOOM` across 3000–20000, and record the visible width at each
-   stop — that gives field of view, and focal length follows. The lens is
-   open-loop, so `Ptz.home()` drives both motors into their stops at boot
-   before any of this means anything.
-5. **Focus grid**: tape a high-contrast target at 2 m and run
-   `python -m sportcam.focuscal 2`; repeat at 5, 10 and 30 m. At five focal
-   lengths it sweeps the focus motor, keeps the sharpest position (variance
-   of the Laplacian over the frame centre), and prints a `FOCUS_GRID` to
-   paste into `config.py`. Do it after the zoom curve, in the light you will
-   film in.
-6. **Centre and direction, both axes**: run `python -m sportcam.ptzcheck`.
-   It sweeps each axis to its soft limits so you can confirm `PAN_CENTER_RAW`
-   and `TILT_CENTER_RAW` really centre the lens (on the bar's normal, and
-   level), and that neither `PAN_SIGN` nor `TILT_SIGN` is mirrored. A wrong
-   sign makes the camera run away from the subject, which looks like a
-   tracking failure and is not one. With A3 fitted this matters for tilt as
-   much as pan, since tilt is commanded from ranging rather than corrected step
-   by step from the picture.
+4. **Lens and servos**: the zoom curve, the focus grid, and the centre and
+   direction of both axes are calibrated the same way in both builds;
+   [14 — Software setup](../setup/14-software-setup.md#6-calibrate) has the
+   steps. With A3 fitted, the servo direction matters for tilt as much as
+   pan, since tilt is commanded from ranging: a wrong `TILT_SIGN` makes the
+   camera run away from the subject, which looks like a tracking failure and
+   isn't one.
 
 ## Wearing the tag
 
@@ -396,10 +336,9 @@ Climbing-specific notes:
 - The tag is the **initiator**: it polls each anchor in turn and broadcasts
   the collected ranges. It has its own power and is unaffected by the
   camera's; on a 2 500 mAh USB bank it runs well past a full day.
-- **Switching the tag on and off is the remote control.** On: the camera
-  acquires the subject and starts recording. Off: 5 s later it saves and
-  returns to standby. Nothing on the tag needs changing for this — the camera
-  just notices ranging start and stop (`src/with_uwb/device/sportcam/session.py`).
-- The tag has no buttons: its power switch does the job.
+- **Switching the tag on and off is the remote control**, and it has no
+  buttons. The camera just notices ranging start and stop
+  ([01 — A session](../../../docs/product/01-requirements.md#a-session-with-uwb),
+  `src/with_uwb/device/sportcam/session.py`).
 - LED: blinks green when ranging. The tag runs off a USB power bank and
   cannot read its charge, so the bank's own indicator shows the battery level.

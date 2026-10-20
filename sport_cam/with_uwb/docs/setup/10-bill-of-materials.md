@@ -40,16 +40,13 @@ its ☐ once the part is printed.
 | --- | ------ | ----------------------------------------------------------------------- | --- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | O      | **Arducam IMX477 12 MP PTZ camera with metal pan-tilt base (B0167B12)** | 1   | $293  | [RobotShop CA](https://ca.robotshop.com/products/arducam-imx477-12mp-ptz-camera-w-metal-pan-tilt-base-for-raspberry-pi-jetson-b0167b12) · [Arducam](https://www.arducam.com/) | camera, motorized zoom lens, aluminium base, two digital servos and the I2C controller, assembled. Both axes 0–180°. **Ordered 9 Oct direct from Arducam, order #000009517, express: US$204.99 + US$38 shipping. Arducam prices in USD and ships from China, so the landed cost lands nearer C$340 plus HST on import than the C$293 shown here — that figure is the RobotShop CA shelf price, kept as the planning number |
 
-### Why the IMX477, and what it means for reach
+### Why the IMX477
 
 Arducam's cheaper 8 MP IMX219 PTZ kit (B0167B8) is discontinued, so the 12 MP
-IMX477 kit is the only option and the design, CAD and software all assume it.
-
-Its one trade-off is reach. A 1.8 m subject fills the 65 % framing target out
-to about **8 m** (40 % at 13.5 m), and full-body framing works from as close
-as **1.5 m**. Past 8 m the subject just gets smaller in frame ([05](../design/05-tracking-system.md)).
-The larger sensor gives bigger pixels, which helps in a dim gym, and 12 MP of
-resolution to crop into.
+IMX477 kit is the only option, and the design, CAD and software all assume
+it. Its larger sensor has bigger pixels, which helps in a dim gym. How far
+back it can frame a subject is in
+[05 — Camera placement](../design/05-tracking-system.md#camera-placement-envelope).
 
 ## Compute, tracking and status
 
@@ -148,13 +145,6 @@ per-part settings, orientation, supports and print times are in
 **[3D printing specifications](../../../docs/setup/11-3d-printing.md)** — read that
 before you buy filament or start an 18-hour enclosure.
 
-**Measure your parts first** and put the numbers in
-[`cad/ordered_parts.toml`](../../../cad/ordered_parts.toml), then run
-`python3 cad/fit.py` from `sport_cam/`: it re-solves the layout around them,
-re-renders every part and checks that they all fit together. The
-[15 — Verification checklist](15-verification.md#before-you-print) says which
-ones matter most.
-
 The short version: any FDM printer with a **160 × 155 × 90 mm** build volume
 (every part also fits a Bambu Lab A1 Mini, the reference printer), a 0.4 mm
 nozzle, a 250 °C hotend and an 80 °C bed. About **40 hours** of machine time.
@@ -220,33 +210,11 @@ If you would rather keep the cheaper generic boards, set
 `UWB_PROTOCOL = "dual-serial"` in `src/with_uwb/device/sportcam/config.py`; that path is
 still supported and tested.
 
-### Verify on the bench before committing to three
-
-These are also in the [verification checklist](15-verification.md#on-the-bench-before-the-first-session)
-alongside everything else to check in order.
-
-The manual documents the frame format and we parse it exactly as written, but
-two things are worth a quick check with the first two boards:
-
-1. **That the RTLS firmware is loaded.** The vendor ships two sketch pairs:
-   `RangingAnchor`/`RangingTag` reports a single tag-to-anchor distance, and
-   `RTLS_Anchor`/`RTLS_Tag` ranges to every anchor and broadcasts the lot.
-   Only the second gives one anchor the full picture. If you see one range
-   where three should be, you are on the wrong pair; reflash, or fall back to
-   `dual-serial`. If you see two (mask `03`), the tag is not configured for
-   the third anchor.
-2. **The update rate.** The control loop runs at 20 Hz. Each anchor adds a
-   ranging exchange to the cycle, so three anchors run slower than two —
-   and two-anchor cycles on this hardware are generally quoted at 10–20 Hz
-   once firmware overhead is counted. Anything above about 8 Hz is fine: the
-   Kalman filters degrade gracefully, and a climber moves a couple of degrees
-   a second. Measure it rather than assuming.
-
-**The third anchor goes up, not out.** The vendor's "minimum three anchors"
-describes a system that solves for position in a plane. We need two angles,
-not a position. A1 and A2 give the bearing; A3, 250 mm above them on a mast,
-gives elevation, so tilt doesn't depend on the person detector. A third
-anchor in the horizontal plane would add nothing. See
+**Before you order all four**, check the first two boards on the bench: that
+they run the RTLS firmware (one frame with every range) and how fast they
+range. Both are rows 7–8 of the
+[verification checklist](15-verification.md#on-the-bench-before-the-first-session).
+Why the third anchor goes on a mast rather than beside the other two is in
 [05](../design/05-tracking-system.md#why-the-third-anchor-is-vertical).
 
 ## Parts that are hard to source in Canada
@@ -259,11 +227,8 @@ Bare INA226 modules are a grey-market item here. The clean answer is the
 **[Adafruit INA260 breakout, part 4226](https://www.digikey.ca/en/products/result?keywords=adafruit%204226%20ina260), through Digi-Key Canada**: duty-free,
 customs pre-cleared, one to three days to Toronto, and free shipping once the
 order passes C$100. The INA260 alone does not reach that, so expect a small
-shipping charge, or put other parts on the same order.
-
-The INA260 is the better part anyway. Its shunt is on the die, so there is no
-`INA226_SHUNT_OHMS` to measure or mistype, and it carries 36 V and 15 A
-against our 12 V and 1.7 A. Same I2C address, so only one config line changes:
+shipping charge, or put other parts on the same order. It's the better part
+anyway (see item 12), and it's the default:
 
 ```python
 POWER_MONITOR = "ina260"      # src/with_uwb/device/sportcam/config.py — this is the default
@@ -296,18 +261,16 @@ Order everything the same day:
 3. **Digi-Key.ca** (item 12, the INA260): no reliable domestic listing. See
    [above](#parts-that-are-hard-to-source-in-canada). Nothing else in this
    build comes from Digi-Key.
-4. **Amazon.ca Prime** (everything else): 1–3 days per item. Vet two
-   listings carefully: the UWB boards (item 6), and the power bank (item 9).
-   For the bank, check that its USB-C output lists **12 V**, because some
-   banks skip that profile and the trigger then sits at 5 V. Also check its
-   **input** wattage, which sets how fast it recharges.
+4. **RobotShop.ca** (item 6, the four ULA1s): ships from Quebec in a few days.
+5. **Amazon.ca Prime** (everything else): 1–3 days per item.
 
-Substitution-sensitive parts, worth full price: the **buck** (item 11 — cheap
-units sag and brown the Pi out) and the **power bank** (item 9 — the capacity
-is the runtime). The USB-C cable (item 14) is not: any C-to-C cable carries the
-12 V contract.
+**Read these listings closely.** They look identical in a photo and aren't:
 
-Three things in the fine print that look identical in a listing photo and are
-not: a bank's **output versus input** wattage (item 9, since "65 W" on the box
-is usually output), whether its PD output **includes 12 V** (item 9), and
-**fixed versus adjustable** bucks (item 11 — you must be able to trim it).
+- **The power bank (item 9).** Its USB-C output must list **12 V**; some banks
+  skip that profile and the trigger then sits at 5 V. "65 W" on the box is
+  usually *output*; the *input* wattage sets how fast it recharges. Its
+  capacity is your runtime, so don't economise here.
+- **The buck (item 11).** It must be **adjustable**, so you can trim it, and
+  cheap units sag and brown the Pi out. Worth full price.
+- **The USB-C cable (item 14)** is the exception: any C-to-C cable carries the
+  12 V contract.
