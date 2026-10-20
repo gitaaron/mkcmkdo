@@ -6,7 +6,7 @@ power bank for a full session** with nothing plugged in. An LED ring on the
 enclosure and a companion app both show the system state
 (idle / tracking / recording).
 
-It comes in two builds that share the camera, enclosure, power, Pi, server and
+It comes in two builds that share the camera, enclosure, power, Pi, backend and
 apps, and differ in how the camera finds the subject:
 
 - **[With UWB](with_uwb/README.md)**: the subject wears a UWB tag that the
@@ -43,8 +43,8 @@ build's folder; in paths, `<build>` means `with_uwb` or `without_uwb`.
 | 03 | [Mechanical design](docs/design/03-mechanical-design.md) | shared | PTZ base, enclosure, shelf and lid, layout inside, ranges of motion, printed parts |
 | 04 | [Electronics](docs/design/04-electronics.md) | shared | Why a Pi 4, PTZ controller, LED ring, power budget and runtime, SD card, bring-up |
 | 05 | Tracking system: [with UWB](with_uwb/docs/design/05-tracking-system.md) · [without UWB](without_uwb/docs/design/05-tracking-system.md) | per build | UWB geometry, anchors and control loops · search sweep, lock-on and vision loops |
-| 06 | [Device software](docs/design/06-device-software.md) | shared | Pi camera service, motion, vision, status ring, device ↔ server protocol |
-| 07 | [Server & app](docs/design/07-server-and-app.md) | shared | Protocol, function-style API, `TRACKING_MODE`, Vue app, Firebase migration path |
+| 06 | [Device software](docs/design/06-device-software.md) | shared | Pi camera service, motion, vision, status ring, the Firebase link |
+| 07 | [Backend & app](docs/design/07-backend-and-app.md) | shared | Firebase (one function, Firestore, Storage), the camera key, the API, the Vue app |
 | 08 | [Recordings, cloud & gym Wi-Fi](docs/design/08-recordings-and-cloud.md) | shared | Upload → library pipeline, Firebase backend, phone-driven Wi-Fi setup |
 | 09 | [Direct connection & native app](docs/design/09-direct-connection-and-app.md) | shared | mDNS discovery, camera-hosted API, the Flutter app |
 | | **Setup** | [`docs/setup/`](docs/setup/), `<build>/docs/setup/` | start here: [with UWB](with_uwb/docs/setup/README.md) · [without UWB](without_uwb/docs/setup/README.md) |
@@ -57,7 +57,7 @@ build's folder; in paths, `<build>` means `with_uwb` or `without_uwb`.
 | | **Appendices** | [`docs/appendix/`](docs/appendix/) | |
 | A | [CAD printed parts](docs/appendix/appendix-a-cad-parts.md) | shared | Fitting the layout to your parts (`cad/fit.py`), render workflow, per-part notes, measure-first list |
 | B | [Open-source printed parts](docs/appendix/appendix-b-open-source-parts.md) | shared | Community STL alternatives and what each trade costs |
-| C | [Development workflow](docs/appendix/appendix-c-development.md) | shared | Running the server and apps locally, Docker workspace, docs viewer, regenerating diagrams |
+| C | [Development workflow](docs/appendix/appendix-c-development.md) | shared | Where the code is, running everything on the Firebase emulators, tests, deploying, Docker workspace, docs viewer |
 
 Also in each build's folder: an
 interactive wiring schematic ([with UWB](with_uwb/schematics/interactive/index.html) ·
@@ -72,7 +72,8 @@ order above with diagrams inline and doc-to-doc links working:
 npm run docs       # → http://localhost:8090
 ```
 
-To run the server and app on your computer (`npm install && npm run dev`), see
+To run the whole system on your computer on the Firebase emulators
+(`npm install && npm run dev`), or deploy it, see
 [Appendix C](docs/appendix/appendix-c-development.md).
 
 ## Repository layout
@@ -81,14 +82,16 @@ To run the server and app on your computer (`npm install && npm run dev`), see
 README.md           this file
 docs/               docs shared by both builds
   product/          01 — requirements
-  design/           02–09 — architecture, mechanical, electronics, software, server, cloud, app
+  design/           02–09 — architecture, mechanical, electronics, software, backend, cloud, app
   setup/            11 — 3D printing; assembly/ holds the guides' shared parts catalogue
   appendix/         A — CAD, B — open-source parts, C — development workflow
+src/                all the code and apps
+  backend/          Firebase: the api function, Firestore/Storage rules, the simulated camera — runs on the emulators locally
+  web/              Vue 3 web app (Vite, served by Firebase Hosting)
+  app_flutter/      native phone app: mDNS discovery + direct camera connection, Firebase from anywhere
+  with_uwb/         Pi software (device/), anchor firmware (firmware/), UWB tag firmware (wearable/)
+  without_uwb/      Pi software (device/)
 cad/                ordered_parts.toml + fit.py: fits both builds' CAD to the parts you bought
-server/             Node.js + TypeScript API (function-style, Firebase-ready) — one for both builds
-web/                Vue 3 companion app (Vite) — one for both builds
-app_flutter/        native phone app: mDNS discovery + direct camera connection — one for both builds
-firebase/           cloud backend: callable API + hosting + Firestore rules
 scripts/            firebase-setup.sh / firebase-deploy.sh
 tools/              docs viewer (npm run docs), git hooks
 
@@ -98,9 +101,6 @@ with_uwb/           the UWB-tracked build — README.md is its overview
   docs/images/      rendered diagrams and part previews
   cad/              OpenSCAD sources (+ render_all.sh → STL), incl. anchor arms, mast, wearable pod
   schematics/       diagram/schematic sources → docs/images/; interactive/ wiring viewer
-  device/           Raspberry Pi 4 camera service (Python) — PTZ, UWB ranging, LED, battery
-  firmware/         DS-TWR anchor sketch (dual-serial alternative to the vendor ULA1 firmware)
-  wearable/         UWB tag firmware (Arduino)
 
-without_uwb/        the camera-only build — same layout, without firmware/ and wearable/
+without_uwb/        the camera-only build — same layout
 ```

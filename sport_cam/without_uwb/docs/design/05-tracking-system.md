@@ -291,7 +291,7 @@ lens and the servos it drives.
 ## Tuning
 
 Change one parameter at a time and film a short walk or climb after each.
-Defaults are in `device/sportcam/config.py`.
+Defaults are in `src/without_uwb/device/sportcam/config.py`.
 
 | Symptom | Likely cause | Adjust |
 | --- | --- | --- |
@@ -309,7 +309,7 @@ Defaults are in `device/sportcam/config.py`.
 
 ## Parameter reference
 
-All in `device/sportcam/config.py`.
+All in `src/without_uwb/device/sportcam/config.py`.
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
@@ -344,5 +344,5 @@ All in `device/sportcam/config.py`.
 | `DIST_SMOOTHING` | 0.3 | share of each new distance estimate taken |
 | `DIST_MIN_M` / `DIST_MAX_M` | 1 / 30 | clamp on the estimate |
 
-The control code is in [`device/sportcam/tracker.py`](../../device/sportcam/tracker.py);
-session rules in [`session.py`](../../device/sportcam/session.py).
+The control code is in [`src/without_uwb/device/sportcam/tracker.py`](../../../src/without_uwb/device/sportcam/tracker.py);
+session rules in [`session.py`](../../../src/without_uwb/device/sportcam/session.py).

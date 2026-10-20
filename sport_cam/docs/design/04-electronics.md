@@ -66,7 +66,7 @@ Everything that moves is a register write on one I2C device:
 | `OPT_MOTOR_Y` | 0x06 | 0–180 | tilt servo, degrees |
 | `OPT_IRCUT` | 0x0C | 0/1 | IR-cut filter |
 
-`<build>/device/sportcam/ptz.py` wraps this. Power the controller board from the 5 V
+`src/<build>/device/sportcam/ptz.py` wraps this. Power the controller board from the 5 V
 rail directly rather than through the Pi's GPIO 5 V pin — two servos stalling
 is about 0.7 A, which you do not want crossing the header — and share ground.
 
@@ -74,7 +74,7 @@ is about 0.7 A, which you do not want crossing the header — and share ground.
 
 Data goes out of SPI0 MOSI (GPIO10), through a 74AHCT125 to lift 3.3 V logic
 to 5 V, into DIN. Enable SPI in `raspi-config` → Interface Options.
-`<build>/device/sportcam/led.py` uses `adafruit-circuitpython-neopixel-spi`.
+`src/<build>/device/sportcam/led.py` uses `adafruit-circuitpython-neopixel-spi`.
 
 A Pi 4 can also drive WS2812B the classic way, with `rpi_ws281x` on GPIO18
 using PWM and DMA. We do not, for one reason: that driver needs the whole
@@ -156,7 +156,7 @@ roughly a watt off every mode.
 
 A power bank reports nothing about its own charge over PD, so SportCam
 measures instead. The sensor on the 12 V side is read every second;
-`<build>/device/sportcam/power.py` integrates watt-hours and reports a fraction
+`src/<build>/device/sportcam/power.py` integrates watt-hours and reports a fraction
 remaining, present draw, and an estimated minutes-left from a 60 s rolling
 average. That assumes a full pack when the gauge was last zeroed, so the app
 exposes a reset for when you clip on a fresh one.

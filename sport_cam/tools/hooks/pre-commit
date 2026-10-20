@@ -5,7 +5,7 @@
 #
 # Installed by:  npm run hooks:install   (from sport_cam/)
 # which sets git's core.hooksPath to this folder.
-changed=$(git diff --cached --name-only | grep -E '(^|/)sport_cam/(cad/|[^/]+/cad/|[^/]+/device/sportcam/config\.py)|^(cad/|[^/]+/cad/)' || true)
+changed=$(git diff --cached --name-only | grep -E '(^|/)sport_cam/(cad/|[^/]+/cad/|src/[^/]+/device/sportcam/config\.py)|^(cad/|[^/]+/cad/)' || true)
 [ -z "$changed" ] && exit 0
 
 root=$(git rev-parse --show-toplevel)

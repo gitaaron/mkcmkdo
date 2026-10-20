@@ -11,12 +11,13 @@ tag is how the camera tells your subject from a bystander. The other build,
 [without UWB](../without_uwb/README.md), needs nothing worn and nothing
 mounted around the head, but follows whoever it finds first.
 
-Everything common to both builds — the PTZ base, enclosure, power, Pi, server
+Everything common to both builds — the PTZ base, enclosure, power, Pi, backend
 and apps — is in the [shared docs](../README.md#documentation). This
 folder has only what is specific to the UWB build.
 
-Run the server with `TRACKING_MODE=with_uwb` (the default): `npm run dev` or
-`npm run dev:with_uwb` from the repo root.
+The camera reports its build to the backend and the apps itself (`TRACKING_MODE` in
+`src/with_uwb/device/sportcam/config.py`). To try the apps with a simulated camera
+of this build, run `npm run dev` (or `npm run dev:with_uwb`) from the repo root.
 
 ## Docs
 
@@ -46,7 +47,12 @@ this folder; the rest are shared ([full table of contents](../README.md#document
 docs/          tracking, BOM, verification, setup guides; images/ is rendered here
 cad/           OpenSCAD sources + render_all.sh → cad/stl/ — includes anchor arms, A3 mast, wearable pod
 schematics/    render_diagrams.py, render_schematics.py → docs/images/; interactive/ wiring viewer
-device/        Raspberry Pi 4 camera service (Python): PTZ, UWB ranging (uwb.py, rangecal.py), tag sessions
+```
+
+The code for this build is under [`src/with_uwb/`](../src/with_uwb/):
+
+```
+device/        Raspberry Pi 4 camera service (Python): PTZ, UWB ranging (uwb.py, rangecal.py), tag sessions, the Firebase link
 firmware/      uwb_anchor/ — our own DS-TWR anchor sketch (the `dual-serial` protocol; ULA1s run the vendor firmware)
 wearable/      tag_firmware/ — earlier ESP32-UWB tag sketch (pair / record button)
 ```

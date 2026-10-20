@@ -8,12 +8,12 @@ on:
     paths:
       - "sport_cam/cad/**"
       - "sport_cam/*/cad/**"
-      - "sport_cam/*/device/sportcam/config.py"
+      - "sport_cam/src/*/device/sportcam/config.py"
   pull_request:
     paths:
       - "sport_cam/cad/**"
       - "sport_cam/*/cad/**"
-      - "sport_cam/*/device/sportcam/config.py"
+      - "sport_cam/src/*/device/sportcam/config.py"
 
 jobs:
   fit:

@@ -8,7 +8,7 @@
 # node_modules are installed on first start.
 #
 # Common tasks inside the workspace:
-#   npm run dev                        # app :5173 + API :8787 (watch mode)
+#   npm run dev                        # app :5173 + Firebase emulators + simulated camera
 #   npm run docs                       # docs viewer :8090
 #   (BUILD = with_uwb or without_uwb)
 #   ./BUILD/cad/render_all.sh                    # OpenSCAD → BUILD/cad/stl/*.stl
@@ -24,12 +24,12 @@ services:
       - .:/workspace
       # keep container node_modules off the host mount (and vice versa)
       - node_modules:/workspace/node_modules
-      - server_node_modules:/workspace/server/node_modules
-      - web_node_modules:/workspace/web/node_modules
+      - web_node_modules:/workspace/src/web/node_modules
+      # emulator downloads (Firestore/Storage jars), kept between restarts
+      - firebase_cache:/root/.cache/firebase
     working_dir: /workspace
     environment:
-      SIM: "1"
-      # with_uwb | without_uwb — which build the server (and simulator) serves
+      # with_uwb | without_uwb — which build the simulated camera is
       TRACKING_MODE: ${TRACKING_MODE:-with_uwb}
       # pass the host's proxy config through (empty/no-op on proxy-less hosts;
       # needed when the host routes egress via a proxy, e.g. Docker sandboxes)
@@ -41,7 +41,10 @@ services:
       no_proxy: ${no_proxy:-}
     ports:
       - "5173:5173"   # web app (vite)
-      - "8787:8787"   # API
+      - "5001:5001"   # functions emulator (the API)
+      - "8080:8080"   # Firestore emulator (the web app connects to it directly)
+      - "9199:9199"   # Storage emulator
+      - "4000:4000"   # emulator UI
       - "8090:8090"   # docs viewer
     # `;` not `&&` — the workspace must stay up even if the initial install
     # fails (e.g. no network); just rerun `npm install` inside.
@@ -52,5 +55,5 @@ services:
 
 volumes:
   node_modules:
-  server_node_modules:
   web_node_modules:
+  firebase_cache:

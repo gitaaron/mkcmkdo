@@ -65,7 +65,7 @@ add `dtoverlay=imx477` to `/boot/firmware/config.txt` and reboot.
 ```bash
 sudo apt install -y git python3-pip python3-picamera2 python3-opencv i2c-tools
 git clone https://github.com/gitaaron/sport_cam.git ~/sportcam
-cd ~/sportcam/with_uwb/device
+cd ~/sportcam/src/with_uwb/device
 sudo pip3 install --break-system-packages -r requirements.txt
 ```
 
@@ -79,21 +79,38 @@ so a virtualenv would need `--system-site-packages` and edited unit files.
 for t in tests/test_*.py; do python3 $t | tail -1; done
 ```
 
-## 4. Point it at your server (optional)
+## 4. Connect it to Firebase (optional)
 
-Edit `~/sportcam/with_uwb/device/sportcam/config.py`:
+Firebase is what lets you use the app away from the camera's Wi-Fi, and
+where recordings go. Skip this step to run **stand-alone**: the phone app
+talks to the camera directly and recordings stay on the card
+([09](../../../docs/design/09-direct-connection-and-app.md)).
+
+On your computer, once: `./scripts/firebase-setup.sh <project-id>`, then
+`npm run deploy` ([08](../../../docs/design/08-recordings-and-cloud.md#deploying-the-firebase-backend)).
+The setup prints three values and saves the camera's key file. Copy the file
+to the Pi:
+
+```bash
+scp sportcam-firebase.json pi@sportcam.local:/home/pi/   # then delete it on your computer
+```
+
+and set the values in `~/sportcam/src/with_uwb/device/sportcam/config.py`:
 
 | Setting | Set it to |
 | --- | --- |
-| `SERVER_WS` | `ws://<your-computer>.local:8787/ws/device`, if you run the home server (step 9) |
-| `UPLOAD_API_BASE` | the same host as `http://…:8787`, or `https://<project>.web.app` for the cloud backend ([08](../../../docs/design/08-recordings-and-cloud.md)) |
+| `FIREBASE_PROJECT` | your project id |
+| `CAMERA_KEY` | the key the setup printed — it's also in your app link |
+| `UPLOAD_API_BASE` | `https://<project>.web.app` |
+| `FIREBASE_CREDENTIALS` | leave as `/home/pi/sportcam-firebase.json` |
 
-Skip this step for **direct mode**: the phone app talks to the camera itself
-and needs no server ([09](../../../docs/design/09-direct-connection-and-app.md)).
+**Done when:** after the services are installed (step 7), `journalctl -u sportcam-head`
+shows `[cloud] connected to <project>`, and your app link shows the camera
+online.
 
 ## 5. Bench checks: motion and radios
 
-Run everything from `~/sportcam/with_uwb/device`.
+Run everything from `~/sportcam/src/with_uwb/device`.
 
 **a. Pan and tilt:**
 
@@ -165,7 +182,7 @@ focus depends on zoom alone and is soft away from one distance.
 ## 7. Install the services
 
 ```bash
-sudo cp ~/sportcam/with_uwb/device/sportcam-head.service ~/sportcam/with_uwb/device/sportcam-wifi.service /etc/systemd/system/
+sudo cp ~/sportcam/src/with_uwb/device/sportcam-head.service ~/sportcam/src/with_uwb/device/sportcam-wifi.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now sportcam-head sportcam-wifi
 journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
@@ -209,27 +226,22 @@ elevation are right.
 
 ## 9. The app
 
-Pick one:
+- **The web app, from anywhere.** Open the link `firebase-setup.sh` printed
+  (`https://<project>.web.app/#key=…`) on your phone or computer; add it to
+  your home screen. It shows the camera's state and a live preview, drives
+  it, and plays the recording library. Needs step 4.
+- **The native app, on the camera's Wi-Fi** — full-rate video with no internet:
+  `cd src/app_flutter && flutter pub get && flutter run`. It finds the camera by
+  mDNS ([09](../../../docs/design/09-direct-connection-and-app.md)). Add
+  `--dart-define=SPORTCAM_FALLBACK=https://<project>.web.app --dart-define=SPORTCAM_CAMERA_KEY=<key>`
+  and it reaches the camera through Firebase when it's not on the same
+  network. For the record start/stop chimes to play with the phone in your
+  bag, apply the platform setup in
+  [`src/app_flutter/README.md`](../../../src/app_flutter/README.md) first, and
+  allow notifications on Android when asked.
 
-- **Direct, no server.** On the same Wi-Fi as the camera:
-  `cd app_flutter && flutter pub get && flutter run`. It finds the camera by
-  mDNS ([09](../../../docs/design/09-direct-connection-and-app.md)). For the record start/stop
-  chimes to play with the phone in your bag, apply the platform setup in
-  [`app_flutter/README.md`](../../../app_flutter/README.md) first, and allow
-  notifications on Android when asked.
-- **Home server + web app**, on your computer with Node 22:
-
-  ```bash
-  npm install
-  SIM=0 npm run dev        # API on :8787, app on http://localhost:5173 (TRACKING_MODE=with_uwb is the default)
-  ```
-
-  `SIM=0` turns off the built-in camera simulator, so the app shows the real
-  camera `with_uwb` is the default, so nothing else is needed for this build.
-  The camera reports its build too; if the two disagree the server logs a
-  warning ([07 — Tracking mode](../../../docs/design/07-server-and-app.md#tracking-mode)).
-- **Cloud**, for filming away from home: see
-  [08 — Recordings, cloud & gym Wi-Fi](../../../docs/design/08-recordings-and-cloud.md).
+Both word their buttons for this build: the camera reports
+`TRACKING_MODE = "with_uwb"` itself ([07 — Tracking mode](../../../docs/design/07-backend-and-app.md#tracking-mode)).
 
 **At a new gym:** power on, join the camera's `SportCam-Setup` hotspot from
 your phone, open `http://10.42.0.1` and pick the gym's network. The camera
@@ -237,7 +249,7 @@ remembers it.
 
 ## Values you end up setting
 
-All in `device/sportcam/config.py`:
+All in `src/with_uwb/device/sportcam/config.py`:
 
 | Setting | From |
 | --- | --- |
@@ -248,4 +260,4 @@ All in `device/sportcam/config.py`:
 | `FOCUS_GRID` | step 6d, `focuscal` |
 | `UWB_THETA_SIGN` | step 8 |
 | `AUTO_SESSION` and the `ACQUIRE_*` lock-on settings | defaults are fine; see [05](../design/05-tracking-system.md) to tune |
-| `SERVER_WS`, `UPLOAD_API_BASE` | step 4, only with a server |
+| `FIREBASE_PROJECT`, `CAMERA_KEY`, `UPLOAD_API_BASE` | step 4, only with Firebase |

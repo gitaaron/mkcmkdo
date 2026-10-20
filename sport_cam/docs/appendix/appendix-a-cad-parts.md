@@ -44,7 +44,7 @@ python3 cad/fit.py            # solve, regenerate, render, audit — both builds
    names the part and the constraint.
 3. **Writes** `<build>/cad/layout.scad` (and `layout.json`, and the 3D
    guide's `layout.js`), and keeps the geometry constants in
-   `<build>/device/sportcam/config.py` (`UWB_BASELINE_M`, `UWB_A3_BACK_M`,
+   `src/<build>/device/sportcam/config.py` (`UWB_BASELINE_M`, `UWB_A3_BACK_M`,
    `UWB_A3_UP_M`, `LED_COUNT`) in step.
 4. **Renders** every STL through `<build>/cad/render_all.sh`, and refreshes
    the guide's meshes and preview images if `numpy-stl` and `matplotlib` are

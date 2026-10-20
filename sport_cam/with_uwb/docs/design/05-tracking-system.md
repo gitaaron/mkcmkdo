@@ -392,7 +392,7 @@ Climbing-specific notes:
   top-out 15 m up at 7 m horizontal distance (~65° elevation) is comfortably
   in range. Gyms are
   multipath-rich (steel structure, concrete) — the Kalman filter settings in
-  `device/sportcam/uwb.py` already assume σ ≈ 10 cm ranges; if bearing looks
+  `src/with_uwb/device/sportcam/uwb.py` already assume σ ≈ 10 cm ranges; if bearing looks
   jumpy indoors, raise `r` (measurement noise) toward 0.2 before touching
   the PID gains.
 - **Sweat and chalk**: the pod's USB-C slot faces down when worn; wipe the
@@ -407,7 +407,7 @@ Climbing-specific notes:
 - **Switching the tag on and off is the remote control.** On: the camera
   acquires the subject and starts recording. Off: 5 s later it saves and
   returns to standby. Nothing on the tag needs changing for this — the camera
-  just notices ranging start and stop (`device/sportcam/session.py`).
+  just notices ranging start and stop (`src/with_uwb/device/sportcam/session.py`).
 - The old wearable sketch's pair/record button and BLE broadcast are not
   ported to the ULA1, and with the tag's power doing the job they are no
   longer needed.

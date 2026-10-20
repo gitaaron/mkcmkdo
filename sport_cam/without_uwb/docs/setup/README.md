@@ -26,8 +26,8 @@ The assembly guide is a single HTML page. Open it straight from disk, or run
 `npm run docs` and pick it from the sidebar. Its build scripts are described
 in [assembly/README.md](assembly/README.md).
 
-Commands in these guides that touch `cad/`, `device/` or `docs/` are written
+Commands in these guides that touch `cad/` or `docs/` are written
 relative to this build's folder, [`without_uwb/`](../../). Run them from there (`cd without_uwb`),
 or prefix the path from the repo root — every script finds its files from its
-own location, so both work. Things common to both builds (the server, the
-apps, the cloud backend) live at the repo root and are linked from here.
+own location, so both work. The Pi software is in `src/without_uwb/device/`, and things common to both builds
+(the Firebase backend, the apps) are under `src/`; they're linked from here.

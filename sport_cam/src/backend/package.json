@@ -1,0 +1,19 @@
+{
+  "name": "@sportcam/backend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SportCam backend: Firebase (one API function, Firestore, Storage). Runs locally on the Firebase emulators.",
+  "type": "module",
+  "scripts": {
+    "build": "npm --prefix functions run build",
+    "emulators": "firebase emulators:start --project demo-sportcam --only functions,firestore,storage",
+    "sim": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=demo-sportcam node sim/camera-sim.mjs",
+    "dev": "npm run build && concurrently -k -n fn,emu,cam -c magenta,yellow,cyan \"npm --prefix functions run watch\" \"npm run emulators\" \"npm run sim\"",
+    "test": "npm run build && firebase emulators:exec --config firebase.test.json --project demo-sportcam --only firestore,storage \"cd functions && npm test\"",
+    "deploy": "firebase deploy --only functions,hosting,firestore,storage"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "firebase-tools": "^15.0.0"
+  }
+}

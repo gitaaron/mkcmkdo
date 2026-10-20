@@ -39,7 +39,7 @@ picture of the scene.
 | Head size | ≈ 30 cm across the arms, 28 cm tall to the mast; Ø 141 mm enclosure | Ø 135 mm enclosure, nothing sticking out |
 | Runtime (92 Wh bank) | ≈ 6.2 h tracking + recording | ≈ 8.4 h (estimated) |
 | Budget (own tripod) | ≈ C$1079 | ≈ C$716 |
-| Server setting | `TRACKING_MODE=with_uwb` (default) | `TRACKING_MODE=without_uwb` |
+| Camera setting | `TRACKING_MODE = "with_uwb"` | `TRACKING_MODE = "without_uwb"` |
 
 Pick the UWB build to film one person in a room with other people in it: the
 tag is how the camera tells your subject from a bystander. Pick the
@@ -64,11 +64,11 @@ camera-only build for simplicity, size and cost.
 5. **F5 — Companion app**: opens straight into the live stream, state-dependent
    bottom buttons, circular status indicator (top-right) matching the LED
    colours ([companion app](#companion-app)).
-6. **F6 — Home server.** Both camera and app talk to a **home server**
-   (Node.js + TypeScript, Vue 3 web app) started with a single `npm run dev`
-   that watches `src` and reloads. **One server and one app serve both
-   builds**; `TRACKING_MODE` picks which
-   ([07](../design/07-server-and-app.md#tracking-mode)).
+6. **F6 — Use it from anywhere.** The app reaches the camera, shows its
+   state and a live preview, and drives it from any phone or computer with
+   internet, not only on the camera's Wi-Fi. **One backend and one app serve
+   both builds**; the camera says which build it is
+   ([07](../design/07-backend-and-app.md#tracking-mode)).
 7. **F7 — Recordings library.** A stopped recording uploads to the backend
    and shows up in the app's library
    ([08](../design/08-recordings-and-cloud.md)).
@@ -90,13 +90,15 @@ each build's section ([with UWB](#non-functional-requirements-with-uwb),
 | C5 | **Every printed part prints on a Bambu Lab A1 Mini** | ≤ 170 mm along every axis, as oriented for printing | it's the printer already bought | [11 — 3D printing](../setup/11-3d-printing.md#design-rule-every-part-prints-on-a-bambu-lab-a1-mini); checked by `cad/fit.py` |
 | C6 | **Everything bought fits inside what's printed** | every part in `cad/ordered_parts.toml` fits, with clearance, in the printed parts | parts are bought before they can be measured | `cad/fit.py`, run on every render, commit and CI build ([Appendix A](../appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)) |
 | C7 | **Works with no network** | tracks, records and shows its state on the ring with no server and no Wi-Fi | a gym's Wi-Fi can't be relied on | [02 — System architecture](../design/02-system-architecture.md#key-decisions) |
-| C8 | **Portable server code** | the API is written as typed functions, so it can be lifted onto Firebase Cloud Functions with minimal change | filming away from home needs a cloud backend | [07 — Server & app](../design/07-server-and-app.md) |
+| C8 | **Nothing to run at home** | once deployed, the whole backend is Firebase (Functions, Firestore, Storage, Hosting); no home server or PC stays on | a home server is one more thing to keep running, and can't be reached from the gym | [07 — Backend & app](../design/07-backend-and-app.md) |
+| C9 | **Testable without the cloud or the camera** | the whole backend runs on the Firebase emulators with a simulated camera (`npm run dev`); the API's tests run against them (`npm test`) | changes get tried before they're deployed, and without the hardware | [Appendix C](../appendix/appendix-c-development.md) |
+| C10 | **Only the camera's owner can see or drive it** | every call and every read needs the camera key; cameras can't be listed; clients can't write | the backend is on the public internet | [07 — The camera key](../design/07-backend-and-app.md#the-camera-key) |
 
 ## Concept of operations
 
 The beginning and end of a session are the same in both builds:
 
-1. **Power on** → the Pi boots, joins Wi-Fi, registers with the server.
+1. **Power on** → the Pi boots, joins Wi-Fi, checks in with Firebase.
    State = **IDLE** (LED solid blue). Opening the app immediately shows the
    live stream.
 2. **Start, lock on, follow** — this is where the builds differ:
@@ -135,15 +137,16 @@ Rules common to both:
   LED (2 Hz). What happens next depends on the build.
 - Below 20 % battery the ring dims and blinks orange once a second over
   whatever colour the state is; below 7 % the camera saves and drops to idle.
-- The server is the single source of truth for state; devices and app render
-  whatever the server last broadcast. The head may change state itself (and
-  reports it); the server adopts it.
+- The camera is the single source of truth for state; the apps render
+  whatever it last reported. An app's command is a request the camera acts
+  on and then reports; the camera may also change state itself (and reports
+  that the same way).
 
 ## Companion app
 
 Single screen: full-bleed live video, circular status indicator top-right
 (same colours as the LED ring), two bottom buttons that change with state.
-See [07 — Server & app](../design/07-server-and-app.md).
+See [07 — Backend & app](../design/07-backend-and-app.md).
 
 ---
 
@@ -164,7 +167,7 @@ the session films itself.
 | # | Requirement | Value | Why | Where it is set |
 | --- | --- | --- | --- | --- |
 | C1 | **Compact head** for use in a cramped room | ≤ 30 cm across, ≤ 30 cm tall to the top of the A3 mast (enclosure floor up), excluding the tripod | the camera has to stand in small rooms without being in the way | `uwb_half_base`, `uwb_v_base` in `with_uwb/cad/config.scad` |
-| C2 | **UWB anchor spacing** | A1–A2 **250 mm** apart (horizontal); A3 **250 mm** above them (vertical), ≈ 89 mm behind the pan axis | the spacing sets angle accuracy (noise ∝ 1/spacing): 250 mm gives ≈ 9° RMS filtered against ≈ 7° at 400 mm, and the vision trim absorbs the difference ([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)). Keep both ≥ 250 mm; below that the error and A3's blind corner grow quickly | `with_uwb/cad/config.scad` and, matching, `UWB_BASELINE_M`, `UWB_A3_UP_M`, `UWB_A3_BACK_M` in `with_uwb/device/sportcam/config.py` |
+| C2 | **UWB anchor spacing** | A1–A2 **250 mm** apart (horizontal); A3 **250 mm** above them (vertical), ≈ 89 mm behind the pan axis | the spacing sets angle accuracy (noise ∝ 1/spacing): 250 mm gives ≈ 9° RMS filtered against ≈ 7° at 400 mm, and the vision trim absorbs the difference ([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)). Keep both ≥ 250 mm; below that the error and A3's blind corner grow quickly | `with_uwb/cad/config.scad` and, matching, `UWB_BASELINE_M`, `UWB_A3_UP_M`, `UWB_A3_BACK_M` in `src/with_uwb/device/sportcam/config.py` |
 
 ### A session, with UWB
 
@@ -189,7 +192,7 @@ the session films itself.
    recording**), and anything it does stands: stop a tag-started session from
    the phone and the camera stays stopped until the tag has been off for 5 s
    and comes back on. Set `AUTO_SESSION = False` to make the tag a plain
-   ranging beacon again. Details: [`with_uwb/device/sportcam/session.py`](../../with_uwb/device/sportcam/session.py).
+   ranging beacon again. Details: [`src/with_uwb/device/sportcam/session.py`](../../src/with_uwb/device/sportcam/session.py).
 
 ### State machine, with UWB
 
@@ -217,7 +220,7 @@ session films itself.
 | # | Requirement | Value | Why | Where it is set |
 | --- | --- | --- | --- | --- |
 | C1 | **Compact head** for use in a cramped room | Ø 135 mm enclosure (with the assumed part sizes) with the camera on top and nothing sticking out sideways, excluding the tripod | the camera has to stand in small rooms without being in the way | `base_d_min` in `without_uwb/cad/config.scad`; `cad/fit.py` widens it only if your parts need it |
-| C2 | **Pan range ±80°** | soft limits `PAN_MIN_DEG` / `PAN_MAX_DEG` = ∓80°, no continuous rotation | the metal base fouls before 180°, and it cannot turn 360°; the search sweeps this range and the camera cannot look behind itself | `without_uwb/device/sportcam/config.py` |
+| C2 | **Pan range ±80°** | soft limits `PAN_MIN_DEG` / `PAN_MAX_DEG` = ∓80°, no continuous rotation | the metal base fouls before 180°, and it cannot turn 360°; the search sweeps this range and the camera cannot look behind itself | `src/without_uwb/device/sportcam/config.py` |
 
 ### A session, without UWB
 
@@ -244,7 +247,7 @@ session films itself.
    **Stop recording** (tracking continues, and the camera does not start a
    second recording in the same session), **Stop tracking** to go back to
    idle. Set `AUTO_RECORD_ON_LOCK = False` to make recording a separate tap.
-   Details: [`without_uwb/device/sportcam/session.py`](../../without_uwb/device/sportcam/session.py).
+   Details: [`src/without_uwb/device/sportcam/session.py`](../../src/without_uwb/device/sportcam/session.py).
 
 ### State machine, without UWB
 

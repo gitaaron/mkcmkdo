@@ -6,10 +6,12 @@ __pycache__/
 *.pyc
 .venv/
 recordings/
-firebase/.firebaserc
+src/backend/.firebaserc
 .firebase/
-app_flutter/.dart_tool/
-app_flutter/build/
-app_flutter/.packages
+*-debug.log
+src/app_flutter/.dart_tool/
+src/app_flutter/build/
+src/app_flutter/.packages
 *.swp
 .obsidian
+sportcam-firebase.json

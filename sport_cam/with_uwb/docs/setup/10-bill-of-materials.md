@@ -220,7 +220,7 @@ of a charge board and a LiPo cell — which happens to delete both of the parts
 that had no Canadian listing at all.
 
 If you would rather keep the cheaper generic boards, set
-`UWB_PROTOCOL = "dual-serial"` in `device/sportcam/config.py`; that path is
+`UWB_PROTOCOL = "dual-serial"` in `src/with_uwb/device/sportcam/config.py`; that path is
 still supported and tested.
 
 ### Verify on the bench before committing to three
@@ -275,7 +275,7 @@ The INA260 is the better part anyway. Its shunt is on the die, so there is no
 against our 12 V and 1.7 A. Same I2C address, so only one config line changes:
 
 ```python
-POWER_MONITOR = "ina260"      # device/sportcam/config.py — this is the default
+POWER_MONITOR = "ina260"      # src/with_uwb/device/sportcam/config.py — this is the default
 ```
 
 **Do not use the ADS1115-plus-shunt route.** An ADS1115 cannot see a high-side

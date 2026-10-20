@@ -12,12 +12,13 @@ sticking out. The trade: vision cannot tell people apart, so in a busy room
 the camera follows whoever it found first. If that matters, build
 [with UWB](../with_uwb/README.md).
 
-Everything common to both builds — the PTZ base, enclosure, power, Pi, server
+Everything common to both builds — the PTZ base, enclosure, power, Pi, backend
 and apps — is in the [shared docs](../README.md#documentation). This
 folder has only what is specific to the camera-only build.
 
-Run the server with `TRACKING_MODE=without_uwb`: `npm run dev:without_uwb`
-from the repo root.
+The camera reports its build to the backend and the apps itself (`TRACKING_MODE` in
+`src/without_uwb/device/sportcam/config.py`). To try the apps with a simulated camera
+of this build, run `npm run dev:without_uwb` from the repo root.
 
 ## Docs
 
@@ -47,7 +48,12 @@ this folder; the rest are shared ([full table of contents](../README.md#document
 docs/          tracking, BOM, verification, setup guides; images/ is rendered here
 cad/           OpenSCAD sources + render_all.sh → cad/stl/ — enclosure, lid, diffuser, battery tray
 schematics/    render_diagrams.py, render_schematics.py → docs/images/; interactive/ wiring viewer
-device/        Raspberry Pi 4 camera service (Python): PTZ, vision search and tracking, auto-record sessions
+```
+
+The code for this build is under [`src/without_uwb/`](../src/without_uwb/):
+
+```
+device/        Raspberry Pi 4 camera service (Python): PTZ, vision search and tracking, auto-record sessions, the Firebase link
 ```
 
 ```bash

@@ -138,9 +138,9 @@ def intro_scene():
 def system_architecture():
     fig, ax = new_fig(12, 7.6, "SportCam — system architecture")
 
-    box(ax, 4.5, 5.4, 3.2, 1.9, "Home server (Node.js + TS)",
-        ["REST /api/call/*  (fn-style)", "WebSocket hub  /ws",
-         "MJPEG relay + state store", "Vue 3 web app (Vite)"])
+    box(ax, 4.5, 5.4, 3.2, 1.9, "Firebase (cloud)",
+        ["api function  /api/call/*", "Firestore: state + preview",
+         "Storage: recordings", "Hosting: Vue web app"])
     box(ax, 9.2, 5.4, 2.5, 1.9, "Phone / laptop app",
         ["Flutter (phone) · Vue (web)", "live video",
          "link badge + status ring"])
@@ -151,12 +151,12 @@ def system_architecture():
     box(ax, 4.6, 0.3, 3.2, 1.8, "Battery", ["USB-C PD bank 92 Wh",
                                             "PD trigger 12 V → buck 5 V",
                                             "8.4 h tracking + recording"], fc="#fdf6e8")
-    arrow(ax, (4.0, 4.3), (4.5, 5.6), "Wi-Fi: state + video", color=BLUE, lofs=(-0.75, 0.15))
-    arrow(ax, (7.7, 6.4), (9.2, 6.4), "HTTP + WS + WebRTC", color=BLUE)
+    arrow(ax, (4.0, 4.3), (4.5, 5.6), "internet: state,\npreview, clips", color=BLUE, lofs=(1.05, -0.35))
+    arrow(ax, (7.7, 6.4), (9.2, 6.4), "HTTPS + Firestore", color=BLUE)
     ax.annotate("", xy=(4.05, 4.5), xytext=(10.4, 5.35),
                 arrowprops=dict(arrowstyle="<|-|>", color=GREEN, lw=2.2,
                                 connectionstyle="arc3,rad=-0.38"))
-    ax.text(8.15, 4.85, "DIRECT (same Wi-Fi): mDNS discovery →\nlive video + control, no server",
+    ax.text(8.15, 4.85, "DIRECT (same Wi-Fi): mDNS discovery →\nfull-rate video + control, no internet",
             fontsize=9, color=GREEN, ha="center", fontweight="bold",
             bbox=dict(fc="white", ec=GREEN, boxstyle="round,pad=0.28", lw=1.1))
     arrow(ax, (4.6, 1.2), (4.0, 2.4), "5 V", color=RED, lofs=(-0.35, -0.1))

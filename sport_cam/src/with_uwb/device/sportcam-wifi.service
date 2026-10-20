@@ -1,0 +1,15 @@
+[Unit]
+Description=SportCam Wi-Fi provisioning portal (hotspot + captive page when offline)
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/sportcam/src/with_uwb/device
+ExecStart=/usr/bin/python3 -m sportcam.wifi_portal
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

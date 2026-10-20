@@ -1,0 +1,10 @@
+rules_version = '2';
+// Recordings are written on signed URLs and read on signed URLs, both made by
+// the API function, so no client ever needs direct access.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

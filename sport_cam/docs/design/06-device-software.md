@@ -2,26 +2,27 @@
 
 The base controller is gone: with no pan stepper there is nothing for a
 second microcontroller to do, so pan, tilt, zoom, focus, the status ring and
-the person detector all live on the Pi. The camera speaks the WebSocket
-protocol to the server (`/ws/device`), documented below and in
-[07 — Server & app](07-server-and-app.md).
+the person detector all live on the Pi. The camera talks to Firebase
+through its own Firestore document, [described below](#firebase-link), and
+serves phones on its Wi-Fi directly ([09](09-direct-connection-and-app.md)).
 
 The Pi software is **per build**, because it drives different hardware:
-[`with_uwb/device/`](../../with_uwb/device/) ranges a tag;
-[`without_uwb/device/`](../../without_uwb/device/) sweeps and tracks by vision.
+[`src/with_uwb/device/`](../../src/with_uwb/device/) ranges a tag;
+[`src/without_uwb/device/`](../../src/without_uwb/device/) sweeps and tracks by vision.
 Most modules are the same in both; this doc covers those first, then each
 build's own modules in its section ([With UWB](#with-uwb),
 [Without UWB](#without-uwb)). The UWB build also runs a second program, on the
 wearable tag.
 
-## Camera service — Raspberry Pi 4 (`<build>/device/`)
+## Camera service — Raspberry Pi 4 (`src/<build>/device/`)
 
 Python 3.11+, systemd unit `sportcam-head.service`. Modules common to both
 builds:
 
 | Module | Job |
 | --- | --- |
-| `main.py` | asyncio supervisor: WS client to server, state handling, control/frame/telemetry loops |
+| `main.py` | asyncio supervisor: state handling, control/frame/telemetry loops |
+| `cloud.py` | the Firebase link: the camera's Firestore document, app requests, previews ([below](#firebase-link)) |
 | `camera.py` | Picamera2: 720p preview (JPEG + person-detect) and 1080p **hardware** H.264 recording to `/home/pi/recordings` |
 | `ptz.py` | the whole PTZ controller at I2C 0x0C: pan, tilt, zoom, focus, soft limits, homing |
 | `ptzcheck.py` | bench tool — sweeps both axes to their limits so you can set `config` before filming |
@@ -31,9 +32,9 @@ builds:
 | `focuscal.py` | `python -m sportcam.focuscal <metres>` — sweeps the focus motor at five focal lengths and prints a `FOCUS_GRID` |
 | `uploader.py` | background recording upload → backend, with progress, retry, and a boot-time drain of anything stranded ([08](08-recordings-and-cloud.md)) |
 | `wifi_portal.py` | hotspot + captive setup page when offline, for gym Wi-Fi ([08](08-recordings-and-cloud.md)) |
-| `local_api.py` | the camera-hosted copy of the server's API, for phones connecting directly ([09](09-direct-connection-and-app.md)) |
+| `local_api.py` | the camera-hosted copy of the Firebase API, for phones connecting directly ([09](09-direct-connection-and-app.md)) |
 | `discovery.py` | mDNS advertisement as `_sportcam._tcp` |
-| `config.py` | all tunables, including `TRACKING_MODE` (this build's name, reported to the server and phones) and `UPLOAD_API_BASE` |
+| `config.py` | all tunables, including `TRACKING_MODE` (this build's name, reported to Firebase and phones) and the Firebase settings (`FIREBASE_PROJECT`, `CAMERA_KEY`, `UPLOAD_API_BASE`) |
 
 `tracker.py` and `session.py` exist in both but differ completely, and the UWB
 build adds `uwb.py` and `rangecal.py` — see the build sections.
@@ -43,14 +44,14 @@ Install on the Pi (the clone holds both builds; run the one you built):
 ```bash
 sudo apt install -y python3-picamera2 python3-opencv
 git clone https://github.com/gitaaron/sport_cam.git ~/sportcam
-cd ~/sportcam/<build>/device              # with_uwb or without_uwb
+cd ~/sportcam/src/<build>/device          # with_uwb or without_uwb
 pip install -r requirements.txt           # + smbus2 and neopixel-spi
 sudo raspi-config            # Interface Options → enable I2C (PTZ, gauge) and SPI (ring)
 sudo cp sportcam-head.service sportcam-wifi.service /etc/systemd/system/
 sudo systemctl enable sportcam-head sportcam-wifi
 ```
 
-The service files point at `/home/pi/sportcam/<build>/device`. The service
+The service files point at `/home/pi/sportcam/src/<build>/device`. The service
 runs as an ordinary user. Nothing here needs root, which is why the LED ring
 goes out over SPI rather than the PWM/DMA driver. Your build's
 software setup guide has every step in order.
@@ -64,19 +65,20 @@ python -m sportcam.ptzcheck
 
 After a recording stops, `main.py` hands the finished MP4 to `uploader.py`
 as a background task — tracking and live streaming continue uninterrupted —
-which uploads it to whichever backend `UPLOAD_API_BASE` points at, then
+which uploads it to Firebase (`UPLOAD_API_BASE`), then
 deletes the local copy once the backend confirms the byte count. See
 [08 — Recordings, cloud backend & gym Wi-Fi](08-recordings-and-cloud.md).
 
 Streaming choices:
 
-- **Dev / simplest**: `camera.py` JPEG-encodes the 720p preview at 15 fps and
-  pushes binary WS frames to the server, which re-serves them as MJPEG. Zero
-  extra moving parts; ~250 ms latency.
-- **Production**: run [MediaMTX](https://github.com/bluenviron/mediamtx) on the
-  Pi, feed it H.264 via `rpicam-vid`, and let the app play WebRTC (WHEP)
-  directly from the Pi; the server only brokers the URL. ~150 ms latency,
-  no transcode. The Vue player tries WHEP first and falls back to MJPEG.
+- **On the camera's Wi-Fi**: `camera.py` JPEG-encodes the 720p preview at
+  15 fps and `local_api.py` serves it as MJPEG to phones connected directly.
+  ~250 ms latency. Or run [MediaMTX](https://github.com/bluenviron/mediamtx)
+  on the Pi, feed it H.264 via `rpicam-vid`, and set `WHEP_URL`: the app
+  plays WebRTC from the Pi, ~150 ms, no transcode.
+- **From anywhere**: while an app is watching, `cloud.py` posts one frame a
+  second to Firestore. A preview, not a stream — Cloud Functions can't hold
+  a video connection open, and nothing else runs in the cloud.
 
 ### Motion, in one place
 
@@ -112,7 +114,7 @@ fast, but it needs to be steady:
 The control loop runs at 20 Hz and vision at 3, so acting on a cached
 detection every tick would apply one measurement about seven times over and
 make the camera hunt. The tracker acts only on a **fresh** detection.
-`<build>/device/tests/test_ptz.py` covers the focus lookup in both builds; all device
+`src/<build>/device/tests/test_ptz.py` covers the focus lookup in both builds; all device
 tests run on any machine (`python3 tests/test_<name>.py`).
 
 ### Status ring
@@ -122,46 +124,43 @@ green light chasing round once a second, `tracking` once locked on solid green,
 `recording` 1 Hz breathing red, lost subject 2 Hz flash, low battery dims the
 ring and blinks orange once a second over whatever colour the state is.
 
-## Message protocol (device ↔ server)
+## Firebase link
 
-Common to both builds; the UWB build adds the tag messages listed in
-[its section](#protocol-additions-with-uwb).
+`cloud.py` keeps one Firestore document current, `cameras/{CAMERA_KEY}`
+([07](07-backend-and-app.md#how-the-pieces-talk)). It is common to both
+builds; the UWB build adds `tagPresent` to the telemetry.
 
 ```jsonc
-// device → server
-{ "type": "hello", "device": "head" | "sim", "mode": "with_uwb" | "without_uwb",
-  "caps": ["video","pan","tilt","zoom","led","battery","direct"] }   // + "uwb" with UWB
-{ "type": "telemetry", "pan": -12.5, "tilt": 10.0, "zoomMm": 7.4, "dist": 4.2,
-  "phase": "acquiring" | "acquired" | null, "acquireStalled": false,
-  "battery": 0.82, "batteryWatts": 14.6, "batteryMinutes": 191, "batteryLevel": "ok" }
-{ "type": "warning", "code": "battery-low", ... }
-{ "type": "frame" }                    // followed by one binary WS message (JPEG)
-{ "type": "stateReport", "state": "recording" }  // the head changed state itself
-                                       // (lock-on, tag on/off, give-up, low battery); the server adopts it
-{ "type": "uploadProgress", "name": "rec_….mp4", "sent": 12345, "total": 99999 }
-
-// server → app clients
-{ "type": "state", "mode": "with_uwb" | "without_uwb", ... }   // full StateSnapshot
-{ "type": "recordings", "recordings": [ … ] }   // library, newest first
-{ "type": "uploadProgress", … }        // relayed from the head
-
-// server → device
-{ "type": "state", "state": "idle" | "tracking" | "recording" | "off" }
-{ "type": "resetBattery" }             // zero the fuel gauge on a fresh pack
-{ "type": "shutdown" }
+// cameras/{CAMERA_KEY} — written by the camera
+{ "mode": "with_uwb" | "without_uwb",       // config.TRACKING_MODE
+  "state": "off" | "idle" | "tracking" | "recording",
+  "stateBy": "device",                       // "app" when the API wrote a request
+  "telemetry": { "pan": -12.5, "tilt": 10.0, "zoomMm": 7.4, "dist": 4.2,
+                 "phase": "acquiring" | "acquired" | null, "acquireStalled": false,
+                 "battery": 0.82, "batteryWatts": 14.6, "batteryMinutes": 191,
+                 "batteryLevel": "ok", "storageMinutes": 212, … },
+  "deviceSeenAt": <server time>,             // heartbeat, every HEARTBEAT_S (5 s)
+  "whepUrl": null,                           // config.WHEP_URL
+  "upload": { "name": "rec_….mp4", "sent": 12345, "total": 99999 } | null }
+// written by the API
+{ "state": "tracking", "stateBy": "app" }   // an app's request
+{ "viewerAt": <server time> }               // an app is watching
+// cameras/{CAMERA_KEY}/live/preview — written by the camera while watched
+{ "jpeg": <bytes>, "at": <server time> }
 ```
 
-`mode` in the hello is the camera's `config.TRACKING_MODE`. The server does
-not change behaviour on it — its own `TRACKING_MODE` decides — but it logs a
-warning if the two disagree ([07](07-server-and-app.md#tracking-mode)).
+The camera owns its state. On connecting it writes its state first, so a
+recording started at the gym with no internet survives the link coming back.
+Its listener adopts any state written with `stateBy: "app"`, runs it through
+`apply_state()` like a command from a phone connected directly, and writes
+back what it did. Its own changes — a lock-on starting a recording, low
+battery, and the build-specific ones below — are written straight away.
 
-Devices are dumb about state: they render/act on whatever `state` the server
-last sent. The exception is a change the head makes itself — a lock-on
-starting a recording, low battery, and the build-specific ones below — which
-it reports as `stateReport` and the server adopts. On (re)connecting, the head
-reports its state first and the server takes it, rather than pushing its own:
-a recording started at the gym must survive the home server coming back into
-reach.
+Writes are throttled to stay inside the free tier: telemetry rides on the
+heartbeat (sooner on a phase change), upload progress every 2 s, previews
+only while `viewerAt` is under a minute old. The camera signs in with a
+service account that may only use Firestore (`FIREBASE_CREDENTIALS`); with no
+`CAMERA_KEY` set it doesn't connect at all and runs stand-alone.
 
 `pan` is degrees from centre (negative is left), not an absolute 0–360
 heading, because the axis no longer rotates.
@@ -204,7 +203,7 @@ The search strip comes from ranging: the tracker turns the known bearing into
 a pixel column, so the detector looks at about 40 % of frame width.
 `Camera.person_bbox()` returns `(bbox, fresh)`.
 
-`with_uwb/device/tests/test_tracker.py` covers the fresh-only rule, the strip
+`src/with_uwb/device/tests/test_tracker.py` covers the fresh-only rule, the strip
 hint, the slew limits, tilt from the third anchor, the sign of every vertical
 correction, and vision framing (fill target, edge guard, stale relax).
 `test_session.py` covers lock-on and the tag-driven session flow.
@@ -234,39 +233,34 @@ the tag can, and that is the reason the tag exists.
   three are expected — at which point either reflash, or switch to
   `dual-serial`.
 - **`dual-serial`** — one port per anchor running our own DS-TWR sketch
-  ([`with_uwb/firmware/uwb_anchor/`](../../with_uwb/firmware/uwb_anchor/)),
+  ([`src/with_uwb/firmware/uwb_anchor/`](../../src/with_uwb/firmware/uwb_anchor/)),
   printing `R,<tag>,<range_m>`. Vendor-agnostic, but the ranges are
   independent samples.
 
-`with_uwb/device/tests/test_uwb.py` parses the manual's own worked example and
+`src/with_uwb/device/tests/test_uwb.py` parses the manual's own worked example and
 checks the mask, the hex scaling, the bearing geometry, and the elevation
 solve — exact to 0.01° across the whole envelope with A3's backward offset
 in. It runs anywhere.
 
-### Wearable tag — ULA1 (`with_uwb/wearable/`)
+### Wearable tag — ULA1 (`src/with_uwb/wearable/`)
 
 The tag is a ULA1 module running the vendor's ranging firmware, powered by a
 small USB bank. It initiates ranging against each anchor and broadcasts the
 results.
 
-Our previous sketch (`with_uwb/wearable/tag_firmware/`) targeted a Makerfabs
+Our previous sketch (`src/with_uwb/wearable/tag_firmware/`) targeted a Makerfabs
 ESP32-UWB and added a pair/record button broadcast over BLE as
 `SPORTCAM-BTN:<kind>`, which the camera relayed as `tagButton`. The ULA1 is
 also an ESP32 under Arduino, so that code can be ported, but the pin map must
 come from the vendor's schematic first. Until then, recording is started from
 the phone.
 
-### Protocol additions, with UWB
+### Firebase link, with UWB
 
-```jsonc
-// device → server, with UWB only
-{ "type": "telemetry", …, "tagPresent": true }   // the wearable is switched on and ranging
-{ "type": "tagButton", "kind": "short" | "long" } // long press toggles recording
-{ "type": "lost" }                     // tag gone past the timeout → server drops to idle
-```
-
-The head also reports the tag switching on or off as a `stateReport`. A server
-running `TRACKING_MODE=without_uwb` ignores `tagButton` and `lost`.
+`tagPresent` in the telemetry says the wearable is switched on and ranging.
+The tag switching on (a session starts) or staying gone past `LOST_IDLE_S`
+(back to idle, saving the clip) are state changes the camera makes itself and
+writes like any other.
 
 ---
 
@@ -303,7 +297,7 @@ are in the frame, and its box size gives the framing and the focus distance.
 itself is isolated in `Camera._detect()`: swapping HOG for a MobileNet-SSD
 through `cv2.dnn` changes that method and nothing else.
 
-`without_uwb/device/tests/test_tracker.py` covers the sweep and its
+`src/without_uwb/device/tests/test_tracker.py` covers the sweep and its
 turn-arounds, the two-detection lock, the gate against bystanders, the sign
 of every correction, the slew limits, and vision framing (fill target, edge
 guard, stale relax). `test_session.py` covers auto-record on lock and the
@@ -314,7 +308,7 @@ keeps to the detection nearest the last position, and sweeps again when it
 loses them; see
 [limitations](../../without_uwb/docs/design/05-tracking-system.md#limitations).
 
-### Protocol, without UWB
+### Firebase link, without UWB
 
 No additions. `dist` in the telemetry is estimated from the person's size in
 frame (null while searching), and `acquireStalled` means the search has found

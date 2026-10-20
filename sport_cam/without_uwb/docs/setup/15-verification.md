@@ -70,7 +70,7 @@ checks above pass. Press **Track & record** in the app to start each one.
 | 7 | **Zoom and focus estimate sanity** | walk from 2 m to 8 m and back, and check the focus is sharp at each distance | zoom keeps you at about two-thirds of the frame height (`ZOOM_FILL_TARGET`) across that range, without hunting. Until the focus grid has been run, focus follows the height-based distance estimate and may be soft at the tele end |
 | 8 | **Give-up to idle** | press Track & record with nobody in the room and do not record | after `SEARCH_GIVE_UP_S` (180 s) the camera stops sweeping and returns to idle (ring blue). If a recording is running it must **not** give up |
 | 9 | **Framing** | once recording, you fill roughly two-thirds of the frame height, with space all round | too loose or tight: `ZOOM_FILL_TARGET` |
-| 10 | **Chimes** | the phone app chimes on record start and stop — test once with the app in the background and the screen off | no chime in the background: the platform setup in `app_flutter/README.md` (notification permission on Android, `UIBackgroundModes` on iOS) |
+| 10 | **Chimes** | the phone app chimes on record start and stop — test once with the app in the background and the screen off | no chime in the background: the platform setup in `src/app_flutter/README.md` (notification permission on Android, `UIBackgroundModes` on iOS) |
 | 11 | **Battery estimate is honest** | compare minutes-left against a stopwatch over the first half hour | badly off usually means `BATTERY_WH` is still set to the bank's nameplate instead of the ~91 % that reaches the 12 V rail |
 | 12 | **Card space reads as minutes** | the app shows free space as recording time | a 64 GB card reads roughly 10 h when empty |
 
@@ -79,8 +79,8 @@ checks above pass. Press **Track & record** in the app to start each one.
 These need no hardware and should pass before any of the above:
 
 ```bash
-python3 device/tests/test_tracker.py
-python3 device/tests/test_session.py
+python3 src/without_uwb/device/tests/test_tracker.py
+python3 src/without_uwb/device/tests/test_session.py
 ```
 
 `test_tracker.py` covers the search sweep, lock-on, re-search and the control
@@ -97,7 +97,7 @@ Worth knowing these were real, not hypothetical:
   optimistic.
 - **The tilt loop integrated the same measurement repeatedly.** Vision runs at
   3 fps and the control loop at 20 Hz, so a cached detection was applied
-  roughly seven times over. `device/tests/test_tracker.py` now guards it.
+  roughly seven times over. `src/without_uwb/device/tests/test_tracker.py` now guards it.
 - **The vision-only tilt loop drove the wrong way.** It applied the PID
   output with an extra minus sign, so a subject low in the frame tilted the
   camera up. Found while reworking the tracking loops; the tracker tests

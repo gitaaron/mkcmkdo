@@ -1,35 +1,32 @@
 #!/usr/bin/env bash
-# Build and deploy the SportCam cloud backend + web app to Firebase.
+# Build and deploy SportCam to Firebase — the whole backend and the web app.
 #
-#   ./scripts/firebase-deploy.sh
+#   ./scripts/firebase-deploy.sh        (or: npm run deploy)
 #
-# Deploys:
-#   functions : the /api/** callable + playback endpoints (see firebase/functions)
-#   hosting   : the Vue app (built same-origin, so /api/call/* just works)
-#   firestore : deny-all rules (all access is via the function's Admin SDK)
+# Deploys, from src/backend:
+#   functions : the `api` function — every /api/** call, upload and playback
+#   hosting   : the web app (src/web), same-origin with /api through a rewrite
+#   firestore : rules (anyone holding a camera key can read that camera; no
+#               client writes) and indexes
+#   storage   : rules (deny all — recordings move on signed URLs)
 #
-# After deploy, point the Pi at the cloud:
-#   device/sportcam/config.py → UPLOAD_API_BASE = "https://<project-id>.web.app"
+# Run ./scripts/firebase-setup.sh <project-id> once first.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-[ -f firebase/.firebaserc ] || { echo "run ./scripts/firebase-setup.sh <project-id> first"; exit 1; }
+[ -f src/backend/.firebaserc ] || { echo "run ./scripts/firebase-setup.sh <project-id> first"; exit 1; }
 
-echo "==> Installing workspaces + building the web app (same-origin API base)"
+echo "==> Installing + building the web app and the function"
 npm install --no-audit --no-fund
-VITE_API_BASE="" npm run build -w web
-
-echo "==> Installing + building functions"
-(cd firebase/functions && npm install --no-audit --no-fund && npm run build)
+npm run build
 
 echo "==> Deploying"
-(cd firebase && firebase deploy --only functions,hosting,firestore)
+(cd src/backend && npx --no-install firebase deploy --only functions,hosting,firestore,storage)
 
-PROJECT_ID=$(sed -n 's/.*"default": "\([^"]*\)".*/\1/p' firebase/.firebaserc)
+PROJECT_ID=$(sed -n 's/.*"default": "\([^"]*\)".*/\1/p' src/backend/.firebaserc)
 cat <<EOF
 
 Deployed.
-  App     : https://${PROJECT_ID}.web.app
+  App     : https://${PROJECT_ID}.web.app/#key=<CAMERA_KEY>   (setup printed the full link)
   Health  : https://${PROJECT_ID}.web.app/api/health
-  Pi      : set UPLOAD_API_BASE = "https://${PROJECT_ID}.web.app" in device/sportcam/config.py
 EOF

@@ -22,7 +22,7 @@ Outputs, per build (all generated — don't edit by hand):
     <build>/cad/layout.json         the same, plus every part's envelope
     <build>/docs/setup/assembly/layout.js   for the 3D assembly guide
     <build>/cad/stl/*.stl           via render_all.sh
-    <build>/device/sportcam/config.py      geometry constants kept in step
+    src/<build>/device/sportcam/config.py  geometry constants kept in step
     cad/FIT_REPORT.md               the audit, both builds
 
 The layout ("option B"): bottom to top, the power boards stuck to the
@@ -789,7 +789,7 @@ def device_updates(build, P, L) -> dict:
 
 
 def device_config_text(build, P, L):
-    path = os.path.join(ROOT, build, "device", "sportcam", "config.py")
+    path = os.path.join(ROOT, "src", build, "device", "sportcam", "config.py")
     text = open(path, encoding="utf-8").read()
     new = text
     for k, v in device_updates(build, P, L).items():

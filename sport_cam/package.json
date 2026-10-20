@@ -2,19 +2,21 @@
   "name": "sportcam",
   "private": true,
   "version": "0.1.0",
-  "description": "Subject-tracking robotic camera tripod — home server + companion app",
+  "description": "Subject-tracking robotic camera tripod \u2014 Firebase backend + companion app",
   "workspaces": [
-    "server",
-    "web"
+    "src/backend",
+    "src/backend/functions",
+    "src/web"
   ],
   "scripts": {
-    "dev": "concurrently -n api,web -c blue,green \"npm:dev -w server\" \"npm:dev -w web\"",
+    "dev": "concurrently -k -n backend,web -c blue,green \"npm run dev -w @sportcam/backend\" \"npm run dev -w @sportcam/web\"",
     "dev:with_uwb": "TRACKING_MODE=with_uwb npm run dev",
     "dev:without_uwb": "TRACKING_MODE=without_uwb npm run dev",
     "docs": "node tools/docs-server.mjs",
-    "build": "npm run build -w server && npm run build -w web",
-    "test": "npm test -w server",
-    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "build": "npm run build -w @sportcam/backend && npm run build -w @sportcam/web",
+    "test": "npm test -w @sportcam/backend",
+    "typecheck": "npm run typecheck -w @sportcam/functions && npm run typecheck -w @sportcam/web",
+    "deploy": "./scripts/firebase-deploy.sh",
     "cad:fit": "python3 cad/fit.py",
     "cad:check": "python3 cad/fit.py --check",
     "cad:watch": "python3 cad/fit.py --watch",

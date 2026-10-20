@@ -196,7 +196,7 @@ The INA260 is the better part anyway. Its shunt is on the die, so there is no
 against our 12 V and 1.7 A. Same I2C address, so only one config line changes:
 
 ```python
-POWER_MONITOR = "ina260"      # device/sportcam/config.py — this is the default
+POWER_MONITOR = "ina260"      # src/without_uwb/device/sportcam/config.py — this is the default
 ```
 
 **Do not use the ADS1115-plus-shunt route.** An ADS1115 cannot see a high-side
