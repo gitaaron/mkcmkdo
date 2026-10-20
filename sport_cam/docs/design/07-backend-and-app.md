@@ -33,7 +33,7 @@ buttons. Running and deploying it all: [Appendix C](../appendix/appendix-c-devel
                           Flutter app (relay) ──────►  (Express, one function)
 ```
 
-- **The camera owns its state**, as it always has. It writes its Firestore
+- **The camera owns its state.** It writes its Firestore
   document directly (`cameras/{CAMERA_KEY}`): build, state, telemetry, a
   heartbeat every 5 s ([06](06-device-software.md#firebase-link)).
 - **An app's command** is a call to the API (`startTracking`, …). The

@@ -1,10 +1,9 @@
 # 10 — Bill of materials (Canadian sourcing, Toronto / M2L 2E2)
 
-This is the **PTZ-base, battery-powered build**. The Arducam PTZ camera
-supplies the sensor, the zoom lens and both motion axes, so the pan stage —
-stepper, driver, slip ring, lazy susan, belt and pulleys — is gone, along with
-the base ESP32 and the mains supply. What replaces them is one expensive
-camera and a power bank.
+Everything to buy for the UWB build, with prices and Canadian sources. The
+Arducam PTZ camera supplies the sensor, the zoom lens and both motion axes,
+so it is the one expensive part; the rest is the Pi, the power chain, four
+UWB radios and the fasteners.
 
 Sourcing strategy for delivery to **M2L 2E2 (North York, Toronto) in under two
 weeks**:
@@ -19,19 +18,22 @@ weeks**:
   reseller, ships from Ontario in 1–3 days. First choice for all Pi items.
 - **[Digi-Key Canada](https://www.digikey.ca/)** — 1–3 days to Toronto,
   free shipping over C$100. Good backstop for anything Amazon is out of.
-- **Makerfabs (China, DHL)** — the UWB boards' manufacturer; DHL Express is
-  5–8 days to Toronto, but add ~C$25 shipping + possible ~13% HST on import.
+- **Makerfabs (China, DHL)** — only if you use generic ESP32-UWB boards
+  instead of the ULA1 ([below](#why-the-ula1-radios)). DHL Express is 5–8
+  days to Toronto; add ~C$25 shipping and possibly ~13 % HST on import.
 
 Prices are approximate CAD street prices (Oct 2026), ±15%.
 
 > **Before you print anything**, work through
-> [15 — Verification checklist](15-verification.md#before-you-print). Four
-> dimensions in this build come off parts you bought, not numbers we chose,
-> and the lid is a six-hour print that depends on one of them.
+> [15 — Verification checklist](15-verification.md#before-you-print). Nine
+> measurements of parts you bought decide whether the printed parts fit them,
+> and the enclosure alone is an 18-hour print.
 
-Every parts table carries an **Status|Acquired** column. Replace the ☐ with a ☑, a date or an order number as things arrive; on the printed-parts table it means printed rather than bought.
+**Tracking what you have.** The **Status** column in each parts table says
+where a part is: **A** acquired, **O** ordered, **P** pending, blank for not
+ordered yet. The printed-parts table has an **Acquired** column instead: tick
+its ☐ once the part is printed.
 
-Status: A = acquired, O = ordered, P = pending
 ## The camera (this is the design)
 
 | #   | Status | Part                                                                    | Qty | ≈ CAD | Source                                                                                                                                                                        | Notes                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -65,7 +67,7 @@ resolution to crop into.
 | #   | Status | Part                                                   | Qty | ≈ CAD | Source                                                                                                                                                           | Notes                                                                                                                                                                                                                                                                                                                                                                                        |
 | --- | ------ | ------------------------------------------------------ | --- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 9   | A      | **USB-C PD power bank, 25 000 mAh (92 Wh), 65 W+**     | 1   | $80   | [Amazon.ca](https://www.amazon.ca/s?k=25000mah+power+bank+65w+usb+c+pd)                                                                                          | gives **6.2 h** tracking + recording on a Pi 4, after the bank's own conversion loss ([04](../../../docs/design/04-electronics.md#runtime)). A 20 000 mAh (74 Wh) bank makes 5.0 h, saves ≈ C$25 and 200 g, and is the better pick unless you want a full day between charges. Whichever you buy, set `BATTERY_WH` to match. Stay under 100 Wh to keep it flyable                                                 |
-| 10  | O      | USB-C PD trigger board, 12 V                           | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=usb+c+pd+trigger+board+12v)                                                                                                | negotiates 12 V out of the bank. Fixed-12 V or adjustable both fine; most banks cap their 5 V profile at 3 A, and the 5 V rail here also feeds the servos, both anchors and the ring                                                                                                                                                                                                         |
+| 10  | O      | USB-C PD trigger board, 12 V                           | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=usb+c+pd+trigger+board+12v)                                                                                                | negotiates 12 V out of the bank. Fixed-12 V or adjustable both fine; most banks cap their 5 V profile at 3 A, and the 5 V rail here also feeds the servos, the three anchors and the ring                                                                                                                                                                                                         |
 | 11  | O      | 12 V → 5 V 8 A buck (≥ 40 W), **adjustable**           | 1   | $16   | [Amazon.ca](https://www.amazon.ca/s?k=12v+to+5v+8a+adjustable+buck+converter)                                                                                    | the single 5 V rail. Buy an adjustable unit, not a fixed-5 V one: it must be **trimmed to 5.1 V under a 4 A load before the Pi is ever connected**. Open-circuit voltage tells you nothing — a module that reads 5.1 V unloaded and sags to 4.8 V will brown out a Pi. This is the first bench job in the build                                                                              |
 | 12  | A      | **Current/voltage sensor — INA260 breakout preferred** | 1   | $22   | [Digi-Key.ca](https://www.digikey.ca/en/products/result?keywords=adafruit%204226%20ina260) · [Amazon.ca](https://www.amazon.ca/s?k=ina226+current+sensor+module) | the battery gauge, on the 12 V side, I2C 0x40. The **INA260** (Adafruit 4226) has the shunt on the die: nothing to calibrate, no `INA226_SHUNT_OHMS` to get wrong, 36 V and 15 A headroom. A bare **INA226** module works too if you can find one — set `POWER_MONITOR = "ina226"` and the shunt value. **Hard to source in Canada — see [below](#parts-that-are-hard-to-source-in-canada)** |
 | 13  | O      | Panel-mount rocker switch, 10 A                        | 1   | $8    | [Amazon.ca](https://www.amazon.ca/s?k=panel+mount+rocker+switch+12v)                                                                                             | between the trigger and the buck, so you are not unplugging USB-C to turn it off                                                                                                                                                                                                                                                                                                             |
@@ -79,7 +81,7 @@ If the IMX477 is not detected on first boot, add `dtoverlay=imx477`.
 
 | #   | Status | Part                                     | Qty | ≈ CAD | Source                                                                  | Notes                                                                                                                                                                                                                                                        |
 | --- | ------ | ---------------------------------------- | --- | ----- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 15  | O      | **Slim USB power bank, 2 500–5 000 mAh** | 1   | $18   | [Amazon.ca](https://www.amazon.ca/s?k=lipstick+power+bank+2500mah+slim) | powers the wearable tag. The ULA1 takes 5 V over USB and has no battery connector, so this replaces the charge board and cell the old design needed. A 2 500 mAh "lipstick" bank runs the tag well past a full day and charges over USB like everything else |
+| 15  | O      | **Slim USB power bank, 2 500–5 000 mAh** | 1   | $18   | [Amazon.ca](https://www.amazon.ca/s?k=lipstick+power+bank+2500mah+slim) | powers the wearable tag. The ULA1 takes 5 V over USB and has no battery connector, so this bank is its battery. A 2 500 mAh "lipstick" bank runs the tag well past a full day and charges over USB like everything else |
 | 17  | O      | Elastic armband/pouch + strap            | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=elastic+armband+pouch+small)      | 26 mm strap for the pod's strap bars; see [05](../design/05-tracking-system.md) for climbing-specific wearing                                                                                                                                                          |
 
 ## Charging
@@ -116,11 +118,10 @@ If the tripod bank supports **pass-through charging** (it charges and
 discharges at the same time; the listing will say so), a USB-C charger also lets you
 run the camera from a wall socket at the gym with no runtime limit.
 
-**Already bought and not needed: Adafruit 4410** (Micro-Lipo charger, USB-C,
-Digi-Key 1528-4410-ND). It charges a bare single-cell LiPo, the charge board
-for the old wearable's cell. A power bank has its own charger, so the 4410
-cannot charge either bank and has no place in this build. Return it, or
-keep it for a future project with a bare LiPo cell. It is not counted in the totals.
+**Already bought, not needed: Adafruit 4410** (Micro-Lipo charger, USB-C,
+Digi-Key 1528-4410-ND). It charges a bare single-cell LiPo; both banks have
+their own chargers, so it has no place in this build. Return it, or keep it
+for another project. It is not counted in the totals.
 
 ## Wiring and fasteners
 
@@ -128,7 +129,7 @@ keep it for a future project with a bare LiPo cell. It is not counted in the tot
 | --- | ------ | ----------------------------------------------------------------------- | --- | ----- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 18  |        | Barrel jack, JST kit, 18/22 AWG silicone wire, heatshrink, Dupont leads | —   | $20   | [Amazon.ca](https://www.amazon.ca/s?k=jst+connector+kit+22awg+silicone+wire)      | 18 AWG on the 5 V rail — it carries 4 A                                                                                                                                                                                                           |
 | 19  |        | 470 µF electrolytic capacitor, 10 V or higher (small pack)              | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=470uf+16v+electrolytic+capacitor)           | across the buck output, stripe (−) to OUT− — connection R1 in the [wiring guide](12-wiring.md). The tag needs no parts of its own: the ULA1 plugs straight into its USB bank                                                                       |
-| 20  |        | **USB-A male-to-female extension cables**, 3 × 50 cm                     | 3   | $18   | [Amazon.ca](https://www.amazon.ca/s?k=usb+a+male+to+female+extension+cable+50cm)  | the ULA1 has a USB-A plug on the board, so each anchor reaches its arm tip — or the top of the 250 mm mast — on an extension rather than a cable with two different ends, and comes into the enclosure through the slot high in the wall. Full extensions carry data by definition, which removes the charge-only trap the old micro-USB cables had |
+| 20  |        | **USB-A male-to-female extension cables**, 3 × 50 cm                     | 3   | $18   | [Amazon.ca](https://www.amazon.ca/s?k=usb+a+male+to+female+extension+cable+50cm)  | the ULA1 has a USB-A plug on the board, so each anchor reaches its arm tip — or the top of the 250 mm mast — on an extension rather than a cable with two different ends, and comes into the enclosure through the slot high in the wall. An extension always carries data, so there's no risk of a charge-only cable |
 | 21  |        | Nylon standoff kit, M2.5 + M3                                           | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=m2.5+m3+nylon+standoff+kit)                 | Pi on four 6 mm M2.5 standoffs on the shelf, ULA1 boards on 3 mm M2.5 standoffs. The power boards are foam-taped down, so no M3 standoffs are needed |
 | 22  |        | M2.5/M3 screw + nut + brass heat-set insert kit                         | 1   | $20   | [Amazon.ca](https://www.amazon.ca/s?k=m3+screw+assortment+brass+heat+set+inserts) | ≈ 23 × M3: PTZ base 4 + nuts, lid 4 × M3 × 8 countersunk (in sideways through the wall), shelf 3 × M3 × 8, anchor arms 4, mast foot 2, 2 pinch screws, boards. 16 × M2.5. Inserts: 15 × M3 — 2 in each of the three wall bosses, 1 in each mast socket, 1 in each shelf post, 4 in the lid's ring |
 | 23  |        | 3/8-16 brass insert (≤ 8 mm long) + 3/8-16 → 1/4-20 reducer bushing   | 1   | $12   | [Amazon.ca](https://www.amazon.ca/s?k=3%2F8-16+to+1%2F4-20+brass+tripod+bushing)  | tripod interface: 3/8-16 tripods screw into the insert, 1/4-20 ones into the bushing — so it fits any standard tripod ([C3](../../../docs/product/01-requirements.md#non-functional-requirements)).                                                                                                                                                                      |
@@ -195,29 +196,25 @@ tracking ≈ C$369 (items 2–8), wearable, wiring, fasteners and filament
 ≈ C$195 (items 15–25b, 27 and 27a). The optional charging items 28–29 are not
 included.
 
-Switching from a Pi 5 to a Pi 4 saved about C$60: C$55 on the board, C$8 on
-the camera adapter cable the Pi 4 does not need, less C$3 more for cooling.
+## Why the ULA1 radios
 
-## A note on the radios
+Item 6 is the **Haorutech ULA1** rather than a generic ESP32-UWB board, mostly
+for availability: the generic boards have no dependable Canadian listing,
+while RobotShop stocks the ULA1 in Canada.
 
-Item 6 moved from generic ESP32-UWB boards to the **Haorutech ULA1**, and the
-reason is availability as much as anything: the generic boards have no
-dependable Canadian listing, while RobotShop stocks the ULA1 domestically.
-
-It costs about C$28 more per board, and it buys three things beyond stock:
+It costs about C$28 more per board, and it buys three more things:
 
 - **Every range arrives in one frame.** The tag polls each anchor and
   broadcasts a single RangeData message, so r₁, r₂ and r₃ share a
   timestamp. The formulas in [05](../design/05-tracking-system.md) assume exactly
-  that; with independent serial streams it was only approximately true.
+  that; with independent serial streams it is only approximately true.
 - **Only one anchor needs a data connection.** The others just need 5 V.
 - **A USB-A plug on the board**, so the arm run is a plain extension cable
   rather than a micro-USB cable that might be charge-only.
 
-It also forced a better wearable. The ULA1 is 5 V USB with no battery
-connector, so the tag now runs off a small USB power bank (item 15) instead
-of a charge board and a LiPo cell — which happens to delete both of the parts
-that had no Canadian listing at all.
+It also makes the wearable simpler. The ULA1 is 5 V USB with no battery
+connector, so the tag runs off a small USB power bank (item 15), with no
+charge board or LiPo cell to source.
 
 If you would rather keep the cheaper generic boards, set
 `UWB_PROTOCOL = "dual-serial"` in `src/with_uwb/device/sportcam/config.py`; that path is
@@ -225,11 +222,11 @@ still supported and tested.
 
 ### Verify on the bench before committing to three
 
-These three are also in the [verification checklist](15-verification.md#on-the-bench-before-the-first-session)
+These are also in the [verification checklist](15-verification.md#on-the-bench-before-the-first-session)
 alongside everything else to check in order.
 
 The manual documents the frame format and we parse it exactly as written, but
-three things are worth a quick check with the first two boards:
+two things are worth a quick check with the first two boards:
 
 1. **That the RTLS firmware is loaded.** The vendor ships two sketch pairs:
    `RangingAnchor`/`RangingTag` reports a single tag-to-anchor distance, and
@@ -244,23 +241,17 @@ three things are worth a quick check with the first two boards:
    once firmware overhead is counted. Anything above about 8 Hz is fine: the
    Kalman filters degrade gracefully, and a climber moves a couple of degrees
    a second. Measure it rather than assuming.
-3. **The tag's button.** The old wearable sketch had a pair/record button and
-   a BLE broadcast. The ULA1 ships its own firmware; that feature needs
-   porting. The vendor publishes the hardware schematic, so the free pins are
-   documented — it is a job rather than a risk. Until then, drive recording
-   from the phone.
 
 **The third anchor goes up, not out.** The vendor's "minimum three anchors"
 describes a system that solves for position in a plane. We need two angles,
 not a position. A1 and A2 give the bearing; A3, 250 mm above them on a mast,
-gives elevation, so tilt no longer depends on the person detector. A third
+gives elevation, so tilt doesn't depend on the person detector. A third
 anchor in the horizontal plane would add nothing. See
 [05](../design/05-tracking-system.md#why-the-third-anchor-is-vertical).
 
 ## Parts that are hard to source in Canada
 
-**Both are now resolved.** The INA260 substitution below still stands, and the
-wearable charge board is gone entirely — the tag runs off a USB power bank.
+Just one: the battery gauge. Use the INA260, or build without a gauge.
 
 ### Item 12, the battery gauge — substitute the INA260
 
@@ -295,21 +286,6 @@ Everything runs. You lose the low-battery warning and the automatic
 save-and-park at 7 %, so you watch the clock instead — the camera gives about
 6.2 hours. Add the sensor later without touching anything else.
 
-### Item 15, the wearable charge board
-
-**This line no longer exists.** Moving to the ULA1 made the wearable a module
-plugged into a small USB power bank (item 15), so there is no cell to charge
-and no charge board to find. The part with no Canadian listing is simply gone
-from the design, along with the 30 mm LiPo width trap that went with it.
-
-## What this build deleted
-
-Against the earlier continuous-pan revision: NEMA17 stepper, TMC2209 driver,
-22 mm slip ring, 3" lazy-susan bearing, GT2 belt and 20T pulley, 6701ZZ
-bearing, DS3225 servo, A3144 hall sensor and magnet, ESP32 DevKitC, the 12 V
-mains brick and all three bucks — about C$206 of parts and the entire pan
-stage. The camera and the battery cost more than that back.
-
 ## Two-week delivery plan
 
 Order everything the same day:
@@ -319,8 +295,7 @@ Order everything the same day:
 2. **PiShop.ca** (items 2 and 3): 1–3 days.
 3. **Digi-Key.ca** (item 12, the INA260): no reliable domestic listing. See
    [above](#parts-that-are-hard-to-source-in-canada). Nothing else in this
-   build comes from Digi-Key; the charge board earlier revisions bought there
-   is gone.
+   build comes from Digi-Key.
 4. **Amazon.ca Prime** (everything else): 1–3 days per item. Vet two
    listings carefully: the UWB boards (item 6), and the power bank (item 9).
    For the bank, check that its USB-C output lists **12 V**, because some

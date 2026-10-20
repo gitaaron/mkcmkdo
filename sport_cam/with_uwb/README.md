@@ -54,7 +54,7 @@ The code for this build is under [`src/with_uwb/`](../src/with_uwb/):
 ```
 device/        Raspberry Pi 4 camera service (Python): PTZ, UWB ranging (uwb.py, rangecal.py), tag sessions, the Firebase link
 firmware/      uwb_anchor/ — our own DS-TWR anchor sketch (the `dual-serial` protocol; ULA1s run the vendor firmware)
-wearable/      tag_firmware/ — earlier ESP32-UWB tag sketch (pair / record button)
+wearable/      tag_firmware/ — optional sketch for a generic ESP32-UWB tag with a pair / record button (not used by the ULA1)
 ```
 
 ```bash

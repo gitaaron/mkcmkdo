@@ -46,7 +46,7 @@ Pi, the power boards, the Arducam PTZ base and camera, the
 power bank and the tripod — is a primitive defined in the `PARTS` table in
 `index.html`, at the position `cad/fit.py` solved for it and wrote to
 **`layout.js`** (generated; `window.SPORTCAM_LAYOUT`). Nothing in the guide is
-positioned by hand any more: change the CAD or a part size, re-run `fit.py`,
+positioned by hand: change the CAD or a part size, re-run `fit.py`,
 and the guide follows — step text included, where it says which side of the
 enclosure the inlet or the switch is on.
 

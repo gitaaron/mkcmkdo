@@ -1,15 +1,29 @@
 # 04 — Electronics
 
-One board does the computing and one does the moving. There is no base
-controller any more: with the pan stepper gone, the ESP32, the TMC2209, the
-slip ring and the carrier PCB all left with it, and the status ring moved onto
-the Pi. What remains in both builds is a Raspberry Pi 4, the Arducam PTZ
-controller it talks to over I2C, the LED ring, a battery gauge and a battery.<!--with_uwb-->
-The UWB build adds three USB anchors on the head and a wearable tag
-([With UWB](#with-uwb))<!--/--><!--both-->; the<!--/--><!--without_uwb:  The--><!--without_uwb--> camera-only build adds nothing and leaves the
-Pi's USB ports free ([Without UWB](#without-uwb))<!--/-->.
+One board does the computing and one does the moving. Every build has:
 
-### Why a Pi 4 and not a Pi 5
+- a **Raspberry Pi 4**, which runs everything;
+- the **Arducam PTZ controller**, which drives pan, tilt, zoom and focus, on
+  the Pi's I2C bus;
+- the **WS2812B LED ring** that shows the state;
+- a **battery gauge** and a **USB-C power bank**, with one 5 V supply
+  between them.
+
+<!--with_uwb-->
+
+The UWB build adds three USB anchors on the head and a wearable tag
+([With UWB](#with-uwb)).
+
+<!--/-->
+
+<!--without_uwb-->
+
+The camera-only build adds nothing and leaves the Pi's USB ports free
+([Without UWB](#without-uwb)).
+
+<!--/-->
+
+## Why a Pi 4 and not a Pi 5
 
 Because of the **hardware H.264 encoder**. The Pi 5 dropped the block the
 Pi 4 has, so on a Pi 5 every recorded frame is encoded in software on the CPU,
@@ -32,7 +46,7 @@ C$55 cheaper.
 Schematic sources live in <!--both-->each build's<!--/--><!--with_uwb: the build's--><!--without_uwb: the build's--> `schematics/` —
 `render_schematics.py` (schemdraw) produces the PNGs, and
 `schematics/interactive/index.html` is a zoomable view of the whole system
-(open it via `npm run docs` at <!--with_uwb-->http://localhost:8090/with_uwb/schematics/interactive/index.html<!--/--><!--both--> or<!--/--> <!--without_uwb-->http://localhost:8090/without_uwb/schematics/interactive/index.html<!--/--> — its
+(open it from `npm run docs` at <!--with_uwb-->http://localhost:8090/with_uwb/schematics/interactive/index.html<!--/--><!--both--> or<!--/--> <!--without_uwb-->http://localhost:8090/without_uwb/schematics/interactive/index.html<!--/--> — its
 libraries are vendored locally, no internet needed).
 
 ## Head unit
@@ -183,10 +197,11 @@ roughly a watt off every mode.
 
 A power bank reports nothing about its own charge over PD, so SportCam
 measures instead. The sensor on the 12 V side is read every second;
-`src/<build>/device/sportcam/power.py` integrates watt-hours and reports a fraction
-remaining, present draw, and an estimated minutes-left from a 60 s rolling
-average. That assumes a full pack when the gauge was last zeroed, so the app
-exposes a reset for when you clip on a fresh one.
+`src/<build>/device/sportcam/power.py` integrates watt-hours and reports a
+fraction remaining, present draw, and an estimated minutes-left from a 60 s
+rolling average. It counts from when the camera service started and assumes
+the bank was full then, so **start each session on a charged bank**.
+Restarting the service zeroes it; there is no app button for that yet.
 
 Two parts work, set by `POWER_MONITOR` in `config.py`. Prefer the **INA260**:
 its shunt is on the die, so there is nothing to calibrate and no
@@ -246,8 +261,8 @@ deliberately leaves one you can watch.
 
 ### Saving power
 
-`config.py` carries the levers. The detector drops to 2 fps when nothing is
-being tracked and the ring dims on low battery, both automatically. Beyond
+`config.py` carries the levers. The detector drops to 0.5 fps when nothing
+is being tracked and the ring dims on low battery, both automatically. Beyond
 that: lower `MJPEG_FPS`, drop `RECORD_SIZE` to 720p, or cap the Pi's clock.
 
 Grounds: single star point at the buck output; everything on the head shares
@@ -295,14 +310,10 @@ frames per second is enough
 
 ![Wearable schematic](../../with_uwb/docs/images/schematic-wearable.png)
 
-A ULA1 module (DWM1000 on-board) plugged into a small USB power bank. The
-module is 5 V USB only and has no battery connector, which is why the charge
-board and LiPo cell the old design used are gone. A 2 500 mAh bank runs it
-well past a full day.
-
-The pair / remote-record button and its status LED belonged to our own
-wearable sketch; porting them to the ULA1 needs the vendor's schematic for
-the free pins. Until then, recording starts from the phone.
+A ULA1 module (DWM1000 on board) plugged into a small USB power bank. The
+module takes 5 V over USB and has no battery connector, so the bank is its
+battery. A 2 500 mAh bank runs it well past a full day. It has no buttons:
+switching it on starts a session, and switching it off ends one.
 
 ### Bring-up, with UWB
 

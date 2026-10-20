@@ -1,13 +1,12 @@
 # 10 — Bill of materials (Canadian sourcing, Toronto / M2L 2E2)
 
-This is the **camera-only, PTZ-base, battery-powered build**: no tracking tag
-and no anchors, the camera finds and follows a person by vision alone. The
-Arducam PTZ camera supplies the sensor, the zoom lens and both motion axes, so
-the pan stage — stepper, driver, slip ring, lazy susan, belt and pulleys — is
-gone, along with the base ESP32 and the mains supply. What replaces them is one
-expensive camera and a power bank. (The UWB-tracked build is in [`with_uwb/`](../../../with_uwb/README.md);
-what this variant drops from it is listed under
-[What was removed vs the UWB build](#what-was-removed-vs-the-uwb-build).)
+Everything to buy for the camera-only build, with prices and Canadian
+sources. There is no tag and no anchor: the camera finds and follows a person
+by vision alone. The Arducam PTZ camera supplies the sensor, the zoom lens and
+both motion axes, so it is the one expensive part; the rest is the Pi, the
+power chain and the fasteners. What this build leaves out of the
+[UWB build](../../../with_uwb/README.md) is listed under
+[Compared with the UWB build](#compared-with-the-uwb-build).
 
 Sourcing strategy for delivery to **M2L 2E2 (North York, Toronto) in under two
 weeks**:
@@ -26,13 +25,15 @@ weeks**:
 Prices are approximate CAD street prices (Oct 2026), ±15%.
 
 > **Before you print anything**, work through
-> [15 — Verification checklist](15-verification.md#before-you-print). Two
-> dimensions in this build come off parts you bought, not numbers we chose,
-> and the lid is a six-hour print that depends on one of them.
+> [15 — Verification checklist](15-verification.md#before-you-print). Five
+> measurements of parts you bought decide whether the printed parts fit them,
+> and the enclosure alone is a 14-hour print.
 
-Every parts table carries an **Status|Acquired** column. Replace the ☐ with a ☑, a date or an order number as things arrive; on the printed-parts table it means printed rather than bought.
+**Tracking what you have.** The **Status** column in each parts table says
+where a part is: **A** acquired, **O** ordered, **P** pending, blank for not
+ordered yet. The printed-parts table has an **Acquired** column instead: tick
+its ☐ once the part is printed.
 
-Status: A = acquired, O = ordered, P = pending
 ## The camera (this is the design)
 
 | #   | Status | Part                                                                    | Qty | ≈ CAD | Source                                                                                                                                                                        | Notes                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -176,12 +177,9 @@ Of the full build: camera and power ≈ C$439 (items 1 and 9–14: 293 + 80 + 10
 27: 20 + 10 + 10 + 20 + 12 + 8 + 25 + 12 + 4 + 15). 439 + 141 + 136 = 716. The
 optional charging items 28–29 are not included.
 
-Switching from a Pi 5 to a Pi 4 saved about C$60: C$55 on the board, C$8 on
-the camera adapter cable the Pi 4 does not need, less C$3 more for cooling.
-
 ## Parts that are hard to source in Canada
 
-**Resolved.** The INA260 substitution below stands.
+Just one: the battery gauge. Use the INA260, or build without a gauge.
 
 ### Item 12, the battery gauge — substitute the INA260
 
@@ -214,20 +212,12 @@ POWER_MONITOR = "none"
 
 Everything runs. You lose the low-battery warning and the automatic
 save-and-park at 7 %, so you watch the clock instead — the camera gives about
-6.2 hours. Add the sensor later without touching anything else.
+8.4 hours. Add the sensor later without touching anything else.
 
-## What this build deleted
+## Compared with the UWB build
 
-Against the earlier continuous-pan revision: NEMA17 stepper, TMC2209 driver,
-22 mm slip ring, 3" lazy-susan bearing, GT2 belt and 20T pulley, 6701ZZ
-bearing, DS3225 servo, A3144 hall sensor and magnet, ESP32 DevKitC, the 12 V
-mains brick and all three bucks — about C$206 of parts and the entire pan
-stage. The camera and the battery cost more than that back.
-
-## What was removed vs the UWB build
-
-The UWB-tracked build ([`with_uwb/`](../../../with_uwb/docs/setup/10-bill-of-materials.md)) cost ≈ C$1079 with its own tripod. This
-camera-only variant drops all of the following:
+The [UWB build](../../../with_uwb/docs/setup/10-bill-of-materials.md) costs ≈ C$1079 with your own tripod. This build
+leaves out:
 
 | Removed | ≈ CAD |
 | --- | --- |
@@ -240,10 +230,10 @@ camera-only variant drops all of the following:
 
 C$1079 − C$363 = **C$716**. Also gone, but not itemised because the kit prices
 are kept unchanged: heat-set inserts, the M3 hardware that only the arms and
-mast used, and the UWB boards' M2.5 standoffs. Printed parts drop from eight to
-four (the two anchor arms, mast foot, mast cradle and wearable pod are gone):
-about 106 g less PETG and 10.5 h less machine time, and the enclosure wall is
-plain, with no bosses and no support.
+mast used, and the UWB boards' M2.5 standoffs. There are five printed parts
+instead of ten (no anchor arms, mast foot, mast cradle or wearable pod):
+about 140 g less PETG and 14 h less machine time, and the enclosure wall is
+plain, with no bosses and no supports.
 
 ## Two-week delivery plan
 

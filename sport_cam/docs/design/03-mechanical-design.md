@@ -10,12 +10,12 @@ base** (B0167B12). That one part supplies the camera, the motorized zoom lens,
 and both motion axes, which is why there is no pan stage, no slip ring and no
 tilt tower in this design. Everything printed is an enclosure or a bracket.
 
-> **This is a deliberate trade.** An earlier revision used a continuous-rotation
-> pan stage: a lazy-susan bearing, a slip ring, a NEMA17 driving a printed 120T
-> ring pulley, and a 270° tilt tower. It panned forever and tilted past vertical,
-> and it took about a month to build. This one is a weekend, and it gives up
-> continuous pan. See [ranges of motion](#ranges-of-motion) for exactly what
-> that costs.
+> **This is a deliberate trade.** A pan stage that turns all the way round
+> needs a bearing, a slip ring, a stepper and its driver, and about a month to
+> build. The PTZ base is a weekend, and it pans ±80° instead. See
+> [ranges of motion](#ranges-of-motion) for what that costs, and
+> [Appendix B](../appendix/appendix-b-open-source-parts.md#if-you-want-continuous-pan)
+> if you want continuous pan anyway.
 
 ## Stack, bottom to top
 
@@ -73,10 +73,9 @@ The last result is in [`cad/FIT_REPORT.md`](../../cad/FIT_REPORT.md).
 | Tilt | PTZ base servo, direct | **−45° … +85°** | same; verify yours with `python -m sportcam.ptzcheck` |
 | Zoom | Arducam motorized lens | 96° → 33° horizontal (≈ 3.5× optical) | ≈ 2.8–10.6 mm EFL on this sensor |
 
-**What the 160° pan costs you.** There are no end stops on a continuous axis,
-so the old build could follow a subject through a full circle and always take
-the shorter way round. This one cannot. A subject crossing a soft limit is
-lost: the camera stops and holds — then<!--with_uwb-->, with UWB, falls back to idle after
+**What the 160° pan costs you.** The camera can't follow a subject all the
+way round, or take the short way past its back. A subject crossing a soft
+limit is lost: the camera stops and holds — then<!--with_uwb-->, with UWB, falls back to idle after
 5 s<!--/--><!--both-->; without UWB,<!--/--><!--without_uwb--> sweeps again after a few seconds (the search covers the
 same ±80°, so it can never look behind itself)<!--/-->. Point the lens at the thing
 you are filming — a wall, a pitch, a mat — and this never comes up. Expect to
@@ -125,9 +124,6 @@ Every part prints in one piece on a Bambu Lab A1 Mini (≤ 170 mm on each side);
 `cad/fit.py` checks it.
 Settings, orientation and materials are in
 [3D printing specifications](../setup/11-3d-printing.md).
-
-Deleted with the pan stage: the rotating platform, the 120T ring pulley, both
-tilt-tower uprights and the camera cradle.
 
 ## Assembly
 
@@ -189,7 +185,8 @@ the tilt axis, so it stays just out of shot; a taller mast would not, and then
   room, raise `uwb_half_base` in `with_uwb/cad/config.scad` and
   `UWB_BASELINE_M` to match. A3's height above them, `uwb_v_base` /
   `UWB_A3_UP_M`, sets elevation resolution the same way; keep it at least
-  250 mm or the blind corner described in 04 grows.
+  250 mm or the blind corner described in
+  [05](../../with_uwb/docs/design/05-tracking-system.md#elevation-from-the-third-anchor) grows.
 - **Nothing metal near an antenna.** That is why the mast is wood. An
   aluminium tube under A3 detunes it and biases its range, and every
   centimetre of r₃ bias is over two degrees of elevation at 10 m.
@@ -225,5 +222,5 @@ found.
 
 ### Printed parts, without UWB
 
-Just the common parts: enclosure, diffuser ring, lid and battery tray. About
-280 g of PETG and 25 hours of machine time.
+Just the five common parts: enclosure, Pi shelf, diffuser band, lid and
+battery tray. About 280 g of PETG and 26 hours of machine time.

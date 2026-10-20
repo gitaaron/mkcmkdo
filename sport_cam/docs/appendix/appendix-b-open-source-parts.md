@@ -5,8 +5,9 @@ in `<build>/cad/` ([Appendix A](appendix-a-cad-parts.md)), this doc maps each
 SportCam printed part to open-source models on Printables / MakerWorld /
 Thingiverse, and is honest about what each substitution costs you.
 
-This build buys its motion as one assembly (the Arducam PTZ camera and metal
-pan-tilt base), so there is far less to substitute than there used to be.
+SportCam buys its motion as one assembly (the Arducam PTZ camera and metal
+pan-tilt base), so only the enclosure, the LED diffuser and the trays are
+worth substituting.
 Both builds print an enclosure, a lid, a diffuser ring and a tray<!--with_uwb-->; the UWB
 build adds two arms, a mast and a pod ([With UWB](#with-uwb))<!--/-->.
 
@@ -32,14 +33,14 @@ that. The enclosure, though, is just a round box with a light band.
 - [Parametric container generator, OpenSCAD — Printables 208305](https://www.printables.com/model/208305-parametric-battery-holder-9v-default-openscad-cust) — made for a 9 V battery, but its OpenSCAD parameters generate a holder to your bank's exact size.
 - [Tripod leg accessory clamp — Thingiverse 4536847](https://www.thingiverse.com/thing:4536847) — if you'd rather clamp to a leg than strap to the column.
 
-## If you want continuous pan back
+## If you want continuous pan
 
-The parts below rebuild the pan stage this design deleted. Going this way
-means returning to a stepper, a driver, a slip ring and a second
-microcontroller, and rewriting `ptz.py` and `tracker.py` to command pan
+The parts below are a starting point for a pan stage that turns all the way
+round. Going this way means adding a stepper, a driver, a slip ring and a
+second microcontroller, and rewriting `ptz.py` and `tracker.py` to command pan
 velocity rather than position. <!--with_uwb-->With UWB, the geometry in
 [05](../../with_uwb/docs/design/05-tracking-system.md#static-anchors-change-the-loop)
-goes back to anchors that rotate with the lens<!--/--><!--both-->; <!--/--><!--without_uwb: Without UWB,--><!--both-->without UWB,<!--/--><!--without_uwb--> the search sweep
+changes to anchors that rotate with the lens<!--/--><!--both-->; <!--/--><!--without_uwb: Without UWB,--><!--both-->without UWB,<!--/--><!--without_uwb--> the search sweep
 in [05](../../without_uwb/docs/design/05-tracking-system.md) would no longer be limited
 to ±80°, which is the point of doing it<!--/-->.
 
@@ -49,8 +50,9 @@ to ±80°, which is the point of doing it<!--/-->.
 | [Lazy Susan motorized turntable converter — MakerWorld 228118](https://makerworld.com/en/models/228118-experimental-lazy-susan-motorized-turntable-conver) | Bolts a drive onto a stock lazy-susan bearing | A turntable, not a camera mount — you design the rest |
 
 For true continuous rotation you need a ring pulley whose bore clears a slip
-ring, which is the one piece none of these have. The git history of this
-repository has a parametric one (`cad/ring_pulley.scad`) if you want it back.
+ring, which is the one piece none of these have. An earlier design of
+SportCam had a parametric one, `cad/ring_pulley.scad`; it's still in the
+repository's git history.
 
 ---
 
@@ -66,8 +68,8 @@ antennas. The same goes for the mast's 250 mm height.
 
 ### Wearable pod
 
-- [DIY smartwatch case for ESP32-C3 — MakerWorld 1749335](https://makerworld.com/en/models/1749335-diy-smartwatch-case-for-esp32-c3-0-96-oled) — comes with a printed armband in three sizes; the best starting point for an arm-worn remix, but the pod now has to hold a ULA1 module (40 × 25 mm) beside a small USB power bank, so the cavity needs rethinking rather than enlarging.
-- Search [yeggi: "makerfabs esp32 dw1000 uwb"](https://www.yeggi.com/q/makerfabs+esp32+dw1000+uwb/) — community cases for the exact UWB board appear and disappear; check before designing.
+- [DIY smartwatch case for ESP32-C3 — MakerWorld 1749335](https://makerworld.com/en/models/1749335-diy-smartwatch-case-for-esp32-c3-0-96-oled) — comes with a printed armband in three sizes; the best starting point for an arm-worn remix. Our pod holds a ULA1 module (40 × 25 mm) plugged into the end of a small USB power bank, so the cavity needs rethinking rather than enlarging.
+- Search [yeggi: "esp32 dw1000 uwb case"](https://www.yeggi.com/q/esp32+dw1000+uwb+case/) — community cases for DW1000 boards appear and disappear; check one fits the ULA1 before printing.
 
 ---
 

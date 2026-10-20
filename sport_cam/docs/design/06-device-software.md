@@ -1,10 +1,10 @@
 # 06 — Device software
 
-The base controller is gone: with no pan stepper there is nothing for a
-second microcontroller to do, so pan, tilt, zoom, focus, the status ring and
-the person detector all live on the Pi. The camera talks to Firebase
-through its own Firestore document, [described below](#firebase-link), and
-serves phones on its Wi-Fi directly ([09](09-direct-connection-and-app.md)).
+Everything the camera does runs as one Python service on the Raspberry Pi:
+pan, tilt, zoom and focus, the person detector, the status ring, recording
+and upload. It talks to Firebase through its own Firestore document
+([below](#firebase-link)) and serves phones on its Wi-Fi directly
+([09](09-direct-connection-and-app.md)). There is no second microcontroller.
 
 The Pi software is **per build**, because it drives different hardware: <!--with_uwb-->[`src/with_uwb/device/`](../../src/with_uwb/device/) ranges a tag<!--/--><!--both-->;<!--/--> <!--without_uwb-->[`src/without_uwb/device/`](../../src/without_uwb/device/) sweeps and tracks by vision<!--/-->.
 Most modules are the same in both; this doc covers those first, then <!--both-->each
@@ -37,37 +37,22 @@ builds:
 `tracker.py` and `session.py` exist in both but differ completely<!--with_uwb-->, and the UWB
 build adds `uwb.py` and `rangecal.py`<!--/--> — see <!--both-->the build sections<!--/--><!--with_uwb: [With UWB](#with-uwb)--><!--without_uwb: [Without UWB](#without-uwb)-->.
 
-Install on the Pi (the clone holds both builds; run the one you built):
+**Installing it** is step 3 onward of your build's 14 — Software setup
+([with UWB](../../with_uwb/docs/setup/14-software-setup.md),
+[without UWB](../../without_uwb/docs/setup/14-software-setup.md)). The Pi
+clones the whole repo and runs the service from
+`/home/pi/sportcam/src/<build>/device`. The service runs as an ordinary
+user, which is why the LED ring is driven over SPI rather than the PWM/DMA
+driver (that one needs root). The Wi-Fi portal is a separate service that
+runs as root.
 
-```bash
-sudo apt install -y python3-picamera2 python3-opencv
-git clone https://github.com/gitaaron/sport_cam.git ~/sportcam
-cd ~/sportcam/src/<build>/device          # with_uwb or without_uwb
-pip install -r requirements.txt           # + smbus2 and neopixel-spi
-sudo raspi-config            # Interface Options → enable I2C (PTZ, gauge) and SPI (ring)
-sudo cp sportcam-head.service sportcam-wifi.service /etc/systemd/system/
-sudo systemctl enable sportcam-head sportcam-wifi
-```
+**After a recording stops**, `main.py` hands the finished MP4 to
+`uploader.py` as a background task, so tracking and live streaming carry on.
+The uploader sends it to Firebase (`UPLOAD_API_BASE`) and deletes the local
+copy once the backend confirms the byte count
+([08](08-recordings-and-cloud.md)).
 
-The service files point at `/home/pi/sportcam/src/<build>/device`. The service
-runs as an ordinary user. Nothing here needs root, which is why the LED ring
-goes out over SPI rather than the PWM/DMA driver. Your build's
-software setup guide has every step in order.
-
-Before the first run, set the soft limits and check the servo
-directions:
-
-```bash
-python -m sportcam.ptzcheck
-```
-
-After a recording stops, `main.py` hands the finished MP4 to `uploader.py`
-as a background task — tracking and live streaming continue uninterrupted —
-which uploads it to Firebase (`UPLOAD_API_BASE`), then
-deletes the local copy once the backend confirms the byte count. See
-[08 — Recordings, cloud backend & gym Wi-Fi](08-recordings-and-cloud.md).
-
-Streaming choices:
+**Live video** goes out two ways:
 
 - **On the camera's Wi-Fi**: `camera.py` JPEG-encodes the 720p preview at
   15 fps and `local_api.py` serves it as MJPEG to phones connected directly.
@@ -94,7 +79,7 @@ ptz.park()              # centre both axes
 
 The tracker calls `set_pan` / `set_tilt` with an absolute target each tick,
 slew-limited to `PAN_MAX_DPS` so the servo glides between frames instead of
-snapping. There is no `panVel` message, on the wire or anywhere else.
+snapping.
 
 ### Vision, and why it runs slowly
 
@@ -160,8 +145,8 @@ only while `viewerAt` is under a minute old. The camera signs in with a
 service account that may only use Firestore (`FIREBASE_CREDENTIALS`); with no
 `CAMERA_KEY` set it doesn't connect at all and runs stand-alone.
 
-`pan` is degrees from centre (negative is left), not an absolute 0–360
-heading, because the axis no longer rotates.
+`pan` is degrees from centre (negative is left). The axis turns ±80°, so
+there is no 0–360 heading.
 
 ---
 
@@ -185,7 +170,7 @@ anchor's range bias. With the 250 mm mast this is not optional: a few
 centimetres on A3 is ten degrees of tilt.
 
 ```bash
-cd ~/sportcam/with_uwb/device && python -m sportcam.rangecal 5
+cd ~/sportcam/src/with_uwb/device && python3 -m sportcam.rangecal 5
 ```
 
 ### Vision, with UWB
@@ -242,16 +227,14 @@ in. It runs anywhere.
 
 ### Wearable tag — ULA1 (`src/with_uwb/wearable/`)
 
-The tag is a ULA1 module running the vendor's ranging firmware, powered by a
-small USB bank. It initiates ranging against each anchor and broadcasts the
-results.
+The tag is a ULA1 module running the vendor's `RTLS_Tag` firmware, powered
+by a small USB bank. It ranges against each anchor in turn and broadcasts the
+results. It has no buttons: switching it on and off is the remote control.
 
-Our previous sketch (`src/with_uwb/wearable/tag_firmware/`) targeted a Makerfabs
-ESP32-UWB and added a pair/record button broadcast over BLE as
-`SPORTCAM-BTN:<kind>`, which the camera relayed as `tagButton`. The ULA1 is
-also an ESP32 under Arduino, so that code can be ported, but the pin map must
-come from the vendor's schematic first. Until then, recording is started from
-the phone.
+`src/with_uwb/wearable/tag_firmware/` is an optional sketch for a Makerfabs
+ESP32-UWB board that adds a pair/record button, sent over BLE as
+`SPORTCAM-BTN:<kind>` and relayed by the camera as `tagButton`. It isn't
+ported to the ULA1; that needs the free pins from the vendor's schematic.
 
 ### Firebase link, with UWB
 
@@ -264,8 +247,7 @@ writes like any other.
 
 ## Without UWB
 
-One program runs on the hardware — the camera. There is no wearable and with
-no UWB there is no tag to talk to.
+One program runs on the hardware: the camera service. There is no wearable.
 
 ### Modules, without UWB
 

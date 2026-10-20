@@ -3,10 +3,10 @@
 Everything in this build that depends on a part you bought rather than a
 number we chose. It is ordered by **when you find out**, because the cost of
 being wrong rises sharply down the page: a dimension caught before printing
-costs nothing, the same dimension caught after costs a six-hour print.
+costs nothing, the same dimension caught after can cost an 18-hour reprint.
 
-Nothing here is optional reading. Three of the entries have already bitten
-this design once.
+Nothing here is optional reading. The [last section](#mistakes-this-design-has-already-made)
+lists four mistakes these checks would have caught.
 
 ## Before you print
 
@@ -45,7 +45,6 @@ a 1/4-20 one with the reducer bushing in.
 | **An arm sits flat on each wall boss** | dry fit both | check for elephant's foot on the boss; a few passes with a file |
 | **The bank sits in the tray with the strap closed** | dry fit | back to item 5 above |
 | **Micro-USB vs USB-A on the radios** | look at the board | the ULA1 has a USB-A plug; if yours does not, you have a different board and need different cables |
-| **The LiPo, if you kept the old wearable** | read the four-digit code | 603048 fits, 503450 is 34 mm wide and does not |
 
 ## On the bench, before the first session
 
@@ -58,13 +57,13 @@ Do these in order. Each one assumes the one above passed.
 | 3 | **I2C devices present** | `i2cdetect -y 1` shows `0c` and `40` | `0c` missing: PTZ controller unpowered or leads swapped. `40` missing: set `POWER_MONITOR = "none"` and carry on without a gauge |
 | 4 | **Camera detected** | `rpicam-hello` | add `dtoverlay=imx477` to `/boot/firmware/config.txt` |
 | 5 | **Ring lights evenly** | run the three state colours | move the ring up or down the window; it should sit 20–32 mm up |
-| 6 | **Soft limits and servo direction** | `cd device && python -m sportcam.ptzcheck` | narrow the limits in `config.py` if anything binds. If a positive pan command swings the lens the wrong way, flip `PAN_SIGN`; if a positive tilt command does not tilt it **up**, flip `TILT_SIGN`. Get either backwards and the camera runs away from the subject, which looks like a tracking fault and is not one |
+| 6 | **Soft limits and servo direction** | from `~/sportcam/src/with_uwb/device`: `python3 -m sportcam.ptzcheck` | narrow the limits in `config.py` if anything binds. If a positive pan command swings the lens the wrong way, flip `PAN_SIGN`; if a positive tilt command does not tilt it **up**, flip `TILT_SIGN`. Get either backwards and the camera runs away from the subject, which looks like a tracking fault and is not one |
 | 7 | **Radios on the RTLS firmware** | watch the serial for `mc <mask> …` frames carrying **three** ranges, mask `07` | one range means you are on the `RangingAnchor`/`RangingTag` pair: reflash to `RTLS_Anchor`/`RTLS_Tag`, or set `UWB_PROTOCOL = "dual-serial"`. Two (mask `03`) means the tag is not configured for A3 |
 | 8 | **Ranging rate, with all three anchors** | count frames per second | each anchor lengthens the cycle, so measure it with A3 in. 8–20 Hz is fine. Below that, lower `UWB_RATE_HZ` to match rather than letting the loop run on stale ranges |
 | 9 | **Anchor order and sign** | walk to one side and watch the bearing | if the bearing moves opposite to you, flip `UWB_THETA_SIGN` |
 | 10 | **Range bias, per anchor** | centre the pan axis, tape the tag **5.00 m** out on the boresight at A1/A2 board height, run `python -m sportcam.rangecal 5` and paste the `RANGE_BIAS_M` it prints | it also prints each anchor's noise. A bias over 30 cm is a setup error (distance, boresight, or anchor order), not a calibration. Noise well above 10 cm means metal or a body near an antenna. **Do not skip this with the 250 mm mast:** 5 cm of uncorrected A3 bias is about 12° of tilt |
-| 11 | **A3 geometry and elevation** | tag 5 m out level with the anchors, then held 2 m higher; watch `tilt` in the app's telemetry | level should settle near −1° (the lens sits 10 cm above the anchors), and 2 m up near +21°. A constant offset after row 10 means `UWB_A3_UP_M` / `UWB_A3_BACK_M` do not match your mast (docs/04, calibration 3). Tilt going the wrong way means the board on the mast is not the one the tag reports as RANGE2: swap boards, or their anchor IDs |
-| 12 | **Focus grid** | `python -m sportcam.focuscal` at 2, 5, 10 and 30 m | until you run it, focus is keyed on focal length alone, as before — soft at the tele end away from the distance it happened to be set for |
+| 11 | **A3 geometry and elevation** | tag 5 m out level with the anchors, then held 2 m higher; watch `tilt` in the app's telemetry | level should settle near −1° (the lens sits 10 cm above the anchors), and 2 m up near +21°. A constant offset after row 10 means `UWB_A3_UP_M` / `UWB_A3_BACK_M` do not match your mast ([05 — Calibration](../design/05-tracking-system.md#calibration), step 3). Tilt going the wrong way means the board on the mast is not the one the tag reports as RANGE2: swap boards, or their anchor IDs |
+| 12 | **Focus grid** | `python -m sportcam.focuscal` at 2, 5, 10 and 30 m | until you run it, focus is keyed on focal length alone — soft at the tele end away from the distance it happened to be set for |
 
 ## First session
 
@@ -77,9 +76,10 @@ Do these in order. Each one assumes the one above passed.
 | **Battery estimate is honest** | compare minutes-left against a stopwatch over the first half hour | badly off usually means `INA226_SHUNT_OHMS` does not match your module's shunt, or `BATTERY_WH` is still set to the bank's nameplate instead of the ~91 % that reaches the 12 V rail |
 | **Card space reads as minutes** | the app shows free space as recording time | a 64 GB card reads roughly 10 h when empty |
 
-## The four that already caught us
+## Mistakes this design has already made
 
-Worth knowing these were real, not hypothetical:
+Each of these really happened, and each is now caught by a check above or a
+test:
 
 - **The anchor arm floated 8 mm above the bed.** Caught while measuring print
   times for [the printing spec](../../../docs/setup/11-3d-printing.md); it would have

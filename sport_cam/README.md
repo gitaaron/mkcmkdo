@@ -33,7 +33,9 @@ appendices last:
 Shared docs are in [`docs/`](docs/). A doc with build-specific detail covers
 the shared material first, then has a **With UWB** section and a **Without
 UWB** section. Docs that differ entirely between the builds live in the
-build's folder; in paths, `<build>` means `with_uwb` or `without_uwb`.
+build's folder; in paths, `<build>` means `with_uwb` or `without_uwb`. New
+to the terms? [Appendix D](docs/appendix/appendix-d-glossary.md) explains
+them.
 
 | # | Doc | Where | Contents |
 | --- | --- | --- | --- |
@@ -59,6 +61,7 @@ build's folder; in paths, `<build>` means `with_uwb` or `without_uwb`.
 | A | [CAD printed parts](docs/appendix/appendix-a-cad-parts.md) | shared | Fitting the layout to your parts (`cad/fit.py`), render workflow, per-part notes, measure-first list |
 | B | [Open-source printed parts](docs/appendix/appendix-b-open-source-parts.md) | shared | Community STL alternatives and what each trade costs |
 | C | [Development workflow](docs/appendix/appendix-c-development.md) | shared | Where the code is, running everything on the Firebase emulators, tests, deploying, Docker workspace, docs viewer |
+| D | [Glossary](docs/appendix/appendix-d-glossary.md) | shared | The terms the docs use, from *acquiring* to *WS2812B* |
 
 Also in each build's folder: an
 interactive wiring schematic ([with UWB](with_uwb/schematics/interactive/index.html) ·
@@ -87,7 +90,7 @@ docs/               docs shared by both builds
   product/          01 — requirements
   design/           02–09 — architecture, mechanical, electronics, software, backend, cloud, app
   setup/            11 — 3D printing; assembly/ holds the guides' shared parts catalogue
-  appendix/         A — CAD, B — open-source parts, C — development workflow
+  appendix/         A — CAD, B — open-source parts, C — development workflow, D — glossary
 src/                all the code and apps
   backend/          Firebase: the api function, Firestore/Storage rules, the simulated camera — runs on the emulators locally
   web/              Vue 3 web app (Vite, served by Firebase Hosting)

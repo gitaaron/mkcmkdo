@@ -1,5 +1,15 @@
 # 05 — Tracking system
 
+The subject wears a UWB (ultra-wideband radio) tag. Three anchors on the
+camera head measure their distance to it 20 times a second, and from those
+three distances the camera works out the subject's **bearing, elevation and
+distance**. Vision then does three smaller jobs: it trims what's left of the
+aim error, frames the shot with the zoom, and confirms there really is a
+person in view before a session records.
+
+This doc covers why UWB, the geometry, the control loops, where to put the
+camera, calibration, and how to wear the tag.
+
 ## Why UWB (and not BLE, GPS, or vision alone)
 
 | Option | Verdict |
@@ -42,7 +52,7 @@ raw — too noisy per sample, workable after filtering. A 1-D Kalman filter on �
 feeds the pan loop; its measurement noise is computed from the baseline
 (`UWB_RANGE_SIGMA_M`), so it smooths harder when the baseline shrinks. On a
 simulated subject crossing 5 m out at up to 1.8 m/s the filtered error is
-**≈ 9° RMS** (≈ 7° at the old 400 mm). The camera's horizontal FOV at wide is
+**≈ 9° RMS** (≈ 7° with a 400 mm baseline). The camera's horizontal FOV at wide is
 96°, so the subject stays in frame; CV centring trims the rest.
 
 | Baseline | Raw σ_θ | Filtered, moving subject | Head width |
@@ -50,11 +60,6 @@ simulated subject crossing 5 m out at up to 1.8 m/s the filtered error is
 | 400 mm | ≈ 20° | ≈ 7° RMS | ≈ 45 cm |
 | **250 mm** | **≈ 32°** | **≈ 9° RMS** | **≈ 30 cm** |
 | 200 mm | ≈ 40° | ≈ 11° RMS | ≈ 25 cm |
-
-> **Correction.** Earlier revisions said the filtered noise was ~3–4°. That
-> was never true of this filter: re-run, it gave about 8° at 400 mm with the
-> old process-noise setting (q = 4). The current q = 1 does better at both
-> baselines, which is part of why 250 mm costs so little.
 
 ### Elevation from the third anchor
 
@@ -82,10 +87,10 @@ is allowed to correct.
 
 The offset has one blind corner. Three anchors cannot tell a point from its
 mirror image in the plane through them, and that plane leans back
-atan(86/250) ≈ 19° from vertical. A subject both well below the camera *and*
+atan(89/250) ≈ 20° from vertical. A subject both well below the camera *and*
 far to one side can end up behind it, and resolves to the mirror. Inside the
 pan and tilt limits the worst case is at pan ±80° and 45° down, where it
-reads **5.7°** off (1° at the old 400 mm mast). Everywhere else the solve is
+reads **5.7°** off (1° with a 400 mm mast). Everywhere else the solve is
 exact.
 
 **Noise.** A Monte Carlo at σ_range = 10 cm and 5 m gives a raw elevation
@@ -113,32 +118,30 @@ of that is the bearing we already had. It would buy nothing the loops use.
 Offset vertically it resolves **elevation**, which a horizontal baseline
 cannot, and that changes what vision is for.
 
-**Before A3**, the person detector was the only source of tilt. It is OpenCV
-HOG, trained on upright pedestrians. Overhangs, full-extension reaches and a
-back-facing climber are exactly what it misses, and a miss meant the tilt
-axis stopped. **With A3**, tilt works like pan: ranging sets the angle and
-vision trims a slow bias. A missed detection now only pauses the trim.
+**Without A3**, the person detector is the only source of tilt. It is
+OpenCV HOG, trained on upright pedestrians. Overhangs, full-extension reaches
+and a back-facing climber are exactly what it misses, and a miss stops the
+tilt axis. **With A3**, tilt works like pan: ranging sets the angle and
+vision trims a slow bias, so a missed detection only pauses the trim.
 
 The price: one more C$78 module, a dowel and two small prints, and a longer
 ranging cycle. The update rate with three anchors is still to be measured
-(see [15 — Verification](../setup/15-verification.md)). Set `UWB_ANCHORS = 2` and the
-build runs exactly as before, with tilt from vision alone.
+(see [15 — Verification](../setup/15-verification.md)). Set `UWB_ANCHORS = 2` to
+build without it; tilt then comes from vision alone.
 
 ### Static anchors change the loop
 
-On the old rotating-head build the anchors turned with the lens, so θ *was*
-the pan error and the loop drove it to zero. Here the bar is bolted to the
-tripod, so θ is an angle in the bar's frame and the camera is simply told to
-point there:
+The anchors don't turn with the lens: the arms are bolted to the enclosure.
+So θ is an angle in the bar's frame, and the camera is simply told to point
+there:
 
 ```
 pan_target = θ + bias          # absolute position, commanded to OPT_MOTOR_X
 ```
 
-That is less machinery, not more: no velocity integration, no windup, and no
-dead-reckoned heading to maintain. What it adds is one new error source —
-the pan servo is **open-loop**, so the angle we command is the angle we
-believe, good to a couple of degrees.
+That needs no velocity integration, no windup and no dead-reckoned heading.
+It does have one error source: the pan servo is **open-loop**, so the angle
+we command is the angle we believe, good to a couple of degrees.
 
 `bias` is how that gets cleaned up. The person detector's horizontal error
 feeds a slow integrator (`PAN_CV_BIAS_GAIN`, clamped to ±12°) rather than
@@ -160,7 +163,7 @@ person bbox ──► CV bias (slow integrator, ±12°) ──┘
 uwb φ ──► Kalman ──► lens-height correction ──┐
                                               ├──► tilt target ──► slew limit ──► OPT_MOTOR_Y (0x06)
 person bbox ──► CV bias (slow integrator, ±10°) ──┘
-   (no A3: person bbox ──► tilt PID ──► OPT_MOTOR_Y, as before)
+   (no A3: person bbox ──► tilt PID ──► OPT_MOTOR_Y)
 
 d ─────► zoom setpoint: EFL = frac · sensor_h · d / subject_h × vision scale
                        └─► OPT_ZOOM (0x00), rate-limited
@@ -201,7 +204,7 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
   already knows the distance, so this is focus without hunting. A deadband
   of 0.02 dioptres (about ±2 m at 10 m) keeps the motor still on ranging
   noise, and a zoom move refocuses immediately. **The shipped grid is flat
-  until you calibrate it**, which reproduces the old behaviour exactly; see
+  until you calibrate it**, so focus follows zoom alone until then; see
   calibration step 5.
 - **Tilt**: with A3, tilt is an absolute position like pan. φ is measured at
   the anchor plane, but the lens is 98 mm higher on the tilt axis, so the
@@ -211,22 +214,16 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
   wear it low. The detector's vertical error, converted to degrees at the
   current zoom, feeds a bias clamped to ±10°.
 
-  Without A3 — `UWB_ANCHORS = 2`, or a frame where A3 dropped out — tilt is
-  CV-driven as before: the bounding-box centre feeds a PID on
-  `OPT_MOTOR_Y`.
-
-  > **Correction.** The vision-only tilt path used to drive the wrong way:
-  > it applied the PID output with its sign inverted, so a subject low in the
-  > frame tilted the camera *up*. `test_tracker.py` now checks both
-  > directions.
+  Without A3 — `UWB_ANCHORS = 2`, or a frame where A3 dropped out — tilt
+  comes from vision: the bounding-box centre feeds a PID on `OPT_MOTOR_Y`.
 
   Detector = OpenCV HOG on the 720p preview at **3 fps**, dropping to
   0.5 fps when idle; the record stream is untouched 1080p.
 
   Three frames per second sounds slow and is not. A climber rises at about
-  0.3 m/s, which from 10 m is 1.7°/s, and with the subject framed at 40 % of
-  frame height there is roughly 0.75 m of headroom — two and a half seconds
-  of tolerance. What matters far more than the rate is that each detection is
+  0.3 m/s, which from 10 m is 1.7°/s, and with the subject framed at 65 %
+  there is a margin of about 17 % of the frame on each side — several
+  seconds of tolerance. What matters far more than the rate is that each detection is
   integrated **once**: the control loop runs at 20 Hz, so acting on a cached
   box every tick would multiply the tilt gain sevenfold and make the axis
   hunt. `camera.person_bbox()` returns a freshness flag for exactly this.
@@ -257,7 +254,7 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
 
 ## Camera placement envelope
 
-How far back can the tripod sit? Three constraints, and they bite at
+How far back can the tripod sit? Four constraints, and they bite at
 different distances:
 
 1. **UWB tracking — distance-independent until the radio gives out.** Bearing
@@ -286,24 +283,20 @@ different distances:
    end a full body fits from about 1.5 m out, so close range is never the
    constraint.
 
-   > **Correction.** Earlier revisions of this document quoted an 8–20 mm lens
-   > and a 43 m limit. The Arducam PTZ lens is neither — it is roughly
-   > 2.8–10.6 mm on this sensor — and the old numbers were wrong for the old
-   > build too. The table above is derived from the published field of view;
-   > confirm it in the zoom calibration below.
+   The table is derived from the lens's published field of view (roughly
+   2.8–10.6 mm on this sensor); confirm it in the zoom calibration below.
 3. **Geometry — closer isn't better.** Inside ~5 m of a tall wall the tilt
    angle gets steep (foreshortened footage) and pan/tilt angular rates spike
    on fast moves. At 8–12 m, a full 15 m route sweeps a comfortable ~50–60°
    of tilt.
+4. **Pan range — the camera only pans ±80°.** At 8 m back that sweep is
+   about 22 m wide, which covers any bouldering wall and most routes. Aim the
+   lens at the middle of what you are filming and give the far ends a check
+   before you start.
 
 **Rule of thumb: 6–12 m back is the sweet spot; 2 m to ~20 m works.** Past
 13.5 m the subject is simply smaller than the framing target. Past ~30 m the
 UWB link gives out before the pixels do.
-
-There is a third constraint now: **the camera only pans ±80°.** At 8 m back
-that sweep is about 22 m wide, which covers any bouldering wall and most
-routes. Aim the lens at the middle of what you are filming and give the far
-ends a check before you start.
 
 ## Calibration
 
@@ -316,8 +309,8 @@ ends a check before you start.
    `python -m sportcam.rangecal 5`. It samples 300 frames, compares each
    anchor's median range with the true range the geometry gives (A1 and A2
    hypot(d, b/2), A3 hypot(d + back, up)), and prints a `RANGE_BIAS_M` to
-   paste into `config.py`. That also covers the old A1–A2 offset check, since
-   any r₁ − r₂ imbalance is just the difference of two biases. It prints
+   paste into `config.py`. That also covers any A1–A2 imbalance, since
+   r₁ − r₂ is just the difference of two biases. It prints
    each anchor's noise too; if that is well above `UWB_RANGE_SIGMA_M`, find
    out why before trusting the filters. A3's bias matters most: 5 cm of it
    alone is about 12° of elevation at 10 m, roughly r₃'s error over the mast
@@ -346,8 +339,8 @@ ends a check before you start.
    level), and that neither `PAN_SIGN` nor `TILT_SIGN` is mirrored. A wrong
    sign makes the camera run away from the subject, which looks like a
    tracking failure and is not one. With A3 fitted this matters for tilt as
-   much as pan, since tilt is now commanded from ranging rather than
-   corrected step by step from the picture.
+   much as pan, since tilt is commanded from ranging rather than corrected step
+   by step from the picture.
 
 ## Wearing the tag
 
@@ -386,15 +379,14 @@ Climbing-specific notes:
   ranges keep flowing (diffraction), and A3 — high on its mast — is usually
   the anchor with the clearest path to a tag facing upward. Expect the
   noisiest angles of the session here, not a loss of lock.
-- **Camera placement in the gym**: 8–12 m back from the wall base (full
-  envelope: 7–30 m — see [placement envelope](#camera-placement-envelope)).
-  The tilt axis (−45°…+225°) covers ground-to-past-vertical, so even a
-  top-out 15 m up at 7 m horizontal distance (~65° elevation) is comfortably
-  in range. Gyms are
-  multipath-rich (steel structure, concrete) — the Kalman filter settings in
-  `src/with_uwb/device/sportcam/uwb.py` already assume σ ≈ 10 cm ranges; if bearing looks
-  jumpy indoors, raise `r` (measurement noise) toward 0.2 before touching
-  the PID gains.
+- **Camera placement in the gym**: 8–12 m back from the wall base (it works
+  from about 2 m to 20 m — see the [placement envelope](#camera-placement-envelope)).
+  Tilt runs from −45° to +85°, so even a top-out 15 m up seen from 7 m away
+  (~65° elevation) is comfortably in range.
+- **Jumpy bearing indoors**: gyms are full of steel and concrete, which
+  reflect the radio. The Kalman filters assume ranges good to about 10 cm
+  (`UWB_RANGE_SIGMA_M = 0.10` in `config.py`). If the bearing looks jumpy,
+  raise it toward 0.15 before touching any gains.
 - **Sweat and chalk**: the pod's USB-C slot faces down when worn; wipe the
   case, not the board. Chalk dust is non-conductive and harmless; sweat
   ingress is the reason the case has no top vents.
@@ -408,8 +400,6 @@ Climbing-specific notes:
   acquires the subject and starts recording. Off: 5 s later it saves and
   returns to standby. Nothing on the tag needs changing for this — the camera
   just notices ranging start and stop (`src/with_uwb/device/sportcam/session.py`).
-- The old wearable sketch's pair/record button and BLE broadcast are not
-  ported to the ULA1, and with the tag's power doing the job they are no
-  longer needed.
+- The tag has no buttons: its power switch does the job.
 - LED: blinks green when ranging. The tag runs off a USB power bank and
   cannot read its charge, so the bank's own indicator shows the battery level.

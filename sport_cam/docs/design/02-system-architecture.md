@@ -35,18 +35,15 @@ The UWB build adds a fourth subsystem, the **wearable tag**.
 
 ## Key decisions
 
-**The whole control loop closes on one board.**
-Pan, tilt, zoom and focus are all register writes to the Arducam PTZ
-controller on the Pi's I2C bus, so a tracking correction never leaves the
-device. The old revision put the pan stepper in a separate static base and
-relayed velocity commands Pi → server → ESP32 over the LAN, because the head
-rotated continuously and a stepper cannot ride on a slip ring. Giving up
-continuous rotation deleted the slip ring, the second microcontroller, its
-firmware and that entire network hop.
+**The whole control loop closes on one board.** Pan, tilt, zoom and focus
+are all register writes to the Arducam PTZ controller on the Pi's I2C bus,
+so a tracking correction never leaves the device. The price is pan range:
+the PTZ base turns ±80°, not all the way round
+([03 — Ranges of motion](03-mechanical-design.md#ranges-of-motion)).
 
-**The backend and the network are optional** in the strict sense: unplug the
-Wi-Fi and the camera still tracks, films, and shows its state on the ring,
-and a phone on the camera's own hotspot still drives it directly
+**The backend and the network are optional.** Unplug the Wi-Fi and the
+camera still tracks, films and shows its state on the ring, and a phone on
+the same Wi-Fi still drives it directly
 ([09](09-direct-connection-and-app.md)).
 
 **Nothing runs at home.** The backend is Firebase and only Firebase
@@ -76,6 +73,5 @@ for elevation.
 
 ![System architecture, without UWB](../../without_uwb/docs/images/system-architecture.png)
 
-There is no wearable and no radio: the camera is the only sensor. Dropping
-the UWB radios deleted the only other thing the camera had to talk to, and
-the Pi's USB ports are left free.
+There is no wearable and no radio: the camera is the only sensor, and the
+Pi's USB ports are left free.

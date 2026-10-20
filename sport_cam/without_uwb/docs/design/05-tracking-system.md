@@ -12,14 +12,16 @@ second.
 
 ## Why camera-only
 
-An earlier revision of this project told the camera where the subject was
-with ultra-wideband radio: a wearable tag ranged against three anchors on the
-camera head, and the bearing came from the geometry. It was precise and it
-worked through a body or a jacket. It also meant a tag to wear and charge,
-three anchor boards, two printed arms, a mast, range calibration and firmware
-for two kinds of board. This variant drops all of it.
+The other build, [with UWB](../../../with_uwb/docs/design/05-tracking-system.md),
+tells the camera where the subject is with ultra-wideband radio: a wearable
+tag ranged by three anchors on the camera head. It is precise and works
+through a body or a jacket. It also means a tag to wear and charge, three
+anchor boards, two printed arms, a mast and range calibration. This build
+drops all of it.
 
-| | Camera-only (this build) | UWB tag (previous build) |
+<!--compare-->
+
+| | Camera-only (this build) | With UWB (the other build) |
 | --- | --- | --- |
 | Wearable | none | tag on a harness or armband |
 | Who gets filmed | the first person the camera sees | whoever wears the tag, even out of sight |
@@ -237,11 +239,8 @@ different distances:
    end a full body fits from about 1.5 m out, so close range is never the
    constraint.
 
-   > **Correction.** Earlier revisions of this document quoted an 8–20 mm lens
-   > and a 43 m limit. The Arducam PTZ lens is neither — it is roughly
-   > 2.8–10.6 mm on this sensor — and the old numbers were wrong for the old
-   > build too. The table above is derived from the published field of view;
-   > confirm it in the zoom calibration below.
+   The table is derived from the lens's published field of view (roughly
+   2.8–10.6 mm on this sensor); confirm it in the zoom calibration below.
 2. **Geometry — closer isn't better.** Inside ~5 m of a tall wall the tilt
    angle gets steep (foreshortened footage) and pan/tilt angular rates spike
    on fast moves. At 8–12 m, a full 15 m route sweeps a comfortable ~50–60°
@@ -260,7 +259,6 @@ different distances:
 **Rule of thumb: 6–12 m back is the sweet spot; 2 m to ~20 m works.** Past
 13.5 m the subject is simply smaller than the framing target. Past ~30 m the
 person is too small for the detector at any zoom.
-
 
 ## Calibration
 
@@ -286,7 +284,6 @@ lens and the servos it drives.
    level), and that neither `PAN_SIGN` nor `TILT_SIGN` is mirrored. A wrong
    sign makes the camera run away from the subject, which looks like a
    tracking failure and is not one.
-
 
 ## Tuning
 
