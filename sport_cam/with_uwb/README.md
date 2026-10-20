@@ -12,7 +12,7 @@ tag is how the camera tells your subject from a bystander. The other build,
 mounted around the head, but follows whoever it finds first.
 
 Everything common to both builds — the PTZ base, enclosure, power, Pi, server
-and apps — is in the [top-level docs](../README.md#documentation). This
+and apps — is in the [shared docs](../README.md#documentation). This
 folder has only what is specific to the UWB build.
 
 Run the server with `TRACKING_MODE=with_uwb` (the default): `npm run dev` or
@@ -20,24 +20,25 @@ Run the server with `TRACKING_MODE=with_uwb` (the default): `npm run dev` or
 
 ## Docs
 
-| Doc | Contents |
-| --- | --- |
-| [04 — Tracking system](docs/04-tracking-system.md) | UWB geometry with static anchors, elevation from the third, control loops, vision framing and focus, lock-on, what vision is for |
-| [07 — Bill of materials](docs/07-bill-of-materials.md) | Every part, CAD price, Canadian sourcing, printed parts with STL links |
-| [10 — Verification checklist](docs/10-verification.md) | What to measure before printing, check on arrival, and confirm on the bench |
-| [**Setup — start here**](docs/setup/README.md) | The guides to follow, in order: |
-| &nbsp;&nbsp;1. [**Assembly guide** (interactive, 3D)](docs/setup/assembly/index.html) | Step-by-step build with a live 3D rendering of every step |
-| &nbsp;&nbsp;1a. [**Wiring guide**](docs/setup/wiring.md) | Every connection pin by pin, in order, with checks |
-| &nbsp;&nbsp;2. [**Software setup**](docs/setup/software_setup.md) | Radios, Pi, calibration and services, in order, with every command |
-| [Interactive wiring schematic](schematics/interactive/index.html) | Zoomable view of the whole system (best through `npm run docs`) |
+The docs are numbered in reading order across three folders: product
+requirements, design, and setup. Only the ones specific to this build live in
+this folder; the rest are shared ([full table of contents](../README.md#documentation)).
 
-The UWB-specific sections of the common docs:
-[overview](../docs/01-system-overview.md#with-uwb) ·
-[mechanical](../docs/02-hardware-mechanical.md#with-uwb) ·
-[electronics](../docs/03-electronics.md#with-uwb) ·
-[device software](../docs/05-device-software.md#with-uwb) ·
-[3D printing](../docs/3d_printer/specifications.md#with-uwb) ·
-[CAD](../docs/appendix-a-cad-parts.md#with-uwb).
+| Folder | Doc | Contents |
+| --- | --- | --- |
+| Product | [01 — Product requirements](../docs/product/01-requirements.md#with-uwb) | this build's session, state machine and requirements (shared doc) |
+| Design | [02 — System architecture](../docs/design/02-system-architecture.md#with-uwb) · [03 — Mechanical](../docs/design/03-mechanical-design.md#with-uwb) · [04 — Electronics](../docs/design/04-electronics.md#with-uwb) | this build's sections of the shared design docs |
+| Design | [**05 — Tracking system**](docs/design/05-tracking-system.md) | UWB geometry with static anchors, elevation from the third, control loops, vision framing and focus, lock-on, what vision is for |
+| Design | [06 — Device software](../docs/design/06-device-software.md#with-uwb) | this build's modules, vision and protocol (shared doc) |
+| Setup | [**Setup — start here**](docs/setup/README.md) | the setup docs below, in order, with times |
+| Setup | [**10 — Bill of materials**](docs/setup/10-bill-of-materials.md) | Every part, CAD price, Canadian sourcing, printed parts with STL links |
+| Setup | [11 — 3D printing](../docs/setup/11-3d-printing.md#with-uwb) | printer, filament, settings; this build's parts (shared doc) |
+| Setup | [**12 — Wiring guide**](docs/setup/12-wiring.md) | every connection pin by pin, in order, with checks |
+| Setup | [**13 — Assembly guide** (interactive, 3D)](docs/setup/assembly/index.html) | step-by-step build with a live 3D rendering of every step |
+| Setup | [**14 — Software setup**](docs/setup/14-software-setup.md) | Radios, Pi, calibration and services, in order, with every command |
+| Setup | [**15 — Verification checklist**](docs/setup/15-verification.md) | what to measure before printing, check on arrival, and confirm on the bench |
+| Setup | [Interactive wiring schematic](schematics/interactive/index.html) | zoomable view of the whole system (best through `npm run docs`) |
+| Appendix | [A — CAD printed parts](../docs/appendix/appendix-a-cad-parts.md#with-uwb) · [B — Open-source alternatives](../docs/appendix/appendix-b-open-source-parts.md#with-uwb) | fitting the layout to your parts; community STL alternatives |
 
 ## Files
 

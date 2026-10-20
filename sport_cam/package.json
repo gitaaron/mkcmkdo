@@ -14,7 +14,11 @@
     "docs": "node tools/docs-server.mjs",
     "build": "npm run build -w server && npm run build -w web",
     "test": "npm test -w server",
-    "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "cad:fit": "python3 cad/fit.py",
+    "cad:check": "python3 cad/fit.py --check",
+    "cad:watch": "python3 cad/fit.py --watch",
+    "hooks:install": "git config core.hooksPath \"$(git rev-parse --show-prefix)tools/hooks\""
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

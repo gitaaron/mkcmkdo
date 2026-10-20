@@ -4,7 +4,7 @@ Native companion app. Finds the camera on the local network over mDNS and
 connects **directly** to it for live video and control — no home server, no
 internet.
 
-See [docs/09-direct-connection-and-app.md](../docs/09-direct-connection-and-app.md)
+See [docs/09-direct-connection-and-app.md](../docs/design/09-direct-connection-and-app.md)
 for the architecture and why this is native rather than web.
 
 ## Run

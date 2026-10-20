@@ -1,0 +1,192 @@
+# SportCam — sizes of the parts you buy.
+#
+# The CAD, the layout and the fit audit are all built from these numbers.
+# Most are typical figures for the part in the bill of materials, NOT
+# measurements of yours. When a part arrives:
+#
+#   1. measure it with calipers and edit its entry below,
+#   2. set  measured = true  on it,
+#   3. run  python3 cad/fit.py  from sport_cam/.
+#
+# fit.py re-solves the layout for both builds (where each board sits, which
+# way the Pi faces, how tall the enclosure is, …), regenerates the CAD,
+# re-renders the STLs and audits that every part fits together and prints on
+# a Bambu Lab A1 Mini. If the new sizes don't fit the current arrangement it
+# looks for one that does — other positions and orientations, a taller
+# enclosure, a wider one up to what the A1 Mini can print — and says what it
+# changed. If nothing fits, it names the part and the constraint. The result
+# of the last run is in cad/FIT_REPORT.md.
+#
+# All lengths in mm. Unless noted: l = long side, w = short side, h = overall
+# height including the tallest component. "bom" is the item number in the
+# bill of materials; "builds" limits a part to one build (default: both).
+
+# ---- compute -------------------------------------------------------------
+
+[pi]
+name = "Raspberry Pi 4 Model B"
+bom = 2
+measured = false
+l = 85                # board; x runs from the microSD end (0) to the USB/Ethernet end
+w = 56                # y runs from the power/HDMI edge (0) to the GPIO edge
+pcb_t = 1.6
+holes = [[3.5, 3.5], [61.5, 3.5], [3.5, 52.5], [61.5, 52.5]]   # M2.5, from the microSD end / power edge
+hole_d = 2.7
+under_h = 2.5         # solder joints and the microSD socket under the board
+heatsink_h = 10       # stick-on heatsinks (item 3); a fan case is taller — enter its height
+port_block_l = 24     # USB + Ethernet jacks, measured in from the USB end
+port_h = 16           # their height above the board
+port_overhang = 3     # how far they stick out past the board edge
+gpio_x0 = 7           # GPIO header, from the microSD end
+gpio_x1 = 58
+gpio_w = 7            # header depth in from the GPIO edge
+gpio_lead_h = 16      # Dupont leads on the header, above the board
+usbc_x = 11.2         # USB-C power socket centre, from the microSD end, on the power edge
+plug_w = 12           # USB-C plug overmould of the pigtail
+plug_h = 7
+plug_l = 20           # plug and strain relief, before the cable bends down through the shelf gap
+standoff_h = 6        # M2.5 nylon standoffs it sits on (item 21)
+
+[shifter]
+name = "74AHCT125 level shifter on a scrap of perfboard"
+bom = 8
+measured = false
+l = 25
+w = 15
+h = 8
+
+# ---- power ---------------------------------------------------------------
+
+[pd_trigger]
+name = "USB-C PD trigger board, 12 V"
+bom = 10
+measured = false
+l = 33                # the USB-C socket is at one short end
+w = 14
+h = 6
+port_h = 3.3          # the socket's height, sitting on top of the board at that end
+plug_w = 12.5         # the bank cable's USB-C plug overmould — the wall opening is cut to this
+plug_h = 7
+
+[buck]
+name = "12 V → 5 V 8 A adjustable buck"
+bom = 11
+measured = false
+l = 60
+w = 40
+h = 22                # including the inductor / heatsink
+
+[gauge]
+name = "INA260 breakout (battery gauge)"
+bom = 12
+measured = false
+l = 22.9
+w = 22.9
+h = 12                # including the screw terminal
+
+[switch]
+name = "Panel-mount rocker switch, 10 A"
+bom = 13
+measured = false
+cut_w = 19.2          # panel cut-out
+cut_h = 13.2
+body_w = 21           # flange / body behind the panel
+body_h = 15
+depth = 24            # body plus terminals behind the panel
+max_panel_t = 2.0     # thickest panel its snap-in clips grip; the wall is thinned round the cut-out if needed
+
+[jack]
+name = "Panel-mount barrel jack (5 V service tap)"
+bom = 18
+measured = false
+hole_d = 8.2
+body_d = 11           # nut / body behind the panel
+depth = 16
+max_panel_t = 4.0
+
+[power_bank]
+name = "USB-C PD power bank, 25 000 mAh"
+bom = 9
+measured = false
+l = 150
+w = 72
+h = 30
+
+# ---- status light --------------------------------------------------------
+
+[led_ring]
+name = "WS2812B 16-LED ring"
+bom = 7
+measured = false
+od = 44.5
+id = 31.75
+h = 3.5               # board plus LEDs
+count = 16
+
+# ---- camera --------------------------------------------------------------
+
+[ptz]
+name = "Arducam IMX477 PTZ camera, metal pan-tilt base"
+bom = 1
+measured = false
+bolt_spacing = 46     # between opposite mounting holes of the base — MEASURE: the lid slots take 30–72
+plate_l = 56          # base plate footprint (square)
+plate_t = 3           # base plate thickness where the bolts go through
+bolt_l = 10           # the M3 screws you bolt it down with
+nut_h = 2.4           # M3 nut (nylon-insert)
+nut_af = 5.5
+cable_bundle_d = 20   # ribbon plus servo/I2C leads, bunched, through the lid opening
+
+# ---- tripod --------------------------------------------------------------
+
+[tripod_insert]
+name = "3/8-16 brass insert"
+bom = 23
+measured = false
+od = 12.7             # the floor boss bore is cut to this — epoxied, so a snug slip fit
+l = 8
+
+# ---- with UWB only -------------------------------------------------------
+
+[ula1]
+name = "Haorutech ULA1 UWB module"
+bom = 6
+builds = ["with_uwb"]
+measured = false
+l = 40
+w = 25
+h = 8
+hole_dx = 32          # corner holes along l
+hole_dy = 17          # and along w
+plug_overhang = 12    # USB-A plug past the board end
+antenna_from_end = 10 # antenna centre from the far (non-USB) end
+
+[usb_extension]
+name = "USB-A male-to-female extension"
+bom = 20
+builds = ["with_uwb"]
+measured = false
+female_l = 40         # rigid female end, strain relief included
+female_w = 14
+female_h = 8
+male_l = 30           # male plug in a Pi USB port: overmould and cable bend beyond the port face
+male_w = 16           # the wall slot the three cables come in through is cut to pass this
+male_h = 8
+
+[dowel]
+name = "½-inch hardwood dowel"
+bom = "27a"
+builds = ["with_uwb"]
+measured = false
+d = 12.7
+stock_l = 914         # 36 in as bought
+
+[tag_bank]
+name = "Slim USB power bank for the wearable"
+bom = 15
+builds = ["with_uwb"]
+measured = false
+l = 95
+w = 23
+h = 23
+input_on_far_end = true   # charging socket at the opposite end to the USB-A output

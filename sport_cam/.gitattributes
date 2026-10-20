@@ -1,12 +1,12 @@
 # Generated artefacts. None of these is a source of truth — every one is
 # reproducible from the .scad sources and the Python renderers alongside them:
 #
-#   cad/stl/*.stl             ./cad/render_all.sh
+#   cad/stl/*.stl             ./cad/render_all.sh (via ../cad/fit.py)
 #   docs/images/parts/*.png   python3 cad/render_previews.py
 #   docs/images/*.png         python3 schematics/render_diagrams.py
 #                             python3 schematics/render_schematics.py
-#   docs/assembly/models.js   python3 docs/assembly/build_models.py
-#   docs/assembly/renders/    python3 docs/assembly/render_steps.py
+#   docs/setup/assembly/models.js   python3 docs/setup/assembly/build_models.py
+#   docs/setup/assembly/renders/    python3 docs/setup/assembly/render_steps.py
 
 # OpenSCAD writes ASCII STL, so git treats the meshes as text and expands them
 # on every re-render. Six files produced ~29.5k of the ~30.9k changed lines in
@@ -18,8 +18,8 @@
 
 # Collapse the rest in review. They are output, and they also skew the
 # repository's language statistics.
-cad/stl/*.stl            linguist-generated=true
-docs/assembly/models.js  linguist-generated=true
-docs/assembly/renders/*  linguist-generated=true
-docs/images/*.png        linguist-generated=true
-docs/images/parts/*.png  linguist-generated=true
+*/cad/stl/*.stl          linguist-generated=true
+*/docs/setup/assembly/models.js  linguist-generated=true
+*/docs/setup/assembly/renders/*  linguist-generated=true
+*/docs/images/*.png      linguist-generated=true
+*/docs/images/parts/*.png linguist-generated=true

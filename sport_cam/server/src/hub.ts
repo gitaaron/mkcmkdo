@@ -16,7 +16,7 @@ interface DeviceConn {
 /**
  * WebSocket hub.
  *   /ws         app clients   — receive { type:"state", ... } broadcasts
- *   /ws/device  head/sim — protocol in docs/05-device-software.md
+ *   /ws/device  head/sim — protocol in docs/design/06-device-software.md
  *
  * In a Firebase migration the app side of this becomes a Firestore
  * `onSnapshot` listener; the device side stays a plain socket server.

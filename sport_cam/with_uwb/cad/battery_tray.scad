@@ -1,12 +1,11 @@
 // Battery tray — carries the USB-C power bank low on the tripod.
 //
-// Two ways to mount it, both cut into the same part:
-//   * strap it to a tripod leg or centre column through the two slots, or
-//   * sandwich it between the tripod plate and the enclosure using a long
-//     1/4-20 through the central bore, into the enclosure's reducer bushing.
+// Strap it to a tripod leg or the centre column through the two slots. (An
+// earlier version also had a central 1/4-20 bore for sandwiching the tray
+// between the tripod and the enclosure, but the bolt would have had to pass
+// through the bank, so it's gone.)
 //
-// Keeping the heaviest single item at the bottom is what stops the rig being
-// tippy once the anchor arms and the mast are bolted on.
+// Keeping the heaviest single item low is what stops the rig being tippy.
 include <config.scad>
 
 ol = bank_l + 2 * tray_wall;
@@ -31,11 +30,6 @@ module battery_tray() {
         for (x = [ol * 0.26, ol * 0.74 - tray_strap_w])
             for (y = [tray_wall / 2 - 1, ow - tray_wall / 2 - 2])
                 translate([x, y, -1]) cube([tray_strap_w, 3, tray_wall + 2]);
-        // central 1/4-20 bore + counterbore for the bolt head
-        translate([ol / 2, ow / 2, -1]) {
-            cylinder(d = 7, h = tray_wall + 2);
-            cylinder(d = 14, h = 4);
-        }
     }
 }
 

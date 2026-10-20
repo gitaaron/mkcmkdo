@@ -333,7 +333,7 @@ def tracking_geometry():
             bbox=dict(fc=BGBOX, ec=INK, boxstyle="round,pad=0.5"))
     ax.text(1.0, 4.9, "pan is commanded to θ\ntilt to φ from A3, 250 mm above the bar\nzoom and focus from d",
             fontsize=9, color=GREY)
-    # A3 is 86 mm behind the bar (0.65 units at this scale) and 250 mm up
+    # A3 is ≈ 89 mm behind the bar (0.65 units at this scale) and 250 mm up
     a3 = (mid[0], mid[1] - 0.65)
     ax.add_patch(Circle(a3, 0.18, fc="#eaf1ff", ec=BLUE, lw=2))
     ax.text(a3[0] + 0.3, a3[1] - 0.1, "A3 — 250 mm up, on the mast", fontsize=8.5, color=BLUE)

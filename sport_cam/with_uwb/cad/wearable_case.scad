@@ -1,7 +1,9 @@
-// Wearable pod: ULA1 tag module beside the small USB bank it plugs into
-// (sized by bank_tag_* and uwb_* in config.scad).
+// Wearable pod: the ULA1 tag plugged straight into the end of a slim USB
+// bank, the two in a line (the ULA1's USB-A plug goes into the bank's
+// output). cad/fit.py sizes the pod from both — pod_inner_* in layout.scad.
 // Renders body + friction-fit lid side by side. Strap bars fit a 26 mm
-// elastic armband. USB-C slot on one end, for charging the bank in place.
+// elastic armband. A USB-C slot at the bank's far end lets it charge in place
+// (when its charging socket is at that end — ordered_parts.toml [tag_bank]).
 // Rounded, no sharp corners (worn against an arm). Add a 3 mm foam pad under
 // the board — keeps the antenna off the skin.
 include <config.scad>
@@ -23,7 +25,8 @@ module body() {
         translate([pod_wall, pod_wall, pod_wall])
             rbox(pod_inner_l, pod_inner_w, pod_inner_h + 1, r - 1);
         // USB-C slot (charging without opening the pod)
-        translate([-1, ow / 2 - 5, pod_wall + 3]) cube([pod_wall + 2, 10, 4.5]);
+        if (pod_charge_slot)
+            translate([-1, ow / 2 - 5, pod_wall + 3]) cube([pod_wall + 2, 10, 4.5]);
         // lid lip rebate
         translate([pod_wall / 2, pod_wall / 2, oh - 2])
             rbox(ol - pod_wall, ow - pod_wall, 3, r - 1);
@@ -41,9 +44,9 @@ module lid() {
     translate([pod_wall / 2 + clr, pod_wall / 2 + clr, 2])
         difference() {
             rbox(ol - 2 * pod_wall - 4 * clr, ow - 2 * pod_wall - 4 * clr, 2, r - 1.5);
-            // LED light pipe + button access
-            translate([10, (ow - 2 * pod_wall) / 2, -1]) cylinder(d = 3.5, h = 4, $fn = 24);
-            translate([22, (ow - 2 * pod_wall) / 2, -1]) cylinder(d = 8, h = 4, $fn = 32);
+            // LED light pipe + button access, over the ULA1 at the far end
+            translate([pod_ula1_x0 + 10, (ow - 2 * pod_wall) / 2, -1]) cylinder(d = 3.5, h = 4, $fn = 24);
+            translate([pod_ula1_x0 + 22, (ow - 2 * pod_wall) / 2, -1]) cylinder(d = 8, h = 4, $fn = 32);
         }
 }
 

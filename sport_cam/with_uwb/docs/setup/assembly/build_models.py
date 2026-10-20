@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pack the printed-part STLs into docs/assembly/models.js for the guide.
+"""Pack the printed-part STLs into docs/setup/assembly/models.js for the guide.
 
 The interactive guide (index.html) renders the *real* meshes from cad/stl/,
 so the pictures can never drift from the parts you print. Browsers refuse
@@ -34,6 +34,7 @@ PARTS: dict[str, str] = {
     "base_housing":      "base_housing.stl",
     "lid":               "lid.stl",
     "led_diffuser_ring": "led_diffuser_ring.stl",
+    "shelf":             "shelf.stl",
     "anchor_arm":        "anchor_arm.stl",
     "mast_foot":         "mast_foot.stl",
     "mast_cradle":       "mast_cradle.stl",

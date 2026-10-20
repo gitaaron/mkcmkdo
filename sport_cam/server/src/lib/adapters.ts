@@ -13,7 +13,7 @@ const HTTP_BY_CODE: Record<string, number> = {
  * Local (Express) adapter for the callable functions:
  *   POST /api/call/:name   body: { data }   →   200 { result } | 4xx/5xx { error }
  *
- * The Firebase adapter is the one-liner documented in docs/06-server-and-app.md.
+ * The Firebase adapter is the one-liner documented in docs/design/07-server-and-app.md.
  */
 export function mountLocal(app: Express, fns: FnMap, ctx: FnContext): void {
   app.post("/api/call/:name", async (req: Request, res: Response) => {

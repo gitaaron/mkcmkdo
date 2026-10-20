@@ -3,24 +3,25 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SportCam assembly guide</title>
+<title>13 — SportCam assembly guide</title>
 <meta name="description" content="Interactive step-by-step guide for building the SportCam subject-tracking camera tripod, with 3D renderings of every assembly step." />
 <link rel="stylesheet" href="guide.css" />
-<link rel="stylesheet" href="../../../../docs/assembly/catalog.css" />
+<link rel="stylesheet" href="../../../../docs/setup/assembly/catalog.css" />
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
+<script src="layout.js"></script>
 <script src="models.js"></script>
-<script src="../../../../docs/assembly/catalog.js"></script>
+<script src="../../../../docs/setup/assembly/catalog.js"></script>
 </head>
 <body>
 
 <header>
   <div>
-    <h1>📷 SportCam — assembly guide</h1>
+    <h1>📷 13 — SportCam assembly guide</h1>
     <div class="sub">Subject-tracking robotic camera tripod · drag the model to inspect each step</div>
   </div>
   <select id="stepSelect" class="step-select" aria-label="Jump to step"></select>
@@ -89,22 +90,32 @@
    Assembly data. Coordinates are OpenSCAD-space millimetres, matching
    cad/config.scad (Z up, lens axis +X, tilt axis Y).
    ===================================================================== */
-const LID_Z = 66;                 // lid spigot drops into the enclosure mouth
-const LID_TOP = LID_Z + 5;        // top face of the lid — the PTZ base bolts here
-const TILT_Z = 120;               // tilt axis of the Arducam base
-const ARM_R = 71.5;               // enclosure wall boss face the anchor arms bolt to
-const MAST_R = 86.1;              // A3 mast axis behind the pan axis, at −X (cad/config.scad mast_axis_r)
-const UWB_HALF = 125;             // A1/A2 board centres either side of the pan axis (cad/config.scad uwb_half_base)
-const MAST_TOP = 258;             // dowel top: 12 mm socket floor + 246 mm dowel
-const A3_Z = 272;                 // A3 board, 250 mm above A1/A2 at 22 mm
+// The layout cad/fit.py solved from the part sizes (layout.js, generated).
+const LY = window.SPORTCAM_LAYOUT;
+const LID_Z = LY.lid_z;           // lid ring drops into the enclosure mouth
+const LID_TOP = LY.lid_top;       // top face of the lid — the PTZ base bolts here
+const TILT_Z = LY.tilt_z;         // tilt axis of the Arducam base
+const SHELF_Z = LY.shelf_z;       // underside of the Pi shelf
+const BAND_Z = LY.window_z - LY.design.diffuser_lip;   // bottom of the diffuser band
+const ARM_R = LY.arm_boss_r;       // enclosure wall boss the anchor arms bolt to
+const MAST_R = LY.mast_axis_r;    // A3 mast axis behind the pan axis, at −X
+const UWB_HALF = LY.uwb.uwb_half_base;   // A1/A2 board centres either side of the pan axis
+const BOARD_Z = LY.uwb.anchor_board_z;   // A1/A2 board height
+const DOWEL_Z0 = LY.uwb.arm_boss_z + LY.uwb.mast_floor;
+const MAST_TOP = DOWEL_Z0 + LY.dowel_l;  // dowel top
+const A3_Z = BOARD_Z + LY.uwb.uwb_v_base;    // A3 board, uwb_v_base above A1/A2
+// where a wall feature is, in words: +X is the lens, +Y is on your left behind the camera
+const where = (a) => ["front", "front-left", "left side", "back-left", "back", "back-right", "right side", "front-right"][Math.round((((a % 360) + 360) % 360) / 45) % 8];
+const bx = (k) => LY.boxes[k];
 
 const PHASES = ["Prepare", "Enclosure", "Camera", "Tracking", "Finish"];
 
 // part groups, in assembly order
 const SHELL = ["base_housing", "insert"];
-const POWER = ["jack", "trigger", "switch", "ina226", "buck"];
+const POWER = ["jack", "trigger", "switch", "ina226", "buck", ...(LY.shifter_on === "deck" ? ["shifter"] : [])];
+const SHELF = ["shelf", "ledring", ...(LY.shifter_on === "shelf" ? ["shifter"] : [])];
 const PI = ["pi", "cooler"];
-const LED = ["ledring", "shifter", "led_diffuser_ring"];
+const LED = ["led_diffuser_ring"];
 const HEAD = ["lid", "ptz_plate", "ptz_pan", "ptz_yoke", "camera", "lens"];
 const ARMS = ["arm_p", "arm_n", "uwb_p", "uwb_n"];
 const MAST = ["mast_foot", "dowel", "mast_cradle", "uwb_m"];
@@ -114,22 +125,22 @@ const lift = (ids, dz) => ids.map((id) => [id, 0, 0, dz]);
 
 const STEPS = [
   {
-    id: "prep", phase: 0, title: "Print, measure and prepare the parts", time: "≈ 31 h print · 50 min prep",
-    parts: ["All 8 printed bodies (≈ 380 g PETG) — settings and filament in <a href='../../../../docs/3d_printer/specifications.md' target='_blank'>printer specifications</a>", "M2.5 / M3 screw kit + brass heat-set inserts", "Calipers"],
+    id: "prep", phase: 0, title: "Print, measure and prepare the parts", time: "≈ 33 h print · 60 min prep",
+    parts: ["All 9 printed bodies (≈ 400 g PETG) — settings and filament in <a href='../../../../docs/setup/11-3d-printing.md' target='_blank'>printer specifications</a>", "M2.5 / M3 screw kit + brass heat-set inserts", "Calipers"],
     tools: ["3D printer", "Calipers", "Soldering iron (for inserts)", "3.2 mm drill bit, flush cutters"],
     steps: [
-      "<b>Measure before printing.</b> The one that matters is your Arducam base's <b>bolt spacing</b> — the lid is cut with slots spanning 30–72 mm because Arducam publishes no drawing and it has changed between revisions. Also check <code>bank_l/w/h</code> against your power bank and <code>uwb_*</code> against your ULA1 modules. Edit <code>cad/config.scad</code>, then <code>./cad/render_all.sh</code>. The full list is in the <a href='../../10-verification.md' target='_blank'>verification checklist</a>.",
-      "<b>Print:</b> enclosure — PETG, 4 walls, 20 %, no supports · <b>lid — 5 walls, 40 %</b>, it carries the whole camera · diffuser — white PETG, 2 walls, 0 % infill · anchor arms ×2 — flat, 4+ walls · mast foot and mast cradle — socket up, 4+ walls · battery tray — 3 walls, 20 % · wearable pod — 2 walls, 20 %.",
+      "<b>Measure before printing.</b> Measure what you've bought and put the numbers in <code>cad/ordered_parts.toml</code> — above all the Arducam base's <b>bolt spacing</b> (the lid's slots take 30–72 mm), the power bank, the buck converter, and your ULA1 boards. Then run <code>python3 cad/fit.py</code> from <code>sport_cam/</code>: it works out where everything goes, re-renders the parts and checks that they all fit together and print on an A1 Mini. This guide follows its layout. The full list is in the <a href='../15-verification.md' target='_blank'>verification checklist</a>.",
+      "<b>Print:</b> enclosure — PETG, 4 walls, 20 %, no supports · <b>lid — 5 walls, 40 %</b>, it carries the whole camera · shelf — 3 walls, 20 %, white or natural if you have it · diffuser band — white PETG, 2 walls, 0 % infill · anchor arms ×2 — flat, 4+ walls · mast foot and mast cradle — socket up, 4+ walls · battery tray — 3 walls, 20 % · wearable pod — 2 walls, 20 %.",
       "<b>Clean up.</b> Remove brims, run a 3.2 mm drill through every M3 clearance hole, and check the lid's slots are clear so the base can slide to its bolt spacing.",
-      "<b>Dry-fit</b> the lid spigot in the enclosure mouth, an arm on each side boss, the mast foot on the back boss, the dowel in both sockets, and the bank in the tray.",
-      "<b>Heat-set inserts:</b> 2 × M3 in each of the three wall bosses, where the arm and mast-foot bolts land, and 1 × M3 in the side of each mast socket for its pinch screw (8 total). That is the only insert work in this build.",
-      "<b>Cut the dowel</b> to <b>246 mm</b> — a ½-inch (12.7 mm) hardwood dowel, square-ended. That length puts A3 exactly 250 mm above A1 and A2; <code>cad/anchor_mast.scad</code> prints the figure if you change <code>uwb_v_base</code>.",
+      "<b>Dry-fit</b> the lid ring in the enclosure mouth, the shelf on its three posts, the diffuser band over the window, an arm on each side boss, the mast foot on the back boss, the dowel in both sockets, and the bank in the tray.",
+      "<b>Heat-set inserts</b> (M3, 15 in all): 2 in each of the three wall bosses for the arm and mast-foot bolts, 1 in the side of each mast socket for its pinch screw, 1 in the top of each shelf post, and 4 pushed in sideways into the lid's ring, lined up with the holes in the wall.",
+      `<b>Cut the dowel</b> to <b>${Math.round(LY.dowel_l)} mm</b> — a ½-inch (12.7 mm) hardwood dowel, square-ended. That length puts A3 exactly 250 mm above A1 and A2; <code>cad/anchor_mast.scad</code> prints the figure if you change <code>uwb_v_base</code>.`,
     ],
-    note: "This is a much shorter parts list than the continuous-pan revision: no ring pulley, rotating platform, tilt towers or camera cradle. The Arducam base replaces all of them.",
+    note: "The layout is solved, not drawn: if a part you measure is bigger than assumed, <code>cad/fit.py</code> moves things around — or makes the enclosure taller or wider, up to what the A1 Mini can print — and this guide follows. <code>cad/FIT_REPORT.md</code> says what it checked.",
     scene: {
       show: [], arrows: false, focus: "all", stay: true,
-      add: [["base_housing", 0, 0, 0], ["led_diffuser_ring", 0, 0, 95],
-            ["lid", 0, 0, 150], ["arm_p", 0, 0, 60], ["arm_n", 0, 0, 60],
+      add: [["base_housing", 0, 0, 0], ["shelf", 0, 0, 60], ["led_diffuser_ring", 0, 0, 105],
+            ["lid", 0, 0, 160], ["arm_p", 0, 0, 60], ["arm_n", 0, 0, 60],
             ["mast_foot", -60, 0, 0], ["mast_cradle", -60, 0, -80],
             ["battery_tray", 0, 0, -90]],
       view: "iso", render: "prep",
@@ -151,55 +162,64 @@ const STEPS = [
              marks: [[0, 0, 8, "3/8-16 insert (1/4-20 via bushing)", 45, -45, 45]] },
   },
   {
-    id: "power", phase: 1, title: "Power chain into the enclosure", time: "60 min",
-    parts: ["USB-C PD trigger board (12 V)", "Rocker switch", "INA226 module", "12 V → 5 V 8 A buck", "Panel-mount barrel jack", "18 AWG silicone wire, 470 µF"],
-    tools: ["Soldering iron", "Multimeter", "4 A dummy load", "M3 screws"],
+    id: "power", phase: 1, title: "Power boards onto the floor", time: "60 min",
+    parts: ["USB-C PD trigger board (12 V)", "Rocker switch", "INA260 battery gauge", "12 V → 5 V 8 A buck", "Panel-mount barrel jack", "18 AWG silicone wire, 470 µF", "Double-sided foam tape"],
+    tools: ["Soldering iron", "Multimeter", "4 A dummy load"],
     steps: [
-      "<b>Wiring:</b> connections P1–P5 and R1 in the <a href='../wiring.md' target='_blank'>wiring guide</a>, steps 1–3.",
+      "<b>Wiring:</b> connections P1–P5 and R1 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, steps 1–3.",
       "<b>Bench-set the buck to 5.1 V under a 4 A dummy load before it goes anywhere near the Pi.</b> Open-circuit voltage tells you nothing; a unit that reads 5.1 V unloaded and 4.8 V loaded will brown the Pi out under load.",
       "Set the PD trigger to <b>12 V</b> (solder jumper or resistor, per its silkscreen) and confirm with a meter on a real bank before wiring anything else.",
-      "Mount the trigger, the gauge and the buck on the three M3 posts on the <b>+X</b> side of the floor. The Pi takes the other side.",
-      "Wire the chain: trigger 12 V out → rocker switch → gauge <b>IN+</b>, gauge <b>OUT+</b> → buck 12 V in. Grounds common. It has to sit in series on the positive line or it measures nothing.",
-      "Gauge SDA/SCL → Pi GPIO 2/3. It shares the bus with the PTZ controller at a different address, 0x40 against 0x0C. If you could not source one, set <code>POWER_MONITOR = \"none\"</code> and skip this — you lose the low-battery warning, nothing else.",
-      "Fit the barrel jack in the 8 mm hole low on the −Y wall as the 5 V service tap, and put a 470 µF across the buck output.",
-      "Leave the buck's 5 V out on 18 AWG, long enough to reach a USB-C pigtail, the LED ring and the lid.",
+      `<b>PD trigger:</b> foam-tape it to the floor at the ${where(LY.usbc.ang)} of the enclosure, its USB-C socket hard against the inside of the rectangular inlet low in the wall. The bank's cable plugs in from outside.`,
+      "<b>Switch and jack:</b> the rocker snaps into its cut-out — the wall is thinned round it so the clips grip — and the barrel jack (the 5 V service tap) goes through the round hole and takes its nut inside.",
+      "<b>Gauge and buck:</b> foam-tape them to the floor where the model shows them, clear of the posts and the tripod boss. Everything on the floor stays below the LED window.",
+      "Wire the chain: trigger 12 V out → rocker switch → gauge <b>VIN+</b>, gauge <b>VOUT+</b> → buck 12 V in. Grounds common. The gauge has to sit in series on the positive line or it measures nothing. If you couldn't source one, set <code>POWER_MONITOR = \"none\"</code> and skip it — you lose the low-battery warning, nothing else.",
+      "Put the 470 µF across the buck output. Leave the buck's 5 V out on 18 AWG, and the gauge's SDA/SCL leads, long enough (≈ 15 cm) to reach up past the shelf to the Pi, the LED ring and the lid.",
     ],
-    warn: "Use the 100 W e-marked USB-C cable from the bill of materials. A charge-only cable cannot carry a 12 V PD contract and the trigger will silently stay at 5 V.",
-    scene: { show: SHELL, add: [["trigger", 0, 0, 70], ["switch", 0, 0, 70], ["ina226", 0, 0, 70], ["buck", 0, 0, 70], ["jack", 0, -55, 0]],
+    warn: "Use the USB-C cable from the bill of materials. Before closing anything up, check the trigger really negotiates 12 V from your bank through the wall inlet.",
+    scene: { show: SHELL, add: [["trigger", 0, 0, 60], ["switch", 0, 0, 60], ["jack", 0, 0, 60], ["ina226", 0, 0, 70], ["buck", 0, 0, 70]],
              view: "iso-high", focus: "all", render: "power",
-             marks: [[46, 18, 14, "PD trigger → 12 V", 55, 45, 48], [46, 0, 13, "battery gauge (0x40)", 70, -5, 40], [46, -18, 15, "buck → 5.1 V @ 8 A", 50, -50, 46], [0, -74, 11, "5 V service jack", 0, -45, 30]] },
+             marks: [[bx("trigger").cx, bx("trigger").cy, bx("trigger").z1, "PD trigger → 12 V, at the USB-C inlet", 30, 30, 45],
+                     [bx("gauge").cx, bx("gauge").cy, bx("gauge").z1, "battery gauge (0x40)", 40, 20, 40],
+                     [bx("buck").cx, bx("buck").cy, bx("buck").z1, "buck → 5.1 V @ 8 A", 40, -30, 40],
+                     [bx("switch").cx, bx("switch").cy, bx("switch").z1, "rocker switch", -30, -30, 35],
+                     [bx("jack").cx, bx("jack").cy, bx("jack").z1, "5 V service jack", -40, 20, 30]] },
   },
   {
-    id: "pi", phase: 1, title: "Raspberry Pi 4 on the floor", time: "20 min",
-    parts: ["Raspberry Pi 4 Model B 4 GB + heatsink/fan + 64 GB microSD", "4 × M2.5 × 6", "USB-C pigtail"],
-    tools: ["2 mm driver"],
-    steps: [
-      "<b>Wiring:</b> connection R2 in the <a href='../wiring.md' target='_blank'>wiring guide</a>, step 4; the gauge's I2C (I1–I4) is step 5.",
-      "Fit the heatsinks or the fan case to the Pi <b>before</b> mounting it. The board sits low in a sealed enclosure and you will not reach the chips afterwards.",
-      "Flash the card and enable I2C and SPI in <code>raspi-config</code>. If the camera is not detected on first boot, add <code>dtoverlay=imx477</code> to <code>/boot/firmware/config.txt</code>. The <code>usb_max_current_enable</code> flag is a Pi 5 thing and is not needed here.",
-      "Mount the Pi on the four standoffs at <b>−X</b>, USB and Ethernet edge facing the vent slots.",
-      "Buck 5 V out → USB-C pigtail → Pi. Keep the run short and use 18 AWG; it carries 4 A.",
-      "Power up on the bench and confirm the Pi boots before the lid ever goes on.",
-    ],
-    scene: { show: [...SHELL, ...POWER], add: [["pi", 0, 0, 70], ["cooler", 0, 0, 70]],
-             view: "iso-high", focus: "all", render: "power",
-             marks: [[-10, 0, 26, "Pi 4 + heatsink", -70, 25, 45]] },
-  },
-  {
-    id: "led", phase: 1, title: "LED ring, level shifter and diffuser", time: "30 min",
-    parts: ["WS2812B 16-LED ring", "74AHCT125 level shifter", "LED diffuser ring (white PETG)", "CA or hot glue"],
+    id: "led", phase: 1, title: "LED ring under the shelf, diffuser band", time: "30 min",
+    parts: ["Shelf", "WS2812B 16-LED ring", "74AHCT125 level shifter", "LED diffuser ring (white PETG)", "Double-sided foam tape", "CA or hot glue"],
     tools: ["Soldering iron"],
     steps: [
-      "<b>Wiring:</b> connections R4, R5 and L1–L4 in the <a href='../wiring.md' target='_blank'>wiring guide</a>, with the 74AHCT125 pin numbers.",
+      "<b>Wiring:</b> connections R4, R5 and L1–L4 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, with the 74AHCT125 pin numbers.",
       "Data comes out of <b>SPI0 MOSI, GPIO10</b>, not the classic <code>rpi_ws281x</code> PWM/DMA pin. A Pi 4 can do it either way, but the PWM driver needs the whole camera service to run as root and SPI does not.",
-      "Wire GPIO10 → 74AHCT125 input, its output → ring DIN. Tie the shifter's unused inputs to ground and power it from 5 V. Ring 5 V and ground come from the buck, not the Pi.",
-      "Sit the ring on a spacer so the LEDs are at window height (20–32 mm up), facing outward.",
-      "Power up and run the three state colours. Nudge the ring until the band glows evenly all the way round, then fix the diffuser to the enclosure with four dabs of glue.",
+      "<b>Ring:</b> foam-tape it to the <b>underside</b> of the shelf, <b>LEDs facing down</b>, centred on the shelf's small centre hole. It then sits in the band of the LED window, between the power boards and the shelf, and lights the window all the way round. Take its leads round the edge of the shelf through the cut-away side.",
+      LY.shifter_on === "shelf"
+        ? "<b>Shifter:</b> foam-tape it to the top of the shelf where the model shows, beside the Pi's place. Wire GPIO10 → 74AHCT125 input, its output → ring DIN. Tie the shifter's unused inputs to ground and power it from 5 V. Ring 5 V and ground come from the buck, not the Pi."
+        : "<b>Shifter:</b> foam-tape it to the floor where the model shows. Wire GPIO10 → 74AHCT125 input, its output → ring DIN. Tie the shifter's unused inputs to ground and power it from 5 V. Ring 5 V and ground come from the buck, not the Pi.",
+      "<b>Diffuser band:</b> slide it down over the outside of the enclosure until it rests on the small ledge below the window, then fix it with four dabs of glue.",
+      "Power up and run the three state colours with the shelf held in place. The band should glow evenly all the way round; the three posts behind the window cast faint shadows.",
     ],
-    note: "Two walls and 0 % infill are what make the band glow instead of showing 16 hot spots. A 60/m strip lining the window looks better still if you have one — change <code>LED_COUNT</code> to match.",
-    scene: { show: [...SHELL, ...POWER, ...PI], add: [["ledring", 0, 0, 80], ["shifter", 0, 0, 80], ["led_diffuser_ring", 0, 0, 80]],
+    note: "Two walls and 0 % infill are what make the band glow instead of showing 16 hot spots. A white or natural shelf helps too: the ring lights its underside and that bounces out through the window.",
+    scene: { show: [...SHELL, ...POWER], add: [...lift(SHELF, 60), ["led_diffuser_ring", 0, 0, 90]],
              view: "iso", focus: "all", render: "led",
-             marks: [[0, 0, 26, "ring at window height", 75, 35, 40]] },
+             marks: [[0, 0, LY.ring_z0, "ring under the shelf, LEDs down", 75, 35, 40], [0, -LY.base_d / 2 - 2, BAND_Z + 8, "band over the window", 20, -60, 20]] },
+  },
+  {
+    id: "pi", phase: 1, title: "Raspberry Pi 4 onto the shelf, shelf into the enclosure", time: "30 min",
+    parts: ["Raspberry Pi 4 Model B 4 GB + heatsink/fan + 64 GB microSD", "4 × M2.5 × 6", "4 × M2.5 nylon standoffs, 6 mm", "3 × M3 × 8", "USB-C pigtail"],
+    tools: ["2 mm driver", "2.5 mm hex key"],
+    steps: [
+      "<b>Wiring:</b> connection R2 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, step 4; the gauge's I2C (I1–I4) is step 5.",
+      "Fit the heatsinks to the Pi <b>before</b> mounting it. It sits in a closed enclosure and you won't reach the chips afterwards. A fan case is taller: put its height in <code>ordered_parts.toml</code> and re-run <code>fit.py</code> first.",
+      "Flash the card and enable I2C and SPI in <code>raspi-config</code>. If the camera is not detected on first boot, add <code>dtoverlay=imx477</code> to <code>/boot/firmware/config.txt</code>. The <code>usb_max_current_enable</code> flag is a Pi 5 thing and is not needed here.",
+      "Screw the four 6 mm nylon standoffs into the shelf's Pi holes from underneath and mount the Pi on them with M2.5 × 6 — USB-C socket towards the shelf's cut-away side — and its USB ports towards the cable slot high in the wall, where the anchor leads come in.",
+      "Feed the buck's 5 V pigtail, the gauge's I2C leads and the PTZ controller's 5 V up through the cut-away side, lower the shelf onto its three posts, and fix it with 3 × M3 × 8 into the inserts in their tops.",
+      "Plug the pigtail into the Pi's USB-C and the gauge's SDA/SCL onto GPIO 2/3. Keep the 5 V run short and on 18 AWG; it carries 4 A.",
+      "Power up on the bench and confirm the Pi boots before the lid ever goes on.",
+    ],
+    scene: { show: [...SHELL, ...POWER, ...LED], add: lift([...SHELF, ...PI], 70),
+             view: "iso-high", focus: "all", render: "pi",
+             marks: [[LY.pi.x, LY.pi.y, LY.pi.z + 12, "Pi 4 on the shelf", -70, 25, 45],
+                     [LY.post_r * Math.cos(LY.post_angs[0] * Math.PI / 180), LY.post_r * Math.sin(LY.post_angs[0] * Math.PI / 180), SHELF_Z, "shelf post", 30, 30, 30]] },
   },
   {
     id: "lid-ptz", phase: 2, title: "Arducam base onto the lid", time: "25 min",
@@ -218,53 +238,57 @@ const STEPS = [
   },
   {
     id: "lid-on", phase: 2, title: "Lid onto the enclosure", time: "20 min",
-    parts: ["Lid assembly", "4 × M3 × 12 countersunk"],
+    parts: ["Lid assembly", "4 × M3 × 8 countersunk"],
     tools: ["2.5 mm hex key"],
     steps: [
-      "<b>Wiring:</b> connections R3, I1, I2 and C1 in the <a href='../wiring.md' target='_blank'>wiring guide</a>, step 7.",
-      "Connect the leads waiting inside: PTZ controller 5 V and ground to the buck output, SDA and SCL to Pi GPIO 2/3 alongside the INA226.",
+      "<b>Wiring:</b> connections R3, I1, I2 and C1 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, step 7.",
+      "Connect the leads waiting on the shelf: PTZ controller 5 V and ground to the buck's 5 V (brought up through the shelf's cut-away side), SDA and SCL to Pi GPIO 2/3 alongside the gauge.",
       "Plug the camera ribbon into the Pi's CSI connector, contacts the right way, latch closed. The 15-pin cable in the Arducam kit fits a Pi 4 directly, so there is no adapter to find.",
-      "Lower the lid so its spigot enters the enclosure mouth, feeding the cable coil in as you go. Nothing should be pinched between spigot and wall.",
-      "Four countersunk M3 down into the wall.",
+      "Lower the lid so its ring drops into the enclosure mouth, feeding the cable coil in as you go. Nothing should be pinched between the ring and the wall.",
+      "Turn the lid until the four inserts in its ring line up with the four countersunk holes near the top of the wall, then drive 4 × M3 × 8 countersunk in from outside.",
       "Power up and run <code>i2cdetect -y 1</code>. You want <b>0c</b> and <b>40</b>. If 0c is missing, the PTZ controller is unpowered or the lead is swapped.",
     ],
-    scene: { show: [...SHELL, ...POWER, ...PI, ...LED], add: lift(HEAD, 95),
+    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED], add: lift(HEAD, 95),
              view: "iso", focus: "all", render: "lid-on",
-             marks: [[0, 0, 55, "ribbon + I2C down the middle", -80, 40, 30]] },
+             marks: [[0, 0, LY.shelf_top + 20, "ribbon + I2C down the middle", -80, 40, 30]] },
   },
   {
     id: "arms", phase: 3, title: "UWB anchor arms", time: "25 min",
     parts: ["Anchor arm ×2 (M3 inserts fitted)", "2 × Haorutech ULA1 modules", "4 × M3 × 12, 8 × M2.5 × 6 + 3 mm standoffs", "2 × short USB cables"],
     tools: ["2.5 mm hex key"],
     steps: [
-      "<b>Wiring:</b> connections U1–U3 in the <a href='../wiring.md' target='_blank'>wiring guide</a>.",
-      "Bolt an arm to each wall boss at ±Y, pointing straight out, rib up and the wide board pad outboard. Two M3 each, through the boss into the inserts in the arm root.",
-      "Mount a ULA1 module at each tip on 3 mm standoffs, DWM1000 antenna at the very end and clear of the printed pad, USB-A plug facing inward.",
-      "USB-A extension from each arm back to the Pi. Only <b>one</b> anchor carries data — it reports every range in a single frame — the others just need 5 V. Make the data one A1 or A2, not the mast's, so the data cable stays short. Note which arm is which, because the sign convention depends on it.",
+      "<b>Wiring:</b> connections U1–U3 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>.",
+      "Bolt an arm to each wall boss at ±Y, pointing straight out, rib up and the board pad outboard. Two M3 each, through the boss into the inserts in the arm root.",
+      LY.ula1_tangential
+        ? "Mount a ULA1 module at each tip on 3 mm standoffs, lying <b>across</b> the arm: USB-A plug towards the back (−X), antenna towards the front. Along the arm there is no room between the plug and the enclosure for the extension's socket end; across, it hangs off the side."
+        : "Mount a ULA1 module at each tip on 3 mm standoffs, DWM1000 antenna at the very end and clear of the printed pad, USB-A plug facing inward.",
+      "USB-A extension from each arm back to the Pi, in through the slot high in the wall behind its USB ports — pass the plugs through one at a time. Only <b>one</b> anchor carries data — it reports every range in a single frame — the others just need 5 V. Make the data one A1 or A2, not the mast's, so the data cable stays short. Note which arm is which, because the sign convention depends on it.",
       "Check the geometry: board centres <b>250 mm apart</b>, symmetric about the pan axis, and both at the <b>same height</b>.",
     ],
     note: "The anchors sit well below the lens here, and that is fine. Both are at the same height, so the vertical offset is common to both ranges and cancels out of the bearing. What matters is that they are level with <i>each other</i> and that the baseline is right.",
     warn: "These anchors are <b>static</b> — they do not turn with the camera. That is the one real consequence of the PTZ base, and the tracker handles it by subtracting the commanded pan angle. If you ever swap the arms left for right, flip <code>UWB_THETA_SIGN</code>.",
-    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD], add: lift(ARMS, 60),
+    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD], add: lift(ARMS, 60),
              view: "iso", focus: "all", render: "arms",
-             marks: [[0, UWB_HALF, 22, "anchor A1", 0, 45, 60], [0, -UWB_HALF, 22, "anchor A2", 0, -45, 60]] },
+             marks: [[0, UWB_HALF, BOARD_Z, "anchor A1", 0, 45, 60], [0, -UWB_HALF, BOARD_Z, "anchor A2", 0, -45, 60]] },
   },
   {
     id: "mast", phase: 3, title: "Third anchor mast (A3)", time: "20 min",
-    parts: ["Mast foot and mast cradle (M3 insert in each socket)", "½-inch hardwood dowel, cut to 246 mm", "1 × Haorutech ULA1 module", "2 × M3 × 12, 2 × M3 thumb screws, 4 × M2.5 × 6 + 3 mm standoffs", "USB-A extension, ≈ 50 cm"],
+    parts: ["Mast foot and mast cradle (M3 insert in each socket)", `½-inch hardwood dowel, cut to ${Math.round(LY.dowel_l)} mm`, "1 × Haorutech ULA1 module", "2 × M3 × 12, 2 × M3 thumb screws, 4 × M2.5 × 6 + 3 mm standoffs", "USB-A extension, ≈ 50 cm"],
     tools: ["2.5 mm hex key", "Small level or phone level app", "Tape measure"],
     steps: [
       "Bolt the mast foot to the boss at <b>−X</b>, directly behind the lens, socket outboard and opening up. Two M3, through the root plate into the inserts in the boss — the same as the arms.",
-      "Mount the third ULA1 on the cradle pad on 3 mm standoffs, oriented like the other two: long axis parallel to the anchor bar (±Y), antenna end toward +Y.",
+      LY.ula1_tangential
+        ? "Mount the third ULA1 on the cradle pad on 3 mm standoffs, oriented like the other two: plug towards the back (−X), antenna towards the front."
+        : "Mount the third ULA1 on the cradle pad on 3 mm standoffs, oriented like the other two: long axis parallel to the anchor bar (±Y), antenna end toward +Y.",
       "Push the dowel to the bottom of the foot socket and snug its thumb screw. Fit the cradle on top, pushed fully down, and snug that thumb screw with the board level and square to the bar.",
-      "<b>Check the geometry:</b> the A3 board should be <b>250 mm above</b> the A1/A2 boards and about <b>86 mm behind</b> the pan axis, and the dowel plumb. If you built it differently, measure both and put them in <code>UWB_A3_UP_M</code> and <code>UWB_A3_BACK_M</code>.",
-      "Run the USB extension down the dowel with two or three ties, and in to the Pi alongside the other two.",
+      `<b>Check the geometry:</b> the A3 board should be <b>250 mm above</b> the A1/A2 boards and about <b>${Math.round(LY.mast_axis_r)} mm behind</b> the pan axis, and the dowel plumb. If you built it differently, measure both and put them in <code>UWB_A3_UP_M</code> and <code>UWB_A3_BACK_M</code>.`,
+      "Run the USB extension down the dowel with two or three ties, and in through the wall slot to the Pi alongside the other two.",
     ],
     note: "A3 is what gives the camera <b>elevation</b>. A1 and A2 are level with each other, so their ranges carry no information about height; a third anchor straight above them does. Tilt then works like pan: ranging sets the angle, and vision only trims it.",
     warn: "Wood, not metal. A metal tube running up to a UWB antenna detunes it and skews A3's range, which reads as a wrong elevation. If you must use aluminium, stand the board well clear of the tube's end.",
-    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD, ...ARMS], add: [["mast_foot", -60, 0, 0], ["dowel", 0, 0, 140], ["mast_cradle", 0, 0, 90], ["uwb_m", 0, 0, 90]],
+    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS], add: [["mast_foot", -60, 0, 0], ["dowel", 0, 0, 140], ["mast_cradle", 0, 0, 90], ["uwb_m", 0, 0, 90]],
              view: "iso-back", focus: "all", render: "mast",
-             marks: [[-MAST_R, 0, A3_Z, "anchor A3 — 250 mm above A1/A2", -70, -40, 20], [-MAST_R, 0, 30, "mast foot on the −X boss", -70, -50, 10], [0, UWB_HALF, 22, "A1", 0, 40, 40]] },
+             marks: [[-MAST_R, 0, A3_Z, "anchor A3 — 250 mm above A1/A2", -70, -40, 20], [-MAST_R, 0, 30, "mast foot on the −X boss", -70, -50, 10], [0, UWB_HALF, BOARD_Z, "A1", 0, 40, 40]] },
   },
   {
     id: "battery", phase: 3, title: "Battery tray and power bank", time: "15 min",
@@ -272,29 +296,29 @@ const STEPS = [
     tools: [],
     steps: [
       "Drop the bank into the tray and strap it through the two floor slots.",
-      "Mount the tray either way: strap it to a tripod leg or centre column, or sandwich it between the tripod plate and the enclosure using a 1/4-20 × 50 mm through the central bore and into the reducer bushing. Either way the mass ends up low, which is what keeps the rig stable with the mast and camera above it.",
-      "Run the 100 W USB-C cable from the bank up to the PD trigger. Dress it so it cannot snag a tripod leg.",
+      "Strap the tray to a tripod leg or the centre column, as low as is convenient. The mass ends up low, which is what keeps the rig stable with the camera above it. (There is no sandwich mount: the bolt would have to go through the bank.)",
+      `Run the USB-C cable from the bank up to the inlet low on the ${where(LY.usbc.ang)} of the enclosure and plug it in. Dress it so it cannot snag a tripod leg.`,
       "Charge the bank fully before the first power-on. The fuel gauge counts what it measures from the moment the camera software starts and assumes a full pack then — it has no way to read the bank's own charge.",
     ],
     note: "Expect about 6.2 hours tracking and recording, 6.5 tracking only, and 8 idle. Those allow for the bank's own conversion loss, which is why they are lower than its 92 Wh label suggests. Recording is nearly free on this board: the Pi 4 has a hardware H.264 encoder, which is the reason the design is not on a Pi 5.",
-    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST], add: lift(BATT, -70),
+    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST], add: lift(BATT, -70),
              view: "iso-low", focus: "all", render: "battery",
-             marks: [[0, 0, -14, "92 Wh bank, slung low", 85, -40, -25]] },
+             marks: [[0, 0, LY.tray_z + 15, "92 Wh bank, strapped low", 85, -40, -25]] },
   },
   {
     id: "cabling", phase: 3, title: "Cabling and service loops", time: "25 min",
     parts: ["Zip ties, adhesive tie mounts"],
     tools: ["Flush cutters"],
     steps: [
-      "<b>Wiring:</b> the full connection list and a symptom table are in the <a href='../wiring.md' target='_blank'>wiring guide</a>.",
+      "<b>Wiring:</b> the full connection list and a symptom table are in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>.",
       "<b>Camera ribbon:</b> about 80 mm of slack coiled under the lid, loose enough that neither axis pulls it at full travel. Sweep both by hand and watch the coil before you tie anything.",
       "<b>PTZ I2C and power:</b> 5 V and ground from the buck, SDA and SCL to GPIO 2/3. Power the controller from the rail, <i>not</i> the Pi's GPIO 5 V pin — two servos stalling is about 0.7 A and the header is not the place for it.",
-      "<b>Anchors:</b> a USB-A extension each, routed down the arms and tied along the rib, and down the dowel for A3. Only one carries data; the others just need 5 V. Leave A3's lead a little slack at the foot so the mast can be pulled for transport.",
+      "<b>Anchors:</b> a USB-A extension each, routed along the arms and tied to the rib, down the dowel for A3, and in through the slot high in the wall to the Pi's USB ports. Only one carries data; the others just need 5 V. Leave A3's lead a little slack at the foot so the mast can be pulled for transport.",
       "Tie everything off. Nothing may hang where a tripod leg folds, and nothing may reach the pan axis.",
     ],
-    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST, ...BATT], add: lift(CABLES, 0), arrows: false,
+    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST, ...BATT], add: lift(CABLES, 0), arrows: false,
              view: "iso-back", focus: "all", render: "complete",
-             marks: [[0, 0, 60, "ribbon service loop", -85, 35, 35], [-30, 60, 30, "USB → anchors", -70, 35, 30], [-MAST_R - 8, 0, A3_Z - 80, "A3 lead down the mast", -60, -40, 30]] },
+             marks: [[0, 0, 60, "ribbon service loop", -85, 35, 35], [LY.base_d / 2 * Math.cos(LY.usb_entry.ang * Math.PI / 180), LY.base_d / 2 * Math.sin(LY.usb_entry.ang * Math.PI / 180), LY.usb_entry.z, "anchor leads in", -70, 35, 30], [-MAST_R - 8, 0, A3_Z - 80, "A3 lead down the mast", -60, -40, 30]] },
   },
   {
     id: "tripod", phase: 4, title: "Mount on the tripod", time: "10 min",
@@ -307,7 +331,7 @@ const STEPS = [
       "Level the enclosure, then point the lens at the middle of what you are filming. At 8 m back the ±80° sweep covers about 22 m of wall, so aim it once and the limits never come up.",
       "Switch on. The ring should come up solid blue.",
     ],
-    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST, ...BATT, ...CABLES], add: [["tripod", 0, 0, -170]],
+    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST, ...BATT, ...CABLES], add: [["tripod", 0, 0, -170]],
              view: "iso-low", focus: "all", render: "complete" },
   },
   {
@@ -324,7 +348,7 @@ const STEPS = [
       "Finish with the zoom sweep and leave the lens homed.",
     ],
     warn: "Do this before the first tracking run, not after. A servo driving into a mechanical stop will strip itself given a few minutes.",
-    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST, ...BATT, ...CABLES, "tripod"], add: [],
+    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST, ...BATT, ...CABLES, "tripod"], add: [],
              view: "front-high", focus: "all", demo: true, render: "complete" },
   },
   {
@@ -337,13 +361,13 @@ const STEPS = [
       "<b>Ring:</b> solid blue in standby, with the tag off.",
       "<b>Anchors:</b> the reporting one appears as ttyUSB and streams <code>mc \u2026</code> frames carrying three ranges and a validity mask of <code>07</code>. Walk around and watch the bearing follow you; then hold the tag overhead and crouch, and watch the elevation follow.",
       "<b>Range bias:</b> with the pan centred, tape the tag <b>5.00 m</b> out on the boresight at the height of the A1/A2 boards and run <code>python -m sportcam.rangecal 5</code> on the Pi. Paste the <code>RANGE_BIAS_M</code> it prints into <code>config.py</code>. Don't skip it: on the 250 mm mast, 5 cm of error on A3 is about 12° of tilt.",
-      "<b>Tracking:</b> switch the wearable tag on. That is the start button: the ring shows a green light chasing round while the camera turns to find you, then turns breathing red once it has locked on — it must <b>see</b> you in the middle of the frame, so stand upright and face it — and the phone app chimes. The zoom then settles with you filling about two-thirds of the frame. Walk the arc; the head should follow smoothly. Switch the tag off and 5 s later the ring is back to solid blue. Hit <b>Motion demo</b> above to see what healthy pan and tilt look like. Do the bearing and elevation checks in the <a href='../software_setup.md' target='_blank'>software setup</a> first.",
+      "<b>Tracking:</b> switch the wearable tag on. That is the start button: the ring shows a green light chasing round while the camera turns to find you, then turns breathing red once it has locked on — it must <b>see</b> you in the middle of the frame, so stand upright and face it — and the phone app chimes. The zoom then settles with you filling about two-thirds of the frame. Walk the arc; the head should follow smoothly. Switch the tag off and 5 s later the ring is back to solid blue. Hit <b>Motion demo</b> above to see what healthy pan and tilt look like. Do the bearing and elevation checks in the <a href='../14-software-setup.md' target='_blank'>software setup</a> first.",
       "<b>Battery:</b> check the gauge's minutes-left against a stopwatch over the first half hour. If the estimate is badly off, your <code>INA226_SHUNT_OHMS</code> does not match the shunt fitted to your module.",
       "<b>Card:</b> the app should show free space as minutes of recording. A 64 GB card reads roughly 10 hours when empty. Fill it deliberately once if you want to see the camera decline to record and say why.",
     ],
     warn: "If the mask reads <code>03</code>, A3 is not being ranged — check the tag is configured for three anchors. Tracking still works on <code>03</code>, but tilt falls back to vision alone.",
-    note: "Full bring-up order is in <a href='../../../../docs/03-electronics.md' target='_blank'>doc 03</a>; the tracking maths and calibration are in <a href='../../04-tracking-system.md' target='_blank'>doc 04</a>.",
-    scene: { show: [...SHELL, ...POWER, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST, ...BATT, ...CABLES, "tripod"], add: [],
+    note: "Full bring-up order is in <a href='../../../../docs/design/04-electronics.md' target='_blank'>doc 04</a>; the tracking maths and calibration are in <a href='../../design/05-tracking-system.md' target='_blank'>doc 05</a>.",
+    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST, ...BATT, ...CABLES, "tripod"], add: [],
              view: "iso", focus: "all", demo: true, render: "complete" },
   },
 ];
@@ -382,7 +406,7 @@ function buildNav() {
 }
 
 // Names of parts and tools become buttons that open a picture and a
-// description (docs/assembly/catalog.js, shared by both builds).
+// description (docs/setup/assembly/catalog.js, shared by both builds).
 const linkify = (x) => (window.SportcamCatalog ? SportcamCatalog.linkify(x) : x);
 function list(items) { return items.length ? "<ul>" + items.map((x) => `<li>${linkify(x)}</li>`).join("") + "</ul>" : "<p class='muted'>none</p>"; }
 
@@ -594,6 +618,27 @@ function stlGeometry(name) {
   return g;
 }
 
+/* ---- parts placed by cad/fit.py ----------------------------------------
+   placed(key, fn): a board from LY.boxes, drawn in its own frame (centre
+   origin, z = 0 on the floor tape, +x along its length) and moved to where
+   the solver put it. `mid` centres it vertically (switch, jack). */
+function placed(key, fn, mid) {
+  const b = LY.boxes[key], g = group(...fn(b));
+  g.position.set(b.cx, b.cy, mid ? (b.z0 + b.z1) / 2 : b.z0);
+  g.rotation.z = THREE.MathUtils.degToRad(b.ang);
+  return g;
+}
+function piPlaced(fn) {   // the Pi's frame: centre origin, z = 0 under the board, +x to the USB end, −y the power edge
+  const p = LY.parts.pi, g = group(...fn(p, p.l / 2, p.w / 2));
+  g.position.set(LY.pi.x, LY.pi.y, LY.pi.z);
+  g.rotation.z = THREE.MathUtils.degToRad(LY.pi.ang);
+  return g;
+}
+function piPoint(x, y, z) {    // Pi-frame point → world (OpenSCAD) coordinates
+  const a = LY.pi.ang * Math.PI / 180;
+  return [LY.pi.x + x * Math.cos(a) - y * Math.sin(a), LY.pi.y + x * Math.sin(a) + y * Math.cos(a), LY.pi.z + z];
+}
+
 /* ---- the parts catalogue ---------------------------------------------
    build: returns an Object3D positioned at its seat in OpenSCAD coords.
    grp:   static (base), pan (turns with the platform), tilt (turns on the
@@ -611,45 +656,56 @@ const PARTS = {
     }
     return g;
   } },
-  battery_tray: { grp: "static", stl: "battery_tray", color: COL.print, pos: [-77.4, -38.4, -20] },
-  bank: { grp: "static", build: () => group(at(mesh(box(150, 72, 30), COL.dark, { rough: 0.5 }), 0, 0, -2.6),
-                                            at(mesh(box(26, 10, 2), COL.steel, { metal: 0.4 }), -70, 0, -2.6)) },
-  insert: { grp: "static", build: () => at(mesh(cyl(6.3, 8), COL.brass, { metal: 0.6, rough: 0.4 }), 0, 0, 4.2) },
+  battery_tray: { grp: "static", stl: "battery_tray", color: COL.print,
+                  pos: [-LY.parts.power_bank.l / 2 - 2.4, -LY.parts.power_bank.w / 2 - 2.4, LY.tray_z] },
+  bank: { grp: "static", build: () => { const k = LY.parts.power_bank;
+    return group(at(mesh(box(k.l, k.w, k.h), COL.dark, { rough: 0.5 }), 0, 0, LY.tray_z + 2.4 + k.h / 2),
+                 at(mesh(box(26, 10, 2), COL.steel, { metal: 0.4 }), -k.l / 2 + 5, 0, LY.tray_z + 2.4 + k.h)); } },
+  insert: { grp: "static", build: () => at(mesh(cyl(LY.parts.tripod_insert.od / 2 - 0.05, LY.parts.tripod_insert.l), COL.brass, { metal: 0.6, rough: 0.4 }), 0, 0, LY.parts.tripod_insert.l / 2 + 0.2) },
   base_housing: { grp: "static", stl: "base_housing", color: COL.print, double: true },
 
-  // power chain on the +X side of the floor
-  trigger: { grp: "static", build: () => group(at(mesh(box(30, 20, 1.6), COL.blue), 46, 18, 7.8),
-                                               at(mesh(box(9, 7, 3.2), COL.steel, { metal: 0.4 }), 34, 18, 10.2)) },
-  ina226: { grp: "static", build: () => group(at(mesh(box(20, 16, 1.6), COL.pcb), 46, 0, 7.8),
-                                              at(mesh(box(7, 5, 1.5), COL.black), 46, 0, 9.3)) },
-  buck: { grp: "static", build: () => group(at(mesh(box(45, 26, 1.6), COL.blue), 46, -18, 7.8),
-                                            at(mesh(box(13, 13, 9), COL.black), 36, -18, 13.2),
-                                            at(mesh(cyl(4.5, 10), COL.dark), 56, -18, 13.6)) },
-  switch: { grp: "static", build: () => group(at(mesh(box(13, 20, 10), COL.black), 60, 30, 9),
-                                              at(mesh(box(9, 14, 2), COL.steel, { metal: 0.4 }), 60, 30, 14.5)) },
-  jack: { grp: "static", build: () => group(at(mesh(cyl(4.5, 16, "y"), COL.black), 0, -62, 11),
-                                            at(mesh(cyl(5.6, 2, "y"), COL.steel, { metal: 0.5 }), 0, -69, 11)) },
+  // power boards on the floor, where cad/fit.py put them
+  trigger: { grp: "static", build: () => placed("trigger", (b) => [
+      at(mesh(box(b.l, b.w, 1.6), COL.blue), 0, 0, 0.8),
+      at(mesh(box(8, 9, 3.3), COL.steel, { metal: 0.4 }), b.l / 2 - 4, 0, b.z1 - b.z0 - 1.65)]) },
+  ina226: { grp: "static", build: () => placed("gauge", (b) => [
+      at(mesh(box(b.l, b.w, 1.6), COL.pcb), 0, 0, 0.8),
+      at(mesh(box(b.l * 0.35, b.w * 0.8, b.z1 - b.z0 - 1.6), COL.blue), b.l * 0.28, 0, (b.z1 - b.z0 + 1.6) / 2),
+      at(mesh(box(4, 4, 1.2), COL.black), -b.l * 0.2, 0, 2.2)]) },
+  buck: { grp: "static", build: () => placed("buck", (b) => [
+      at(mesh(box(b.l, b.w, 1.6), COL.blue), 0, 0, 0.8),
+      at(mesh(box(b.l * 0.3, b.w * 0.5, b.z1 - b.z0 - 1.6), COL.black), -b.l * 0.15, 0, (b.z1 - b.z0 + 1.6) / 2),
+      at(mesh(cyl(4.5, 12), COL.dark), b.l * 0.3, b.w * 0.2, 7.6)]) },
+  switch: { grp: "static", build: () => placed("switch", (b) => [
+      at(mesh(box(b.l - 3, b.w * 0.8, (b.z1 - b.z0) * 0.8), COL.black), -1.5, 0, 0),
+      at(mesh(box(2, b.w, b.z1 - b.z0), COL.black), b.l / 2 - 0.5, 0, 0),
+      at(mesh(box(2, b.w * 0.6, (b.z1 - b.z0) * 0.6), COL.wire), b.l / 2 + 1, 0, 0)], true) },
+  jack: { grp: "static", build: () => placed("jack", (b) => [
+      at(mesh(cyl(4.4, b.l - 3, "x"), COL.black), -1.5, 0, 0),
+      at(mesh(cyl(b.w / 2, 2, "x"), COL.steel, { metal: 0.5 }), -LY.design.base_wall - 1, 0, 0)], true) },
 
-  // compute
-  pi: { grp: "static", build: () => group(at(mesh(box(85, 56, 1.6), COL.pcb), -10, 0, 9.8),
-                                          at(mesh(box(51, 5, 8.5), COL.black), -6, 24.5, 14.8),
-                                          at(mesh(box(17, 13, 15), COL.steel, { metal: 0.4 }), -46, -17, 18),
-                                          at(mesh(box(17, 13, 15), COL.steel, { metal: 0.4 }), -46, 0, 18),
-                                          at(mesh(box(21, 16, 13.5), COL.steel, { metal: 0.4 }), -44, 19, 17.3),
-                                          at(mesh(box(9, 7, 3.2), COL.steel, { metal: 0.4 }), 27, -22, 12.2)) },
-  cooler: { grp: "static", build: () => group(at(mesh(box(55, 40, 13), COL.dark, { metal: 0.3 }), -3, -5, 17.1),
-                                              at(mesh(tube(14, 11, 2), COL.black), 9, -5, 24.6),
-                                              at(mesh(cyl(10.5, 1.2), COL.black), 9, -5, 24.2)) },
-
-  // status ring
+  // the shelf, with the LED ring under it and the Pi on top
+  shelf: { grp: "static", stl: "shelf", color: COL.white, pos: [0, 0, SHELF_Z] },
   ledring: { grp: "static", build: () => {
-    const g = group(at(mesh(tube(24, 17, 1.6), COL.black), 0, 0, 25));
-    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; g.add(at(mesh(box(5, 5, 1.6), COL.cream), 20.5 * Math.cos(a), 20.5 * Math.sin(a), 26.6, 0, 0, a)); }
+    const r = LY.parts.led_ring, g = group(at(mesh(tube(r.od / 2, r.id / 2, 1.6), COL.black), 0, 0, LY.ring_z1 - 0.8));
+    for (let i = 0; i < r.count; i++) { const a = i / r.count * Math.PI * 2; g.add(at(mesh(box(5, 5, 1.6), COL.cream), (r.od + r.id) / 4 * Math.cos(a), (r.od + r.id) / 4 * Math.sin(a), LY.ring_z0 + 0.8, 0, 0, a)); }
     return g;
   } },
-  shifter: { grp: "static", build: () => group(at(mesh(box(20, 8, 1.6), COL.pcb), 20, 40, 7.8),
-                                               at(mesh(box(13, 5, 3), COL.black), 20, 40, 10.3)) },
-  led_diffuser_ring: { grp: "static", stl: "led_diffuser_ring", color: COL.white, opacity: 0.82, pos: [0, 0, 18] },
+  shifter: { grp: "static", build: () => placed("shifter", (b) => [
+      at(mesh(box(b.l, b.w, 1.6), COL.pcb), 0, 0, 0.8),
+      at(mesh(box(19, 6.5, 3), COL.black), 0, 0, 3.1)]) },
+  pi: { grp: "static", build: () => piPlaced((p, hl, hw) => [
+      at(mesh(box(p.l, p.w, 1.6), COL.pcb), 0, 0, 0.8),
+      at(mesh(box(p.gpio_x1 - p.gpio_x0, 5, 8.5), COL.black), (p.gpio_x0 + p.gpio_x1) / 2 - hl, hw - 3.5, 5.85),
+      at(mesh(box(17.5, 13, 15.6), COL.steel, { metal: 0.4 }), hl + p.port_overhang - 8.75, -hw + 9, 9.4),
+      at(mesh(box(17.5, 13, 15.6), COL.steel, { metal: 0.4 }), hl + p.port_overhang - 8.75, -hw + 27, 9.4),
+      at(mesh(box(21, 16, 13.5), COL.steel, { metal: 0.4 }), hl + p.port_overhang - 10.5, hw - 10.25, 8.35),
+      at(mesh(box(9, 7, 3.2), COL.steel, { metal: 0.4 }), p.usbc_x - hl, -hw + 3.5, 3.2),
+      at(mesh(box(4, 22, 5.5), COL.cream), 45 - hl, -hw + 16, 4.35)]) },
+  cooler: { grp: "static", build: () => piPlaced((p, hl, hw) => [
+      at(mesh(box(15, 15, p.heatsink_h), COL.dark, { metal: 0.3 }), 29 - hl, -hw + 32, 1.6 + p.heatsink_h / 2),
+      at(mesh(box(10, 14, p.heatsink_h * 0.7), COL.dark, { metal: 0.3 }), 45 - hl, -hw + 32, 1.6 + p.heatsink_h * 0.35)]) },
+  led_diffuser_ring: { grp: "static", stl: "led_diffuser_ring", color: COL.white, opacity: 0.82, pos: [0, 0, BAND_Z] },
 
   // lid and the bought PTZ assembly
   lid: { grp: "static", stl: "lid", color: COL.print, pos: [0, 0, LID_Z] },
@@ -670,31 +726,52 @@ const PARTS = {
   // static anchor arms
   arm_p: { grp: "static", stl: "anchor_arm", color: COL.print, pos: [15, ARM_R, 10], rot: [0, 0, Math.PI / 2] },
   arm_n: { grp: "static", stl: "anchor_arm", color: COL.print, pos: [-15, -ARM_R, 10], rot: [0, 0, -Math.PI / 2] },
-  uwb_p: { grp: "static", build: () => uwb(1) },
-  uwb_n: { grp: "static", build: () => uwb(-1) },
+  uwb_p: { grp: "static", build: () => uwbBoard(0, UWB_HALF, BOARD_Z, 1) },
+  uwb_n: { grp: "static", build: () => uwbBoard(0, -UWB_HALF, BOARD_Z, -1) },
 
   // A3 mast, behind the lens at −X
   mast_foot: { grp: "static", stl: "mast_foot", color: COL.print, pos: [-ARM_R, -9, 10], rot: [0, 0, Math.PI / 2] },
-  dowel: { grp: "static", build: () => at(mesh(cyl(6.35, MAST_TOP - 12), COL.cream, { rough: 0.8 }), -MAST_R, 0, (MAST_TOP + 12) / 2) },
+  dowel: { grp: "static", build: () => at(mesh(cyl(LY.parts.dowel.d / 2, MAST_TOP - DOWEL_Z0), COL.cream, { rough: 0.8 }), -MAST_R, 0, (MAST_TOP + DOWEL_Z0) / 2) },
   mast_cradle: { grp: "static", stl: "mast_cradle", color: COL.print, pos: [-MAST_R, 0, A3_Z - 4], rot: [Math.PI, 0, 0] },
-  uwb_m: { grp: "static", build: () => group(at(mesh(box(25, 40, 1.6), COL.pcb), -MAST_R, 0, A3_Z - 0.2),
-                                             at(mesh(box(8, 8, 2.4), COL.white), -MAST_R, 16, A3_Z + 1.8),
-                                             at(mesh(box(12, 12, 4.5), COL.steel, { metal: 0.4 }), -MAST_R, -26, A3_Z + 1.8)) },
+  uwb_m: { grp: "static", build: () => uwbBoard(-MAST_R, 0, A3_Z, 1) },
 
   // cabling
-  ffc: { grp: "static", build: () => cable([[6, 0, TILT_Z - 16], [14, 10, 100], [6, 16, 84], [-6, 10, 74], [-4, 0, 56], [0, -8, 30], [12, -16, 14]], 1.6, COL.ffc) },
-  usb_p: { grp: "static", build: () => cable([[0, UWB_HALF - 14, 32], [-6, UWB_HALF - 38, 30], [-24, 66, 25], [-20, 22, 16]], 1.5, COL.black) },
-  usb_n: { grp: "static", build: () => cable([[0, -UWB_HALF + 14, 32], [-6, -UWB_HALF + 38, 30], [-24, -66, 25], [-20, -22, 16]], 1.5, COL.black) },
-  usb_m: { grp: "static", build: () => cable([[-MAST_R, -30, A3_Z + 2], [-MAST_R - 8, -4, A3_Z - 30], [-MAST_R - 8, 0, (A3_Z + 80) / 2], [-MAST_R - 8, 0, 80], [-80, -16, 36], [-40, -24, 16]], 1.5, COL.black) },
-  pwr_pi: { grp: "static", build: () => group(cable([[56, -18, 14], [40, -34, 14], [10, -30, 13], [27, -22, 13]], 2.2, COL.wire),
-                                              cable([[46, 18, 10], [46, 34, 12], [20, 40, 10], [8, 30, 27]], 2.0, COL.wire)) },
-  i2c_lead: { grp: "static", build: () => cable([[0, 6, 62], [-6, 14, 44], [-14, 16, 26], [-24, 10, 13]], 1.4, COL.dark) },
+  ffc: { grp: "static", build: () => { const p = LY.parts.pi, c = piPoint(45 - p.l / 2, -p.w / 2 + 16, 8);
+    return cable([[6, 0, TILT_Z - 16], [14, 10, LID_Z + 20], [4, 8, LID_Z - 4], [-6, 6, LID_Z - 10], [c[0], c[1], c[2] + 12], c], 1.6, COL.ffc); } },
+  pwr_pi: { grp: "static", build: () => {
+    const p = LY.parts.pi, u = [Math.cos(LY.gap_ang * Math.PI / 180), Math.sin(LY.gap_ang * Math.PI / 180)];
+    const gp = [u[0] * (LY.gap_d + 8), u[1] * (LY.gap_d + 8)], plug = piPoint(p.usbc_x - p.l / 2, -p.w / 2 - 12, 3);
+    const B = bx("buck"), G = bx("gauge"), T = bx("trigger");
+    return group(cable([[B.cx, B.cy, B.z1], [gp[0], gp[1], (B.z1 + SHELF_Z) / 2], [gp[0], gp[1], LY.shelf_top + 2], plug], 2.2, COL.wire),
+                 cable([[T.cx, T.cy, T.z1], [G.cx, G.cy, G.z1 + 2], [B.cx, B.cy, B.z1 - 4]], 2.0, COL.wire));
+  } },
+  i2c_lead: { grp: "static", build: () => {
+    const p = LY.parts.pi, u = [Math.cos(LY.gap_ang * Math.PI / 180), Math.sin(LY.gap_ang * Math.PI / 180)];
+    const G = bx("gauge"), hdr = piPoint(p.gpio_x0 + 6 - p.l / 2, p.w / 2 - 3.5, 10);
+    return cable([[G.cx, G.cy, G.z1], [u[0] * (LY.gap_d + 4), u[1] * (LY.gap_d + 4), SHELF_Z - 4], [u[0] * (LY.gap_d + 4), u[1] * (LY.gap_d + 4), LY.shelf_top + 6], hdr], 1.4, COL.dark);
+  } },
+  usb_p: { grp: "static", build: () => usbLead([-LY.parts.ula1.l / 2 - 14, UWB_HALF, BOARD_Z + 2]) },
+  usb_n: { grp: "static", build: () => usbLead([-LY.parts.ula1.l / 2 - 14, -UWB_HALF, BOARD_Z + 2]) },
+  usb_m: { grp: "static", build: () => usbLead([-MAST_R - LY.parts.ula1.l / 2 - 14, 0, A3_Z + 2], true) },
 };
-function uwb(s) {   // board centre UWB_HALF out (250 mm baseline), on 3 mm standoffs on the arm pad
-  return group(at(mesh(box(30, 55, 1.6), COL.pcb), 0, s * UWB_HALF, 29.8),
-               at(mesh(box(16, 24, 3), COL.steel), 0, s * (UWB_HALF - 10), 32.1),
-               at(mesh(box(8, 8, 2.4), COL.white), 0, s * (UWB_HALF + 22), 31.8),
-               at(mesh(box(8, 6, 3), COL.steel, { metal: 0.4 }), 0, s * (UWB_HALF - 25), 32));
+function uwbBoard(cx, cy, z, radialSign) {   // a ULA1: plug at local −x, antenna at +x
+  const u = LY.parts.ula1;
+  const g = group(at(mesh(box(u.l, u.w, 1.6), COL.pcb), 0, 0, 0),
+                  at(mesh(box(8, 8, 2.4), COL.white), u.l / 2 - u.antenna_from_end, 0, 2),
+                  at(mesh(box(16, 12, 3), COL.steel), -4, 0, 2.3),
+                  at(mesh(box(u.plug_overhang, 12, 4.5), COL.steel, { metal: 0.4 }), -u.l / 2 - u.plug_overhang / 2, 0, 1.5));
+  g.position.set(cx, cy, z);
+  // across the arm: plug to −X; along it: plug pointing at the enclosure
+  if (!LY.ula1_tangential) g.rotation.z = radialSign * Math.PI / 2;
+  return g;
+}
+function usbLead(from, mast) {   // anchor plug → round to the wall slot → the Pi's USB ports
+  const e = LY.usb_entry, a = e.ang * Math.PI / 180, R = LY.base_d / 2;
+  const out = [(R + 6) * Math.cos(a), (R + 6) * Math.sin(a), e.z], inn = [(R - 8) * Math.cos(a), (R - 8) * Math.sin(a), e.z];
+  const p = LY.parts.pi, port = piPoint(p.l / 2 + p.port_overhang + 10, -p.w / 2 + 14, 9);
+  const pts = mast ? [from, [from[0] - 6, 0, A3_Z - 40], [from[0] - 6, 0, e.z + 20], out, inn, port]
+                   : [from, [from[0] - 10, from[1] * 0.85, BOARD_Z + 4], [out[0] * 1.4, out[1] * 1.4, e.z - 10], out, inn, port];
+  return cable(pts, 1.5, COL.black);
 }
 
 /* ---- scene ------------------------------------------------------------ */
@@ -907,7 +984,7 @@ function setDemo(on) { demo = on; if (!on) { demoT = 0; } }
 
 /* ---- catalogue snapshots ---------------------------------------------
    A still picture of one or more PARTS models on their own, for the
-   parts-and-tools popup (docs/assembly/catalog.js). */
+   parts-and-tools popup (docs/setup/assembly/catalog.js). */
 let snapRenderer = null;
 function snapshot(ids) {
   ids = ids.filter((id) => PARTS[id]);

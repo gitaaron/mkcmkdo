@@ -1,17 +1,26 @@
-# Setup — start here
+# Setup — start here (without UWB)
 
-Three guides take you from a box of parts to a camera that films on its own.
-Follow them in order; the wiring guide is used alongside the assembly guide.
+These docs take you from ordering parts to a camera that films on its own.
+Follow them in order. 11 — 3D printing is shared by both builds; the rest
+are specific to this build.
 
-| # | Guide | Covers | Time |
+| # | Doc | Covers | Time |
 | --- | --- | --- | --- |
-| 1 | [**Assembly guide**](assembly/index.html) (interactive, 3D) | printing, the enclosure, power, camera, battery, tripod, power-on checks | a weekend, plus ≈ 25 h of printing |
-| 1a | [**Wiring guide**](wiring.md) | every connection, pin by pin, in wiring order with a check after each, linked to the [schematics](../../schematics/interactive/index.html) | ≈ 2 h, inside the assembly |
-| 2 | [**Software setup**](software_setup.md) | Raspberry Pi OS, the camera software, bench checks, calibration, services, the app | ≈ 2 h |
+| 10 | [**Bill of materials**](10-bill-of-materials.md) | every part to order, with prices and Canadian sources, and the printed parts | ≈ 2 weeks of deliveries |
+| 11 | [**3D printing**](../../../docs/setup/11-3d-printing.md) | printer requirements, filament, settings, orientation and print order for every printed part | ≈ 25 h of printing |
+| 12 | [**Wiring guide**](12-wiring.md) | every connection, pin by pin, in wiring order with a check after each, linked to the [schematics](../../schematics/interactive/index.html) | ≈ 2 h, made during the assembly |
+| 13 | [**Assembly guide**](assembly/index.html) (interactive, 3D) | the enclosure, power, LED ring, Pi shelf, camera, battery, tripod, power-on checks | a weekend |
+| 14 | [**Software setup**](14-software-setup.md) | Raspberry Pi OS, the camera software, bench checks, calibration, services, the app | ≈ 2 h |
+| 15 | [**Verification checklist**](15-verification.md) | what to measure before printing, check on arrival, confirm on the bench and in the first session | used alongside the docs above |
 
-Before you order or print anything, read
-[10 — Verification](../10-verification.md#before-you-print): two
-measurements decide whether the printed parts fit what you bought.
+Read the wiring guide before you start the assembly: the assembly guide makes
+its connections in the same order, at the step where each one goes in.
+
+Before you print anything, work through
+[15 — Verification](15-verification.md#before-you-print): two
+measurements decide whether the printed parts fit what you bought. Put them in
+`cad/ordered_parts.toml` and run `python3 cad/fit.py` (see
+[Appendix A](../../../docs/appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)).
 
 The assembly guide is a single HTML page. Open it straight from disk, or run
 `npm run docs` and pick it from the sidebar. Its build scripts are described

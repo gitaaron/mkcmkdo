@@ -10,7 +10,7 @@
  *   GET /api/recordings/:name → 302 to a signed URL (so <video> src works)
  *
  * Live control/streaming stays on the LAN server — those callables return
- * failed-precondition here (documented in docs/08-cloud-gym-workflow.md).
+ * failed-precondition here (documented in docs/design/08-recordings-and-cloud.md).
  */
 import express, { type Request, type Response } from "express";
 import { initializeApp } from "firebase-admin/app";

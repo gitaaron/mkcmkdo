@@ -154,37 +154,53 @@ loadToc().then(loadDoc);
 </body>
 </html>`;
 
-// Every top-level .md in `dir`, titled by its first heading.
-async function mdEntries(dir) {
-  const files = (await readdir(join(ROOT, dir))).filter((f) => f.endsWith(".md")).sort();
+// Every .md in `dir` (if it exists), titled by its first heading.
+async function mdEntries(dir, suffix = "") {
+  let files;
+  try {
+    files = (await readdir(join(ROOT, dir))).filter((f) => f.endsWith(".md") && f !== "README.md");
+  } catch {
+    return [];
+  }
   const out = [];
   for (const f of files) {
     const first = (await readFile(join(ROOT, dir, f), "utf8")).split("\n")[0];
-    out.push({ path: `${dir}/${f}`, title: first.replace(/^#\s*/, "") || f });
+    out.push({ path: `${dir}/${f}`, title: (first.replace(/^#\s*/, "") || f) + suffix });
   }
   return out;
 }
 
-// Sidebar: what both builds share first, then one section per build.
 const BUILDS = [
   { dir: "with_uwb", title: "With UWB" },
   { dir: "without_uwb", title: "Without UWB" },
 ];
 
+// Docs are numbered in reading order; sort by number, then by build, so a
+// build-specific doc appears once per build at its place in the order.
+const byNumber = (a, b) => a.path.split("/").pop().localeCompare(b.path.split("/").pop()) || a.path.localeCompare(b.path);
+
+// Sidebar: README and the build overviews, then Product, Design, Setup and
+// the appendices — the order of the README's table of contents.
 async function listDocs() {
-  const entries = [{ path: "README.md", title: "README" }, { section: "Common to both builds" }];
-  entries.push(...(await mdEntries("docs")));
-  entries.push({ path: "docs/3d_printer/specifications.md", title: "3D printing specifications" });
-  for (const b of BUILDS) {
-    entries.push({ section: b.title });
-    entries.push({ path: `${b.dir}/README.md`, title: `${b.title} — overview` });
-    entries.push(...(await mdEntries(`${b.dir}/docs`)));
-    entries.push({ path: `${b.dir}/docs/setup/README.md`, title: "Setup — start here" });
-    entries.push({ path: `${b.dir}/docs/setup/assembly/index.html`, title: "Setup 1: Assembly guide (interactive 3D)" });
-    entries.push({ path: `${b.dir}/docs/setup/wiring.md`, title: "Setup 1a: Wiring guide" });
-    entries.push({ path: `${b.dir}/docs/setup/software_setup.md`, title: "Setup 2: Software setup" });
-    entries.push({ path: `${b.dir}/schematics/interactive/index.html`, title: "Wiring schematic (interactive)" });
+  const entries = [{ path: "README.md", title: "README" }];
+  for (const b of BUILDS) entries.push({ path: `${b.dir}/README.md`, title: `${b.title} — overview` });
+  for (const [folder, title] of [["product", "Product"], ["design", "Design"], ["setup", "Setup"]]) {
+    entries.push({ section: title });
+    if (folder === "setup")
+      for (const b of BUILDS) entries.push({ path: `${b.dir}/docs/setup/README.md`, title: `Setup — start here (${b.title})` });
+    const list = [...(await mdEntries(`docs/${folder}`))];
+    for (const b of BUILDS) {
+      list.push(...(await mdEntries(`${b.dir}/docs/${folder}`, ` (${b.title})`)));
+      if (folder === "setup")
+        list.push({ path: `${b.dir}/docs/setup/13-assembly.html`, href: `${b.dir}/docs/setup/assembly/index.html`, title: `13 — Assembly guide, interactive 3D (${b.title})` });
+    }
+    list.sort(byNumber);
+    entries.push(...list.map(({ href, ...e }) => (href ? { ...e, path: href } : e)));
+    if (folder === "setup")
+      for (const b of BUILDS) entries.push({ path: `${b.dir}/schematics/interactive/index.html`, title: `Wiring schematic, interactive (${b.title})` });
   }
+  entries.push({ section: "Appendices" });
+  entries.push(...(await mdEntries("docs/appendix")).sort(byNumber));
   return entries;
 }
 

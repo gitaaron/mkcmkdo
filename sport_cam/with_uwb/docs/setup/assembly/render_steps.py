@@ -44,14 +44,19 @@ BODY = "#c3ccdb"       # already-assembled parts
 NEW = "#2f6fed"        # the part going on in this step
 ACCENT = "#1f9d55"
 
-# Assembly coordinates (mm) — OpenSCAD space, matching cad/config.scad and
-# the PARTS table in index.html.
-LID_Z = 66
-LID_TOP = LID_Z + 5
-ARM_R = 71.5
-UWB_HALF = 125   # A1/A2 board centres either side of the pan axis
-MAST_R = 86.1     # A3 mast axis, behind the pan axis at −X
-A3_Z = 272        # A3 board height; the cradle's pad top is 4 mm below
+# Assembly coordinates (mm) — OpenSCAD space, from the layout cad/fit.py
+# solved (../../../cad/layout.json), the same numbers the live guide uses.
+import json  # noqa: E402
+LY = json.load(open(os.path.join(HERE, "..", "..", "..", "cad", "layout.json")))
+LID_Z = LY["lid_z"]
+LID_TOP = LY["lid_top"]
+SHELF_Z = LY["shelf_z"]
+BAND_Z = LY["window_z"] - LY["design"]["diffuser_lip"]
+ARM_R = LY["arm_boss_r"]
+UWB_HALF = LY["uwb"]["uwb_half_base"]   # A1/A2 board centres either side of the pan axis
+MAST_R = LY["mast_axis_r"]               # A3 mast axis, behind the pan axis at −X
+A3_Z = LY["uwb"]["anchor_board_z"] + LY["uwb"]["uwb_v_base"]   # A3 board height; the cradle's pad top is 4 mm below
+DOWEL_Z0 = LY["uwb"]["arm_boss_z"] + LY["uwb"]["mast_floor"]
 
 
 def rot_z(deg):
@@ -67,7 +72,8 @@ def rot_x(deg):
 # name -> (stl file, rotation, translation)
 PARTS = {
     "shell":    ("base_housing.stl",      None,        (0, 0, 0)),
-    "diffuser": ("led_diffuser_ring.stl", None,        (0, 0, 18)),
+    "diffuser": ("led_diffuser_ring.stl", None,        (0, 0, BAND_Z)),
+    "shelf":    ("shelf.stl",             None,        (0, 0, SHELF_Z)),
     "lid":      ("lid.stl",               None,        (0, 0, LID_Z)),
     "arm_p":    ("anchor_arm.stl",        rot_z(90),   (15, ARM_R, 10)),
     "arm_n":    ("anchor_arm.stl",        rot_z(-90),  (-15, -ARM_R, 10)),
@@ -91,7 +97,7 @@ def cylinder(cx: float, cy: float, r: float, z0: float, z1: float, n: int = 20) 
 
 # Bought parts drawn here anyway, because the picture is wrong without them.
 PRIMS = {
-    "dowel": lambda: cylinder(-MAST_R, 0, 6.35, 12, 258),     # ½" dowel, 246 mm
+    "dowel": lambda: cylinder(-MAST_R, 0, LY["parts"]["dowel"]["d"] / 2, DOWEL_Z0, DOWEL_Z0 + LY["dowel_l"]),
 }
 
 
@@ -126,30 +132,37 @@ def shade(tris: np.ndarray, base_hex: str) -> np.ndarray:
 # field of the steps in index.html.
 # ---------------------------------------------------------------------------
 UP = (0, 0, 0)
-ALL = ["tray", "shell", "diffuser", "lid", "arm_p", "arm_n", "foot", "dowel", "cradle"]
+ALL = ["tray", "shell", "shelf", "diffuser", "lid", "arm_p", "arm_n", "foot", "dowel", "cradle"]
 SCENES = [
     dict(id="prep", title="Printed parts overview", show=[],
-         add=[("shell", UP), ("diffuser", (0, 0, 95)), ("lid", (0, 0, 150)),
+         add=[("shell", UP), ("shelf", (0, 0, 60)), ("diffuser", (0, 0, 95)), ("lid", (0, 0, 150)),
               ("arm_p", (0, 0, 60)), ("arm_n", (0, 0, 60)),
               ("foot", (-60, 0, 0)), ("cradle", (-60, 0, -80)), ("tray", (0, 0, -90))],
          arrows=False),
     dict(id="tripod-insert", title="Enclosure", show=[], add=[("shell", UP)], elev=38,
          marks=[((0, 0, 8), "3/8-16 insert (1/4-20 via bushing)")]),
-    dict(id="power", title="Power chain and Pi on the floor", show=[], add=[("shell", UP)], elev=44,
-         marks=[((46, 0, 12), "PD trigger · gauge · buck"), ((-10, 0, 10), "Raspberry Pi 4")]),
-    dict(id="led", title="LED ring and diffuser", show=["shell"], add=[("diffuser", (0, 0, 80))],
-         marks=[((0, 0, 26), "ring at window height")]),
+    dict(id="power", title="Power boards on the floor", show=[], add=[("shell", UP)], elev=44,
+         marks=[((LY["boxes"]["trigger"]["cx"], LY["boxes"]["trigger"]["cy"], 8), "PD trigger at the USB-C inlet"),
+                ((LY["boxes"]["buck"]["cx"], LY["boxes"]["buck"]["cy"], 20), "buck"),
+                ((LY["boxes"]["gauge"]["cx"], LY["boxes"]["gauge"]["cy"], 14), "gauge")]),
+    dict(id="led", title="LED ring under the shelf, diffuser band", show=["shell"],
+         add=[("shelf", (0, 0, 60)), ("diffuser", (0, 0, 80))],
+         marks=[((0, 0, SHELF_Z - 2), "ring under the shelf"), ((0, -LY["base_d"] / 2, BAND_Z + 8), "band over the window")]),
+    dict(id="pi", title="Pi on the shelf, shelf on the posts", show=["shell", "diffuser"],
+         add=[("shelf", (0, 0, 70))],
+         marks=[((LY["pi"]["x"], LY["pi"]["y"], LY["pi"]["z"]), "Raspberry Pi 4"),
+                ((LY["post_r"] * math.cos(math.radians(LY["post_angs"][0])), LY["post_r"] * math.sin(math.radians(LY["post_angs"][0])), SHELF_Z), "post")]),
     dict(id="lid-ptz", title="Arducam base onto the lid", show=[], add=[("lid", UP)], elev=34,
          marks=[((0, 0, LID_TOP), "slots take 30-72 mm bolt spacing")]),
-    dict(id="lid-on", title="Lid onto the enclosure", show=["shell", "diffuser"],
+    dict(id="lid-on", title="Lid onto the enclosure", show=["shell", "diffuser", "shelf"],
          add=[("lid", (0, 0, 95))]),
-    dict(id="arms", title="UWB anchor arms", show=["shell", "diffuser", "lid"],
+    dict(id="arms", title="UWB anchor arms", show=["shell", "shelf", "diffuser", "lid"],
          add=[("arm_p", (0, 0, 60)), ("arm_n", (0, 0, 60))],
          marks=[((0, UWB_HALF, 22), "anchor A1"), ((0, -UWB_HALF, 22), "anchor A2")]),
-    dict(id="mast", title="Third anchor mast (A3)", show=["shell", "diffuser", "lid", "arm_p", "arm_n"],
+    dict(id="mast", title="Third anchor mast (A3)", show=["shell", "shelf", "diffuser", "lid", "arm_p", "arm_n"],
          add=[("foot", (-60, 0, 0)), ("dowel", (0, 0, 140)), ("cradle", (0, 0, 90))],
          marks=[((-MAST_R, 0, A3_Z), "anchor A3, 250 mm up"), ((0, UWB_HALF, 22), "A1")]),
-    dict(id="battery", title="Battery tray", show=["shell", "diffuser", "lid", "arm_p", "arm_n", "foot", "dowel", "cradle"],
+    dict(id="battery", title="Battery tray", show=["shell", "shelf", "diffuser", "lid", "arm_p", "arm_n", "foot", "dowel", "cradle"],
          add=[("tray", (0, 0, -70))],
          marks=[((0, 0, -14), "92 Wh bank, slung low")]),
     dict(id="complete", title="Completed assembly", show=ALL, add=[]),

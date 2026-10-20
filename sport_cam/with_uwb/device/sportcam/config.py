@@ -63,10 +63,11 @@ UWB_RANGE_SIGMA_M = 0.10
 # (away from the lens), `up` how far above it. The mast puts it slightly
 # behind rather than exactly over the bar so the camera can tilt without
 # hitting it; the solver in uwb.py accounts for the offset. Both figures come
-# from cad/config.scad (`mast_axis_r`, `uwb_v_base`).
+# from the CAD (`mast_axis_r`, `uwb_v_base`); cad/fit.py keeps them, the
+# baseline and LED_COUNT in step with it.
 # Set UWB_ANCHORS = 2 to run without A3: tilt then falls back to vision alone.
 UWB_ANCHORS = 3
-UWB_A3_BACK_M = 0.086
+UWB_A3_BACK_M = 0.089
 UWB_A3_UP_M = 0.250
 
 # Elevation is measured at the anchor plane, but the lens sits higher, on the

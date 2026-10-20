@@ -42,14 +42,20 @@ module mast_foot() {
 }
 
 // Printed pad-down; mounted, it is flipped so the board faces up.
+cr_x  = ula1_tangential ? uwb_l + 12 : uwb_w;
+cr_y  = ula1_tangential ? uwb_w : uwb_l + 12;
+cr_hx = ula1_tangential ? uwb_hole_dx : uwb_hole_dy;
+cr_hy = ula1_tangential ? uwb_hole_dy : uwb_hole_dx;
 module mast_cradle() {
     difference() {
         union() {
-            translate([-(uwb_l + 12) / 2, -uwb_w / 2, 0]) cube([uwb_l + 12, uwb_w, arm_t]);
+            // pad: the board lies the same way as A1/A2 — long side along X
+            // when fit.py turns them across the arms, along Y otherwise
+            translate([-cr_x / 2, -cr_y / 2, 0]) cube([cr_x, cr_y, arm_t]);
             translate([0, 0, arm_t]) socket(mast_cap_h);
         }
         for (x = [-1, 1], y = [-1, 1])
-            translate([x * uwb_hole_dx / 2, y * uwb_hole_dy / 2, -1])
+            translate([x * cr_hx / 2, y * cr_hy / 2, -1])
                 cylinder(d = 2.2, h = arm_t + 2, $fn = 24);
     }
 }
