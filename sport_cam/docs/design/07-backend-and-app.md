@@ -130,7 +130,7 @@ src/web/src/
   lib/firebase.ts        Firestore: the emulator in dev, /__/firebase/init.json deployed
   lib/cameraKey.ts       the key from the link (#key=…), kept in the browser
   lib/useCameraState.ts  live camera document, recordings and preview via onSnapshot
-  lib/chime.ts           lock-on beeps, recording start/stop chimes (Web Audio)
+  lib/chime.ts           search pings, lock-on beeps, recording start/stop chimes (Web Audio)
   lib/modeText.ts        the wording that differs between with_uwb and without_uwb
 ```
 
@@ -145,7 +145,8 @@ Behaviour (requirement F5 in [01](../product/01-requirements.md#functional-requi
   find anyone — step into the room, facing the camera" (<!--/--><!--both-->without UWB, <!--/--><!--without_uwb-->after
   15 s with nobody found)<!--/-->. **Stop tracking** while recording asks to
   confirm, since it also stops the recording.
-- **Sounds** (`lib/chime.ts`): a short beep for each centred detection while
+- **Sounds** (`lib/chime.ts`): a sonar ping every 3 s while telemetry
+  `searching` is true, a short beep for each centred detection while
   locking on (one per step up in telemetry `centred`), then a rising
   two-note chime on record start; falling on stop (Web Audio). Sounds queue,
   so the chime follows the last beep. Armed by the first tap (browser autoplay policy). Desktop

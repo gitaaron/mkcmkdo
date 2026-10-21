@@ -210,7 +210,7 @@ elevation are right.
 3. **Tag-started session.** Switch the tag off and wait 5 s. Stand 5 m out and
    switch it on, standing upright and facing the camera. Within about a second
    the ring shows a green light chasing round (acquiring) while the camera
-   turns to you; once it has settled on you **and seen you in the middle of
+   turns to you (the app pings while it searches); once it has settled on you **and seen you in the middle of
    the frame** (the app beeps for each of the two centred detections) it
    turns breathing red, starts recording, and the app chimes.
    The zoom then settles with you filling about two-thirds of the frame.

@@ -186,7 +186,10 @@ async def full_flow() -> None:
     # --- the app's track / record button -----------------------------------------
     await head.apply_state("tracking")
     await head.report_state()
-    await tick_for(1.0)
+    await tick_for(0.1)
+    check("sweeping: the app is told it is searching (it pings)", head.telemetry()["searching"] is True,
+          head.tracker.mode)
+    await tick_for(0.9)
     check("pressing track / record → tracking, ring shows acquiring, camera sweeping",
           head.state == "tracking" and head.led.acquiring and head.ptz.pan_deg != 0.0,
           f"{seen}")
@@ -198,6 +201,7 @@ async def full_flow() -> None:
           head.state == "recording" and head.camera.recording, f"{seen}")
     check("ring is no longer acquiring; phase is acquired",
           not head.led.acquiring and head.phase == "acquired")
+    check("…and no longer searching (the pings stop)", head.telemetry()["searching"] is False)
     check("camera is pointing at the person", abs(head.ptz.pan_deg - person.bearing) < 5.0,
           f"pan {head.ptz.pan_deg:.1f}")
     check("each centred detection is sent to the app at once (one beep each)",

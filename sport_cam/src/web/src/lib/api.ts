@@ -12,6 +12,7 @@ export interface Telemetry {
   dist?: number | null;
   phase?: "person-in-frame" | "no-person-in-frame" | "acquiring" | "acquired" | null;
   centred?: number;  // consecutive centred detections toward the lock; the app beeps per step up
+  searching?: boolean;  // in SEARCH (turning to the tag / sweeping); the app pings every 3 s
   acquireStalled?: boolean;
   battery?: number;
 }

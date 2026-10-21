@@ -116,6 +116,7 @@ class Telemetry {
     this.distM,
     this.phase,
     this.centred = 0,
+    this.searching = false,
     this.acquireStalled = false,
   });
 
@@ -131,6 +132,10 @@ class Telemetry {
   /// locked, 0 when not tracking). The app beeps once per step up.
   final int centred;
 
+  /// In SEARCH: with UWB turning to the tag, without UWB sweeping the room.
+  /// The app pings every three seconds while it is.
+  final bool searching;
+
   /// Acquiring for a while and the camera still cannot see / has not found anyone.
   final bool acquireStalled;
 
@@ -140,6 +145,7 @@ class Telemetry {
     distM: (j?['dist'] as num?)?.toDouble(),
     phase: j?['phase'] as String?,
     centred: (j?['centred'] as num?)?.toInt() ?? 0,
+    searching: j?['searching'] as bool? ?? false,
     acquireStalled: j?['acquireStalled'] as bool? ?? false,
   );
 }

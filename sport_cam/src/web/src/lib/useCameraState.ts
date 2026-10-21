@@ -4,7 +4,7 @@ import {
 } from "firebase/firestore";
 import { api, recordingUrl, type CamState, type RecordingMeta, type StateSnapshot } from "./api.js";
 import { cameraKey } from "./cameraKey.js";
-import { beep, chime } from "./chime.js";
+import { beep, chime, ping } from "./chime.js";
 import { firestore } from "./firebase.js";
 
 export interface UploadProgress {
@@ -62,6 +62,20 @@ function announce(next: CamState, centred: number): void {
   lastCentred = centred;
 }
 
+/** Sonar ping every PING_EVERY_MS while the camera is in SEARCH. */
+const PING_EVERY_MS = 3000;
+let pingTimer: ReturnType<typeof setInterval> | undefined;
+
+function pingWhile(searching: boolean): void {
+  if (searching && pingTimer === undefined) {
+    ping();
+    pingTimer = setInterval(ping, PING_EVERY_MS);
+  } else if (!searching && pingTimer !== undefined) {
+    clearInterval(pingTimer);
+    pingTimer = undefined;
+  }
+}
+
 const ms = (t: Timestamp | null | undefined) => (t ? t.toMillis() : 0);
 
 let unsubs: Unsubscribe[] = [];
@@ -72,6 +86,7 @@ async function subscribe(key: string): Promise<void> {
   Object.assign(store, { connected: false, recordings: [], upload: null, lastSaved: null });
   lastState = null;
   lastCentred = 0;
+  pingWhile(false);
 
   const db = await firestore();
   const cam = doc(db, "cameras", key);
@@ -81,6 +96,7 @@ async function subscribe(key: string): Promise<void> {
     store.connected = snap.exists();
     if (!d) return;
     announce(d.state, d.telemetry?.centred ?? 0);
+    pingWhile(d.telemetry?.searching === true);
     seenAt = ms(d.deviceSeenAt);
     Object.assign(store, {
       mode: d.mode,
@@ -91,7 +107,7 @@ async function subscribe(key: string): Promise<void> {
       updatedAt: d.updatedAt ? new Date(ms(d.updatedAt)).toISOString() : "",
       upload: d.upload ?? null,
     });
-  }, () => { store.connected = false; }));
+  }, () => { store.connected = false; pingWhile(false); }));
 
   let first = true;
   unsubs.push(onSnapshot(

@@ -175,6 +175,13 @@ function centred() {
   return Math.max(0, Math.min(ACQUIRE_DETECTIONS, ACQUIRE_DETECTIONS - Math.ceil(toLock / DETECT_MS)));
 }
 
+// SEARCH until the first centred detection is due (the sim's CENTRE is the
+// ACQUIRE_DETECTIONS detections before acquireMs).
+function searching() {
+  if (!tracking()) return false;
+  return Date.now() - trackingSince < acquireMs - ACQUIRE_DETECTIONS * DETECT_MS;
+}
+
 function telemetry() {
   const watts = state === "idle" ? 7.5 : 14.5;
   const frac = Math.max(0, 1 - wh / 92);
@@ -187,6 +194,7 @@ function telemetry() {
       ? Date.now() - trackingSince >= acquireMs ? "acquired" : "acquiring"
       : state === "idle" ? (personInFrame() ? "person-in-frame" : "no-person-in-frame") : null,
     centred: centred(),
+    searching: searching(),
     acquireStalled: false,
     ...(MODE === "with_uwb" ? { tagPresent: true } : {}),
     battery: Math.round(frac * 1000) / 1000,
@@ -207,13 +215,15 @@ setInterval(() => {
     .catch((e) => console.error("[sim] heartbeat failed:", e.message));
 }, 1000);
 
-// Like the device: each centred detection goes up at once (the apps beep for
-// it), and the first lock of a session starts recording.
+// Like the device: each centred detection and each change of searching goes
+// up at once (the apps beep and ping on them), and the first lock of a session starts recording.
 let centredSent = 0;
+let searchingSent = false;
 setInterval(() => {
   const c = centred();
-  if (c !== centredSent) {
+  if (c !== centredSent || searching() !== searchingSent) {
     centredSent = c;
+    searchingSent = searching();
     cam.update({ telemetry: telemetry() })
       .catch((e) => console.error("[sim] telemetry failed:", e.message));
   }

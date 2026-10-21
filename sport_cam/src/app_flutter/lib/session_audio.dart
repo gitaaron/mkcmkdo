@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:audioplayers/audioplayers.dart';
@@ -6,15 +7,17 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'camera_client.dart';
 import 'models.dart';
 
-/// Plays a beep for each centred detection while the camera locks on, then
-/// a chime when it starts recording (and another when it stops) — including
-/// with the app in the background, which is the usual case: the phone is in
-/// a bag at the foot of the wall while you climb.
+/// Pings like sonar every three seconds while the camera searches, beeps for
+/// each centred detection while it locks on, then chimes when it starts
+/// recording (and again when it stops) — including with the app in the
+/// background, which is the usual case: the phone is in a bag at the foot of
+/// the wall while you climb.
 ///
-/// Sounds: `assets/sounds/beep.wav`, `rec_start.wav` (rising) and
+/// Sounds: `assets/sounds/ping.wav`, `beep.wav`, `rec_start.wav` (rising) and
 /// `rec_stop.wav` (falling), rendered by `tool/make_chimes.py` from the same
-/// notes as the web app's sounds. They queue rather than cut each other off,
-/// so the start chime plays after the last beep.
+/// notes as the web app's sounds. Beeps and chimes queue rather than cut each
+/// other off, so the start chime plays after the last beep; the ping has its
+/// own player and never holds them up.
 ///
 /// Staying awake in the background needs help on both platforms, and it is
 /// held only while the app is connected to a camera:
@@ -36,7 +39,10 @@ class SessionAudio {
 
   final CameraClient client;
 
+  static const _pingEvery = Duration(seconds: 3);
+
   final AudioPlayer _chime = AudioPlayer();
+  final AudioPlayer _ping = AudioPlayer();
   final AudioPlayer _silence = AudioPlayer();
 
   CamState? _last; // null until the first snapshot after (re)connecting
@@ -44,6 +50,7 @@ class SessionAudio {
   Future<void> _queue = Future.value();
   bool _wasConnected = false;
   bool _keepingAwake = false;
+  Timer? _pingTimer;
 
   /// Call once at start-up.
   static Future<void> init() async {
@@ -93,6 +100,7 @@ class SessionAudio {
       _last = null; // a reconnect's first snapshot is not a change
       _keepAwake(connected);
     }
+    _pingWhile(connected && client.telemetry.searching);
     if (!connected) return;
 
     final next = client.state;
@@ -112,6 +120,26 @@ class SessionAudio {
       _play('sounds/rec_start.wav');
     } else if (prev == CamState.recording) {
       _play('sounds/rec_stop.wav');
+    }
+  }
+
+  /// Sonar ping every [_pingEvery] while the camera is in SEARCH. It has its
+  /// own player, so it rings on under a beep rather than holding it up.
+  void _pingWhile(bool searching) {
+    if (searching && _pingTimer == null) {
+      _playPing();
+      _pingTimer = Timer.periodic(_pingEvery, (_) => _playPing());
+    } else if (!searching && _pingTimer != null) {
+      _pingTimer!.cancel();
+      _pingTimer = null;
+    }
+  }
+
+  Future<void> _playPing() async {
+    try {
+      await _ping.play(AssetSource('sounds/ping.wav'));
+    } catch (_) {
+      // A ping is a nicety too.
     }
   }
 
@@ -160,8 +188,10 @@ class SessionAudio {
 
   void dispose() {
     client.removeListener(_onClientChanged);
+    _pingWhile(false);
     _keepAwake(false);
     _chime.dispose();
+    _ping.dispose();
     _silence.dispose();
   }
 }

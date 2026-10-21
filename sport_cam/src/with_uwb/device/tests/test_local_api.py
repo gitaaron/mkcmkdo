@@ -63,6 +63,7 @@ class StubStorage:
 class StubTracker:
     dist_m = 4.2
     centred = 0
+    searching = False
     def step(self): return 0.0
     def lost_for(self): return 0.0
 

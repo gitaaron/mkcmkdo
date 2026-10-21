@@ -5,7 +5,9 @@
 
 Start rises C6 → G6, stop falls G6 → C6: a sine with a quiet octave partial,
 12 ms attack, exponential decay. The beep, played once per centred detection
-while the camera locks on, is one short A5. 44.1 kHz mono 16-bit WAV. Also writes one
+while the camera locks on, is one short A5. The sonar ping, every three
+seconds while the camera searches, is an E6 with a long ring and a quieter
+echo. 44.1 kHz mono 16-bit WAV. Also writes one
 second of digital silence, which the app loops to stay awake in the
 background during a session (see lib/session_audio.dart).
 """
@@ -16,12 +18,12 @@ import wave
 
 RATE = 44100
 OUT = os.path.join(os.path.dirname(__file__), "..", "assets", "sounds")
-A5, C6, G6 = 880.0, 1046.5, 1568.0
+A5, C6, E6, G6 = 880.0, 1046.5, 1318.5, 1568.0
 
 
 def note(freq: float, start: float, buf: list[float], peak: float = 0.5,
-         decay: float = 0.09) -> None:
-    for i in range(int(0.6 * RATE)):
+         decay: float = 0.09, length: float = 0.6) -> None:
+    for i in range(int(length * RATE)):
         t = i / RATE
         env = (t / 0.012) if t < 0.012 else math.exp(-(t - 0.012) / decay)
         s = math.sin(2 * math.pi * freq * t) + 0.18 * math.sin(2 * math.pi * 2 * freq * t)
@@ -54,4 +56,8 @@ if __name__ == "__main__":
     beep = [0.0] * int(0.25 * RATE)
     note(A5, 0.0, beep, peak=0.4, decay=0.02)
     write("beep.wav", beep)
+    ping = [0.0] * int(1.6 * RATE)
+    note(E6, 0.0, ping, peak=0.36, decay=0.12, length=1.2)
+    note(E6, 0.35, ping, peak=0.11, decay=0.09, length=1.2)
+    write("ping.wav", ping)
     write("silence.wav", [0.0] * RATE)

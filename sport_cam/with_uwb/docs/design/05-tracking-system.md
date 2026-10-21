@@ -187,7 +187,8 @@ there is no sweep. The head still has to pan and tilt to centre the person.
 
 Mapping to app states (telemetry `phase`): idle = `idle`/`no-person-in-frame`
 or `idle`/`person-in-frame`; SEARCH and CENTRE = `tracking`/`acquiring`;
-TRACK = `tracking`/`acquired`. Telemetry `centred` counts the centred
+TRACK = `tracking`/`acquired`. Telemetry `searching` is true in SEARCH, and
+the app pings every 3 s while it is. Telemetry `centred` counts the centred
 detections toward the lock; the app beeps once per detection, then chimes
 when recording starts. Not verified after `ACQUIRE_STALLED_S` (15 s): the
 app reports "Can't see you — step into view, facing the camera".

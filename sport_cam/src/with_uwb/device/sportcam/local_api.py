@@ -121,6 +121,7 @@ class LocalApi:
                 "dist": round(self.head.tracker.dist_m, 2) if self.head.tracker.dist_m else None,
                 "phase": self.head.phase,
                 "centred": self.head.tracker.centred if self.head.state in ("tracking", "recording") else 0,
+                "searching": self.head.state in ("tracking", "recording") and self.head.tracker.searching,
                 "acquireStalled": self.head.acquire_stalled,
                 "tagPresent": self.head.session.tag_present,
                 **self.head.power.telemetry(),

@@ -308,6 +308,7 @@ async def full_flow() -> None:
           head.state == "tracking" and head.led.acquiring, f"{seen}")
     check("…with a person in frame it starts in CENTRE, skipping SEARCH",
           head.tracker.mode == "centre", head.tracker.mode)
+    check("…so the app is told it is not searching (no ping)", head.telemetry()["searching"] is False)
 
     await tick_for(1.5)
     check("locked on → recording, ring no longer acquiring",
@@ -341,6 +342,7 @@ async def full_flow() -> None:
     await tick_for(0.25)
     check("tag on with nobody in frame → SEARCH",
           head.state == "tracking" and head.tracker.mode == "search", head.tracker.mode)
+    check("…and tells the app it is searching (it pings)", head.telemetry()["searching"] is True)
     head.camera._bbox = bbox
     await tick_for(2.0)
     check("…turns to the tag, sees them, centres and records",

@@ -180,7 +180,7 @@ tuning steps only mean something once the signs are right.
    upright and facing it. In the app press **Track & record**. The status
    reads "Looking for a person…" and the ring shows a green light chasing
    round while the camera zooms wide and sweeps left and right, stepping to the
-   next tilt row at each end. When it sees you it stops and turns to put you in
+   next tilt row at each end; the app pings every 3 s while it searches. When it sees you it stops and turns to put you in
    the middle; after two centred detections (the app beeps for each) it locks
    on, the ring turns breathing red, recording starts and the app chimes. The
    zoom then settles with you filling about two-thirds of the frame.

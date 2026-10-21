@@ -139,6 +139,7 @@ builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
                  "phase": "no-person-in-frame" | "person-in-frame"   // idle
                         | "acquiring" | "acquired" | null,          // tracking / recording; off
                  "centred": 0,      // centred detections toward the lock (2 once locked); apps beep per step up
+                 "searching": false, // tracker in SEARCH; apps ping every 3 s while true
                  "acquireStalled": false,
                  "battery": 0.82, "batteryWatts": 14.6, "batteryMinutes": 191,
                  "batteryLevel": "ok", "storageMinutes": 212, … },
@@ -157,7 +158,7 @@ builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
 | State ownership | the camera owns its state. On connect it writes its state first, so a recording started offline survives reconnection |
 | App requests | the listener adopts any state written with `stateBy: "app"`, applies it via `apply_state()` (same path as a direct command), and writes back the result |
 | Camera-initiated changes | lock-on starting a recording, low battery, build-specific events: written immediately |
-| Write throttling (free tier) | telemetry on the heartbeat (sooner on a phase change, and on each change of `centred` so the apps can beep per detection); upload progress every 2 s; previews only while `viewerAt` < 60 s old |
+| Write throttling (free tier) | telemetry on the heartbeat (sooner on a phase change, and on each change of `centred` or `searching` so the apps can beep per detection and ping while searching); upload progress every 2 s; previews only while `viewerAt` < 60 s old |
 | Credentials | service account restricted to Firestore (`FIREBASE_CREDENTIALS`) |
 | Stand-alone | `CAMERA_KEY` empty: no Firebase connection |
 | `pan` | degrees from centre, negative = left; no 0–360 heading (axis range ±80°) |

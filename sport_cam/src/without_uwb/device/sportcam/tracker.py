@@ -122,6 +122,11 @@ class Tracker:
         return self._confirmations if self.mode == CENTRE else 0
 
     @property
+    def searching(self) -> bool:
+        """In SEARCH — the app pings every few seconds while it is."""
+        return self.mode == SEARCH
+
+    @property
     def acquire_stalled(self) -> bool:
         """Searching a long while with nobody found — tell the user."""
         return self.mode == SEARCH and (

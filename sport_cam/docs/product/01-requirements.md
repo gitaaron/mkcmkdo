@@ -45,7 +45,7 @@ view; camera-only for lower cost, size and power.
 | ID | Requirement | Reference |
 | --- | --- | --- |
 | F1 | **Pan, tilt, zoom.** Pan 160° (±80°); tilt 130° (−45° to +85°); optical zoom 96° → 33° horizontal (≈ 3.5×). All three from the Arducam PTZ base | [03](../design/03-mechanical-design.md) |
-| F2 | **Follow a person** <!--both-->by UWB tag or by vision, per build<!--/--><!--with_uwb: by the UWB tag they wear--><!--without_uwb: by vision alone-->, and zoom to keep them framed | your build's 05 |
+| F2 | **Follow a person** <!--both-->by UWB tag or by vision, per build<!--/--><!--with_uwb: by the UWB tag they wear--><!--without_uwb: by vision alone-->, and zoom to keep them framed | <!--both-->05 tracking ([with UWB](../../with_uwb/docs/design/05-tracking-system.md), [without UWB](../../without_uwb/docs/design/05-tracking-system.md))<!--/--><!--with_uwb:[05](../../with_uwb/docs/design/05-tracking-system.md)--><!--without_uwb:[05](../../without_uwb/docs/design/05-tracking-system.md)--> |
 | F3 | **Record unattended.** Recording starts on lock-on and stops at session end. A clip is saved even when the battery runs out | [Ideal path](#ideal-path) |
 | F4 | **LED status ring** showing idle, acquiring, tracking, recording and low battery | [State machine](#state-machine) |
 | F5 | **Companion app**: opens into the live view; state-dependent bottom buttons; status ring top right in the LED colours | [07](../design/07-backend-and-app.md#web-app-srcweb) |
@@ -121,14 +121,14 @@ States, colours and transitions are shared; button labels and the acquiring
 label differ by build. `idle` and `tracking` each have two sub-states,
 reported to the app as telemetry `phase`.
 
-| State | LED | App status ring | Bottom buttons |
-| --- | --- | --- | --- |
-| `off` | off | grey | *(app shows reconnect screen)* |
-| `idle`, no person in frame | solid blue | blue, "On — no one in frame" | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
-| `idle`, person in frame | solid blue | blue, "On — person in frame" | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
-| `tracking`, acquiring | green, chasing round the ring | green (fast blink), <!--with_uwb-->"Acquiring subject…"<!--/--><!--both--> / <!--/--><!--without_uwb-->"Looking for a person…"<!--/--> | **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/--> |
-| `tracking`, locked on | solid green | green | **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/--> |
-| `recording` | pulsing red | red (pulsing) | **Stop recording** · **Stop tracking** |
+| State | LED | App status ring | App sound | Bottom buttons |
+| --- | --- | --- | --- | --- |
+| `off` | off | grey | — | *(app shows reconnect screen)* |
+| `idle`, no person in frame | solid blue | blue, "On — no one in frame" | — | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
+| `idle`, person in frame | solid blue | blue, "On — person in frame" | — | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
+| `tracking`, acquiring | green, chasing round the ring | green (fast blink), <!--with_uwb-->"Acquiring subject…"<!--/--><!--both--> / <!--/--><!--without_uwb-->"Looking for a person…"<!--/--> | Search: sonar ping every 3 s. Centre: a beep per centred detection | **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/--> |
+| `tracking`, locked on | solid green | green | — | **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/--> |
+| `recording` | pulsing red | red (pulsing) | rising chime on start, falling chime on stop<!--both-->; without UWB, pings again if it loses the person and searches<!--/--><!--without_uwb: ; pings again if it loses the person and searches--> | **Stop recording** · **Stop tracking** |
 
 <!--both-->
 
@@ -146,7 +146,8 @@ Rules:
 - `tracking` acquires in three steps, the same in both builds:
   1. **Search** — get the subject into frame. With UWB the location is
      known at once, so the head turns to the ranged position; without UWB
-     it sweeps the room.
+     it sweeps the room. The app plays a sonar ping every 3 s while
+     searching.
   2. **Centre** — pan and tilt to put the person at frame centre. Two
      consecutive centred detections (`ACQUIRE_DETECTIONS`) lock on; the app
      beeps once per centred detection.

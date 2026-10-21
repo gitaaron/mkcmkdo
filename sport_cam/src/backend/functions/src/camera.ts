@@ -32,6 +32,7 @@ export interface Telemetry {
   /** idle: is a person in frame? tracking: found the subject yet? */
   phase?: "person-in-frame" | "no-person-in-frame" | "acquiring" | "acquired" | null;
   centred?: number;          // consecutive centred detections toward the lock (ACQUIRE_DETECTIONS once locked)
+  searching?: boolean;       // in SEARCH: with_uwb turning to the tag, without_uwb sweeping
   acquireStalled?: boolean;  // acquiring a long time: nobody found / vision cannot see the subject
   tagPresent?: boolean;      // with_uwb only: the wearable is switched on and ranging
   battery?: number;          // fraction of the pack remaining, 0-1

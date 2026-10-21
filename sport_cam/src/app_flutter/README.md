@@ -32,7 +32,7 @@ lib/
   discovery.dart               mDNS sweep for _sportcam._tcp
   camera_client.dart           connection strategy + callable API + WS state
   theme.dart                   palette shared with the LED ring / web app
-  session_audio.dart           lock-on beeps and recording chimes, kept awake in the background
+  session_audio.dart           search pings, lock-on beeps and recording chimes, kept awake in the background
   screens/home_screen.dart     live view, badges, controls
   screens/library_screen.dart  recordings list + native player
   widgets/
@@ -112,7 +112,8 @@ more edits:
   session. The app asks for notification permission the first time it
   connects; refuse it and the chimes only play with the app open.
 
-The sounds themselves are `assets/sounds/beep.wav` (one per centred
+The sounds themselves are `assets/sounds/ping.wav` (every 3 s while the
+camera searches), `beep.wav` (one per centred
 detection while locking on), `rec_start.wav` (rising) and `rec_stop.wav`
 (falling), rendered by `python3 tool/make_chimes.py` from the same notes as
 the web app's.

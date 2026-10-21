@@ -57,6 +57,7 @@ class StubTracker:
     dist_m = 4.2
     locked = False
     centred = 0
+    searching = False
 
     def step(self):
         return 0.0

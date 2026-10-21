@@ -4,7 +4,9 @@
  * Start rises (C6 → G6), stop falls (G6 → C6): two soft bell-like notes, a
  * sine with a quiet octave partial, fast attack and a gentle exponential
  * decay. The beep, one per centred detection while the camera locks on, is
- * a single short A5. Same notes as the native app's sounds, so the two agree.
+ * a single short A5. The sonar ping, every three seconds while the camera
+ * searches, is an E6 with a long ring and a quieter echo. Same notes as the
+ * native app's sounds, so the two agree.
  *
  * Sounds queue rather than overlap: beeps that arrive together play one
  * after another, and the start chime waits for the last beep.
@@ -61,6 +63,7 @@ function slot(length: number): number | null {
 }
 
 const A5 = 880.0;
+const E6 = 1318.5;
 const C6 = 1046.5;
 const G6 = 1568.0;
 
@@ -74,6 +77,17 @@ export function chime(kind: "start" | "stop"): void {
     note(G6, t);
     note(C6, t + 0.16);
   }
+}
+
+/**
+ * Sonar ping while searching. It holds the queue only briefly and rings on
+ * under whatever follows, so a lock-on beep is never kept waiting.
+ */
+export function ping(): void {
+  const t = slot(0.3);
+  if (t === null) return;
+  note(E6, t, 0.16, 0.9);
+  note(E6, t + 0.35, 0.05, 0.7);
 }
 
 /** One centred detection on the way to a lock. */

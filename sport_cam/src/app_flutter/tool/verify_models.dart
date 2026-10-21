@@ -64,6 +64,11 @@ void main() {
     Telemetry.fromJson({'centred': 2}).centred == 2 &&
         Telemetry.fromJson(null).centred == 0,
   );
+  check(
+    'searching flag parses, defaulting to false',
+    Telemetry.fromJson({'searching': true}).searching &&
+        !Telemetry.fromJson(null).searching,
+  );
 
   // Captured from `POST /api/call/getRecordings`.
   final recJson = jsonDecode('''

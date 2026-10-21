@@ -251,6 +251,7 @@ class Head:
             "dist": round(self.tracker.dist_m, 2) if self.tracker.dist_m else None,
             "phase": self.phase,
             "centred": self.tracker.centred if self.state in ("tracking", "recording") else 0,
+            "searching": self.state in ("tracking", "recording") and self.tracker.searching,
             "acquireStalled": self.acquire_stalled,
             **self.power.telemetry(),
             **self.storage.telemetry(),
