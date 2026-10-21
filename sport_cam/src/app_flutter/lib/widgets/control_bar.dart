@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 
-/// Bottom buttons — same rules as the LED/web app (right-hand labels depend
-/// on the build, see [ModeText]):
-///   idle      → Turn off      · Start tracking   | Track & record
-///   tracking  → Turn off      · Start recording  | Record now
-///   recording → Stop recording · Stop tracking (confirms; it ends the clip)
+/// Bottom buttons — same rules as the web app (the idle label depends on the
+/// build, see [ModeText]):
+///   idle      → Turn off · Start tracking | Track & record
+///   tracking  → Turn off · Stop tracking (search → found → recording runs by itself)
+///   recording → Turn off · Stop recording (saves the clip, back to idle)
 class ControlBar extends StatelessWidget {
   const ControlBar({
     super.key,
@@ -17,7 +17,6 @@ class ControlBar extends StatelessWidget {
     required this.onSetPower,
     required this.onStartTracking,
     required this.onStopTracking,
-    required this.onStartRecording,
     required this.onStopRecording,
   });
 
@@ -27,30 +26,7 @@ class ControlBar extends StatelessWidget {
   final void Function(bool on) onSetPower;
   final VoidCallback onStartTracking;
   final VoidCallback onStopTracking;
-  final VoidCallback onStartRecording;
   final VoidCallback onStopRecording;
-
-  Future<void> _confirmStopTracking(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: SportColors.panel,
-        title: const Text('Stop tracking?'),
-        content: const Text('This also stops and saves the recording.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Stop'),
-          ),
-        ],
-      ),
-    );
-    if (ok ?? false) onStopTracking();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,16 +34,13 @@ class ControlBar extends StatelessWidget {
       CamState.off => ('Turn on', () => onSetPower(true)),
       CamState.idle => ('Turn off', () => onSetPower(false)),
       CamState.tracking => ('Turn off', () => onSetPower(false)),
-      CamState.recording => ('Stop recording', onStopRecording),
+      CamState.recording => ('Turn off', () => onSetPower(false)),
     };
     final (String? rightLabel, VoidCallback? rightAction) = switch (state) {
       CamState.off => (null, null),
       CamState.idle => (text.startTracking, onStartTracking),
-      CamState.tracking => (text.startRecording, onStartRecording),
-      CamState.recording => (
-        'Stop tracking',
-        () => _confirmStopTracking(context),
-      ),
+      CamState.tracking => ('Stop tracking', onStopTracking),
+      CamState.recording => ('Stop recording', onStopRecording),
     };
 
     return Container(

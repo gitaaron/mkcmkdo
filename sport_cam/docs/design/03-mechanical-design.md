@@ -168,4 +168,4 @@ protrusions
 ([C1](../product/01-requirements.md#non-functional-requirements-without-uwb)).
 
 **Tilt and the search.** The search uses two tilt rows (5° and 22°); the
-rest of the tilt range is used for tracking after lock-on.
+rest of the tilt range is used for tracking once the person is found.

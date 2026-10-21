@@ -6,25 +6,31 @@ tracker is a small state machine,
     (idle, no person in frame)       (idle, person in frame)
                │ session start                │ session start
                ▼                              ▼
-    SEARCH ──person seen──► CENTRE ──N centred detections──► TRACK
-       ▲                       │                                │
-       └───── nobody seen ◄────┴──── missing RESEARCH_AFTER_S ◄─┘
+    SEARCH ──person seen──► FOUND ──FOUND_CONFIRM_S──► TRACK (recording)
+       ▲                       │                          │
+       └─ nobody seen ◄────────┘                          │
+          FOUND_LOST_S                                    │
+       ▲                                                  │
+       └────────────── missing RESEARCH_AFTER_S ◄─────────┘
 
 * **idle** — not a tracker mode: the session has not started. The head is
   parked with the lens wide and `watch_idle()` runs the detector at
   DETECT_FPS_IDLE, so the camera knows whether a person is in frame. A
-  session started with a person in frame skips SEARCH and begins in CENTRE
+  session started with a person in frame skips SEARCH and begins in FOUND
   on that person.
 * **SEARCH** — lens wide, sweep pan end to end and step the tilt row at each
   turn-around, until the detector sees a person. The first one wins.
-* **CENTRE** — the sweep stops and the camera turns to put that person in the
-  middle. A lone false positive does not survive this: it takes
-  ACQUIRE_DETECTIONS consecutive centred detections to lock.
-* **TRACK** — locked. Pan and tilt follow the person, zoom frames them, and
-  among several detections the one nearest the last position is followed, so
-  a bystander walking through does not steal the lock. If the person is gone
-  for RESEARCH_AFTER_S the camera goes back to SEARCH (the sweep starts toward
-  the side they were last heading for).
+* **FOUND** — the sweep stops and the camera follows and frames that person
+  exactly as it will while recording; they need not be centred. Seen
+  throughout FOUND_CONFIRM_S (no gap longer than FOUND_LOST_S), the session
+  starts recording and calls `confirm()`. A lone false positive does not
+  survive the wait.
+* **TRACK** — recording. Pan and tilt follow the person, zoom frames them,
+  and among several detections the one nearest the last position is
+  followed, so a bystander walking through does not steal the shot. If the
+  person is gone for RESEARCH_AFTER_S the camera goes back to SEARCH (the
+  sweep starts toward the side they were last heading for), still recording;
+  the next person found goes straight back to TRACK.
 
 The detector runs at a few frames per second, far slower than the 20 Hz loop
 that calls `step()`. Corrections are therefore applied only on a *fresh*
@@ -42,7 +48,7 @@ from .ptz import Ptz
 
 Box = tuple[int, int, int, int]
 
-SEARCH, CENTRE, TRACK = "search", "centre", "track"
+SEARCH, FOUND, TRACK = "search", "found", "track"
 
 
 class Tracker:
@@ -50,7 +56,7 @@ class Tracker:
         self.camera = camera
         self.ptz = ptz
         self.dist_m: float | None = None   # estimated from the person's size
-        self.ever_locked = False           # has this session ever locked on?
+        self.confirmed = False             # recording: found people go straight to TRACK
         self._idle_box: Box | None = None  # largest person seen while idle
         self._idle_seen_at: float | None = None
         self.reset_lock()
@@ -60,16 +66,22 @@ class Tracker:
         """Forget any subject and start a new session.
 
         Normally that is a fresh SEARCH. If idle had a person in frame, the
-        sweep is skipped and the session starts in CENTRE on that person; if
-        they have gone, CENTRE_TIMEOUT_S later it falls back to SEARCH.
+        sweep is skipped and the session starts in FOUND on that person; if
+        they have gone, FOUND_LOST_S later it falls back to SEARCH.
         """
         now = time.monotonic()
         box = self._idle_box if self.idle_person_in_frame else None
         self._idle_box = self._idle_seen_at = None
-        self.ever_locked = False
+        self.confirmed = False
         self._begin_search(now, direction=1 if self.ptz.pan_deg <= 0 else -1)
         if box is not None:
             self._first_sighting(now, box)
+
+    def confirm(self) -> None:
+        """Recording has started: follow the person (TRACK) for the rest of it."""
+        self.confirmed = True
+        if self.mode == FOUND:
+            self.mode = TRACK
 
     # ---- idle --------------------------------------------------------------
     def watch_idle(self) -> None:
@@ -97,7 +109,7 @@ class Tracker:
         self._row = 0
         self._searching_since = now
         self._last_step = now
-        self._confirmations = 0
+        self._found_since = now
         self._last_centre: tuple[float, float] | None = None
         self._last_seen_at: float | None = None
         self._last_side = 0                  # which way the subject was drifting
@@ -110,21 +122,21 @@ class Tracker:
         self.ptz.set_focus(config.SEARCH_FOCUS_M)
 
     # ---- status the rest of the system reads -------------------------------
-    @property
-    def locked(self) -> bool:
-        return self.mode == TRACK
+    def found_for(self) -> float:
+        """Seconds in FOUND (0 in any other mode)."""
+        return time.monotonic() - self._found_since if self.mode == FOUND else 0.0
 
     @property
-    def centred(self) -> int:
-        """Consecutive centred detections toward the lock (ACQUIRE_DETECTIONS once locked)."""
-        if self.mode == TRACK:
-            return config.ACQUIRE_DETECTIONS
-        return self._confirmations if self.mode == CENTRE else 0
+    def ready_to_record(self) -> bool:
+        """The person has stayed in frame for FOUND_CONFIRM_S."""
+        return self.mode == FOUND and self.found_for() >= config.FOUND_CONFIRM_S
 
     @property
-    def searching(self) -> bool:
-        """In SEARCH — the app pings every few seconds while it is."""
-        return self.mode == SEARCH
+    def countdown(self) -> int:
+        """Whole seconds left in FOUND before recording (0 outside FOUND)."""
+        if self.mode != FOUND:
+            return 0
+        return max(1, math.ceil(config.FOUND_CONFIRM_S - self.found_for()))
 
     @property
     def acquire_stalled(self) -> bool:
@@ -137,7 +149,7 @@ class Tracker:
         return time.monotonic() - self._searching_since if self.mode == SEARCH else 0.0
 
     def lost_for(self) -> float:
-        """Seconds a locked-on person has been missing (0 when not locked)."""
+        """Seconds the person being recorded has been missing (0 outside TRACK)."""
         if self.mode != TRACK or self._last_seen_at is None:
             return 0.0
         return time.monotonic() - self._last_seen_at
@@ -162,15 +174,12 @@ class Tracker:
         matched = self._select(boxes) if boxes else None
         if matched:
             self._seen(now, matched)
-        elif fresh:
-            self._confirmations = 0
         self._relax_zoom_if_stale(now, dt)
-        if self.mode == TRACK:
-            self.ptz.set_zoom_mm(self._efl)      # retry anything the rate limit dropped
+        self.ptz.set_zoom_mm(self._efl)          # retry anything the rate limit dropped
         self._slew(dt)
 
         gone = now - (self._last_seen_at or now)
-        if self.mode == CENTRE and gone > config.CENTRE_TIMEOUT_S:
+        if self.mode == FOUND and gone > config.FOUND_LOST_S:
             self._begin_search(now, direction=self._last_side or self._dir)
         elif self.mode == TRACK and gone > config.RESEARCH_AFTER_S:
             self._begin_search(now, direction=self._last_side or self._dir)
@@ -194,13 +203,14 @@ class Tracker:
         self._pan_goal, self._tilt_goal = pan, self.ptz.tilt_deg
 
     def _first_sighting(self, now: float, box: Box) -> None:
-        """Stop the sweep and start turning toward the first person seen."""
-        self.mode = CENTRE
+        """Stop the sweep and start following the first person seen."""
+        self.mode = TRACK if self.confirmed else FOUND
+        self._found_since = now
         self._last_centre = None            # nothing to gate against yet
         self._seen(now, box)
         self._slew(0.05)
 
-    # ---- CENTRE / TRACK ----------------------------------------------------
+    # ---- FOUND / TRACK -----------------------------------------------------
     def _select(self, boxes: list[Box]) -> Box | None:
         """The detection that is 'our' person, or None.
 
@@ -231,18 +241,9 @@ class Tracker:
             self._tilt_goal = _clamp(
                 self.ptz.tilt_deg - config.TRACK_TILT_GAIN * self._px_to_vdeg(cy_err),
                 config.TILT_MIN_DEG, config.TILT_MAX_DEG)
-
-        centred = (abs(cx_err) <= config.ACQUIRE_CENTRE_FRACTION * pw
-                   and abs(cy_err) <= config.ACQUIRE_CENTRE_FRACTION * ph)
-        self._confirmations = self._confirmations + 1 if centred else 0
-        if self.mode == CENTRE and self._confirmations >= config.ACQUIRE_DETECTIONS:
-            self.mode = TRACK
-            self.ever_locked = True
-
-        if self.mode == TRACK:
-            self.camera.set_search_column(cx)
-            self._estimate_distance(h)
-            self._frame_zoom(x, y, w, h)
+        self.camera.set_search_column(cx)
+        self._estimate_distance(h)
+        self._frame_zoom(x, y, w, h)
 
     def _slew(self, dt: float) -> None:
         """Glide the servos toward the goals instead of snapping between frames."""
@@ -308,7 +309,7 @@ class Tracker:
 
     def _relax_zoom_if_stale(self, now: float, dt: float) -> None:
         """No detection for a while: ease back toward wide, in log space."""
-        if self.mode != TRACK or self._efl <= config.ZOOM_MIN_MM:
+        if self.mode == SEARCH or self._efl <= config.ZOOM_MIN_MM:
             return
         if self._last_seen_at is not None and now - self._last_seen_at > config.ZOOM_STALE_S:
             k = max(0.0, 1.0 - config.ZOOM_STALE_RELAX * dt)

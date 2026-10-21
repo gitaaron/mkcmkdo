@@ -103,14 +103,14 @@ await waitForEmulators();
 let state = "idle";
 let recStarted = 0;
 let trackingSince = 0;
-let acquireMs = 3000;
-let recordOnLock = false;   // a session records once, on its first lock (AUTO_RECORD_ON_LOCK)
+let searchMs = 0;
 // Idle sub-state: someone walks into frame for 10 s of every 20.
 const personInFrame = () => Math.floor(Date.now() / 10000) % 2 === 1;
-// Locking takes ACQUIRE_DETECTIONS centred detections at 3 a second, the last
-// of them at acquireMs.
-const ACQUIRE_DETECTIONS = 2;
-const DETECT_MS = 333;
+// Tracking: search for searchMs (0 with a person already in frame; a turn to
+// the tag with UWB, a sweep without), then found for FOUND_CONFIRM_MS, then
+// recording.
+const SEARCH_MS = MODE === "with_uwb" ? 1500 : 4000;
+const FOUND_CONFIRM_MS = 3000;
 let pan = 0;
 let panDir = 1;
 let wh = 0;
@@ -132,16 +132,12 @@ console.log(`[sim] camera '${KEY}' online (${MODE}, ${frames.length} test frames
 function adopt(next) {
   const prev = state;
   state = next;
-  if (next === "tracking" && prev !== "recording") {
+  if (next === "tracking") {
     trackingSince = Date.now();
-    recordOnLock = prev === "idle";
-    // A session started with a person in frame skips SEARCH (without UWB, the sweep).
-    acquireMs = prev === "idle" && personInFrame() ? 1000 : 3000;
+    // A session started with a person in frame skips search.
+    searchMs = personInFrame() ? 0 : SEARCH_MS;
   }
-  if (next === "recording") {
-    recStarted = Date.now();
-    recordOnLock = false;
-  }
+  if (next === "recording") recStarted = Date.now();
   if (prev === "recording" && next !== "recording") {
     const durationS = Math.round((Date.now() - recStarted) / 100) / 10;
     uploadSample(durationS).catch((e) => console.error("[sim] upload failed:", e.message));
@@ -169,17 +165,18 @@ if (lib.empty && statSync(SAMPLE, { throwIfNoEntry: false })) {
 
 const tracking = () => state === "tracking" || state === "recording";
 
-function centred() {
-  if (!tracking()) return 0;
-  const toLock = acquireMs - (Date.now() - trackingSince);
-  return Math.max(0, Math.min(ACQUIRE_DETECTIONS, ACQUIRE_DETECTIONS - Math.ceil(toLock / DETECT_MS)));
+function phase() {
+  if (state === "idle") return personInFrame() ? "person-in-frame" : "no-person-in-frame";
+  if (state === "recording") return "track";
+  if (state !== "tracking") return null;
+  return Date.now() - trackingSince < searchMs ? "search" : "found";
 }
 
-// SEARCH until the first centred detection is due (the sim's CENTRE is the
-// ACQUIRE_DETECTIONS detections before acquireMs).
-function searching() {
-  if (!tracking()) return false;
-  return Date.now() - trackingSince < acquireMs - ACQUIRE_DETECTIONS * DETECT_MS;
+/** Found: whole seconds left before recording (3, 2, 1); else 0. */
+function countdown() {
+  if (phase() !== "found") return 0;
+  const left = searchMs + FOUND_CONFIRM_MS - (Date.now() - trackingSince);
+  return Math.max(1, Math.ceil(left / 1000));
 }
 
 function telemetry() {
@@ -190,11 +187,8 @@ function telemetry() {
     tilt: 12,
     zoomMm: 7.4,
     dist: Math.round((4.2 + Math.sin(Date.now() / 3000)) * 100) / 100,
-    phase: tracking()
-      ? Date.now() - trackingSince >= acquireMs ? "acquired" : "acquiring"
-      : state === "idle" ? (personInFrame() ? "person-in-frame" : "no-person-in-frame") : null,
-    centred: centred(),
-    searching: searching(),
+    phase: phase(),
+    countdown: countdown(),
     acquireStalled: false,
     ...(MODE === "with_uwb" ? { tagPresent: true } : {}),
     battery: Math.round(frac * 1000) / 1000,
@@ -215,19 +209,18 @@ setInterval(() => {
     .catch((e) => console.error("[sim] heartbeat failed:", e.message));
 }, 1000);
 
-// Like the device: each centred detection and each change of searching goes
-// up at once (the apps beep and ping on them), and the first lock of a session starts recording.
-let centredSent = 0;
-let searchingSent = false;
+// Like the device: a phase change and each second of the countdown go up at
+// once (the apps ping and beep on them), and found for FOUND_CONFIRM_MS starts
+// recording.
+let sent = "";
 setInterval(() => {
-  const c = centred();
-  if (c !== centredSent || searching() !== searchingSent) {
-    centredSent = c;
-    searchingSent = searching();
+  const now = `${phase()}/${countdown()}`;
+  if (now !== sent) {
+    sent = now;
     cam.update({ telemetry: telemetry() })
       .catch((e) => console.error("[sim] telemetry failed:", e.message));
   }
-  if (recordOnLock && state === "tracking" && c >= ACQUIRE_DETECTIONS) {
+  if (state === "tracking" && Date.now() - trackingSince >= searchMs + FOUND_CONFIRM_MS) {
     adopt("recording");
     cam.update({ state, stateBy: "device", updatedAt: Timestamp.now() });
   }

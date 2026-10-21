@@ -100,12 +100,10 @@ class _HomeScreenState extends State<HomeScreen> {
             right: 14,
             child: StatusRing(
               state: client.state,
-              acquiringLabel: text.acquiring,
+              searchingLabel: text.searching,
               connected: client.isConnected,
               phase: client.telemetry.phase,
-              acquiring:
-                  client.state == CamState.tracking &&
-                  client.telemetry.phase == 'acquiring',
+              countdown: client.telemetry.countdown,
             ),
           ),
 
@@ -119,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // acquiring for a while and vision still cannot see the climber
+          // tracking for a while and still not recording: nobody found / vision cannot see the climber
           if (client.state == CamState.tracking &&
               client.telemetry.acquireStalled)
             _Pill(
@@ -146,7 +144,6 @@ class _HomeScreenState extends State<HomeScreen> {
               onSetPower: client.setPower,
               onStartTracking: client.startTracking,
               onStopTracking: client.stopTracking,
-              onStartRecording: client.startRecording,
               onStopRecording: client.stopRecording,
             ),
           ),

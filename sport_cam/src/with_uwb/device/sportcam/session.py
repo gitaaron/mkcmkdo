@@ -1,6 +1,6 @@
 """Tag-driven sessions: switching the tag on is the start button.
 
-    tag on ─► idle → tracking (acquiring) ─► locked ─► recording
+    tag on ─► idle → tracking (search → found, 3 s) ─► recording
     tag off ─► … LOST_IDLE_S later … ─► idle (the recording is saved)
 
 The camera ranges all the time, even in standby, so it notices the tag the
@@ -17,8 +17,9 @@ Rules, in the order they are checked:
   been switched off and on again — it does not argue with you.
 * **It starts only from idle.** If you are already tracking or recording by
   hand, turning the tag on changes nothing.
-* **It records once, on the first lock.** After that, anything the app does
-  (drop back to tracking, say) stands.
+* **It records once the person has been found for FOUND_CONFIRM_S**,
+  however the session started (tag or app). Stopping the recording ends the
+  session: the camera goes back to idle.
 * **It ends the way every session ends:** no ranges for LOST_IDLE_S, and the
   control loop drops to idle (5 s by default). A tag switched off and a tag
   hidden behind a body look the same, so a long enough dropout ends the
@@ -34,14 +35,13 @@ class AutoSession:
         self.active = False           # this session was started by the tag
         self._present = False         # the tag is on, as far as we can tell
         self._armed = True            # the next arrival may start a session
-        self._recorded = False        # this session has already gone to recording
         self._ranging_since: float | None = None
 
-    def update(self, now: float, frame_age_s: float, state: str, locked: bool) -> str | None:
+    def update(self, now: float, frame_age_s: float, state: str, ready: bool) -> str | None:
         """One tick. Returns a state to apply, or None to leave things alone.
 
         `frame_age_s` is how long since the last ranging frame, whatever the
-        camera state; `locked` comes from the tracker.
+        camera state; `ready` is the tracker's `ready_to_record`.
         """
         # --- presence, debounced in both directions -----------------------
         if frame_age_s < 0.5:
@@ -58,7 +58,10 @@ class AutoSession:
         # --- a session ended, by whatever route ----------------------------
         if state in ("idle", "off"):
             self.active = False
-            self._recorded = False
+
+        # --- found for FOUND_CONFIRM_S → record ----------------------------
+        if state == "tracking" and ready:
+            return "recording"
 
         if not config.AUTO_SESSION:
             return None
@@ -69,11 +72,6 @@ class AutoSession:
             if state == "idle":
                 self.active = True
                 return "tracking"
-
-        # --- acquired → record, once ---------------------------------------
-        if self.active and not self._recorded and state == "tracking" and locked:
-            self._recorded = True
-            return "recording"
         return None
 
     @property

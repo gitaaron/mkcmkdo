@@ -7,7 +7,6 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 
 | Term | Meaning |
 | --- | --- |
-| **Acquiring** | the first phase of tracking: the camera is turning to the subject (or searching for one) and hasn't locked on yet. The ring shows a green light chasing round |
 | **Buck converter** | the board that steps the bank's 12 V down to the single 5 V supply everything runs on |
 | **Camera key** | a long random string that names one camera in Firebase and works as its password. It's in the camera's `config.py` and in your app link ([07](../design/07-backend-and-app.md#the-camera-key)) |
 | **CSI** | the Raspberry Pi's camera connector, where the camera's ribbon cable plugs in |
@@ -20,13 +19,14 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | **I2C** | the two-wire bus the Pi uses to talk to the PTZ controller and the gauge |
 | **Kalman filter** | a smoothing filter that averages noisy measurements while still following real movement |
 | **Level shifter** | the 74AHCT125 chip that lifts the Pi's 3.3 V data signal to the 5 V the LED ring needs |
-| **Locked on** | tracking has settled on the subject. The ring turns solid green, and a session that started automatically begins recording |
+| **Found** | the second sub-state of `tracking`: a person is in frame and the camera follows and frames them as it will while recording. The ring fills with green over 3 s and the app beeps each second; still in frame at the end, recording starts |
 | **mDNS / Bonjour** | how a phone finds the camera on the local Wi-Fi by name (`sportcam.local`) without knowing its IP address |
 | **MJPEG** | video sent as a stream of JPEG pictures; the camera's direct live view to phones on its Wi-Fi |
 | **PD (USB Power Delivery)** | the part of USB-C that lets a bank supply more than 5 V. The **PD trigger** board asks the bank for 12 V |
-| **Person in frame / no person in frame** | the two sub-states of `idle`: whether the person detector has seen someone in the last 4 s. <!--both-->Without UWB, starting a session with a person in frame skips the sweep<!--/--><!--without_uwb: Starting a session with a person in frame skips the sweep--><!--with_uwb: Reported to the app only; the tag starts and steers a session--> ([01](../product/01-requirements.md#state-machine)) |
+| **Person in frame / no person in frame** | the two sub-states of `idle`: whether the person detector has seen someone in the last 4 s. Starting a session with a person in frame skips search and goes straight to found. With a person in frame the ring breathes slowly ([01](../product/01-requirements.md#state-machine)) |
 | **PETG** | the filament every structural part is printed in |
 | **PTZ** | pan, tilt and zoom. The **PTZ base** is the bought Arducam camera assembly; the **PTZ controller** is its board that drives the servos and lens motors |
+| **Search** | the first sub-state of `tracking`: getting the subject into frame. <!--both-->With UWB the camera turns to the tag; without UWB it sweeps the room<!--/--><!--with_uwb: The camera turns to where the tag is--><!--without_uwb: The camera sweeps the room-->. The ring shows a green light chasing round and the app pings every 3 s |
 | **Slew limit** | a cap on how fast the camera may turn, so it glides between measurements instead of snapping |
 | **Soft limits** | the pan and tilt angles the software won't go past, set short of where the bracket hits anything |
 | **SPI** | the Pi's serial bus used to send colour data to the LED ring |

@@ -227,13 +227,14 @@ def mechanical_layout():
 # 3. State machine
 # ----------------------------------------------------------------------------
 def state_machine():
-    fig, ax = new_fig(16.5, 8.4, "Camera state machine · LED colours")
+    fig, ax = new_fig(16.5, 8.4, "Camera state machine · LED ring")
     y = 3.3
     R = 0.66
 
-    def node(x, name, c, r=R, fs=9.5):
-        ax.add_patch(Circle((x, y), r, fc="white", ec=c, lw=3, zorder=3))
-        ax.text(x, y, name, ha="center", va="center", fontsize=fs, fontweight="bold",
+    def node(x, name, c, r=R, fs=9.5, yy=None):
+        yy = y if yy is None else yy
+        ax.add_patch(Circle((x, yy), r, fc="white", ec=c, lw=3, zorder=3))
+        ax.text(x, yy, name, ha="center", va="center", fontsize=fs, fontweight="bold",
                 color=c, zorder=4)
 
     def link(p1, p2, label="", rad=0.0, color=INK, ls="-", lofs=(0, 0), fs=8.5, ha="center", va="center"):
@@ -245,74 +246,73 @@ def state_machine():
             ax.text(lofs[0], lofs[1], label, ha=ha, va=va, fontsize=fs, color=color, zorder=5,
                     bbox=dict(fc="white", ec="none", pad=1.2))
 
-    # tracking container
-    ax.add_patch(FancyBboxPatch((5.75, 1.45), 7.55, 3.45, boxstyle="round,pad=0.08",
+    xs = dict(off=1.0, idle=3.4, search=7.6, found=11.0, rec=14.9)
+    yp = 5.55                                   # "person in frame" row
+
+    # initiate-tracking container: two sub-states
+    ax.add_patch(FancyBboxPatch((6.15, 1.75), 6.1, 3.2, boxstyle="round,pad=0.08",
                                 fc="#f2fbf5", ec=GREEN, lw=2, ls="--", zorder=1))
-    ax.text(5.95, 4.62, "TRACKING", fontsize=11, fontweight="bold", color=GREEN, ha="left", va="center")
+    ax.text(6.35, 4.67, "INITIATE TRACKING", fontsize=11, fontweight="bold", color=GREEN,
+            ha="left", va="center")
 
     # idle container: two sub-states
-    yp = 5.55                                   # "person in frame" row
     ax.add_patch(FancyBboxPatch((2.55, 2.45), 1.7, 4.15, boxstyle="round,pad=0.08",
                                 fc="#f2f6ff", ec=BLUE, lw=2, ls="--", zorder=1))
     ax.text(2.7, 6.38, "IDLE", fontsize=11, fontweight="bold", color=BLUE, ha="left", va="center")
 
-    xs = dict(off=1.0, idle=3.4, search=7.1, centre=9.7, lock=12.3, rec=15.3)
     node(xs["off"], "OFF", GREY)
     node(xs["idle"], "no person\nin frame", BLUE, fs=8)
-    ax.add_patch(Circle((xs["idle"], yp), R, fc="white", ec=BLUE, lw=3, zorder=3))
-    ax.text(xs["idle"], yp, "person\nin frame", ha="center", va="center", fontsize=8,
-            fontweight="bold", color=BLUE, zorder=4)
+    node(xs["idle"], "person\nin frame", BLUE, fs=8, yy=yp)
     link((xs["idle"] - 0.25, y + R), (xs["idle"] - 0.25, yp - R), "")
     link((xs["idle"] + 0.25, yp - R), (xs["idle"] + 0.25, y + R), "")
     ax.text(xs["idle"] - 0.32, (y + yp) / 2, "seen", fontsize=8, ha="right", va="center", color=INK)
     ax.text(xs["idle"] + 0.32, (y + yp) / 2, "none\n4 s", fontsize=8, ha="left", va="center", color=INK)
     node(xs["search"], "SEARCH", GREEN, fs=9)
-    node(xs["centre"], "CENTRE", GREEN, fs=9)
-    node(xs["lock"], "LOCKED", GREEN, fs=9)
+    node(xs["found"], "FOUND", GREEN, fs=9)
     node(xs["rec"], "RECORDING", RED, r=0.82, fs=8.5)
 
     # main path
     link((xs["off"] + R, y + 0.25), (xs["idle"] - R, y + 0.25), "power\non", lofs=(2.2, y + 0.75))
     link((xs["idle"] - R, y - 0.25), (xs["off"] + R, y - 0.25), "turn off", lofs=(2.2, y - 0.7))
-    link((xs["idle"] + R, y), (xs["search"] - R, y), "Track &\nrecord", lofs=(5.25, y + 0.55))
-    # person already in frame: straight to CENTRE, no sweep
-    ax.annotate("", xy=(xs["centre"], y + R), xytext=(xs["idle"] + R, yp), zorder=2,
+    link((xs["idle"] + R, y), (xs["search"] - R, y), "Track &\nrecord", lofs=(5.35, y + 0.55), fs=8)
+    # person already in frame: straight to FOUND
+    ax.annotate("", xy=(xs["found"], y + R), xytext=(xs["idle"] + R, yp), zorder=2,
                 arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.5, shrinkA=0, shrinkB=0,
                                 connectionstyle="angle,angleA=0,angleB=90,rad=0"))
-    ax.text(6.9, yp + 0.3, "Track & record — person already in frame: skip the sweep",
+    ax.text(7.6, yp + 0.3, "Track & record — person already in frame: skip the sweep",
             fontsize=8.5, ha="center", va="center", color=INK, zorder=5,
             bbox=dict(fc="white", ec="none", pad=1.2))
-    link((xs["search"] + R, y), (xs["centre"] - R, y), "person\nseen", lofs=(8.4, y + 0.5))
-    link((xs["centre"] + R, y), (xs["lock"] - R, y), "2 centred\ndetections", lofs=(11.0, y + 0.5))
-    link((xs["lock"] + R, y), (xs["rec"] - 0.82, y), "auto-record\non lock", lofs=(13.8, y + 0.5))
-    # CENTRE lost the person -> sweep again
-    link((xs["centre"] - 0.3, y + R), (xs["search"] + 0.3, y + R), "nobody seen 2 s",
-         rad=0.55, lofs=(8.4, 4.4))
-    # LOCKED lost 6 s -> SEARCH
-    link((xs["lock"] - 0.3, y - R), (xs["search"] + 0.3, y - R), "lost for 6 s → sweep again",
-         rad=-0.38, lofs=(9.7, 1.95))
-    # give up -> IDLE
-    link((6.4, 1.45), (xs["idle"] + 0.35, y - R + 0.05), "", rad=-0.25, color=GREY, ls="--")
-    ax.text(4.0, 1.12, "180 s and nobody ever found\n(not recording) → give up", fontsize=8.5,
-            color=GREY, ha="center", va="center", bbox=dict(fc="white", ec="none", pad=1.2))
-    # record now: IDLE -> RECORDING
-    link((xs["idle"] + 0.3, 6.68), (xs["rec"], y + 0.82), "Record now (app button)", rad=-0.25,
-         color=RED, ls="--", lofs=(10.5, 7.3))
-    # stop recording -> tracking
-    link((xs["rec"] - 0.3, y - 0.8), (13.3, 2.35), "", rad=0.3, color=RED)
-    ax.text(15.3, 1.95, "stop recording\n(keeps tracking)", fontsize=8.5, color=RED, ha="center",
-            va="center", bbox=dict(fc="white", ec="none", pad=1.2))
+    link((xs["search"] + R, y), (xs["found"] - R, y), "person\nseen", lofs=(9.3, y + 0.5))
+    # FOUND lost the person -> search again; the 3 s starts over
+    link((xs["found"] - 0.3, y - R), (xs["search"] + 0.3, y - R), "nobody seen 1 s",
+         rad=-0.45, lofs=(9.3, 1.95))
+    link((xs["found"] + R, y), (xs["rec"] - 0.82, y), "still in\nframe 3 s", lofs=(12.95, y + 0.5))
+    # RECORDING lost the person for 6 s: sweep again, still recording
+    ax.annotate("", xy=(xs["rec"] + 0.45, y + 0.68), xytext=(xs["rec"] - 0.45, y + 0.68), zorder=2,
+                arrowprops=dict(arrowstyle="-|>", color=RED, lw=1.5, shrinkA=0, shrinkB=0,
+                                connectionstyle="arc3,rad=-1.6"))
+    ax.text(xs["rec"], y + 1.95, "lost 6 s: sweep again,\nstill recording", fontsize=8.5,
+            color=RED, ha="center", va="center", bbox=dict(fc="white", ec="none", pad=1.2))
 
-    # per-state captions
-    cap = [(xs["off"], "LED off"), (xs["idle"], "LED solid blue, parked,\nlens wide, detector 0.5 fps"),
-           (xs["search"], "lens wide, pan ±80°\nstepping tilt rows"),
-           (xs["centre"], "turn to put them mid-frame;\napp beeps per detection"),
-           (xs["lock"], "follow first person,\nvision only"),
-           (xs["rec"], "LED pulsing red,\napp chimes")]
+    # stop recording -> IDLE, under everything
+    x_in = xs["idle"] + 0.12
+    ax.plot([xs["rec"], xs["rec"], x_in], [y - 0.82, 1.0, 1.0], color=RED, lw=1.5, zorder=2)
+    link((x_in, 1.0), (x_in, y - R + 0.01), "", color=RED)
+    ax.text(10.6, 1.0, "stop recording → idle", fontsize=8.5, color=RED,
+            ha="center", va="center", zorder=5, bbox=dict(fc="white", ec="none", pad=1.2))
+    # stop tracking (and the build's automatic exit) -> IDLE
+    link((6.4, 1.75), (xs["idle"] + 0.55, y - 0.38), "", rad=-0.3, color=GREY, ls="--")
+    ax.text(5.15, 1.62, "stop tracking, or 180 s\nnobody found → idle", fontsize=8.5,
+            color=GREY, ha="center", va="center", bbox=dict(fc="white", ec="none", pad=1.2))
+
+    # per-state captions: the LED ring
+    cap = [(xs["off"], "LED off"),
+           (xs["idle"], "LED blue: solid,\nbreathing with a person in frame"),
+           (xs["search"], "LED chasing green;\nsweep pan ±80°, lens wide"),
+           (xs["found"], "LED fills green over 3 s;\nframe them as when recording"),
+           (xs["rec"], "LED pulsing red")]
     for x, t in cap:
-        ax.text(x, 0.35, t, ha="center", va="center", fontsize=8.5, color=INK)
-    ax.text(10.0, 0.95 - 0.0, "LED chasing green while searching or centring, solid green once locked",
-            fontsize=8.5, color=GREEN, ha="center", va="center", style="italic")
+        ax.text(x, 0.3, t, ha="center", va="center", fontsize=8.5, color=INK)
     ax.text(1.0, 1.9, "\"turn off\" works\nfrom every state", fontsize=8.5, color=GREY, ha="center")
     save(fig, "state-machine.png")
 
@@ -321,7 +321,7 @@ def state_machine():
 # 4. Search and track
 # ----------------------------------------------------------------------------
 def search_and_track():
-    fig, ax = new_fig(14.0, 7.0, "Search → centre → track")
+    fig, ax = new_fig(14.0, 7.0, "Search → found → record")
 
     # --- left: the sweep, drawn in pan/tilt space -----------------------
     x0, x1, yb, yt = 0.9, 6.4, 1.6, 5.2         # axes box
@@ -388,8 +388,8 @@ def search_and_track():
     ax.text(10.25, 6.15, "The loop", fontsize=11, fontweight="bold", color=INK, ha="center")
     S, C, T = (8.4, 4.55), (12.1, 4.55), (10.25, 1.95)
     state(*S, 2.3, 1.3, "SEARCH", "sweep until someone\nis detected", GREEN)
-    state(*C, 2.3, 1.3, "CENTRE", "turn to put them\nin the middle", BLUE)
-    state(*T, 2.9, 1.3, "TRACK", "locked on the first person,\nfollow by vision only", RED)
+    state(*C, 2.3, 1.3, "FOUND", "follow and frame\nthem for 3 s", GREEN)
+    state(*T, 2.9, 1.3, "RECORDING", "follow the first person\nfound, by vision only", RED)
 
     link((S[0] + 1.15, S[1] + 0.2), (C[0] - 1.15, C[1] + 0.2), "person seen", (10.25, 5.1))
     # session start: where the loop is entered depends on idle's sub-state
@@ -397,12 +397,12 @@ def search_and_track():
          (S[0] - 0.6, S[1] + 1.1), ha="right")
     link((C[0] + 0.5, C[1] + 1.45), (C[0] + 0.5, C[1] + 0.65), "start, person in\nframe (no sweep)",
          (C[0] + 0.6, C[1] + 1.1), ha="left")
-    link((C[0] - 1.15, C[1] - 0.2), (S[0] + 1.15, S[1] - 0.2), "nobody seen\nfor 2 s", (10.25, 3.95))
-    link((C[0] + 0.3, C[1] - 0.65), (T[0] + 1.0, T[1] + 0.65), "2 centred\ndetections", (12.5, 3.25),
+    link((C[0] - 1.15, C[1] - 0.2), (S[0] + 1.15, S[1] - 0.2), "nobody seen\nfor 1 s", (10.25, 3.95))
+    link((C[0] + 0.3, C[1] - 0.65), (T[0] + 1.0, T[1] + 0.65), "still in\nframe 3 s", (12.5, 3.25),
          rad=-0.15)
     link((T[0] - 1.0, T[1] + 0.65), (S[0] + 0.4, S[1] - 0.65), "lost for 6 s", (8.0, 3.2),
          rad=-0.15)
-    ax.text(9.0, 0.55, "recording starts on lock; the 180 s give-up only applies\nwhile nobody has ever been found",
+    ax.text(9.0, 0.55, "after a loss the next person found is recorded at once;\nthe 180 s give-up applies only before recording",
             fontsize=8.5, color=GREY, ha="center", va="center")
     save(fig, "search-and-track.png")
 
@@ -413,9 +413,9 @@ def search_and_track():
 def app_ui():
     fig, ax = new_fig(10.8, 7.2, "Companion app — three states")
     labels = [
-        ("IDLE", BLUE, ["Record now", "Track & record"], "Idle"),
-        ("TRACKING", GREEN, ["Record now", "Stop tracking"], "Looking for a person…"),
-        ("RECORDING", RED, ["Stop recording", "Stop tracking"], "Recording · following"),
+        ("IDLE", BLUE, ["Turn off", "Track & record"], "Idle"),
+        ("TRACKING", GREEN, ["Turn off", "Stop tracking"], "Looking for a person…"),
+        ("RECORDING", RED, ["Turn off", "Stop recording"], "Recording · following"),
     ]
     for i, (name, c, buttons, status) in enumerate(labels):
         x0 = 0.5 + i * 3.5

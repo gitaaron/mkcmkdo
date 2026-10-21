@@ -75,10 +75,10 @@ SEARCH_PAN_DPS = 25.0
 SEARCH_TILT_ROWS_DEG = (5.0, 22.0)   # tilt for each pass; lens is ~1.5 m up
 SEARCH_TILT_DPS = 40.0
 SEARCH_FOCUS_M = 5.0           # a room-sized hyperfocal guess while sweeping
-SEARCH_GIVE_UP_S = 180.0       # tracking (not recording) this long with nobody
-                               # ever found → back to idle. A recording is
-                               # never abandoned: the user stops that.
-RESEARCH_AFTER_S = 6.0         # a locked-on person missing this long → sweep again
+SEARCH_GIVE_UP_S = 180.0       # tracking (not recording) and sweeping this long
+                               # without finding anyone → back to idle. A
+                               # recording is never abandoned: the user stops that.
+RESEARCH_AFTER_S = 6.0         # the person being recorded missing this long → sweep again
 LOST_HOLD_S = 2.0              # target missing → hold still and flash the ring
 
 # --- following the person ---------------------------------------------------
@@ -99,23 +99,15 @@ TRACK_DEADBAND_FRACTION = 0.04  # offsets under this share of the frame are igno
 # person" and is ignored.
 TRACK_GATE_FRACTION = 0.45
 
-# --- acquiring a lock ---------------------------------------------------
-# SEARCH → CENTRE → TRACK. The first detection stops the sweep and the camera
-# turns to put the person in the middle (CENTRE). Locked = ACQUIRE_DETECTIONS
-# consecutive detections of someone near the centre of the frame. One-frame
-# false positives (a coat stand, a chair) therefore cost a short pause, not a
-# recording of furniture.
-ACQUIRE_DETECTIONS = 2
-ACQUIRE_CENTRE_FRACTION = 0.2  # "centred": box centre within this fraction of
-                               # the frame's width and height from the middle
-CENTRE_TIMEOUT_S = 2.0         # nobody seen again this long → resume the sweep
+# --- finding a person ------------------------------------------------------
+# SEARCH → FOUND → recording. The first detection stops the sweep and the
+# camera follows and frames the person exactly as it will while recording
+# (FOUND); they need not be centred. Still in frame FOUND_CONFIRM_S later, it
+# records. One-frame false positives (a coat stand, a chair) therefore cost a
+# short pause, not a recording of furniture.
+FOUND_CONFIRM_S = 3.0          # FOUND this long, the person still in frame → record
+FOUND_LOST_S = 1.0             # FOUND with nobody seen this long → resume the sweep
 ACQUIRE_STALLED_S = 15.0       # searching this long → the app says "can't see anyone"
-
-# --- recording --------------------------------------------------------------
-# A session started from idle records as soon as it first locks on, so the
-# clip is of the person and not of an empty room being swept. Set False to
-# make recording a separate tap.
-AUTO_RECORD_ON_LOCK = True
 
 # --- vision ---------------------------------------------------------------
 # Vision is the only sensor, so the detector runs at the full rate whenever a

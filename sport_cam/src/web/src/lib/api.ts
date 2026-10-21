@@ -10,9 +10,8 @@ export interface Telemetry {
   tilt?: number;
   zoomMm?: number;
   dist?: number | null;
-  phase?: "person-in-frame" | "no-person-in-frame" | "acquiring" | "acquired" | null;
-  centred?: number;  // consecutive centred detections toward the lock; the app beeps per step up
-  searching?: boolean;  // in SEARCH (turning to the tag / sweeping); the app pings every 3 s
+  phase?: "person-in-frame" | "no-person-in-frame" | "search" | "found" | "track" | null;
+  countdown?: number;  // found: seconds left before recording (3, 2, 1); the app beeps on each
   acquireStalled?: boolean;
   battery?: number;
 }

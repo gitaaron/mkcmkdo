@@ -30,8 +30,8 @@ from . import config
 # state → (r, g, b), matching the app's status ring and docs/01
 COLOURS = {
     "off":       (0, 0, 0),
-    "idle":      (0x2F, 0x6F, 0xED),    # solid blue
-    "tracking":  (0x1F, 0x9D, 0x55),    # solid green
+    "idle":      (0x2F, 0x6F, 0xED),    # blue: solid, or breathing slowly with a person in frame
+    "tracking":  (0x1F, 0x9D, 0x55),    # green: chasing (search), filling (found)
     "recording": (0xD6, 0x45, 0x41),    # breathing red
     "error":     (0xF2, 0xA9, 0x3B),    # flashing orange
 }
@@ -43,7 +43,9 @@ class StatusRing:
         self.state = "idle"
         self.lost = False          # tracking but no ranges → flash
         self.warn = False          # battery or storage low: dim + orange blink
-        self.acquiring = False     # tracking, not yet locked on → green chase
+        self.idle_person = False   # idle, person in frame → slow blue breath
+        self.searching = False     # tracking, search → green chase
+        self.found: float | None = None   # tracking, found: 0 → 1 over FOUND_CONFIRM_S → ring fills
         if neopixel_spi is not None:
             try:
                 self._pixels = neopixel_spi.NeoPixel_SPI(
@@ -79,13 +81,18 @@ class StatusRing:
             self._pixels.brightness = config.LED_BRIGHTNESS
         if self.state == "recording":
             k = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(2 * math.pi * t))   # 1 Hz breath
+        elif self.state == "idle" and self.idle_person:
+            k = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(math.pi * t))         # 0.5 Hz breath
         elif self.lost and self.state in ("tracking", "recording"):
             k = 1.0 if (t % 0.5) < 0.25 else 0.15                        # 2 Hz flash
         else:
             k = 1.0
         colour = (int(r * k), int(g * k), int(b * k))
-        if (self.acquiring and self.state == "tracking" and not self.lost):
+        if self.state == "tracking" and self.searching and not self.lost:
             for i, c in enumerate(chase(colour, t, config.LED_COUNT)):
+                self._pixels[i] = c
+        elif self.state == "tracking" and self.found is not None:
+            for i, c in enumerate(fill(colour, self.found, config.LED_COUNT)):
                 self._pixels[i] = c
         else:
             self._pixels.fill(colour)
@@ -98,11 +105,11 @@ class StatusRing:
 
 
 def chase(colour: tuple[int, int, int], t: float, n: int) -> list[tuple[int, int, int]]:
-    """"Acquiring": a bright head with a fading tail, once round per second.
+    """Search: a bright head with a fading tail, once round per second.
 
-    Clearly different from steady green (locked, tracking) and from the 2 Hz
-    flash (lost), so you can tell from the far side of the room whether the
-    camera has found you yet.
+    Clearly different from the filling ring (found) and from the 2 Hz flash
+    (lost), so you can tell from the far side of the room whether the camera
+    has found you yet.
     """
     head = (t % 1.0) * n
     out = []
@@ -111,3 +118,11 @@ def chase(colour: tuple[int, int, int], t: float, n: int) -> list[tuple[int, int
         k = max(0.08, 1.0 - behind / 5.0)  # 5-pixel tail over a dim base
         out.append((int(colour[0] * k), int(colour[1] * k), int(colour[2] * k)))
     return out
+
+
+def fill(colour: tuple[int, int, int], progress: float, n: int) -> list[tuple[int, int, int]]:
+    """Found: the ring fills round, bright over a dim base, as FOUND_CONFIRM_S
+    runs down — full when recording starts."""
+    lit = max(1, math.ceil(min(1.0, progress) * n))
+    k = [1.0 if i < lit else 0.1 for i in range(n)]
+    return [(int(colour[0] * a), int(colour[1] * a), int(colour[2] * a)) for a in k]

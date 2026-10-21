@@ -142,15 +142,13 @@ async def main() -> None:
     check("ignores its own writes", head.applied == before, str(head.applied))
 
     print("telemetry and heartbeat")
-    await link.telemetry({"type": "telemetry", "pan": 3.0, "phase": "acquiring"})
-    check("a phase change goes up at once", doc().get("telemetry", {}).get("phase") == "acquiring")
-    await link.telemetry({"type": "telemetry", "pan": 3.0, "phase": "acquiring", "centred": 1})
-    check("a centred detection goes up at once (the app beeps for it)",
-          doc().get("telemetry", {}).get("centred") == 1)
-    await link.telemetry({"type": "telemetry", "pan": 3.0, "phase": "acquiring", "centred": 1,
-                          "searching": True})
-    check("searching goes up at once (the app pings while it is)",
-          doc().get("telemetry", {}).get("searching") is True)
+    await link.telemetry({"type": "telemetry", "pan": 3.0, "phase": "search"})
+    check("a phase change goes up at once (the app pings while searching)",
+          doc().get("telemetry", {}).get("phase") == "search")
+    await link.telemetry({"type": "telemetry", "pan": 3.0, "phase": "found", "countdown": 3})
+    await link.telemetry({"type": "telemetry", "pan": 3.0, "phase": "found", "countdown": 2})
+    check("each second of the countdown goes up at once (the app beeps for it)",
+          doc().get("telemetry", {}).get("countdown") == 2)
     await asyncio.sleep(0.15)
     check("the heartbeat carries telemetry", doc().get("telemetry", {}).get("pan") == 3.0)
 

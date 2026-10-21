@@ -21,7 +21,7 @@ protocol** as the Firebase function:
 
 - Same protocol, so the app's calls are identical; only the base URL changes.
 - Single state owner on the device (`Head.apply_state`). Direct commands,
-  Firebase commands and camera-initiated changes (<!--with_uwb-->tag on/off<!--/--><!--both--> with UWB; <!--/--><!--without_uwb-->first lock-on<!--/--><!--both--> without<!--/-->)
+  Firebase commands and camera-initiated changes (<!--with_uwb-->tag on/off<!--/--><!--both--> with UWB; <!--/--><!--without_uwb-->found for 3 s → recording<!--/--><!--both--> without<!--/-->)
   take the same path; app, LED ring and Firestore stay consistent.
 - State includes `mode` (`config.TRACKING_MODE`), so a direct client selects
   the build's wording ([07 — Tracking mode](07-backend-and-app.md#tracking-mode)).
@@ -86,8 +86,8 @@ Same layout as the web app, plus a connection badge:
 | --- | --- |
 | **Top left — connection** (`ConnectionBadge`) | green **"SportCam · Direct · 10.0.0.42"**; blue **"Firebase"**; amber pulsing **"Searching…"**; red **"Offline — tap to retry"**. Tap to re-scan |
 | **Below the badge** | recordings button with clip-count badge |
-| **Top right, stalled-acquiring pill, bottom buttons** | as in the web app ([07](07-backend-and-app.md#web-app-srcweb)) |
-| **Sounds** (`lib/session_audio.dart`) | a sonar ping every 3 s while searching, a beep per centred detection while locking on, then a rising chime on record start; falling on stop. Queued, so the chime follows the last beep. Plays **including in the background**. While connected the app stays awake: Android foreground service with a "SportCam connected" notification; iOS background audio mode (looped silence). Mixes over music; plays with the iOS silent switch on. Platform setup: [`src/app_flutter/README.md`](../../src/app_flutter/README.md) |
+| **Top right, stalled-tracking pill, bottom buttons** | as in the web app ([07](07-backend-and-app.md#web-app-srcweb)) |
+| **Sounds** (`lib/session_audio.dart`) | a sonar ping every 3 s while searching, a beep each second of the found countdown (3, 2, 1), then a rising chime on record start; falling on stop. Queued, so the chime follows the last beep. Plays **including in the background**. While connected the app stays awake: Android foreground service with a "SportCam connected" notification; iOS background audio mode (looped silence). Mixes over music; plays with the iOS silent switch on. Platform setup: [`src/app_flutter/README.md`](../../src/app_flutter/README.md) |
 
 ## Running and testing it
 

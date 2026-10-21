@@ -61,12 +61,11 @@ async function call(name: string, data?: unknown, k: string | null = key) {
 beforeEach(() => camera());
 
 describe("state machine", () => {
-  it("full happy path idle → tracking → recording → tracking → idle", async () => {
+  it("full happy path idle → tracking → recording → idle", async () => {
     for (const [fn, want] of [
       ["startTracking", "tracking"],
       ["startRecording", "recording"],
-      ["stopRecording", "tracking"],
-      ["stopTracking", "idle"],
+      ["stopRecording", "idle"],
     ] as const) {
       const r = await call(fn);
       expect(r.status).toBe(200);
@@ -95,6 +94,11 @@ describe("state machine", () => {
   it("stopTracking while recording stops both", async () => {
     await camera("recording");
     expect((await call("stopTracking")).body.result.state).toBe("idle");
+  });
+
+  it("there is no way back from recording to tracking: stopping ends the session", async () => {
+    await camera("recording");
+    expect((await call("stopRecording")).body.result.state).toBe("idle");
   });
 
   it("setPower validates its input and is idempotent", async () => {

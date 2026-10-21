@@ -59,7 +59,7 @@ class Head:
         self._rec_path = ""
         self._rec_started = 0.0
         self._warned = ""          # which warning we last announced
-        self._centred_sent = 0     # tracker.centred as last sent to the app
+        self._countdown_sent = 0   # tracker.countdown as last sent to the app
 
     # convenience for local_api/telemetry — pan and tilt are commanded angles
     @property
@@ -74,19 +74,19 @@ class Head:
     def phase(self) -> str | None:
         """The sub-state.
 
-        idle: "person-in-frame" or "no-person-in-frame". Tracking: "acquiring"
-        until locked on, then "acquired".
+        idle: "person-in-frame" or "no-person-in-frame". Tracking: "search",
+        then "found" (FOUND_CONFIRM_S to recording). Recording: "track".
         """
         if self.state == "idle":
             return "person-in-frame" if self.tracker.idle_person_in_frame else "no-person-in-frame"
         if self.state not in ("tracking", "recording"):
             return None
-        return "acquired" if self.tracker.locked else "acquiring"
+        return self.tracker.mode
 
     @property
     def acquire_stalled(self) -> bool:
         """Acquiring for a while and vision still has not seen the subject."""
-        return self.phase == "acquiring" and self.tracker.acquire_stalled
+        return self.state == "tracking" and self.tracker.acquire_stalled
 
     # ---- entry point ------------------------------------------------------
     async def run(self) -> None:
@@ -118,7 +118,9 @@ class Head:
             print(f"[storage] refusing to record — {self.storage.minutes_left:.0f} min left")
             await self.local.broadcast({"type": "warning", "code": "storage-full",
                                         **self.storage.telemetry()})
-            new = "tracking" if self.state in ("tracking", "recording") else self.state
+            new = "idle" if self.state == "tracking" else self.state
+        if self.state == "recording" and new == "tracking":
+            new = "idle"                  # stopping a recording ends the session
 
         old, self.state = self.state, new
         if old not in ("tracking", "recording") and new in ("tracking", "recording"):
@@ -126,6 +128,7 @@ class Head:
         if old != "recording" and new == "recording":
             self._rec_path = self.camera.start_recording()
             self._rec_started = time.monotonic()
+            self.tracker.confirm()
             print(f"[rec] → {self._rec_path}")
         elif old == "recording" and new != "recording":
             self.camera.stop_recording()
@@ -166,24 +169,27 @@ class Head:
         """One 20 Hz tick: track, notice a lost tag, and run the tag session."""
         if self.state in ("tracking", "recording"):
             self.tracker.step()
-            await self.announce_centred()
+            await self.announce_countdown()
             self.led.lost = self.tracker.lost_for() > config.LOST_HOLD_S
             if self.tracker.lost_for() > config.LOST_IDLE_S:
                 await self.apply_state("idle")
                 await self.report_state()
         else:
             if self.state == "idle":
-                self.tracker.watch_idle()     # person in frame? (a session started now starts in CENTRE)
+                self.tracker.watch_idle()     # person in frame? (a session started now starts in FOUND)
             self.led.lost = False
-        # The tag switching on (or the tracker locking on) can move the
+        # The tag switching on (or the person found for FOUND_CONFIRM_S) can move the
         # state, through the same apply_state() as any other command.
         want = self.session.update(now, self.uwb.frame_age(), self.state,
-                                   self.tracker.locked)
+                                   self.tracker.ready_to_record)
         if want and want != self.state:
             print(f"[session] {self.state} → {want}")
             await self.apply_state(want)
             await self.report_state()
-        self.led.acquiring = self.phase == "acquiring"
+        self.led.idle_person = self.phase == "person-in-frame"
+        self.led.searching = self.state == "tracking" and self.phase == "search"
+        self.led.found = (self.tracker.found_for() / config.FOUND_CONFIRM_S
+                          if self.state == "tracking" and self.phase == "found" else None)
 
     async def health_loop(self) -> None:
         """Watch the two things that run out: charge and card space.
@@ -204,7 +210,7 @@ class Head:
                 await self.report_state()
             elif store == "critical" and self.state == "recording":
                 print("[storage] critical — stopping recording while it is still valid")
-                await self.apply_state("tracking")
+                await self.apply_state("idle")
                 await self.report_state()
 
             for code, level, tele in (("battery-low", batt, self.power.telemetry),
@@ -254,8 +260,7 @@ class Head:
             "zoomMm": round(self.ptz.zoom_mm, 1),
             "dist": round(self.tracker.dist_m, 2) if self.tracker.dist_m else None,
             "phase": self.phase,
-            "centred": self.tracker.centred if self.state in ("tracking", "recording") else 0,
-            "searching": self.state in ("tracking", "recording") and self.tracker.searching,
+            "countdown": self.tracker.countdown if self.state == "tracking" else 0,
             "acquireStalled": self.acquire_stalled,
             "tagPresent": self.session.tag_present,
             **self.power.telemetry(),
@@ -266,15 +271,17 @@ class Head:
         await self.cloud.telemetry({"type": "telemetry", **self.telemetry()})
         await self.local.broadcast(self.local.state_payload())
 
-    async def announce_centred(self) -> None:
-        """Each centred detection goes to the app at once, so it can beep for it.
+    async def announce_countdown(self) -> None:
+        """Each second of the FOUND countdown goes to the app at once, so it
+        can beep for it.
 
-        The app beeps once per step up in `centred`, then chimes when
-        recording starts. Telemetry otherwise goes out once a second, which
-        would merge the detections (about three a second).
+        The app beeps once per second counted (3, 2, 1), then chimes when
+        recording starts. Telemetry otherwise goes out once a second, out of
+        step with the count.
         """
-        if self.tracker.centred != self._centred_sent:
-            self._centred_sent = self.tracker.centred
+        countdown = self.tracker.countdown if self.state == "tracking" else 0
+        if countdown != self._countdown_sent:
+            self._countdown_sent = countdown
             await self.send_telemetry()
 
     async def telemetry_loop(self) -> None:

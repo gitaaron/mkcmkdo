@@ -55,9 +55,7 @@ class StubStorage:
 
 class StubTracker:
     dist_m = 4.2
-    locked = False
-    centred = 0
-    searching = False
+    countdown = 0
 
     def step(self):
         return 0.0

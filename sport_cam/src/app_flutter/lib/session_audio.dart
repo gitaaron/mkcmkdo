@@ -8,7 +8,7 @@ import 'camera_client.dart';
 import 'models.dart';
 
 /// Pings like sonar every three seconds while the camera searches, beeps for
-/// each centred detection while it locks on, then chimes when it starts
+/// each second of the found countdown (3, 2, 1), then chimes when it starts
 /// recording (and again when it stops) — including with the app in the
 /// background, which is the usual case: the phone is in a bag at the foot of
 /// the wall while you climb.
@@ -46,7 +46,7 @@ class SessionAudio {
   final AudioPlayer _silence = AudioPlayer();
 
   CamState? _last; // null until the first snapshot after (re)connecting
-  int _lastCentred = 0;
+  int _lastCountdown = 0;
   Future<void> _queue = Future.value();
   bool _wasConnected = false;
   bool _keepingAwake = false;
@@ -100,20 +100,28 @@ class SessionAudio {
       _last = null; // a reconnect's first snapshot is not a change
       _keepAwake(connected);
     }
-    _pingWhile(connected && client.telemetry.searching);
+    _pingWhile(
+      connected &&
+          client.state != CamState.idle &&
+          client.state != CamState.off &&
+          client.telemetry.phase == 'search',
+    );
     if (!connected) return;
 
     final next = client.state;
-    final centred = client.telemetry.centred;
+    final countdown = client.telemetry.countdown;
     final prev = _last;
-    final prevCentred = _lastCentred;
+    final prevCountdown = _lastCountdown;
     _last = next;
-    _lastCentred = centred;
+    _lastCountdown = countdown;
     if (prev == null) return;
-    // One update can carry several detections (the relay polls every two
-    // seconds): one beep per step up.
-    for (var i = prevCentred; i < centred; i++) {
-      _play('sounds/beep.wav');
+    // One beep per second counted down. An update can skip a second (the
+    // relay polls every two seconds), so beep for each one missed.
+    if (countdown > 0 && countdown != prevCountdown) {
+      final steps = prevCountdown > countdown ? prevCountdown - countdown : 1;
+      for (var i = 0; i < steps; i++) {
+        _play('sounds/beep.wav');
+      }
     }
     if (prev == next) return;
     if (next == CamState.recording) {

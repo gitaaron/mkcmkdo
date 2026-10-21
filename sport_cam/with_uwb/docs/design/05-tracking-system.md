@@ -19,7 +19,7 @@ calibration, tag placement.
 | **UWB two-way ranging** | **±10–30 cm range, ≈ 20 Hz, low-cost DW1000 modules, identity from the tag** | **primary sensor** |
 
 Fusion: UWB provides identity, bearing, elevation and distance. Vision trims
-both angles, frames the shot, and verifies lock-on.
+both angles, frames the shot, and confirms the person before recording.
 
 ## Geometry
 
@@ -159,49 +159,50 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
 | **Detector** | OpenCV HOG on the 720p preview, 3 fps (0.5 idle); record stream untouched 1080p. Each detection used once; search strip ≈ 40 % of frame width around the ranged bearing ([06](../../../docs/design/06-device-software.md#vision-and-why-it-runs-slowly)). Sufficient: a climber at 0.3 m/s seen from 10 m moves 1.7°/s, and the 17 % framing margin gives several seconds of tolerance |
 | **Lost tag** | > 2 s without ranges: hold, LED flashes. > 5 s: `idle` (recording saved first). Same path as a tag switched off |
 
-### Acquiring and lock-on
+### Search, found and recording
 
 The same state machine as the camera-only build
 ([without UWB, 05](../../../without_uwb/docs/design/05-tracking-system.md#the-state-machine)).
 The difference is SEARCH: the tag gives the subject's location at once, so
-there is no sweep. The head still has to pan and tilt to centre the person.
+there is no sweep. The head still has to pan and tilt to bring the person
+into frame.
 
 ```
    idle, no person in frame ──tag on──►  SEARCH   turn to the ranged position
                                            │
                                            │ on target 0.5 s, person seen
                                            ▼
-   idle, person in frame ────tag on────►  CENTRE   vision trims the aim to the middle
-             (skips SEARCH)                │        (nobody seen for 2 s → SEARCH)
-                                           │ 2 consecutive centred detections, on target
+   idle, person in frame ────tag on────►  FOUND    track and frame as when recording
+             (skips SEARCH)                │        (nobody seen for 1 s → SEARCH)
+                                           │ still in frame 3 s later
                                            ▼
-                                         TRACK ── first lock starts recording
+                                         TRACK ── recording
 ```
 
 | Mode | Behaviour | Exit |
 | --- | --- | --- |
-| **idle**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_IDLE` (0.5 fps). Person in frame from a detection until `IDLE_PERSON_HOLD_S` (4 s) pass without one | session start (tag on, or **Start tracking**) → SEARCH (no person in frame) or CENTRE (person in frame) |
-| **SEARCH** | pan (and tilt, with A3) slews to the ranged position | within `ACQUIRE_POINT_TOL_DEG` (4°) for `ACQUIRE_SETTLE_S` (0.5 s) and a person detected → CENTRE |
-| **CENTRE** | vision trims the aim until the box centre is within `ACQUIRE_CENTRE_FRACTION` (25 %) of frame centre | `ACQUIRE_DETECTIONS` (2) consecutive centred detections with the head on the ranged position → TRACK; nobody seen for `CENTRE_TIMEOUT_S` (2 s) → SEARCH |
-| **TRACK** | locked for the rest of the session; a hidden tag or a missed detection is ordinary tracking | session end |
+| **idle**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_IDLE` (0.5 fps). Person in frame from a detection until `IDLE_PERSON_HOLD_S` (4 s) pass without one | session start (tag on, or **Start tracking**) → SEARCH (no person in frame) or FOUND (person in frame) |
+| **SEARCH** | pan (and tilt, with A3) slews to the ranged position | within `ACQUIRE_POINT_TOL_DEG` (4°) for `ACQUIRE_SETTLE_S` (0.5 s) and a person detected → FOUND |
+| **FOUND** | the full tracking loop, as in recording: ranged pan and tilt, vision trim, zoom and focus. The person need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) → recording (TRACK); nobody seen for `FOUND_LOST_S` (1 s) → SEARCH |
+| **TRACK** | recording, for the rest of the session; a hidden tag or a missed detection is ordinary tracking | session end |
 
 Mapping to app states (telemetry `phase`): idle = `idle`/`no-person-in-frame`
-or `idle`/`person-in-frame`; SEARCH and CENTRE = `tracking`/`acquiring`;
-TRACK = `tracking`/`acquired`. Telemetry `searching` is true in SEARCH, and
-the app pings every 3 s while it is. Telemetry `centred` counts the centred
-detections toward the lock; the app beeps once per detection, then chimes
-when recording starts. Not verified after `ACQUIRE_STALLED_S` (15 s): the
-app reports "Can't see you — step into view, facing the camera".
+or `idle`/`person-in-frame`; SEARCH = `tracking`/`search` (the app pings
+every 3 s); FOUND = `tracking`/`found`; TRACK = `recording`/`track`.
+Telemetry `countdown` carries the seconds left in FOUND (3, 2, 1); the app
+beeps on each, then chimes when recording starts. Not recording after
+`ACQUIRE_STALLED_S` (15 s): the app reports "Can't see you — step into view,
+facing the camera".
 
-- **Ranging alone never locks.** A sign or calibration error shows as a ring
-  that keeps chasing, not a recording of a wall. Session start is usually an
-  upright climber at the wall base, HOG's best case.
-- **Start recording** in the app overrides verification.
+- **Ranging alone never records.** A sign or calibration error shows as a
+  ring that keeps chasing, not a recording of a wall. Session start is
+  usually an upright climber at the wall base, HOG's best case.
 - Once recording, nothing depends on vision; detector loss mid-route doesn't
   stop the clip.
-- A subject beyond a soft limit is locked from the limit.
-- In a tag-started session, lock-on starts recording
-  ([01](../../../docs/product/01-requirements.md#state-machine-with-uwb)).
+- A subject beyond a soft limit is found from the limit.
+- Every session records after found, whether the tag or **Start tracking**
+  started it ([01](../../../docs/product/01-requirements.md#state-machine-with-uwb)).
+  **Stop recording** ends the session.
 
 ## Camera placement envelope
 

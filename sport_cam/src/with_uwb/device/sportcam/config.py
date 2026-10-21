@@ -131,7 +131,7 @@ LOST_HOLD_S = 2.0              # no ranges → hold + flash
 LOST_IDLE_S = 5.0              # no ranges → drop to idle (saving any recording)
 
 # --- tag-driven sessions (session.py) --------------------------------------
-# Turning the tag on is the start button: standby → acquiring → recording,
+# Turning the tag on is the start button: standby → search → found → recording,
 # and turning it off ends the session LOST_IDLE_S later. A switched-off tag
 # looks exactly like one hidden behind a body, so a dropout longer than that
 # also ends the session — and the tag reappearing then starts a new one, so
@@ -139,22 +139,20 @@ LOST_IDLE_S = 5.0              # no ranges → drop to idle (saving any recordin
 # that happens often.
 AUTO_SESSION = True            # False: the tag only ranges; start from the app
 TAG_PRESENT_S = 1.0            # unbroken ranging this long = the tag is on
-# SEARCH → CENTRE → TRACK, as in the camera-only build, but SEARCH is a turn
-# to the tag's bearing rather than a sweep. CENTRE starts once the camera is
-# pointing where the tag says, has settled there, and the detector sees a
-# person (a session started with a person already in frame starts in CENTRE).
-# Locked = ACQUIRE_DETECTIONS consecutive centred detections in CENTRE. Vision
-# must verify: recording never starts on ranging alone, so a wrong sign or a
-# bad calibration shows up as a ring that keeps chasing, not as a clip of a
-# wall. The start of a climb — standing upright at the foot of the wall — is
+# SEARCH → FOUND → recording, as in the camera-only build, but SEARCH is a
+# turn to the tag's bearing rather than a sweep. FOUND starts once the camera
+# is pointing where the tag says, has settled there, and the detector sees a
+# person (a session started with a person already in frame starts in FOUND).
+# FOUND tracks exactly as recording does; the person need not be centred.
+# Seen throughout FOUND_CONFIRM_S, it records. Vision must verify: recording
+# never starts on ranging alone, so a wrong sign or a bad calibration shows up
+# as a ring that keeps chasing, not as a clip of a wall. The start of a climb — standing upright at the foot of the wall — is
 # the pose HOG handles best; it only struggles later, and nothing mid-climb
 # depends on it.
 ACQUIRE_POINT_TOL_DEG = 4.0    # pan (and tilt, with A3) within this of the target
 ACQUIRE_SETTLE_S = 0.5         # ...for this long
-ACQUIRE_DETECTIONS = 2         # consecutive centred detections, on target, to lock
-ACQUIRE_CENTRE_FRACTION = 0.25 # "centred": box centre within this fraction of
-                               # the frame's width and height from the middle
-CENTRE_TIMEOUT_S = 2.0         # CENTRE with nobody seen this long → back to SEARCH
+FOUND_CONFIRM_S = 3.0          # FOUND this long, the person still in frame → record
+FOUND_LOST_S = 1.0             # FOUND with nobody seen this long → back to SEARCH
 ACQUIRE_STALLED_S = 15.0       # acquiring this long → the app says "can't see you"
 
 # --- vision ---------------------------------------------------------------

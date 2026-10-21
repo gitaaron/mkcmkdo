@@ -41,28 +41,29 @@ const store = reactive<CameraStore>({
 });
 
 let lastState: CamState | null = null;   // null until the first snapshot
-let lastCentred = 0;
+let lastCountdown = 0;
 let seenAt = 0;
 
 /**
- * A beep for each centred detection while locking on, then a chime on
+ * A beep for each second of the found countdown (3, 2, 1), then a chime on
  * recording start (and on stop) — never for the snapshot that arrives at
- * connect. One snapshot can carry several detections, so it beeps once per
- * step up in `centred`; the chime queues behind the beeps.
+ * connect. A late snapshot can skip a second, so it beeps once per second
+ * counted down; the chime queues behind the beeps.
  */
-function announce(next: CamState, centred: number): void {
-  if (lastState !== null) {
-    for (let i = lastCentred; i < centred; i++) beep();
-    if (lastState !== next) {
-      if (next === "recording") chime("start");
-      else if (lastState === "recording") chime("stop");
-    }
+function announce(next: CamState, countdown: number): void {
+  if (lastState !== null && countdown > 0 && countdown !== lastCountdown) {
+    const steps = lastCountdown > countdown ? lastCountdown - countdown : 1;
+    for (let i = 0; i < steps; i++) beep();
+  }
+  if (lastState !== null && lastState !== next) {
+    if (next === "recording") chime("start");
+    else if (lastState === "recording") chime("stop");
   }
   lastState = next;
-  lastCentred = centred;
+  lastCountdown = countdown;
 }
 
-/** Sonar ping every PING_EVERY_MS while the camera is in SEARCH. */
+/** Sonar ping every PING_EVERY_MS while the camera is in search. */
 const PING_EVERY_MS = 3000;
 let pingTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -85,7 +86,7 @@ async function subscribe(key: string): Promise<void> {
   unsubs = [];
   Object.assign(store, { connected: false, recordings: [], upload: null, lastSaved: null });
   lastState = null;
-  lastCentred = 0;
+  lastCountdown = 0;
   pingWhile(false);
 
   const db = await firestore();
@@ -95,8 +96,8 @@ async function subscribe(key: string): Promise<void> {
     const d = snap.data();
     store.connected = snap.exists();
     if (!d) return;
-    announce(d.state, d.telemetry?.centred ?? 0);
-    pingWhile(d.telemetry?.searching === true);
+    announce(d.state, d.telemetry?.countdown ?? 0);
+    pingWhile(d.state !== "idle" && d.state !== "off" && d.telemetry?.phase === "search");
     seenAt = ms(d.deviceSeenAt);
     Object.assign(store, {
       mode: d.mode,

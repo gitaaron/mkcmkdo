@@ -33,9 +33,9 @@ export const callables: Record<string, Callable> = {
     return requestState(cam, (cur) => (data.on ? (cur === "off" ? "idle" : null) : cur === "off" ? null : "off"));
   },
   startTracking: go("tracking"),
-  stopTracking: go("idle"),       // while recording, this stops (and saves) that too
+  stopTracking: go("idle"),
   startRecording: go("recording"),
-  stopRecording: go("tracking"),
+  stopRecording: go("idle"),      // saves the clip and ends the session
   getState: (cam) => getState(cam),
   watch: (cam) => watch(cam),
   getPreview: (cam) => getPreview(cam),

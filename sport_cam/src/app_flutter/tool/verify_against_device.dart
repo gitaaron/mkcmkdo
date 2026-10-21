@@ -106,7 +106,7 @@ Future<void> main(List<String> args) async {
     parsed = camStateFrom(
       (res['result'] as Map<String, dynamic>)['state'] as String?,
     );
-    check('stopRecording → tracking', parsed == CamState.tracking, '$parsed');
+    check('stopRecording → idle (ends the session)', parsed == CamState.idle, '$parsed');
 
     // --- recordings, parsed into the library model -----------------------
     res = await call(client, base, 'getRecordings');

@@ -62,8 +62,7 @@ class StubStorage:
 
 class StubTracker:
     dist_m = 4.2
-    centred = 0
-    searching = False
+    countdown = 0
     def step(self): return 0.0
     def lost_for(self): return 0.0
 
@@ -133,8 +132,8 @@ async def main() -> None:
                   st == 412 and body["error"]["code"] == "failed-precondition", str(body))
 
             st, body = await call(s, "stopRecording")
-            check("stopRecording → tracking",
-                  st == 200 and body["result"]["state"] == "tracking", str(body))
+            check("stopRecording → idle (the session ends)",
+                  st == 200 and body["result"]["state"] == "idle", str(body))
 
             st, body = await call(s, "setPower", {"on": "yes"})
             check("setPower validates payload (400)",
@@ -182,10 +181,10 @@ async def main() -> None:
                 check("WS pushes state on connect", first["type"] == "state", str(first)[:80])
                 check("WS pushes recordings on connect",
                       second["type"] == "recordings", str(second)[:80])
-                await call(s, "stopTracking")
+                await call(s, "startTracking")
                 third = json.loads((await ws.receive(timeout=5)).data)
                 check("WS broadcasts state change",
-                      third["type"] == "state" and third["state"] == "idle", str(third)[:80])
+                      third["type"] == "state" and third["state"] == "tracking", str(third)[:80])
 
         # --- mDNS -------------------------------------------------------
         await mdns.start("idle")

@@ -24,14 +24,6 @@ async function run(action: () => Promise<unknown>): Promise<void> {
   }
 }
 
-const stopTrackingWithConfirm = async () => {
-  // From 'recording' this also stops and saves the recording.
-  if (props.cam.state === "recording" && !confirm("Stop tracking? This also stops the recording.")) {
-    return;
-  }
-  await api.stopTracking();
-};
-
 const buttons = computed<Btn[]>(() => {
   const text = modeText(props.cam.mode);
   switch (props.cam.state) {
@@ -43,14 +35,16 @@ const buttons = computed<Btn[]>(() => {
         { label: text.startTracking, kind: "primary", action: () => api.startTracking() },
       ];
     case "tracking":
+      // search → found → recording runs by itself; this only cancels it
       return [
         { label: "Turn off", kind: "neutral", action: () => api.setPower(false) },
-        { label: text.startRecording, kind: "primary", action: () => api.startRecording() },
+        { label: "Stop tracking", kind: "primary", action: () => api.stopTracking() },
       ];
     case "recording":
+      // stopping saves the clip and ends the session (back to idle)
       return [
-        { label: "Stop recording", kind: "neutral", action: () => api.stopRecording() },
-        { label: "Stop tracking", kind: "primary", action: stopTrackingWithConfirm },
+        { label: "Turn off", kind: "neutral", action: () => api.setPower(false) },
+        { label: "Stop recording", kind: "primary", action: () => api.stopRecording() },
       ];
   }
 });

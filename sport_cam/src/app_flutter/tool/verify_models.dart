@@ -48,26 +48,21 @@ void main() {
   check('telemetry parses', t.pan == 90.0 && t.tilt == 12.0 && t.distM == 4.2);
   check('telemetry tolerates null', Telemetry.fromJson(null).pan == null);
   final acq = Telemetry.fromJson({
-    'phase': 'acquiring',
+    'phase': 'search',
     'acquireStalled': true,
   });
   check(
-    'acquiring phase and stall flag parse',
-    acq.phase == 'acquiring' && acq.acquireStalled,
+    'search phase and stall flag parse',
+    acq.phase == 'search' && acq.acquireStalled,
   );
   check(
     'stall flag defaults to false',
     !Telemetry.fromJson(null).acquireStalled,
   );
   check(
-    'centred count parses, defaulting to 0',
-    Telemetry.fromJson({'centred': 2}).centred == 2 &&
-        Telemetry.fromJson(null).centred == 0,
-  );
-  check(
-    'searching flag parses, defaulting to false',
-    Telemetry.fromJson({'searching': true}).searching &&
-        !Telemetry.fromJson(null).searching,
+    'countdown parses, defaulting to 0',
+    Telemetry.fromJson({'phase': 'found', 'countdown': 2}).countdown == 2 &&
+        Telemetry.fromJson(null).countdown == 0,
   );
 
   // Captured from `POST /api/call/getRecordings`.

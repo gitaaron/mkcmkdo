@@ -4,8 +4,8 @@
     python3 src/app_flutter/tool/make_chimes.py
 
 Start rises C6 → G6, stop falls G6 → C6: a sine with a quiet octave partial,
-12 ms attack, exponential decay. The beep, played once per centred detection
-while the camera locks on, is one short A5. The sonar ping, every three
+12 ms attack, exponential decay. The beep, played once per second of the found
+countdown (3, 2, 1), is one short A5. The sonar ping, every three
 seconds while the camera searches, is an E6 with a long ring and a quieter
 echo. 44.1 kHz mono 16-bit WAV. Also writes one
 second of digital silence, which the app loops to stay awake in the

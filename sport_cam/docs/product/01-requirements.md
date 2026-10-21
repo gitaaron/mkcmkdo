@@ -28,7 +28,7 @@ Subject localisation is build-specific: [With UWB](#with-uwb),
 
 | | [**With UWB**](../../README.md#with-uwb) | [**Without UWB**](../../README.md#without-uwb) |
 | --- | --- | --- |
-| Subject localisation | worn UWB tag, ranged by 3 anchors at 20 Hz | vision only: pan sweep, lock on the first person detected |
+| Subject localisation | worn UWB tag, ranged by 3 anchors at 20 Hz | vision only: pan sweep, follow the first person detected |
 | Session start | tag switched on | **Track & record** in the app |
 | Distinguishes subject from bystanders | yes (tag identity) | no (first person found) |
 | Extra hardware | 3 × ULA1 anchors, 2 anchor arms, A3 mast, wearable pod | none |
@@ -46,8 +46,8 @@ view; camera-only for lower cost, size and power.
 | --- | --- | --- |
 | F1 | **Pan, tilt, zoom.** Pan 160° (±80°); tilt 130° (−45° to +85°); optical zoom 96° → 33° horizontal (≈ 3.5×). All three from the Arducam PTZ base | [03](../design/03-mechanical-design.md) |
 | F2 | **Follow a person** <!--both-->by UWB tag or by vision, per build<!--/--><!--with_uwb: by the UWB tag they wear--><!--without_uwb: by vision alone-->, and zoom to keep them framed | <!--both-->05 tracking ([with UWB](../../with_uwb/docs/design/05-tracking-system.md), [without UWB](../../without_uwb/docs/design/05-tracking-system.md))<!--/--><!--with_uwb:[05](../../with_uwb/docs/design/05-tracking-system.md)--><!--without_uwb:[05](../../without_uwb/docs/design/05-tracking-system.md)--> |
-| F3 | **Record unattended.** Recording starts on lock-on and stops at session end. A clip is saved even when the battery runs out | [Ideal path](#ideal-path) |
-| F4 | **LED status ring** showing idle, acquiring, tracking, recording and low battery | [State machine](#state-machine) |
+| F3 | **Record unattended.** Recording starts once a found person has stayed in frame for 3 s, and stops at session end. A clip is saved even when the battery runs out | [Ideal path](#ideal-path) |
+| F4 | **LED status ring** showing each state and sub-state (idle with or without a person in frame, search, found, recording) and low battery | [State machine](#state-machine) |
 | F5 | **Companion app**: opens into the live view; state-dependent bottom buttons; status ring top right in the LED colours | [07](../design/07-backend-and-app.md#web-app-srcweb) |
 | F6 | **Remote use.** State, live preview and control from any internet-connected phone or computer. One backend and one app serve both builds; the camera reports its build | [07](../design/07-backend-and-app.md#tracking-mode) |
 | F7 | **Recordings library.** Each stopped recording uploads to the backend and appears in the app's library | [08](../design/08-recordings-and-cloud.md) |
@@ -80,55 +80,56 @@ library. Deviations (dropouts, loss, manual control): <!--both-->[with UWB](#sta
 1. **Power on.** Pi boots, joins Wi-Fi, connects to Firebase. State `idle`
    (solid blue): head parked, lens wide. The app opens into the live view;
    the status ring reads "On — no one in frame", then "On — person in frame"
-   once the climber walks into view.
-2. **Start.** State `tracking`, phase `acquiring` (green light chasing round
-   the ring).
-   The climber is already in frame, so tracking starts in **centre** and
-   skips **search**.
+   once the climber walks into view, and the LED ring and the app's ring
+   start breathing slowly.
+2. **Start.** State `tracking` (initiate tracking).
    - **With UWB**: the climber switches the tag on. The camera ranges
-     continuously, including in idle, and detects the tag within ≈ 1 s; the
-     head turns to the ranged position. App: "Acquiring subject…". (With
-     nobody in frame, search is that same turn: the location is known at
-     once, so there is no sweep.)
+     continuously, including in idle, and detects the tag within ≈ 1 s.
    - **Without UWB**: the user taps **Track & record** (app or the camera's
-     local page). App: "Looking for a person…". The head turns straight to
-     the climber. (With nobody in frame, search first sweeps ±80° at 25°/s,
-     zoomed wide, stepping between two tilt rows at each end, until a
-     person is detected.)
-3. **Lock on.** Two consecutive detections with the person near frame
-   centre; the app beeps once for each. Solid green.
-   - **With UWB**: both with the head on the ranged position. Ranging alone
-     never starts a recording.
-   - **Without UWB**: the first person found is kept; afterwards the tracker
-     follows the detection nearest the last position, so a passing
-     bystander doesn't take the lock.
-4. **Record.** State `recording` (pulsing red; the app chimes after the
-   beeps), automatically on the first lock. Pan and tilt keep the climber centred; zoom holds them at
-   ≈ 65 % of the frame. H.264 is written on the Pi.
-5. **End.** The clip is saved, the app chimes, state `idle`.
+     local page).
+3. **Search** — skipped here. The climber is already in frame, so tracking
+   starts at **found**. (With nobody in frame: green light chasing round the
+   ring, the app pings every 3 s.
+   With UWB the location is known at once, so the head turns to the ranged
+   position: "Turning to your tag…". Without UWB it sweeps ±80° at 25°/s,
+   zoomed wide, stepping between two tilt rows at each end: "Looking for a
+   person…". Search ends when a person is detected — with UWB, with the
+   head on the ranged position.)
+4. **Found.** The camera follows and frames the climber exactly as it will
+   while recording (pan, tilt, zoom, focus); they don't have to be centred.
+   The LED ring fills with green over 3 s and the app beeps each second
+   ("Found you — recording in 3… 2… 1…"). Ranging alone never starts a
+   recording. Without UWB, the first person found is kept; afterwards the
+   tracker follows the detection nearest the last position, so a passing
+   bystander doesn't take over.
+5. **Record.** Still in frame after 3 s (`FOUND_CONFIRM_S`): state
+   `recording` (pulsing red; the app chimes after the beeps). Pan and tilt
+   keep the climber in frame; zoom holds them at ≈ 65 % of the frame. H.264
+   is written on the Pi.
+6. **End.** The clip is saved, the app chimes, state `idle`.
    - **With UWB**: the climber switches the tag off; the session ends 5 s
      later.
-   - **Without UWB**: the user taps **Stop tracking** (confirmed in the app).
-6. **Upload.** The clip uploads to Firebase and appears in the app's library
+   - **Without UWB**: the user taps **Stop recording**.
+7. **Upload.** The clip uploads to Firebase and appears in the app's library
    ([08](../design/08-recordings-and-cloud.md)).
-7. **Turn off.** Both axes centre and the Pi shuts down. **Turn off** works
+8. **Turn off.** Both axes centre and the Pi shuts down. **Turn off** works
    from any state and saves any recording first; the same sequence runs
    automatically at 7 % battery.
 
 ## State machine
 
-States, colours and transitions are shared; button labels and the acquiring
-label differ by build. `idle` and `tracking` each have two sub-states,
-reported to the app as telemetry `phase`.
+States, colours, sounds and transitions are shared; the idle button and
+the search label differ by build. `idle` and `tracking` (initiate tracking)
+each have two sub-states, reported to the app as telemetry `phase`.
 
 | State | LED | App status ring | App sound | Bottom buttons |
 | --- | --- | --- | --- | --- |
 | `off` | off | grey | — | *(app shows reconnect screen)* |
 | `idle`, no person in frame | solid blue | blue, "On — no one in frame" | — | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
-| `idle`, person in frame | solid blue | blue, "On — person in frame" | — | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
-| `tracking`, acquiring | green, chasing round the ring | green (fast blink), <!--with_uwb-->"Acquiring subject…"<!--/--><!--both--> / <!--/--><!--without_uwb-->"Looking for a person…"<!--/--> | Search: sonar ping every 3 s. Centre: a beep per centred detection | **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/--> |
-| `tracking`, locked on | solid green | green | — | **Turn off** · <!--with_uwb-->**Start recording**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Record now**<!--/--> |
-| `recording` | pulsing red | red (pulsing) | rising chime on start, falling chime on stop<!--both-->; without UWB, pings again if it loses the person and searches<!--/--><!--without_uwb: ; pings again if it loses the person and searches--> | **Stop recording** · **Stop tracking** |
+| `idle`, person in frame | blue, breathing slowly | blue (slow breath), "On — person in frame" | — | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
+| `tracking`, search | green, chasing round the ring | green (fast blink), <!--with_uwb-->"Turning to your tag…"<!--/--><!--both--> / <!--/--><!--without_uwb-->"Looking for a person…"<!--/--> | sonar ping every 3 s | **Turn off** · **Stop tracking** |
+| `tracking`, found | green, filling round the ring over 3 s | solid green, "Found you — recording in 3…" | a beep each second (3, 2, 1) | **Turn off** · **Stop tracking** |
+| `recording` | pulsing red | red (pulsing) | rising chime on start, falling chime on stop<!--both-->; without UWB, pings again if it loses the person and searches<!--/--><!--without_uwb: ; pings again if it loses the person and searches--> | **Turn off** · **Stop recording** |
 
 <!--both-->
 
@@ -143,22 +144,24 @@ Rules:
   detection until 4 s (`IDLE_PERSON_HOLD_S`) pass without one; otherwise
   **no person in frame**. Telemetry `phase`: `person-in-frame` /
   `no-person-in-frame`.
-- `tracking` acquires in three steps, the same in both builds:
-  1. **Search** — get the subject into frame. With UWB the location is
-     known at once, so the head turns to the ranged position; without UWB
-     it sweeps the room. The app plays a sonar ping every 3 s while
-     searching.
-  2. **Centre** — pan and tilt to put the person at frame centre. Two
-     consecutive centred detections (`ACQUIRE_DETECTIONS`) lock on; the app
-     beeps once per centred detection.
-  3. **Track** — locked on (phase `acquired`).
+- `tracking` (initiate tracking) has two sub-states, the same in both
+  builds:
+  1. **Search** (phase `search`) — get the subject into frame. With UWB the
+     location is known at once, so the head turns to the ranged position;
+     without UWB it sweeps the room. The app pings every 3 s.
+  2. **Found** (phase `found`) — a person is detected. The camera runs the
+     same pan, tilt, zoom and focus routine as in `recording`; the person
+     need not be centred. Still in frame 3 s later (`FOUND_CONFIRM_S`), the
+     camera starts recording. Nobody seen for 1 s (`FOUND_LOST_S`): back to
+     search, and the countdown starts again. Telemetry `countdown` carries
+     the seconds left; the app beeps on each.
 
-  From **person in frame**, tracking starts at centre and skips search. If
-  nobody is seen there for 2 s (`CENTRE_TIMEOUT_S`), it falls back to
-  search.
-- `recording` implies `tracking`. **Stop recording** → `tracking`. **Stop
-  tracking** while recording stops both (confirmed in the app).
-- Subject missing > 2 s in `tracking`: hold position, LED flashes at 2 Hz.
+  From **person in frame**, tracking starts at found and skips search.
+- Recording always follows found; there is no manual record button.
+- **Stop recording** saves the clip and ends the session: `recording` →
+  `idle`. **Stop tracking** cancels a session that hasn't started
+  recording.
+- Subject missing > 2 s in `recording`: hold position, LED flashes at 2 Hz.
   Next step is build-specific.
 - Battery < 20 %: ring dims and blinks orange at 1 Hz over the state colour.
   Battery < 7 %: save, park, drop to `idle`.
@@ -191,17 +194,18 @@ ranges the tag at 20 Hz through body and clothing and points at the result.
 
 Deviations from the [ideal path](#ideal-path):
 
-- Tag lost > 2 s in `tracking`: hold, LED flashes. Lost > 5 s: `idle`
+- Tag lost > 2 s in `tracking` or `recording`: hold, LED flashes. Lost > 5 s: `idle`
   (any recording saved first). A subject crossing a pan soft limit behaves
   the same way.
 - The 5 s delay rides over short dropouts. A switched-off tag and a
   body-shadowed tag are indistinguishable, so a dropout > 5 s also ends the
   session; the tag returning starts a new one (two clips). Raise
   `LOST_IDLE_S` if this happens.
-- Tracking but not verified by vision after 15 s: the app reports it;
-  **Start recording** overrides.
-- Manual control (**Start tracking**, **Start recording**) is always
-  available. A session stopped from the app stays stopped until the tag has
+- Tracking for 15 s without recording (vision can't confirm the person):
+  the app reports it.
+- **Start tracking** in the app starts a session without the tag; it
+  records after found the same way. A session stopped from the app
+  (**Stop tracking** or **Stop recording**) stays stopped until the tag has
   been off for 5 s and comes back on.
 - `AUTO_SESSION = False` disables tag-driven sessions.
 
@@ -216,9 +220,9 @@ Implementation: [`src/with_uwb/device/sportcam/session.py`](../../src/with_uwb/d
 ![SportCam finding and tracking a climber by vision](../../without_uwb/docs/images/intro-scene.png)
 
 Nothing is worn. **Track & record** in the app starts a wide-angle pan
-sweep; the first person detected is centred, locked and recorded. If idle
-already has a person in frame, the sweep is skipped and that person is
-centred directly.
+sweep; the first person detected is followed and, still in frame 3 s later,
+recorded. If idle already has a person in frame, the sweep is skipped and
+that person is followed directly.
 
 ### Non-functional requirements, without UWB
 
@@ -234,15 +238,13 @@ centred directly.
 Deviations from the [ideal path](#ideal-path):
 
 - Nobody found in 15 s: the app reports it.
-- Person missing 2 s in `tracking`: hold, LED flashes at 2 Hz. Missing 6 s:
-  sweep again, toward the last direction of travel; recording continues.
-- Tracking-only session with nobody ever found for 180 s: `idle`. This is
-  the only automatic return to `idle`; a recording is never stopped
+- Person missing 2 s in `recording`: hold, LED flashes at 2 Hz. Missing 6 s:
+  sweep again (phase `search`; the app pings), toward the last direction of
+  travel; recording continues. The next person found is followed at once,
+  with no countdown.
+- `tracking` with nobody found for 180 s of sweeping: `idle`. This is the
+  only automatic return to `idle`; a recording is never stopped
   automatically.
-- Manual control: **Record now** while tracking; **Stop recording**
-  (tracking continues; no second auto-recording in the same session);
-  **Stop tracking** returns to idle.
-- `AUTO_RECORD_ON_LOCK = False` makes recording a separate action.
 
 Implementation: [`src/without_uwb/device/sportcam/session.py`](../../src/without_uwb/device/sportcam/session.py).
 

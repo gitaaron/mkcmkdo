@@ -29,11 +29,10 @@ export interface Telemetry {
   tilt?: number;
   zoomMm?: number;
   dist?: number | null;  // with_uwb: from ranging; without_uwb: from the person's size in frame
-  /** idle: is a person in frame? tracking: found the subject yet? */
-  phase?: "person-in-frame" | "no-person-in-frame" | "acquiring" | "acquired" | null;
-  centred?: number;          // consecutive centred detections toward the lock (ACQUIRE_DETECTIONS once locked)
-  searching?: boolean;       // in SEARCH: with_uwb turning to the tag, without_uwb sweeping
-  acquireStalled?: boolean;  // acquiring a long time: nobody found / vision cannot see the subject
+  /** idle: is a person in frame? tracking: search, then found; recording: track (without_uwb: search if lost) */
+  phase?: "person-in-frame" | "no-person-in-frame" | "search" | "found" | "track" | null;
+  countdown?: number;        // tracking, found: whole seconds left before recording (3, 2, 1); else 0
+  acquireStalled?: boolean;  // tracking a long time: nobody found / vision cannot see the subject
   tagPresent?: boolean;      // with_uwb only: the wearable is switched on and ranging
   battery?: number;          // fraction of the pack remaining, 0-1
   batteryWatts?: number;
@@ -102,7 +101,7 @@ const TRANSITIONS: Record<CamState, CamState[]> = {
   off: ["idle"],
   idle: ["off", "tracking"],
   tracking: ["off", "idle", "recording"],
-  recording: ["off", "idle", "tracking"],
+  recording: ["off", "idle"],     // stopping a recording ends the session
 };
 
 export function assertTransition(from: CamState, to: CamState): void {

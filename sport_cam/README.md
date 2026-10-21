@@ -27,7 +27,7 @@ Setup entry point:
 
 - **Sensing:** wearable UWB tag; three anchors on the head range it at
   20 Hz. Bearing, elevation and distance come from the ranges. Vision trims
-  the aim, sets the zoom and confirms lock-on.
+  the aim, sets the zoom and confirms the person before recording.
 - **Session control:** tag on starts a session; tag off ends it.
 - **Use when:** the subject must be told apart from bystanders.
 - **Locations:** docs and CAD in [`with_uwb/`](with_uwb/); code in
@@ -36,8 +36,8 @@ Setup entry point:
 ### Without UWB
 
 - **Sensing:** vision only. **Track & record** starts a pan sweep (skipped if
-  a person is already in frame); the first person detected is centred,
-  locked and recorded. Re-sweeps after 6 s
+  a person is already in frame); the first person detected is followed
+  and, still in frame 3 s later, recorded. Re-sweeps after 6 s
   without a detection.
 - **Session control:** app buttons.
 - **Use when:** cost, size and runtime matter more than identity. Versus the
@@ -73,7 +73,7 @@ Conventions:
 | 02 | [System architecture](docs/design/02-system-architecture.md) | shared | Subsystems, key decisions, each build's architecture |
 | 03 | [Mechanical design](docs/design/03-mechanical-design.md) | shared | PTZ base, enclosure, shelf and lid, layout inside, ranges of motion, printed parts |
 | 04 | [Electronics](docs/design/04-electronics.md) | shared | Why a Pi 4, PTZ controller, LED ring, power budget and runtime, SD card, bring-up |
-| 05 | Tracking system: [with UWB](with_uwb/docs/design/05-tracking-system.md) · [without UWB](without_uwb/docs/design/05-tracking-system.md) | per build | <!--with_uwb-->UWB geometry, anchors and control loops<!--/--><!--both--> · <!--/--><!--without_uwb-->search sweep, lock-on and vision loops<!--/--> |
+| 05 | Tracking system: [with UWB](with_uwb/docs/design/05-tracking-system.md) · [without UWB](without_uwb/docs/design/05-tracking-system.md) | per build | <!--with_uwb-->UWB geometry, anchors and control loops<!--/--><!--both--> · <!--/--><!--without_uwb-->search sweep, found → record and vision loops<!--/--> |
 | 06 | [Device software](docs/design/06-device-software.md) | shared | Pi camera service, motion, vision, status ring, the Firebase link |
 | 07 | [Backend & app](docs/design/07-backend-and-app.md) | shared | Firebase (one function, Firestore, Storage), the camera key, the API, the Vue app |
 | 08 | [Recordings, cloud & gym Wi-Fi](docs/design/08-recordings-and-cloud.md) | shared | Upload → library pipeline, Firebase backend, phone-driven Wi-Fi setup |
@@ -89,7 +89,7 @@ Conventions:
 | A | [CAD printed parts](docs/appendix/appendix-a-cad-parts.md) | shared | Fitting the layout to your parts (`cad/fit.py`), render workflow, per-part notes, measure-first list |
 | B | [Open-source printed parts](docs/appendix/appendix-b-open-source-parts.md) | shared | Community STL alternatives and what each trade costs |
 | C | [Development workflow](docs/appendix/appendix-c-development.md) | shared | Where the code is, running everything on the Firebase emulators, tests, deploying, Docker workspace, docs viewer |
-| D | [Glossary](docs/appendix/appendix-d-glossary.md) | shared | The terms the docs use, from *acquiring* to *WS2812B* |
+| D | [Glossary](docs/appendix/appendix-d-glossary.md) | shared | The terms the docs use, from *buck converter* to *WS2812B* |
 | | Interactive wiring schematic: [with UWB](with_uwb/schematics/interactive/index.html) · [without UWB](without_uwb/schematics/interactive/index.html) | per build | Zoomable view of the whole system (best through `npm run docs`) |
 
 ## Reading the docs

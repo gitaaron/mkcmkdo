@@ -129,7 +129,7 @@ python3 -m sportcam.focuscal 30
 
 After the last run, paste the `FOCUS_GRID = {…}` it prints. Until then,
 focus depends on zoom alone and is soft away from one distance. The search
-sweep focuses at `SEARCH_FOCUS_M` (5 m); once someone is locked, focus follows
+sweep focuses at `SEARCH_FOCUS_M` (5 m); once someone is found, focus follows
 the distance estimated from their size in the frame.
 
 ## 6. Install the services
@@ -141,7 +141,7 @@ sudo systemctl enable --now sportcam-head sportcam-wifi
 journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
 ```
 
-**Done when** the LED ring is solid blue (idle).
+**Done when** the LED ring is blue (idle): solid, or breathing slowly if the camera can see you.
 
 | Operation | Command / note |
 | --- | --- |
@@ -173,16 +173,17 @@ remembers it.
 
 ## 8. Live checks
 
-With the service running, the ring is solid blue. Do these in order: the
+With the service running, the ring is blue (breathing slowly while it sees you). Do these in order: the
 tuning steps only mean something once the signs are right.
 
 1. **First run.** Stand 3–5 m from the camera, in the room you will film in,
    upright and facing it. In the app press **Track & record**. The status
    reads "Looking for a person…" and the ring shows a green light chasing
    round while the camera zooms wide and sweeps left and right, stepping to the
-   next tilt row at each end; the app pings every 3 s while it searches. When it sees you it stops and turns to put you in
-   the middle; after two centred detections (the app beeps for each) it locks
-   on, the ring turns breathing red, recording starts and the app chimes. The
+   next tilt row at each end; the app pings every 3 s while it searches. When it sees you it stops and follows you;
+   the ring fills with green over 3 s and the app beeps 3, 2, 1. Still in
+   frame at the end, the ring turns breathing red, recording starts and the
+   app chimes. The
    zoom then settles with you filling about two-thirds of the frame.
 2. **Sign checks.** Walk slowly to one side while it follows. If it turns
    *away* from you, flip `PAN_SIGN`; if it tilts away when you crouch or
@@ -199,7 +200,7 @@ tuning steps only mean something once the signs are right.
    fewer false people). If it sweeps past real people, lower it. Tune it in
    your own room and light, since that is where false positives come from.
 5. **Re-sweep.** Walk out of view and wait. After about 6 s
-   (`RESEARCH_AFTER_S`) the camera should start sweeping again and re-lock on
+   (`RESEARCH_AFTER_S`) the camera should start sweeping again and follow
    the first person it finds. If nobody is ever found it gives up to idle after
    `SEARCH_GIVE_UP_S` (180 s) when not recording.
 6. **Battery gauge.** Counts energy used since the service started, assuming
@@ -222,7 +223,6 @@ All in `src/without_uwb/device/sportcam/config.py`:
 | `SEARCH_PAN_DPS`, `SEARCH_TILT_ROWS_DEG` | step 8.3: how fast and where the sweep looks |
 | `DETECT_HIT_THRESHOLD` | step 8.4: raise for fewer false people |
 | `TRACK_PAN_GAIN`, `TRACK_TILT_GAIN` | step 8.2: raise if the camera lags a fast mover, lower if it oscillates |
-| `AUTO_RECORD_ON_LOCK` | `True` records as soon as it locks on; `False` makes recording a separate tap |
 | `RESEARCH_AFTER_S`, `SEARCH_GIVE_UP_S` | step 8.5: how long before re-sweeping, and before giving up on an empty room |
-| `ACQUIRE_DETECTIONS` and the other `ACQUIRE_*` lock-on settings | defaults are fine; see [05](../design/05-tracking-system.md) to tune |
+| `FOUND_CONFIRM_S`, `FOUND_LOST_S` and `ACQUIRE_STALLED_S` | defaults are fine; see [05](../design/05-tracking-system.md) to tune |
 | `FIREBASE_PROJECT`, `CAMERA_KEY`, `UPLOAD_API_BASE` | step 3, only with Firebase |

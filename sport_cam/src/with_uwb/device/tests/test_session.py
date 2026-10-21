@@ -1,9 +1,9 @@
-"""Tag-driven sessions: tag on → acquiring → recording; tag off → standby.
+"""Tag-driven sessions: tag on → search → found (3 s) → recording; tag off → standby.
 
 Three layers, none of which needs a Pi:
 
   1. AutoSession's rules, on a synthetic clock;
-  2. the tracker's lock-on test, against the fakes from test_tracker;
+  2. the tracker's search / found rules, against the fakes from test_tracker;
   3. the whole flow through Head.control_tick(), with fake hardware, which
      is what the LED and the app actually see.
 
@@ -12,6 +12,7 @@ Three layers, none of which needs a Pi:
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 import sys
 import time
@@ -20,7 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 
 from sportcam import config
-from sportcam.led import chase
+from sportcam.led import chase, fill
 from sportcam.session import AutoSession
 from sportcam.tracker import Tracker
 from test_tracker import FakeCamera, FakePtz, FakeUwb
@@ -37,11 +38,11 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 GONE = float("inf")
 
 
-def run_session(s: AutoSession, steps, state="idle", locked=False):
+def run_session(s: AutoSession, steps, state="idle", ready=False):
     """Feed (now, frame_age) pairs; return the states it asked for."""
     asked = []
     for now, age in steps:
-        want = s.update(now, age, state, locked)
+        want = s.update(now, age, state, ready)
         if want:
             asked.append(want)
             state = want
@@ -62,11 +63,9 @@ def session_rules() -> None:
     asked, state = run_session(s, [(present + t / 20, 0.05) for t in range(5)])
     check("tag on → tracking", asked == ["tracking"] and s.active, f"{asked}")
 
-    check("acquiring: no recording before lock",
+    check("search / found: no recording before FOUND_CONFIRM_S",
           s.update(2.0, 0.05, "tracking", False) is None)
-    check("locked → recording", s.update(2.1, 0.05, "tracking", True) == "recording")
-    check("records once: dropping back to tracking from the app stands",
-          s.update(2.2, 0.05, "tracking", True) is None)
+    check("found for FOUND_CONFIRM_S → recording", s.update(2.1, 0.05, "tracking", True) == "recording")
 
     # a body in the way for a few seconds changes nothing
     check("a short gap does not end or restart anything",
@@ -91,80 +90,94 @@ def session_rules() -> None:
     asked, _ = run_session(s, [(70 + t / 20, 0.05) for t in range(40)])
     check("…but off for LOST_IDLE_S and on again does", asked == ["tracking"])
 
-    # manual sessions are left alone
+    # manual sessions: the tag starts nothing, but found → record still applies
     s = AutoSession()
-    asked, _ = run_session(s, [(t / 20, 0.05) for t in range(40)], state="tracking", locked=True)
-    check("tag on during a manual session → no change, no auto-record", asked == [])
+    asked, _ = run_session(s, [(t / 20, 0.05) for t in range(40)], state="tracking")
+    check("tag on during a manual session → no change", asked == [])
+    check("…and a manual session records once found for FOUND_CONFIRM_S",
+          s.update(3.0, 0.05, "tracking", True) == "recording")
 
     config.AUTO_SESSION = False
     s = AutoSession()
     asked, _ = run_session(s, [(t / 20, 0.05) for t in range(40)])
     check("AUTO_SESSION = False → the tag starts nothing", asked == [])
+    check("…but found still records", s.update(3.0, 0.05, "tracking", True) == "recording")
     config.AUTO_SESSION = True
 
 
-def run_tracker(tr: Tracker, seconds: float, until_locked=False) -> float:
+def run_tracker(tr: Tracker, seconds: float, until=None) -> float:
     t0 = time.monotonic()
     while time.monotonic() - t0 < seconds:
         tr.step()
-        if until_locked and tr.locked:
+        if until and until():
             break
         time.sleep(0.005)
     return time.monotonic() - t0
 
 
-def tracker_lock() -> None:
-    print("\ntracker lock-on")
+def tracker_found() -> None:
+    print("\ntracker search / found")
+    confirm_s, config.FOUND_CONFIRM_S = config.FOUND_CONFIRM_S, 0.6
     config.ACQUIRE_SETTLE_S = 0.1
     config.ACQUIRE_STALLED_S = 0.6
     pw, ph = config.PREVIEW_SIZE
     centred = (pw // 2 - 50, ph // 2 - 100, 100, 200)
-    off_centre = (int(pw * 0.85), ph // 2 - 100, 100, 200)
+    off_centre = (int(pw * 0.8), ph // 2 - 100, 100, 200)
 
     ptz = FakePtz()
     tr = Tracker(FakeUwb(theta_deg=40.0), FakeCamera(centred), ptz)
     tr.step()
-    check("not locked while still turning toward the tag", not tr.locked)
-    took = run_tracker(tr, 3.0, until_locked=True)
-    check("locks once on target and the detector sees someone centred", tr.locked,
+    check("still SEARCH while turning toward the tag", tr.mode == "search", tr.mode)
+    took = run_tracker(tr, 3.0, until=lambda: tr.mode == "found")
+    check("FOUND once on target and the detector sees someone", tr.mode == "found",
           f"{took:.2f}s")
+    check("…countdown starts", tr.countdown == math.ceil(config.FOUND_CONFIRM_S), f"{tr.countdown}")
+    check("…not ready yet", not tr.ready_to_record)
+    run_tracker(tr, config.FOUND_CONFIRM_S + 0.1)
+    check("still seen FOUND_CONFIRM_S later → ready to record", tr.ready_to_record)
+    tr.confirm()
+    check("confirm() → TRACK, countdown 0", tr.mode == "track" and tr.countdown == 0)
 
     tr2 = Tracker(FakeUwb(theta_deg=10.0), FakeCamera(None), FakePtz())
     run_tracker(tr2, 1.5)
-    check("no detection → never locks on ranging alone", not tr2.locked)
+    check("no detection → never found on ranging alone", tr2.mode == "search")
     check("…and after ACQUIRE_STALLED_S it reports it cannot see anyone",
           tr2.acquire_stalled)
 
     tr3 = Tracker(FakeUwb(theta_deg=10.0), FakeCamera(off_centre), FakePtz())
-    run_tracker(tr3, 1.5)
-    check("a person at the edge of the frame does not verify the lock", not tr3.locked)
+    run_tracker(tr3, 1.5, until=lambda: tr3.ready_to_record)
+    check("a person off-centre is still found and recorded (no centring needed)",
+          tr3.ready_to_record)
 
     tr4 = Tracker(FakeUwb(theta_deg=170.0), FakeCamera(centred), FakePtz())
-    run_tracker(tr4, 4.0, until_locked=True)
-    check("subject past the soft limit: locks from the limit", tr4.locked)
-    check("a locked tracker is not stalled", not tr4.acquire_stalled)
+    run_tracker(tr4, 4.0, until=lambda: tr4.mode == "found")
+    check("subject past the soft limit: found from the limit", tr4.mode == "found")
 
     tr4.reset_lock()
-    check("reset_lock clears it", not tr4.locked and not tr4.acquire_stalled)
-    check("…back to SEARCH", tr4.mode == "search", tr4.mode)
+    check("reset_lock → back to SEARCH", tr4.mode == "search", tr4.mode)
 
-    timeout, config.CENTRE_TIMEOUT_S = config.CENTRE_TIMEOUT_S, 0.3
     cam5 = FakeCamera(centred)
     tr5 = Tracker(FakeUwb(theta_deg=5.0), cam5, FakePtz())
-    tr5.watch_idle()
-    check("idle: a person in frame is noticed", tr5.idle_person_in_frame)
-    tr5.reset_lock()
-    check("a session started with a person in frame begins in CENTRE",
-          tr5.mode == "centre" and not tr5.idle_person_in_frame, tr5.mode)
+    run_tracker(tr5, 3.0, until=lambda: tr5.mode == "found")
     cam5._bbox = None
-    run_tracker(tr5, 0.6)
-    check("CENTRE with nobody seen for CENTRE_TIMEOUT_S → SEARCH", tr5.mode == "search", tr5.mode)
-    config.CENTRE_TIMEOUT_S = timeout
+    run_tracker(tr5, config.FOUND_LOST_S + 0.3)
+    check("FOUND with nobody seen for FOUND_LOST_S → SEARCH, countdown reset",
+          tr5.mode == "search" and tr5.countdown == 0, tr5.mode)
+
+    cam6 = FakeCamera(centred)
+    tr6 = Tracker(FakeUwb(theta_deg=5.0), cam6, FakePtz())
+    tr6.watch_idle()
+    check("idle: a person in frame is noticed", tr6.idle_person_in_frame)
+    tr6.reset_lock()
+    check("a session started with a person in frame begins in FOUND",
+          tr6.mode == "found" and not tr6.idle_person_in_frame, tr6.mode)
+    config.FOUND_CONFIRM_S = confirm_s
 
 
 class FakeRing:
     def __init__(self):
-        self.state, self.lost, self.acquiring, self.warn = "idle", False, False, False
+        self.state, self.lost, self.warn = "idle", False, False
+        self.idle_person, self.searching, self.found = False, False, None
 
     def set_state(self, s):
         self.state = s
@@ -228,14 +241,9 @@ class FakeRecCamera(FakeCamera):
         pass
 
 
-def steps_to_lock(sent: list[int]) -> list[int]:
-    """The centred counts sent on the way to the first lock, after the last reset to 0."""
-    n = config.ACQUIRE_DETECTIONS
-    if n not in sent:
-        return sent
-    i = sent.index(n)
-    zeros = [k for k in range(i) if sent[k] == 0]
-    return sent[(zeros[-1] + 1 if zeros else 0):i + 1]
+def countdown_heard(sent: list[int]) -> list[int]:
+    """The countdown values the app heard, without repeats or zeros (one beep each)."""
+    return [c for i, c in enumerate(sent) if c and (i == 0 or sent[i - 1] != c)]
 
 
 async def full_flow() -> None:
@@ -270,13 +278,13 @@ async def full_flow() -> None:
     head.mdns = FakeMdns()
     head.cloud = CloudLink(head)       # not connected: writes are no-ops
     head._rec_path, head._rec_started = "", 0.0
-    head._centred_sent = 0
+    head._countdown_sent = 0
 
-    centred_sent: list[int] = []       # what the app hears, in order, to beep on
+    countdown_sent: list[int] = []     # what the app hears, in order, to beep on
     send = head.send_telemetry
 
     async def record_send():
-        centred_sent.append(head.telemetry()["centred"])
+        countdown_sent.append(head.telemetry()["countdown"])
         await send()
     head.send_telemetry = record_send
 
@@ -286,37 +294,35 @@ async def full_flow() -> None:
         t0 = time.monotonic()
         while time.monotonic() - t0 < seconds:
             await head.control_tick(time.monotonic())
-            point = (head.state, "acquiring" if head.led.acquiring else head.phase)
+            point = (head.state, head.phase)
             if not seen or seen[-1] != point:
                 seen.append(point)
             await asyncio.sleep(0.01)
 
     await tick_for(0.3)
-    check("standby with the tag off", head.state == "idle" and not head.led.acquiring)
-    check("idle sub-state: person in frame", head.phase == "person-in-frame", f"{head.phase}")
+    check("standby with the tag off", head.state == "idle")
+    check("idle sub-state: person in frame; the ring breathes",
+          head.phase == "person-in-frame" and head.led.idle_person, f"{head.phase}")
     bbox, head.camera._bbox = head.camera._bbox, None
     await tick_for(config.IDLE_PERSON_HOLD_S + 0.5)
-    check("idle sub-state: no person in frame once they have gone for IDLE_PERSON_HOLD_S",
-          head.phase == "no-person-in-frame", f"{head.phase}")
+    check("idle sub-state: no person in frame once they have gone for IDLE_PERSON_HOLD_S; ring solid",
+          head.phase == "no-person-in-frame" and not head.led.idle_person, f"{head.phase}")
     head.camera._bbox = bbox
     await tick_for(0.5)
     check("…and back to person in frame", head.phase == "person-in-frame", f"{head.phase}")
 
     head.uwb.on_since, head.uwb.off_at = time.monotonic(), None
     await tick_for(0.25)
-    check("tag on → tracking, ring shows acquiring",
-          head.state == "tracking" and head.led.acquiring, f"{seen}")
-    check("…with a person in frame it starts in CENTRE, skipping SEARCH",
-          head.tracker.mode == "centre", head.tracker.mode)
-    check("…so the app is told it is not searching (no ping)", head.telemetry()["searching"] is False)
+    check("tag on with a person in frame → tracking, found (search skipped), ring fills",
+          head.state == "tracking" and head.phase == "found" and head.led.found is not None
+          and not head.led.searching, f"{seen}")
 
-    await tick_for(1.5)
-    check("locked on → recording, ring no longer acquiring",
-          head.state == "recording" and not head.led.acquiring and head.camera.recording,
+    await tick_for(config.FOUND_CONFIRM_S + 1.0)
+    check("found for FOUND_CONFIRM_S → recording",
+          head.state == "recording" and head.camera.recording and head.phase == "track",
           f"{seen}")
-    check("each centred detection is sent to the app at once (one beep each)",
-          steps_to_lock(centred_sent) == list(range(1, config.ACQUIRE_DETECTIONS + 1)),
-          f"{centred_sent}")
+    check("the app heard 3, 2, 1 (one beep each)", countdown_heard(countdown_sent) == [3, 2, 1],
+          f"{countdown_sent}")
 
     head.uwb.on_since, head.uwb.off_at = None, time.monotonic()
     head.tracker.last_fix_at = time.monotonic()
@@ -328,11 +334,10 @@ async def full_flow() -> None:
     dedup = [s for i, s in enumerate(order) if i == 0 or order[i - 1] != s]
     check("states ran idle → tracking → recording → idle",
           dedup == ["idle", "tracking", "recording", "idle"], f"{dedup}")
-    check("idle reports its sub-state; tracking does not",
+    check("idle reports its sub-state; tracking found; recording track",
           all(p in ("person-in-frame", "no-person-in-frame") for s, p in seen if s == "idle")
-          and all(p in ("acquiring", "acquired") for s, p in seen if s != "idle"), f"{seen}")
-    check("phase ran acquiring → acquired",
-          ("tracking", "acquiring") in seen and ("recording", "acquired") in seen, f"{seen}")
+          and all(p == "found" for s, p in seen if s == "tracking")
+          and all(p == "track" for s, p in seen if s == "recording"), f"{seen}")
 
     # --- nobody in frame when the tag goes on: SEARCH, turning to the tag ---------
     head.camera._bbox = None
@@ -340,27 +345,37 @@ async def full_flow() -> None:
     check("idle sub-state: no person in frame", head.phase == "no-person-in-frame", f"{head.phase}")
     head.uwb.on_since, head.uwb.off_at = time.monotonic(), None
     await tick_for(0.25)
-    check("tag on with nobody in frame → SEARCH",
-          head.state == "tracking" and head.tracker.mode == "search", head.tracker.mode)
-    check("…and tells the app it is searching (it pings)", head.telemetry()["searching"] is True)
+    check("tag on with nobody in frame → search; ring chases (the app pings)",
+          head.state == "tracking" and head.phase == "search" and head.led.searching,
+          head.tracker.mode)
     head.camera._bbox = bbox
-    await tick_for(2.0)
-    check("…turns to the tag, sees them, centres and records",
-          head.state == "recording" and head.tracker.mode == "track", head.tracker.mode)
+    await tick_for(config.FOUND_CONFIRM_S + 1.5)
+    check("…turns to the tag, finds them, and records 3 s later",
+          head.state == "recording" and head.phase == "track", f"{head.state} {head.phase}")
+
+    # --- stop recording from the app: the session ends --------------------------
+    await head.apply_state("tracking")          # what an older app sends
+    check("stop recording → idle", head.state == "idle" and not head.camera.recording)
+    await tick_for(0.5)
+    check("…and stays idle while the tag stays on", head.state == "idle")
 
 
 def ring_animation() -> None:
     print("\nring")
     frame = chase((0, 200, 0), 0.25, 16)
-    check("acquiring chase lights every pixel", len(frame) == 16)
+    check("search: the chase lights every pixel", len(frame) == 16)
     check("…with one bright head and a dim base",
           max(frame)[1] == 200 and min(frame)[1] < 40, f"{frame}")
     check("…and it moves", chase((0, 200, 0), 0.5, 16) != frame)
+    lit = lambda f: sum(1 for c in f if c[1] == 200)
+    check("found: the ring fills as the countdown runs",
+          lit(fill((0, 200, 0), 0.0, 16)) == 1 and lit(fill((0, 200, 0), 0.5, 16)) == 8
+          and lit(fill((0, 200, 0), 1.0, 16)) == 16)
 
 
 def main() -> None:
     session_rules()
-    tracker_lock()
+    tracker_found()
     asyncio.run(full_flow())
     ring_animation()
     print()

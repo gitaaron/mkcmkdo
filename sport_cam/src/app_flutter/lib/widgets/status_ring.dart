@@ -3,25 +3,31 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 
-/// Top-right camera-state indicator — same colours as the LED ring on the
-/// base: blue idle, green tracking (blinking while it acquires the subject —
-/// turning to the tag with UWB, sweeping the room without),
-/// pulsing red while recording.
+/// Top-right camera-state indicator — same colours and patterns as the LED
+/// ring on the base, per sub-state (telemetry `phase`):
+///   idle       blue: solid, or breathing slowly with a person in frame
+///   tracking   green: blinking in search (turning to the tag with UWB,
+///              sweeping the room without); solid when found, counting down
+///   recording  pulsing red
 class StatusRing extends StatefulWidget {
   const StatusRing({
     super.key,
     required this.state,
     required this.connected,
-    this.acquiring = false,
-    this.acquiringLabel = 'Acquiring subject',
+    this.searchingLabel = 'Looking for a person',
     this.phase,
+    this.countdown = 0,
   });
 
   final CamState state;
   final bool connected;
-  final bool acquiring;
-  final String acquiringLabel;
-  final String? phase; // telemetry phase: idle's sub-state is in the label
+  final String searchingLabel;
+  final String? phase;
+  final int countdown; // found: seconds left before recording
+
+  bool get searching => state == CamState.tracking && phase == 'search';
+  bool get found => state == CamState.tracking && phase == 'found';
+  bool get idlePerson => state == CamState.idle && phase == 'person-in-frame';
 
   @override
   State<StatusRing> createState() => _StatusRingState();
@@ -47,14 +53,23 @@ class _StatusRingState extends State<StatusRing>
   }
 
   void _syncAnimation() {
-    // Acquiring blinks fast; recording breathes slowly, like the LED ring.
-    final period = Duration(milliseconds: widget.acquiring ? 500 : 1200);
+    // Search blinks fast; recording pulses; idle with a person in frame
+    // breathes slowly — like the LED ring.
+    final period = Duration(
+      milliseconds: widget.searching
+          ? 500
+          : widget.idlePerson
+          ? 2400
+          : 1200,
+    );
     if (_pulse.duration != period) {
       _pulse
         ..stop()
         ..duration = period;
     }
-    if (widget.state == CamState.recording || widget.acquiring) {
+    if (widget.state == CamState.recording ||
+        widget.searching ||
+        widget.idlePerson) {
       if (!_pulse.isAnimating) _pulse.repeat(reverse: true);
     } else {
       _pulse
@@ -69,9 +84,15 @@ class _StatusRingState extends State<StatusRing>
     super.dispose();
   }
 
-  String get _stateLabel => widget.state == CamState.idle
-      ? idleLabel(widget.phase)
-      : stateLabel(widget.state);
+  String get _stateLabel {
+    if (widget.state == CamState.idle) return idleLabel(widget.phase);
+    if (widget.searching) return widget.searchingLabel;
+    if (widget.found) {
+      final n = widget.countdown > 0 ? widget.countdown : 1;
+      return 'Found you — recording in $n';
+    }
+    return stateLabel(widget.state);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +100,7 @@ class _StatusRingState extends State<StatusRing>
     return Semantics(
       label:
           'Camera status: '
-          '${widget.acquiring ? widget.acquiringLabel : _stateLabel}',
+          '$_stateLabel',
       child: FadeTransition(
         opacity: _pulse,
         child: Container(

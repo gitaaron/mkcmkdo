@@ -160,6 +160,13 @@ def run(tr: Tracker, seconds: float, dt: float = 0.05, until=None) -> float:
     return CLOCK.t - t0
 
 
+def locked(tr: Tracker) -> bool:
+    """Recording, as the session would have it: found for FOUND_CONFIRM_S → confirm()."""
+    if tr.ready_to_record:
+        tr.confirm()
+    return tr.mode == "track"
+
+
 def main() -> None:
     print("tracker checks\n")
 
@@ -171,7 +178,7 @@ def main() -> None:
         run(tr, 0.05, 0.05)
         pans.append(ptz.pan_deg)
         tilts.append(ptz.tilt_deg)
-    check("starts unlocked in SEARCH", tr.mode == "search" and not tr.locked)
+    check("starts unlocked in SEARCH", tr.mode == "search" and not locked(tr))
     check("sweep reaches both pan limits",
           min(pans) <= config.PAN_MIN_DEG + 0.5 and max(pans) >= config.PAN_MAX_DEG - 0.5,
           f"{min(pans):.1f}..{max(pans):.1f}")
@@ -189,9 +196,23 @@ def main() -> None:
     # ---- 2. finds and locks a person ---------------------------------------
     print("\nlock-on")
     tr, cam, ptz = world(Person(50.0))
-    t = run(tr, 30, until=lambda: tr.locked)
-    check("sweep finds a person and locks", tr.locked and tr.ever_locked, f"mode={tr.mode}")
+    t = run(tr, 30, until=lambda: tr.mode == "found")
+    check("sweep finds a person (FOUND)", tr.mode == "found", f"mode={tr.mode}")
     check("…within one sweep", t < 12, f"{t:.1f}s")
+    check("…and counts down from FOUND_CONFIRM_S", tr.countdown == math.ceil(config.FOUND_CONFIRM_S),
+          f"{tr.countdown}")
+    run(tr, config.FOUND_CONFIRM_S - 0.5)
+    check("FOUND frames them as recording will: zoom, focus, search strip",
+          tr.mode == "found" and ptz.zoom_mm > config.ZOOM_MIN_MM and cam.column is not None
+          and ptz.focus_dist is not None and abs(ptz.focus_dist - (tr.dist_m or 0)) < 1e-6,
+          f"mode={tr.mode} zoom {ptz.zoom_mm:.1f}")
+    check("…not ready to record before FOUND_CONFIRM_S", not tr.ready_to_record and tr.countdown == 1,
+          f"countdown {tr.countdown}")
+    run(tr, 1.0)
+    check("still in frame FOUND_CONFIRM_S later → ready to record", tr.ready_to_record)
+    tr.confirm()
+    check("confirm() (recording started) → TRACK", tr.mode == "track" and tr.confirmed
+          and tr.countdown == 0)
     run(tr, 4)
     check("camera is pointing at them", abs(ptz.pan_deg - 50.0) < 3.0, f"pan {ptz.pan_deg:.1f}")
     check("…and tilted to their height", abs(ptz.tilt_deg - 8.0) < 3.0, f"tilt {ptz.tilt_deg:.1f}")
@@ -201,31 +222,31 @@ def main() -> None:
     run(tr, 3)
     cam.spurious = [(100, 200, 80, 200)]          # appears in one frame only
     run(tr, 0.4)
-    check("a sighting stops the sweep (CENTRE)", tr.mode == "centre", tr.mode)
-    run(tr, config.CENTRE_TIMEOUT_S + 1.0)
-    check("…but one frame never locks; sweep resumes", tr.mode == "search" and not tr.ever_locked,
-          f"mode={tr.mode}")
+    check("a sighting stops the sweep (FOUND)", tr.mode == "found", tr.mode)
+    run(tr, config.FOUND_LOST_S + 0.5)
+    check("…but one frame never records; sweep resumes",
+          tr.mode == "search" and not tr.ready_to_record and not tr.confirmed, f"mode={tr.mode}")
 
     # ---- 4. the first person found wins; bystanders do not steal the lock ------
     print("\nfirst person")
     a, b = Person(30.0, dist=6.0), Person(-70.0, dist=3.0)     # b is bigger, but behind us
     tr, cam, ptz = world(a, b)
-    run(tr, 30, until=lambda: tr.locked)
+    run(tr, 30, until=lambda: locked(tr))
     run(tr, 3)
-    check("locks the first one the sweep reaches", tr.locked and abs(ptz.pan_deg - 30.0) < 4.0,
+    check("records the first one the sweep reaches", locked(tr) and abs(ptz.pan_deg - 30.0) < 4.0,
           f"pan {ptz.pan_deg:.1f}")
     c = Person(45.0, dist=2.0)                                  # a big bystander walks in
     cam.people.append(c)
     run(tr, 8)
     check("a nearer bystander does not take over",
-          abs(ptz.pan_deg - 30.0) < 5.0 and tr.locked, f"pan {ptz.pan_deg:.1f}")
-    check("detector searches a strip around the person once locked", cam.column is not None)
+          abs(ptz.pan_deg - 30.0) < 5.0 and locked(tr), f"pan {ptz.pan_deg:.1f}")
+    check("detector searches a strip around the person", cam.column is not None)
 
     # ---- 5. following ----------------------------------------------------------
     print("\nfollowing")
     a = Person(20.0)
     tr, cam, ptz = world(a)
-    run(tr, 20, until=lambda: tr.locked)
+    run(tr, 20, until=lambda: locked(tr))
     run(tr, 4)
     peak = 0.0
     for _ in range(int(4 / 0.05)):
@@ -239,7 +260,7 @@ def main() -> None:
         run(tr, 0.05)
         err.append(abs(ptz.pan_deg - a.bearing))
     check("walking subject: tracked within 6°", max(err[40:]) < 6.0, f"worst {max(err[40:]):.1f}°")
-    check("…and still locked", tr.locked)
+    check("…and still tracking", locked(tr))
     a.bearing = 120.0                                           # beyond the soft limit
     run(tr, 6)
     check("subject past the limit: pan stops at the limit",
@@ -249,24 +270,25 @@ def main() -> None:
     print("\nlost")
     a = Person(25.0)
     tr, cam, ptz = world(a)
-    run(tr, 20, until=lambda: tr.locked)
+    run(tr, 20, until=lambda: locked(tr))
     a.visible = False
     run(tr, 1.0)
-    check("a missing person is held, not chased", tr.locked)
+    check("a missing person is held, not chased", locked(tr))
     check("lost_for rises", tr.lost_for() > 0.5, f"{tr.lost_for():.2f}")
     run(tr, config.RESEARCH_AFTER_S + 0.5)
-    check("gone long enough → search again", tr.mode == "search" and not tr.locked)
-    check("…but the session remembers it locked once", tr.ever_locked)
+    check("gone long enough → search again", tr.mode == "search")
+    check("…still confirmed: the recording carries on", tr.confirmed)
     a.visible, a.bearing = True, -50.0
-    run(tr, 30, until=lambda: tr.locked)
-    check("re-finds them somewhere else", tr.locked and abs(ptz.pan_deg + 50.0) < 4.0,
+    run(tr, 30, until=lambda: locked(tr))
+    run(tr, 3)
+    check("re-finds them somewhere else, straight back to TRACK", locked(tr) and abs(ptz.pan_deg + 50.0) < 4.0,
           f"pan {ptz.pan_deg:.1f}")
 
     # ---- 7. framing ---------------------------------------------------------------
     print("\nframing")
     far = Person(10.0, dist=7.0)
     tr, cam, ptz = world(far)
-    run(tr, 20, until=lambda: tr.locked)
+    run(tr, 20, until=lambda: locked(tr))
     run(tr, 25)
     body = cam.project()[0][3] * config.PERSON_IN_BOX_H / config.PREVIEW_SIZE[1]
     check("a person across the room is zoomed in on", ptz.zoom_mm > config.ZOOM_MIN_MM + 2.0,
@@ -288,7 +310,7 @@ def main() -> None:
 
     near = Person(10.0, dist=1.6)
     tr, cam, ptz = world(near)
-    run(tr, 20, until=lambda: tr.locked)
+    run(tr, 20, until=lambda: locked(tr))
     run(tr, 10)
     check("a person close in is not zoomed past wide", ptz.zoom_mm <= config.ZOOM_MIN_MM + 0.5,
           f"{ptz.zoom_mm:.1f} mm")
@@ -297,7 +319,7 @@ def main() -> None:
     print("\nreset")
     tr.reset_lock()
     check("reset_lock forgets the subject",
-          tr.mode == "search" and not tr.ever_locked and tr.dist_m is None)
+          tr.mode == "search" and not tr.confirmed and tr.dist_m is None)
 
     # ---- 9. idle: is anyone in frame? -----------------------------------------------
     print("\nidle")
@@ -318,10 +340,11 @@ def main() -> None:
 
     cam.set_detect_fps(config.DETECT_FPS_TRACKING)
     tr.reset_lock()
-    check("session start with a person in frame → CENTRE, no sweep", tr.mode == "centre", tr.mode)
+    check("session start with a person in frame → FOUND, no sweep", tr.mode == "found", tr.mode)
     pans = []
-    t = run(tr, 10, until=lambda: (pans.append(ptz.pan_deg), tr.locked)[1])
-    check("…locks within 2 s", tr.locked and t < 2.0, f"{t:.1f}s")
+    t = run(tr, 10, until=lambda: (pans.append(ptz.pan_deg), locked(tr))[1])
+    check("…records after FOUND_CONFIRM_S", locked(tr) and t < config.FOUND_CONFIRM_S + 0.2,
+          f"{t:.1f}s")
     run(tr, 3, until=lambda: pans.append(ptz.pan_deg))
     check("…and turns onto the person without sweeping",
           abs(ptz.pan_deg - person.bearing) < 5.0
@@ -347,8 +370,8 @@ def main() -> None:
     gone.visible = False                               # leaves just as the session starts
     cam.set_detect_fps(config.DETECT_FPS_TRACKING)
     tr.reset_lock()
-    run(tr, config.CENTRE_TIMEOUT_S + 1.0)
-    check("person in idle frame gone at session start → CENTRE times out to SEARCH",
+    run(tr, config.FOUND_LOST_S + 0.5)
+    check("person in idle frame gone at session start → FOUND times out to SEARCH",
           tr.mode == "search", tr.mode)
 
     print()

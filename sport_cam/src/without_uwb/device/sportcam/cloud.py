@@ -154,11 +154,10 @@ class CloudLink:
         await self._write(self._doc, {"state": state, "stateBy": "device", "updatedAt": server_time()})
 
     async def telemetry(self, payload: dict) -> None:
-        """Keep the latest; send it now only if the phase, the centred count or
-        searching changed (the heartbeat carries the rest)."""
+        """Keep the latest; send it now only if the phase or the countdown
+        changed (the heartbeat carries the rest)."""
         self._telemetry = {k: v for k, v in payload.items() if k != "type"}
-        key = (self._telemetry.get("phase"), self._telemetry.get("centred"),
-               self._telemetry.get("searching"))
+        key = (self._telemetry.get("phase"), self._telemetry.get("countdown"))
         if key != self._tele_phase:
             self._tele_phase = key
             self._tele_sent = time.monotonic()

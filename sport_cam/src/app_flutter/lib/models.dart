@@ -23,34 +23,28 @@ TrackingMode trackingModeFrom(String? s) =>
 class ModeText {
   const ModeText._({
     required this.startTracking,
-    required this.startRecording,
-    required this.acquiring,
+    required this.searching,
     required this.stalled,
   });
 
   /// Primary button in idle.
   final String startTracking;
 
-  /// Primary button while tracking.
-  final String startRecording;
+  /// Status label while tracking, in search.
+  final String searching;
 
-  /// Status label while tracking but not yet locked on.
-  final String acquiring;
-
-  /// Hint when acquiring has gone on too long.
+  /// Hint when tracking has gone on too long without recording.
   final String stalled;
 
   static const withUwb = ModeText._(
     startTracking: 'Start tracking',
-    startRecording: 'Start recording',
-    acquiring: 'Acquiring subject',
+    searching: 'Turning to your tag',
     stalled: "Can't see you — step into view, facing the camera",
   );
 
   static const withoutUwb = ModeText._(
     startTracking: 'Track & record',
-    startRecording: 'Record now',
-    acquiring: 'Looking for a person',
+    searching: 'Looking for a person',
     stalled: "Can't find anyone — step into the room, facing the camera",
   );
 
@@ -115,8 +109,7 @@ class Telemetry {
     this.tilt,
     this.distM,
     this.phase,
-    this.centred = 0,
-    this.searching = false,
+    this.countdown = 0,
     this.acquireStalled = false,
   });
 
@@ -124,17 +117,15 @@ class Telemetry {
   final double? tilt;
   final double? distM;
 
-  /// While tracking: 'acquiring' until the camera has locked on, then
-  /// 'acquired'. With UWB it is turning to the tag; without, sweeping the room.
+  /// idle: 'person-in-frame' or 'no-person-in-frame'. Tracking: 'search'
+  /// (with UWB turning to the tag, without sweeping the room — the app pings
+  /// every three seconds), then 'found'. Recording: 'track' ('search' again,
+  /// without UWB, while it looks for a person it has lost).
   final String? phase;
 
-  /// Consecutive centred detections toward the lock (ACQUIRE_DETECTIONS once
-  /// locked, 0 when not tracking). The app beeps once per step up.
-  final int centred;
-
-  /// In SEARCH: with UWB turning to the tag, without UWB sweeping the room.
-  /// The app pings every three seconds while it is.
-  final bool searching;
+  /// Found: whole seconds left before recording starts (3, 2, 1); else 0.
+  /// The app beeps on each.
+  final int countdown;
 
   /// Acquiring for a while and the camera still cannot see / has not found anyone.
   final bool acquireStalled;
@@ -144,8 +135,7 @@ class Telemetry {
     tilt: (j?['tilt'] as num?)?.toDouble(),
     distM: (j?['dist'] as num?)?.toDouble(),
     phase: j?['phase'] as String?,
-    centred: (j?['centred'] as num?)?.toInt() ?? 0,
-    searching: j?['searching'] as bool? ?? false,
+    countdown: (j?['countdown'] as num?)?.toInt() ?? 0,
     acquireStalled: j?['acquireStalled'] as bool? ?? false,
   );
 }

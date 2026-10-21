@@ -41,7 +41,7 @@ TRANSITIONS = {
     "off": ["idle"],
     "idle": ["off", "tracking"],
     "tracking": ["off", "idle", "recording"],
-    "recording": ["off", "idle", "tracking"],
+    "recording": ["off", "idle"],
 }
 
 
@@ -73,7 +73,7 @@ class LocalApi:
             "startTracking": lambda d: self._transition("tracking"),
             "stopTracking": lambda d: self._transition("idle"),
             "startRecording": lambda d: self._transition("recording"),
-            "stopRecording": lambda d: self._transition("tracking"),
+            "stopRecording": lambda d: self._transition("idle"),
             "getRecordings": self._get_recordings,
         }
 
@@ -120,8 +120,7 @@ class LocalApi:
                 "tilt": round(self.head.tilt_deg, 1),
                 "dist": round(self.head.tracker.dist_m, 2) if self.head.tracker.dist_m else None,
                 "phase": self.head.phase,
-                "centred": self.head.tracker.centred if self.head.state in ("tracking", "recording") else 0,
-                "searching": self.head.state in ("tracking", "recording") and self.head.tracker.searching,
+                "countdown": self.head.tracker.countdown if self.head.state == "tracking" else 0,
                 "acquireStalled": self.head.acquire_stalled,
                 **self.head.power.telemetry(),
                 **self.head.storage.telemetry(),

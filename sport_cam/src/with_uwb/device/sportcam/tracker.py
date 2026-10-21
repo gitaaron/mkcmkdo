@@ -22,21 +22,25 @@ is no sweep; the head turns straight to the bearing.
     (idle, no person in frame)       (idle, person in frame)
                │ session start                │ session start
                ▼                              ▼
-    SEARCH ──on target, person seen──► CENTRE ──N centred detections──► TRACK
+    SEARCH ──on target, person seen──► FOUND ──FOUND_CONFIRM_S──► TRACK (recording)
        ▲                                  │
-       └───── nobody seen CENTRE_TIMEOUT_S┘
+       └──── nobody seen FOUND_LOST_S ────┘
 
 * **idle** — not a tracker mode: the session has not started. The head is
   parked with the lens wide and `watch_idle()` runs the detector at
   DETECT_FPS_IDLE. A session started with a person in frame skips SEARCH and
-  begins in CENTRE.
+  begins in FOUND.
 * **SEARCH** — turn to the tag's bearing, and hold there ACQUIRE_SETTLE_S
   until the detector sees a person.
-* **CENTRE** — vision trims the aim to put the person in the middle. It takes
-  ACQUIRE_DETECTIONS consecutive centred detections, with the head on the
-  tag's bearing, to lock.
-* **TRACK** — locked, for the rest of the session: a hidden tag or a missed
-  detection afterwards is ordinary tracking.
+* **FOUND** — the same pan, tilt, zoom and focus as recording; the person
+  does not have to be centred. Seen throughout FOUND_CONFIRM_S (no gap
+  longer than FOUND_LOST_S), the session starts recording and calls
+  `confirm()`.
+* **TRACK** — recording, for the rest of the session: a hidden tag or a
+  missed detection afterwards is ordinary tracking.
+
+Every mode runs the same control loop in `step()`; the modes only decide
+when the session moves on.
 """
 from __future__ import annotations
 
@@ -50,7 +54,7 @@ from .camera import Camera
 from .ptz import Ptz
 from .uwb import UwbArray
 
-SEARCH, CENTRE, TRACK = "search", "centre", "track"
+SEARCH, FOUND, TRACK = "search", "found", "track"
 
 
 class Tracker:
@@ -75,23 +79,27 @@ class Tracker:
         return time.monotonic() - self.last_fix_at
 
     # ---- session ----------------------------------------------------------
-    # Vision must verify: ranging alone never locks. Locking takes the camera
+    # Vision must verify: ranging alone never records. FOUND takes the camera
     # pointing where the tag says the subject is AND the detector seeing
-    # someone near the middle of the frame.
+    # someone there.
     def reset_lock(self) -> None:
         """Start a new session's acquisition.
 
         Normally that is SEARCH. If idle had a person in frame, the session
-        starts in CENTRE; if nobody is seen for CENTRE_TIMEOUT_S it falls back
-        to SEARCH.
+        starts in FOUND; if nobody is seen for FOUND_LOST_S it falls back to
+        SEARCH.
         """
         now = time.monotonic()
-        self.mode = CENTRE if self.idle_person_in_frame else SEARCH
+        self.mode = FOUND if self.idle_person_in_frame else SEARCH
         self._idle_seen_at = None
         self._settled_since: float | None = None
-        self._confirmations = 0
         self._acquiring_since = now
-        self._centre_seen_at = now
+        self._found_since = now
+        self._found_seen_at = now
+
+    def confirm(self) -> None:
+        """Recording has started: hold the subject for the rest of the session."""
+        self.mode = TRACK
 
     # ---- idle --------------------------------------------------------------
     def watch_idle(self) -> None:
@@ -113,31 +121,31 @@ class Tracker:
                 and time.monotonic() - self._idle_seen_at <= config.IDLE_PERSON_HOLD_S)
 
     # ---- status the rest of the system reads -------------------------------
-    @property
-    def locked(self) -> bool:
-        return self.mode == TRACK
+    def found_for(self) -> float:
+        """Seconds in FOUND (0 in any other mode)."""
+        return time.monotonic() - self._found_since if self.mode == FOUND else 0.0
 
     @property
-    def centred(self) -> int:
-        """Consecutive centred detections toward the lock (ACQUIRE_DETECTIONS once locked)."""
-        if self.mode == TRACK:
-            return config.ACQUIRE_DETECTIONS
-        return self._confirmations if self.mode == CENTRE else 0
+    def ready_to_record(self) -> bool:
+        """The person has stayed in frame for FOUND_CONFIRM_S."""
+        return self.mode == FOUND and self.found_for() >= config.FOUND_CONFIRM_S
 
     @property
-    def searching(self) -> bool:
-        """In SEARCH — the app pings every few seconds while it is."""
-        return self.mode == SEARCH
+    def countdown(self) -> int:
+        """Whole seconds left in FOUND before recording (0 outside FOUND)."""
+        if self.mode != FOUND:
+            return 0
+        return max(1, math.ceil(config.FOUND_CONFIRM_S - self.found_for()))
 
     @property
     def acquire_stalled(self) -> bool:
         """Acquiring for a long time without vision agreeing — tell the user."""
-        return (not self.locked and
+        return (self.mode != TRACK and
                 time.monotonic() - self._acquiring_since > config.ACQUIRE_STALLED_S)
 
     def _advance(self, now: float, have_fix: bool, pan_target: float,
-                 tilt_target: float | None, saw_person: bool, centred_person: bool) -> None:
-        """SEARCH → CENTRE → TRACK."""
+                 tilt_target: float | None, saw_person: bool) -> None:
+        """SEARCH ⇄ FOUND. FOUND → TRACK is the session's call (`confirm()`)."""
         if self.mode == TRACK:
             return
         on_target = False
@@ -152,26 +160,19 @@ class Tracker:
             on_target = err <= config.ACQUIRE_POINT_TOL_DEG
         if not on_target:
             self._settled_since = None
-            self._confirmations = 0
         elif self._settled_since is None:
             self._settled_since = now
 
         if self.mode == SEARCH:
             settled = (self._settled_since is not None
                        and now - self._settled_since >= config.ACQUIRE_SETTLE_S)
-            if not (saw_person and settled):
-                return
-            self.mode = CENTRE               # this detection counts toward the lock
-
-        if saw_person:
-            self._centre_seen_at = now
-            self._confirmations = (self._confirmations + 1
-                                   if centred_person and on_target else 0)
-            if self._confirmations >= config.ACQUIRE_DETECTIONS:
-                self.mode = TRACK
-        elif now - self._centre_seen_at > config.CENTRE_TIMEOUT_S:
-            self.mode = SEARCH
-            self._confirmations = 0
+            if saw_person and settled:
+                self.mode = FOUND
+                self._found_since = self._found_seen_at = now
+        elif saw_person:
+            self._found_seen_at = now
+        elif now - self._found_seen_at > config.FOUND_LOST_S:
+            self.mode = SEARCH                # gone: the countdown starts again
 
     def step(self) -> None:
         """One 20 Hz iteration. Commands the PTZ base directly."""
@@ -198,14 +199,9 @@ class Tracker:
         # that would be nearly seven times the intended gain.
         bbox, fresh = self.camera.person_bbox()
         saw_person = bool(bbox and fresh)
-        centred_person = False
         if saw_person:
             x, y, w, h = bbox
             self._last_seen_at = now
-            pw, ph = config.PREVIEW_SIZE
-            centred_person = (
-                abs(x + w / 2 - pw / 2) <= config.ACQUIRE_CENTRE_FRACTION * pw
-                and abs(y + h / 2 - ph / 2) <= config.ACQUIRE_CENTRE_FRACTION * ph)
             cx_err = (x + w / 2) - config.PREVIEW_SIZE[0] / 2
             cy_err = (y + h / 2) - config.PREVIEW_SIZE[1] / 2
             # Horizontal: learn a slow bias rather than jogging the axis, so
@@ -249,7 +245,7 @@ class Tracker:
             max_tilt = config.TILT_MAX_DPS * dt
             self.ptz.set_tilt(self.ptz.tilt_deg + _clamp(tilt_target - self.ptz.tilt_deg,
                                                          -max_tilt, max_tilt))
-        self._advance(now, have_fix, target, tilt_target, saw_person, centred_person)
+        self._advance(now, have_fix, target, tilt_target, saw_person)
 
     @staticmethod
     def _aim_tilt(elev_rad: float, dist_m: float) -> float:

@@ -137,9 +137,8 @@ builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
   "stateBy": "device",                       // "app" when the API wrote a request
   "telemetry": { "pan": -12.5, "tilt": 10.0, "zoomMm": 7.4, "dist": 4.2,
                  "phase": "no-person-in-frame" | "person-in-frame"   // idle
-                        | "acquiring" | "acquired" | null,          // tracking / recording; off
-                 "centred": 0,      // centred detections toward the lock (2 once locked); apps beep per step up
-                 "searching": false, // tracker in SEARCH; apps ping every 3 s while true
+                        | "search" | "found" | "track" | null,      // tracking / recording; off
+                 "countdown": 0,    // found: seconds left before recording (3, 2, 1); apps beep on each
                  "acquireStalled": false,
                  "battery": 0.82, "batteryWatts": 14.6, "batteryMinutes": 191,
                  "batteryLevel": "ok", "storageMinutes": 212, … },
@@ -157,8 +156,8 @@ builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
 | --- | --- |
 | State ownership | the camera owns its state. On connect it writes its state first, so a recording started offline survives reconnection |
 | App requests | the listener adopts any state written with `stateBy: "app"`, applies it via `apply_state()` (same path as a direct command), and writes back the result |
-| Camera-initiated changes | lock-on starting a recording, low battery, build-specific events: written immediately |
-| Write throttling (free tier) | telemetry on the heartbeat (sooner on a phase change, and on each change of `centred` or `searching` so the apps can beep per detection and ping while searching); upload progress every 2 s; previews only while `viewerAt` < 60 s old |
+| Camera-initiated changes | found for 3 s starting a recording, low battery, build-specific events: written immediately |
+| Write throttling (free tier) | telemetry on the heartbeat (sooner on a phase change, so the apps can ping while searching, and on each second of `countdown` so they can beep on it); upload progress every 2 s; previews only while `viewerAt` < 60 s old |
 | Credentials | service account restricted to Firestore (`FIREBASE_CREDENTIALS`) |
 | Stand-alone | `CAMERA_KEY` empty: no Firebase connection |
 | `pan` | degrees from centre, negative = left; no 0–360 heading (axis range ±80°) |
@@ -174,8 +173,8 @@ Programs: camera service and wearable tag firmware.
 | Module | Function |
 | --- | --- |
 | `uwb.py` | range parsing (ULA1 frames, or the `dual-serial` sketch), bearing maths, Kalman → (θ, d) |
-| `tracker.py` | SEARCH → CENTRE → TRACK state machine and control loops from [05](../../with_uwb/docs/design/05-tracking-system.md): idle person-in-frame watch (`watch_idle()`; a session starts in CENTRE when someone is in frame), turn to the ranged position, pan/tilt from ranging, CV bias trims, framing, focus from distance |
-| `session.py` | tag-driven sessions: tag on → tracking (acquiring) → recording on lock-on; tag off → idle ([01](../product/01-requirements.md#state-machine-with-uwb)) |
+| `tracker.py` | SEARCH → FOUND → TRACK state machine and control loops from [05](../../with_uwb/docs/design/05-tracking-system.md): idle person-in-frame watch (`watch_idle()`; a session starts in FOUND when someone is in frame), turn to the ranged position, pan/tilt from ranging, CV bias trims, framing, focus from distance |
+| `session.py` | tag-driven sessions: tag on → tracking (search → found) → recording after 3 s found; tag off → idle ([01](../product/01-requirements.md#state-machine-with-uwb)) |
 | `rangecal.py` | `python3 -m sportcam.rangecal <metres>`: per-anchor range bias and noise with the tag on the boresight; prints `RANGE_BIAS_M` |
 
 `config.py` additionally holds the anchor geometry and calibration biases.
@@ -192,14 +191,14 @@ cd ~/sportcam/src/with_uwb/device && python3 -m sportcam.rangecal 5
 - `Camera.person_bbox()` returns `(bbox, fresh)`.
 - The tracker converts the ranged bearing into the pixel column the detector
   searches around.
-- Vision's roles (angle trim, framing, lock-on confirmation) and hold-on-dropout
+- Vision's roles (angle trim, framing, confirming the person before recording) and hold-on-dropout
   behaviour: [05](../../with_uwb/docs/design/05-tracking-system.md#control-loops-all-run-on-the-pi-20-hz).
 
 Tests: `src/with_uwb/device/tests/test_tracker.py` (fresh-only rule, strip
 hint, slew limits, tilt from A3, sign of every vertical correction, framing:
 fill target, edge guard, stale relax); `test_session.py` (SEARCH →
-CENTRE → TRACK lock-on, idle → CENTRE with a person in frame, tag-driven
-sessions, one telemetry push per centred detection).
+FOUND → recording after 3 s, idle → FOUND with a person in frame, tag-driven
+sessions, one telemetry push per countdown second, stop recording → idle).
 
 ### Where ranges come from
 
@@ -245,8 +244,8 @@ Programs: camera service only.
 
 | Module | Function |
 | --- | --- |
-| `tracker.py` | SEARCH → CENTRE → TRACK state machine and loops from [05](../../without_uwb/docs/design/05-tracking-system.md): idle person-in-frame watch (`watch_idle()`; a session starts in CENTRE when someone is in frame), sweep, first-person lock-on with gate, pan/tilt goals and slew, vision-only framing, focus from apparent size |
-| `session.py` | `AutoSession`: first lock of a session started from idle starts recording; a tracking session with nobody found gives up after 180 s ([01](../product/01-requirements.md#state-machine-without-uwb)) |
+| `tracker.py` | SEARCH → FOUND → TRACK state machine and loops from [05](../../without_uwb/docs/design/05-tracking-system.md): idle person-in-frame watch (`watch_idle()`; a session starts in FOUND when someone is in frame), sweep, first person found, followed with a gate, pan/tilt goals and slew, vision-only framing, focus from apparent size |
+| `session.py` | `AutoSession`: found for 3 s starts recording; a tracking session sweeping 180 s without finding anyone gives up ([01](../product/01-requirements.md#state-machine-without-uwb)) |
 
 `config.py` additionally holds the search and tracking gains, detector
 settings, and zoom and focus curves. `camera.py` adds `person_boxes()`.
@@ -258,14 +257,14 @@ settings, and zoom and focus curves. `camera.py` adds `person_boxes()`.
   `(x, y, w, h)` and whether the list is new.
 - Detector isolated in `Camera._detect()`; replacing HOG with MobileNet-SSD
   (`cv2.dnn`) changes only that method.
-- Tracker use of the boxes (search, lock-on, following, framing, focus from
+- Tracker use of the boxes (search, found, following, framing, focus from
   size): [05](../../without_uwb/docs/design/05-tracking-system.md#control-loops-all-run-on-the-pi-20-hz).
 
 Tests: `src/without_uwb/device/tests/test_tracker.py` (idle sub-state and
-sweep skip, sweep and turn-arounds, two-detection lock, bystander gate, correction signs, slew
+sweep skip, sweep and turn-arounds, found → ready after 3 s, bystander gate, correction signs, slew
 limits, framing: fill target, edge guard, stale relax); `test_session.py`
-(auto-record on lock, give-up rule, idle → CENTRE with a person in frame,
-one telemetry push per centred detection).
+(recording after 3 s found, give-up rule, idle → FOUND with a person in frame,
+one telemetry push per countdown second, stop recording → idle).
 
 ### Firebase link, without UWB
 
@@ -273,4 +272,4 @@ one telemetry push per centred detection).
 | --- | --- |
 | `dist` | estimated from the person's size in frame; null while searching |
 | `acquireStalled` | search has found nobody for `ACQUIRE_STALLED_S` |
-| Camera-initiated changes | first lock-on starting a recording; empty-room give-up |
+| Camera-initiated changes | found for 3 s starting a recording; empty-room give-up |

@@ -3,8 +3,8 @@
  *
  * Start rises (C6 → G6), stop falls (G6 → C6): two soft bell-like notes, a
  * sine with a quiet octave partial, fast attack and a gentle exponential
- * decay. The beep, one per centred detection while the camera locks on, is
- * a single short A5. The sonar ping, every three seconds while the camera
+ * decay. The beep, one per second of the found countdown (3, 2, 1), is a
+ * single short A5. The sonar ping, every three seconds while the camera
  * searches, is an E6 with a long ring and a quieter echo. Same notes as the
  * native app's sounds, so the two agree.
  *
@@ -90,7 +90,7 @@ export function ping(): void {
   note(E6, t + 0.35, 0.05, 0.7);
 }
 
-/** One centred detection on the way to a lock. */
+/** One second of the found countdown. */
 export function beep(): void {
   const t = slot(0.25);
   if (t !== null) note(A5, t, 0.18, 0.12);

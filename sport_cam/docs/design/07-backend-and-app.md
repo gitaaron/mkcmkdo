@@ -57,12 +57,12 @@ No backend setting.
 | `mode` | Build | |
 | --- | --- | --- |
 | `with_uwb` | [with UWB](../../README.md#with-uwb) | the subject wears a tag; the tag starts and ends sessions |
-| `without_uwb` | [without UWB](../../README.md#without-uwb) | vision only; the camera sweeps for a person and locks on |
+| `without_uwb` | [without UWB](../../README.md#without-uwb) | vision only; the camera sweeps for a person and follows them |
 
 - Apps select their wording from `mode` (`src/web/src/lib/modeText.ts`;
   `ModeText` in `src/app_flutter/lib/models.dart`).
 - No `mode` (camera never connected) → treated as `with_uwb`.
-- Build-specific automatic transitions (tag off → idle, lock-on → recording)
+- Build-specific automatic transitions (tag off → idle, found for 3 s → recording)
   happen on the camera and arrive as ordinary state reports.
 - In dev, `TRACKING_MODE` sets the simulated camera's build.
 
@@ -130,7 +130,7 @@ src/web/src/
   lib/firebase.ts        Firestore: the emulator in dev, /__/firebase/init.json deployed
   lib/cameraKey.ts       the key from the link (#key=…), kept in the browser
   lib/useCameraState.ts  live camera document, recordings and preview via onSnapshot
-  lib/chime.ts           search pings, lock-on beeps, recording start/stop chimes (Web Audio)
+  lib/chime.ts           search pings, countdown beeps, recording start/stop chimes (Web Audio)
   lib/modeText.ts        the wording that differs between with_uwb and without_uwb
 ```
 
@@ -140,16 +140,15 @@ Behaviour (requirement F5 in [01](../product/01-requirements.md#functional-requi
 - **The status ring** (top right) and **the bottom buttons** follow the
   camera's state, with the colours, labels and buttons in
   [01 — State machine](../product/01-requirements.md#state-machine). The
-  ring is hollow while the camera is offline. If acquiring stalls, a pill
+  ring is hollow while the camera is offline. If tracking stalls, a pill
   says <!--with_uwb-->"Can't see you — step into view, facing the camera"<!--/--><!--both--> (with UWB) or<!--/--><!--without_uwb--> "Can't
   find anyone — step into the room, facing the camera" (<!--/--><!--both-->without UWB, <!--/--><!--without_uwb-->after
-  15 s with nobody found)<!--/-->. **Stop tracking** while recording asks to
-  confirm, since it also stops the recording.
+  15 s with nobody found)<!--/-->.
 - **Sounds** (`lib/chime.ts`): a sonar ping every 3 s while telemetry
-  `searching` is true, a short beep for each centred detection while
-  locking on (one per step up in telemetry `centred`), then a rising
-  two-note chime on record start; falling on stop (Web Audio). Sounds queue,
-  so the chime follows the last beep. Armed by the first tap (browser autoplay policy). Desktop
+  `phase` is `search`, a short beep for each second of the found countdown
+  (telemetry `countdown`: 3, 2, 1), then a rising two-note chime on record
+  start; falling on stop (Web Audio). Sounds queue, so the chime follows the
+  last beep. Armed by the first tap (browser autoplay policy). Desktop
   background tabs chime; phone browsers suspend background pages, so use the
   native app for background chimes ([09](09-direct-connection-and-app.md)).
 - **No optimistic UI:** buttons `call()` a function, and the UI updates only

@@ -8,22 +8,19 @@ import type { TrackingMode } from "./api.js";
  */
 export interface ModeText {
   startTracking: string;   // primary button in idle
-  startRecording: string;  // primary button in tracking
-  acquiring: string;       // status label while tracking but not locked on
-  stalled: string;         // hint when acquiring has gone on too long
+  searching: string;       // status label while tracking, in search
+  stalled: string;         // hint when tracking has gone on too long without recording
 }
 
 export const MODE_TEXT: Record<TrackingMode, ModeText> = {
   with_uwb: {
     startTracking: "Start tracking",
-    startRecording: "Start recording",
-    acquiring: "Acquiring subject…",
+    searching: "Turning to your tag…",
     stalled: "Can't see you — step into view, facing the camera",
   },
   without_uwb: {
     startTracking: "Track & record",
-    startRecording: "Record now",
-    acquiring: "Looking for a person…",
+    searching: "Looking for a person…",
     stalled: "Can't find anyone — step into the room, facing the camera",
   },
 };

@@ -187,7 +187,7 @@ sudo systemctl enable --now sportcam-head sportcam-wifi
 journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
 ```
 
-**Done when** the LED ring is solid blue (idle).
+**Done when** the LED ring is blue (idle): solid, or breathing slowly if the camera can see you.
 
 | Operation | Command / note |
 | --- | --- |
@@ -196,7 +196,7 @@ journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
 
 ## 8. Live checks
 
-With the service running and the tag **off**, the ring is solid blue. Do
+With the service running and the tag **off**, the ring is blue (breathing slowly while it sees you). Do
 these in order: the session check only means something once the bearing and
 elevation are right.
 
@@ -209,10 +209,10 @@ elevation are right.
    from the app afterwards.
 3. **Tag-started session.** Switch the tag off and wait 5 s. Stand 5 m out and
    switch it on, standing upright and facing the camera. Within about a second
-   the ring shows a green light chasing round (acquiring) while the camera
-   turns to you (the app pings while it searches); once it has settled on you **and seen you in the middle of
-   the frame** (the app beeps for each of the two centred detections) it
-   turns breathing red, starts recording, and the app chimes.
+   the ring shows a green light chasing round (search) while the camera
+   turns to you (the app pings while it searches). Once it has settled on
+   you **and seen you** it fills with green over 3 s (found; the app beeps
+   3, 2, 1), then turns breathing red, starts recording, and the app chimes.
    The zoom then settles with you filling about two-thirds of the frame.
    Switch the tag off: 5 s later the ring returns to solid blue and the clip
    is saved. If nothing happens, check `AUTO_SESSION = True` and that ranging
@@ -257,5 +257,5 @@ All in `src/with_uwb/device/sportcam/config.py`:
 | `ZOOM_CURVE` | step 6c, by hand |
 | `FOCUS_GRID` | step 6d, `focuscal` |
 | `UWB_THETA_SIGN` | step 8 |
-| `AUTO_SESSION` and the `ACQUIRE_*` lock-on settings | defaults are fine; see [05](../design/05-tracking-system.md) to tune |
+| `AUTO_SESSION`, the `ACQUIRE_*` and `FOUND_*` settings | defaults are fine; see [05](../design/05-tracking-system.md) to tune |
 | `FIREBASE_PROJECT`, `CAMERA_KEY`, `UPLOAD_API_BASE` | step 4, only with Firebase |
