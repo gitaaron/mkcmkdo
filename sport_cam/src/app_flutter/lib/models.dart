@@ -115,6 +115,7 @@ class Telemetry {
     this.tilt,
     this.distM,
     this.phase,
+    this.centred = 0,
     this.acquireStalled = false,
   });
 
@@ -126,6 +127,10 @@ class Telemetry {
   /// 'acquired'. With UWB it is turning to the tag; without, sweeping the room.
   final String? phase;
 
+  /// Consecutive centred detections toward the lock (ACQUIRE_DETECTIONS once
+  /// locked, 0 when not tracking). The app beeps once per step up.
+  final int centred;
+
   /// Acquiring for a while and the camera still cannot see / has not found anyone.
   final bool acquireStalled;
 
@@ -134,6 +139,7 @@ class Telemetry {
     tilt: (j?['tilt'] as num?)?.toDouble(),
     distM: (j?['dist'] as num?)?.toDouble(),
     phase: j?['phase'] as String?,
+    centred: (j?['centred'] as num?)?.toInt() ?? 0,
     acquireStalled: j?['acquireStalled'] as bool? ?? false,
   );
 }

@@ -146,6 +146,20 @@ def tracker_lock() -> None:
 
     tr4.reset_lock()
     check("reset_lock clears it", not tr4.locked and not tr4.acquire_stalled)
+    check("…back to SEARCH", tr4.mode == "search", tr4.mode)
+
+    timeout, config.CENTRE_TIMEOUT_S = config.CENTRE_TIMEOUT_S, 0.3
+    cam5 = FakeCamera(centred)
+    tr5 = Tracker(FakeUwb(theta_deg=5.0), cam5, FakePtz())
+    tr5.watch_idle()
+    check("idle: a person in frame is noticed", tr5.idle_person_in_frame)
+    tr5.reset_lock()
+    check("a session started with a person in frame begins in CENTRE",
+          tr5.mode == "centre" and not tr5.idle_person_in_frame, tr5.mode)
+    cam5._bbox = None
+    run_tracker(tr5, 0.6)
+    check("CENTRE with nobody seen for CENTRE_TIMEOUT_S → SEARCH", tr5.mode == "search", tr5.mode)
+    config.CENTRE_TIMEOUT_S = timeout
 
 
 class FakeRing:
@@ -172,6 +186,14 @@ class FakeMdns:
 class FakeStorage:
     def can_record(self):
         return True
+
+    def telemetry(self):
+        return {}
+
+
+class FakePower:
+    def telemetry(self):
+        return {}
 
 
 class SwitchableUwb(FakeUwb):
@@ -206,6 +228,16 @@ class FakeRecCamera(FakeCamera):
         pass
 
 
+def steps_to_lock(sent: list[int]) -> list[int]:
+    """The centred counts sent on the way to the first lock, after the last reset to 0."""
+    n = config.ACQUIRE_DETECTIONS
+    if n not in sent:
+        return sent
+    i = sent.index(n)
+    zeros = [k for k in range(i) if sent[k] == 0]
+    return sent[(zeros[-1] + 1 if zeros else 0):i + 1]
+
+
 async def full_flow() -> None:
     print("\nfull flow through Head.control_tick()")
     import sportcam.main as main_mod
@@ -233,11 +265,20 @@ async def full_flow() -> None:
     head.session = AutoSession()
     head.led = FakeRing()
     head.storage = FakeStorage()
+    head.power = FakePower()
     head.local = FakeLocal()
     head.mdns = FakeMdns()
     head.cloud = CloudLink(head)       # not connected: writes are no-ops
     head._rec_path, head._rec_started = "", 0.0
-    head._idle_seen_at = None
+    head._centred_sent = 0
+
+    centred_sent: list[int] = []       # what the app hears, in order, to beep on
+    send = head.send_telemetry
+
+    async def record_send():
+        centred_sent.append(head.telemetry()["centred"])
+        await send()
+    head.send_telemetry = record_send
 
     seen: list[tuple[str, str | None]] = []
 
@@ -265,11 +306,16 @@ async def full_flow() -> None:
     await tick_for(0.25)
     check("tag on → tracking, ring shows acquiring",
           head.state == "tracking" and head.led.acquiring, f"{seen}")
+    check("…with a person in frame it starts in CENTRE, skipping SEARCH",
+          head.tracker.mode == "centre", head.tracker.mode)
 
     await tick_for(1.5)
     check("locked on → recording, ring no longer acquiring",
           head.state == "recording" and not head.led.acquiring and head.camera.recording,
           f"{seen}")
+    check("each centred detection is sent to the app at once (one beep each)",
+          steps_to_lock(centred_sent) == list(range(1, config.ACQUIRE_DETECTIONS + 1)),
+          f"{centred_sent}")
 
     head.uwb.on_since, head.uwb.off_at = None, time.monotonic()
     head.tracker.last_fix_at = time.monotonic()
@@ -286,6 +332,19 @@ async def full_flow() -> None:
           and all(p in ("acquiring", "acquired") for s, p in seen if s != "idle"), f"{seen}")
     check("phase ran acquiring → acquired",
           ("tracking", "acquiring") in seen and ("recording", "acquired") in seen, f"{seen}")
+
+    # --- nobody in frame when the tag goes on: SEARCH, turning to the tag ---------
+    head.camera._bbox = None
+    await tick_for(max(config.IDLE_PERSON_HOLD_S, config.LOST_IDLE_S) + 0.3)
+    check("idle sub-state: no person in frame", head.phase == "no-person-in-frame", f"{head.phase}")
+    head.uwb.on_since, head.uwb.off_at = time.monotonic(), None
+    await tick_for(0.25)
+    check("tag on with nobody in frame → SEARCH",
+          head.state == "tracking" and head.tracker.mode == "search", head.tracker.mode)
+    head.camera._bbox = bbox
+    await tick_for(2.0)
+    check("…turns to the tag, sees them, centres and records",
+          head.state == "recording" and head.tracker.mode == "track", head.tracker.mode)
 
 
 def ring_animation() -> None:

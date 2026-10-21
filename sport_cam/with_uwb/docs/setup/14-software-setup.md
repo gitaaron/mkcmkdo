@@ -211,7 +211,8 @@ elevation are right.
    switch it on, standing upright and facing the camera. Within about a second
    the ring shows a green light chasing round (acquiring) while the camera
    turns to you; once it has settled on you **and seen you in the middle of
-   the frame** it turns breathing red, starts recording, and the app chimes.
+   the frame** (the app beeps for each of the two centred detections) it
+   turns breathing red, starts recording, and the app chimes.
    The zoom then settles with you filling about two-thirds of the frame.
    Switch the tag off: 5 s later the ring returns to solid blue and the clip
    is saved. If nothing happens, check `AUTO_SESSION = True` and that ranging

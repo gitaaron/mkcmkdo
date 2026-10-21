@@ -97,6 +97,14 @@ class FakeStorage:
     def can_record(self):
         return True
 
+    def telemetry(self):
+        return {}
+
+
+class FakePower:
+    def telemetry(self):
+        return {}
+
 
 class RecCamera(SimCamera):
     def __init__(self, ptz, people):
@@ -109,6 +117,16 @@ class RecCamera(SimCamera):
 
     def stop_recording(self):
         self.recording = False
+
+
+def steps_to_lock(sent: list[int]) -> list[int]:
+    """The centred counts sent on the way to the first lock, after the last reset to 0."""
+    n = config.ACQUIRE_DETECTIONS
+    if n not in sent:
+        return sent
+    i = sent.index(n)
+    zeros = [k for k in range(i) if sent[k] == 0]
+    return sent[(zeros[-1] + 1 if zeros else 0):i + 1]
 
 
 async def full_flow() -> None:
@@ -132,10 +150,20 @@ async def full_flow() -> None:
     head.session = AutoSession()
     head.led = FakeRing()
     head.storage = FakeStorage()
+    head.power = FakePower()
     head.local = FakeLocal()
     head.mdns = FakeMdns()
     head.cloud = CloudLink(head)       # not connected: writes are no-ops
     head._rec_path, head._rec_started = "", 0.0
+    head._centred_sent = 0
+
+    centred_sent: list[int] = []       # what the app hears, in order, to beep on
+    send = head.send_telemetry
+
+    async def record_send():
+        centred_sent.append(head.telemetry()["centred"])
+        await send()
+    head.send_telemetry = record_send
 
     seen: list[tuple[str, str | None]] = []
 
@@ -172,6 +200,9 @@ async def full_flow() -> None:
           not head.led.acquiring and head.phase == "acquired")
     check("camera is pointing at the person", abs(head.ptz.pan_deg - person.bearing) < 5.0,
           f"pan {head.ptz.pan_deg:.1f}")
+    check("each centred detection is sent to the app at once (one beep each)",
+          steps_to_lock(centred_sent) == list(range(1, config.ACQUIRE_DETECTIONS + 1)),
+          f"{centred_sent}")
 
     # --- they walk off: recording continues, camera sweeps again --------------------
     person.visible = False

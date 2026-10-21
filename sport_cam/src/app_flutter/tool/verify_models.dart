@@ -59,6 +59,11 @@ void main() {
     'stall flag defaults to false',
     !Telemetry.fromJson(null).acquireStalled,
   );
+  check(
+    'centred count parses, defaulting to 0',
+    Telemetry.fromJson({'centred': 2}).centred == 2 &&
+        Telemetry.fromJson(null).centred == 0,
+  );
 
   // Captured from `POST /api/call/getRecordings`.
   final recJson = jsonDecode('''

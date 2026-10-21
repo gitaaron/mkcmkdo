@@ -144,6 +144,9 @@ async def main() -> None:
     print("telemetry and heartbeat")
     await link.telemetry({"type": "telemetry", "pan": 3.0, "phase": "acquiring"})
     check("a phase change goes up at once", doc().get("telemetry", {}).get("phase") == "acquiring")
+    await link.telemetry({"type": "telemetry", "pan": 3.0, "phase": "acquiring", "centred": 1})
+    check("a centred detection goes up at once (the app beeps for it)",
+          doc().get("telemetry", {}).get("centred") == 1)
     await asyncio.sleep(0.15)
     check("the heartbeat carries telemetry", doc().get("telemetry", {}).get("pan") == 3.0)
 

@@ -115,6 +115,13 @@ class Tracker:
         return self.mode == TRACK
 
     @property
+    def centred(self) -> int:
+        """Consecutive centred detections toward the lock (ACQUIRE_DETECTIONS once locked)."""
+        if self.mode == TRACK:
+            return config.ACQUIRE_DETECTIONS
+        return self._confirmations if self.mode == CENTRE else 0
+
+    @property
     def acquire_stalled(self) -> bool:
         """Searching a long while with nobody found — tell the user."""
         return self.mode == SEARCH and (

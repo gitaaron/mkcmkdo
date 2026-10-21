@@ -104,8 +104,13 @@ let state = "idle";
 let recStarted = 0;
 let trackingSince = 0;
 let acquireMs = 3000;
+let recordOnLock = false;   // a session records once, on its first lock (AUTO_RECORD_ON_LOCK)
 // Idle sub-state: someone walks into frame for 10 s of every 20.
 const personInFrame = () => Math.floor(Date.now() / 10000) % 2 === 1;
+// Locking takes ACQUIRE_DETECTIONS centred detections at 3 a second, the last
+// of them at acquireMs.
+const ACQUIRE_DETECTIONS = 2;
+const DETECT_MS = 333;
 let pan = 0;
 let panDir = 1;
 let wh = 0;
@@ -129,10 +134,14 @@ function adopt(next) {
   state = next;
   if (next === "tracking" && prev !== "recording") {
     trackingSince = Date.now();
-    // Without UWB, a session started with a person in frame skips the sweep.
-    acquireMs = MODE === "without_uwb" && prev === "idle" && personInFrame() ? 1000 : 3000;
+    recordOnLock = prev === "idle";
+    // A session started with a person in frame skips SEARCH (without UWB, the sweep).
+    acquireMs = prev === "idle" && personInFrame() ? 1000 : 3000;
   }
-  if (next === "recording") recStarted = Date.now();
+  if (next === "recording") {
+    recStarted = Date.now();
+    recordOnLock = false;
+  }
   if (prev === "recording" && next !== "recording") {
     const durationS = Math.round((Date.now() - recStarted) / 100) / 10;
     uploadSample(durationS).catch((e) => console.error("[sim] upload failed:", e.message));
@@ -158,35 +167,61 @@ if (lib.empty && statSync(SAMPLE, { throwIfNoEntry: false })) {
   uploadSample(3).catch((e) => console.error("[sim] seeding the library failed:", e.message));
 }
 
+const tracking = () => state === "tracking" || state === "recording";
+
+function centred() {
+  if (!tracking()) return 0;
+  const toLock = acquireMs - (Date.now() - trackingSince);
+  return Math.max(0, Math.min(ACQUIRE_DETECTIONS, ACQUIRE_DETECTIONS - Math.ceil(toLock / DETECT_MS)));
+}
+
+function telemetry() {
+  const watts = state === "idle" ? 7.5 : 14.5;
+  const frac = Math.max(0, 1 - wh / 92);
+  return {
+    pan: Math.round(pan * 10) / 10,
+    tilt: 12,
+    zoomMm: 7.4,
+    dist: Math.round((4.2 + Math.sin(Date.now() / 3000)) * 100) / 100,
+    phase: tracking()
+      ? Date.now() - trackingSince >= acquireMs ? "acquired" : "acquiring"
+      : state === "idle" ? (personInFrame() ? "person-in-frame" : "no-person-in-frame") : null,
+    centred: centred(),
+    acquireStalled: false,
+    ...(MODE === "with_uwb" ? { tagPresent: true } : {}),
+    battery: Math.round(frac * 1000) / 1000,
+    batteryWatts: watts,
+    batteryMinutes: Math.round(((92 * frac) / watts) * 60),
+    batteryLevel: frac <= 0.07 ? "critical" : frac <= 0.2 ? "low" : "ok",
+  };
+}
+
 // Heartbeat + telemetry, once a second.
 setInterval(() => {
-  if (state === "tracking" || state === "recording") {
+  if (tracking()) {
     pan += 3.6 * panDir;
     if (pan >= 80 || pan <= -80) panDir = -panDir;
   }
-  const watts = state === "idle" ? 7.5 : 14.5;
-  wh += watts / 3600;
-  const frac = Math.max(0, 1 - wh / 92);
-  const tracking = state === "tracking" || state === "recording";
-  cam.update({
-    deviceSeenAt: Timestamp.now(),
-    telemetry: {
-      pan: Math.round(pan * 10) / 10,
-      tilt: 12,
-      zoomMm: 7.4,
-      dist: Math.round((4.2 + Math.sin(Date.now() / 3000)) * 100) / 100,
-      phase: tracking
-        ? Date.now() - trackingSince > acquireMs ? "acquired" : "acquiring"
-        : state === "idle" ? (personInFrame() ? "person-in-frame" : "no-person-in-frame") : null,
-      acquireStalled: false,
-      ...(MODE === "with_uwb" ? { tagPresent: true } : {}),
-      battery: Math.round(frac * 1000) / 1000,
-      batteryWatts: watts,
-      batteryMinutes: Math.round(((92 * frac) / watts) * 60),
-      batteryLevel: frac <= 0.07 ? "critical" : frac <= 0.2 ? "low" : "ok",
-    },
-  }).catch((e) => console.error("[sim] heartbeat failed:", e.message));
+  wh += (state === "idle" ? 7.5 : 14.5) / 3600;
+  cam.update({ deviceSeenAt: Timestamp.now(), telemetry: telemetry() })
+    .catch((e) => console.error("[sim] heartbeat failed:", e.message));
 }, 1000);
+
+// Like the device: each centred detection goes up at once (the apps beep for
+// it), and the first lock of a session starts recording.
+let centredSent = 0;
+setInterval(() => {
+  const c = centred();
+  if (c !== centredSent) {
+    centredSent = c;
+    cam.update({ telemetry: telemetry() })
+      .catch((e) => console.error("[sim] telemetry failed:", e.message));
+  }
+  if (recordOnLock && state === "tracking" && c >= ACQUIRE_DETECTIONS) {
+    adopt("recording");
+    cam.update({ state, stateBy: "device", updatedAt: Timestamp.now() });
+  }
+}, 50);
 
 // Preview frames, only while someone is watching.
 let i = 0;

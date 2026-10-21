@@ -59,7 +59,7 @@ class Head:
         self._rec_path = ""
         self._rec_started = 0.0
         self._warned = ""          # which warning we last announced
-        self._idle_seen_at: float | None = None   # last person detection while idle
+        self._centred_sent = 0     # tracker.centred as last sent to the app
 
     # convenience for local_api/telemetry — pan and tilt are commanded angles
     @property
@@ -78,27 +78,10 @@ class Head:
         until locked on, then "acquired".
         """
         if self.state == "idle":
-            return "person-in-frame" if self.idle_person_in_frame else "no-person-in-frame"
+            return "person-in-frame" if self.tracker.idle_person_in_frame else "no-person-in-frame"
         if self.state not in ("tracking", "recording"):
             return None
         return "acquired" if self.tracker.locked else "acquiring"
-
-    @property
-    def idle_person_in_frame(self) -> bool:
-        """Idle sub-state: a person was detected within IDLE_PERSON_HOLD_S."""
-        return (self._idle_seen_at is not None
-                and time.monotonic() - self._idle_seen_at <= config.IDLE_PERSON_HOLD_S)
-
-    def watch_idle(self) -> None:
-        """One idle tick: keep the lens wide and note whether anyone is in frame.
-
-        The tag, not vision, starts and steers a session in this build, so
-        the idle sub-state is reported only; there is no sweep to skip.
-        """
-        self.ptz.set_zoom_mm(config.ZOOM_MIN_MM)    # retried: zoom is rate-limited
-        box, fresh = self.camera.person_bbox()
-        if fresh and box is not None and self.ptz.zoom_mm <= config.ZOOM_MIN_MM:
-            self._idle_seen_at = time.monotonic()
 
     @property
     def acquire_stalled(self) -> bool:
@@ -140,7 +123,6 @@ class Head:
         old, self.state = self.state, new
         if old not in ("tracking", "recording") and new in ("tracking", "recording"):
             self.tracker.reset_lock()     # a new session acquires afresh
-            self._idle_seen_at = None
         if old != "recording" and new == "recording":
             self._rec_path = self.camera.start_recording()
             self._rec_started = time.monotonic()
@@ -184,13 +166,14 @@ class Head:
         """One 20 Hz tick: track, notice a lost tag, and run the tag session."""
         if self.state in ("tracking", "recording"):
             self.tracker.step()
+            await self.announce_centred()
             self.led.lost = self.tracker.lost_for() > config.LOST_HOLD_S
             if self.tracker.lost_for() > config.LOST_IDLE_S:
                 await self.apply_state("idle")
                 await self.report_state()
         else:
             if self.state == "idle":
-                self.watch_idle()             # person in frame?
+                self.tracker.watch_idle()     # person in frame? (a session started now starts in CENTRE)
             self.led.lost = False
         # The tag switching on (or the tracker locking on) can move the
         # state, through the same apply_state() as any other command.
@@ -264,24 +247,39 @@ class Head:
                     await self.cloud.preview(jpg)   # and, while watched, the app anywhere
             await asyncio.sleep(max(0.0, period - (time.monotonic() - t0)))
 
+    def telemetry(self) -> dict:
+        return {
+            "pan": round(self.ptz.pan_deg, 1),
+            "tilt": round(self.ptz.tilt_deg, 1),
+            "zoomMm": round(self.ptz.zoom_mm, 1),
+            "dist": round(self.tracker.dist_m, 2) if self.tracker.dist_m else None,
+            "phase": self.phase,
+            "centred": self.tracker.centred if self.state in ("tracking", "recording") else 0,
+            "acquireStalled": self.acquire_stalled,
+            "tagPresent": self.session.tag_present,
+            **self.power.telemetry(),
+            **self.storage.telemetry(),
+        }
+
+    async def send_telemetry(self) -> None:
+        await self.cloud.telemetry({"type": "telemetry", **self.telemetry()})
+        await self.local.broadcast(self.local.state_payload())
+
+    async def announce_centred(self) -> None:
+        """Each centred detection goes to the app at once, so it can beep for it.
+
+        The app beeps once per step up in `centred`, then chimes when
+        recording starts. Telemetry otherwise goes out once a second, which
+        would merge the detections (about three a second).
+        """
+        if self.tracker.centred != self._centred_sent:
+            self._centred_sent = self.tracker.centred
+            await self.send_telemetry()
+
     async def telemetry_loop(self) -> None:
         while True:
-            payload = {
-                "type": "telemetry",
-                "pan": round(self.ptz.pan_deg, 1),
-                "tilt": round(self.ptz.tilt_deg, 1),
-                "zoomMm": round(self.ptz.zoom_mm, 1),
-                "dist": round(self.tracker.dist_m, 2) if self.tracker.dist_m else None,
-                "phase": self.phase,
-                "acquireStalled": self.acquire_stalled,
-                "tagPresent": self.session.tag_present,
-                **self.power.telemetry(),
-                **self.storage.telemetry(),
-            }
-            await self.cloud.telemetry(payload)
-            await self.local.broadcast(self.local.state_payload())
+            await self.send_telemetry()
             await asyncio.sleep(1.0)
-
 
 if __name__ == "__main__":
     head = Head()

@@ -306,9 +306,9 @@ def state_machine():
     # per-state captions
     cap = [(xs["off"], "LED off"), (xs["idle"], "LED solid blue, parked,\nlens wide, detector 0.5 fps"),
            (xs["search"], "lens wide, pan ±80°\nstepping tilt rows"),
-           (xs["centre"], "turn to put the\nperson mid-frame"),
+           (xs["centre"], "turn to put them mid-frame;\napp beeps per detection"),
            (xs["lock"], "follow first person,\nvision only"),
-           (xs["rec"], "LED pulsing red\nsaving the clip")]
+           (xs["rec"], "LED pulsing red,\napp chimes")]
     for x, t in cap:
         ax.text(x, 0.35, t, ha="center", va="center", fontsize=8.5, color=INK)
     ax.text(10.0, 0.95 - 0.0, "LED chasing green while searching or centring, solid green once locked",

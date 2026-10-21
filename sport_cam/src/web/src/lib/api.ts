@@ -11,6 +11,7 @@ export interface Telemetry {
   zoomMm?: number;
   dist?: number | null;
   phase?: "person-in-frame" | "no-person-in-frame" | "acquiring" | "acquired" | null;
+  centred?: number;  // consecutive centred detections toward the lock; the app beeps per step up
   acquireStalled?: boolean;
   battery?: number;
 }

@@ -87,7 +87,7 @@ Same layout as the web app, plus a connection badge:
 | **Top left — connection** (`ConnectionBadge`) | green **"SportCam · Direct · 10.0.0.42"**; blue **"Firebase"**; amber pulsing **"Searching…"**; red **"Offline — tap to retry"**. Tap to re-scan |
 | **Below the badge** | recordings button with clip-count badge |
 | **Top right, stalled-acquiring pill, bottom buttons** | as in the web app ([07](07-backend-and-app.md#web-app-srcweb)) |
-| **Chimes** (`lib/session_audio.dart`) | rising on record start, falling on stop, **including in the background**. While connected the app stays awake: Android foreground service with a "SportCam connected" notification; iOS background audio mode (looped silence). Mixes over music; plays with the iOS silent switch on. Platform setup: [`src/app_flutter/README.md`](../../src/app_flutter/README.md) |
+| **Sounds** (`lib/session_audio.dart`) | a beep per centred detection while locking on, then a rising chime on record start; falling on stop. Queued, so the chime follows the last beep. Plays **including in the background**. While connected the app stays awake: Android foreground service with a "SportCam connected" notification; iOS background audio mode (looped silence). Mixes over music; plays with the iOS silent switch on. Platform setup: [`src/app_flutter/README.md`](../../src/app_flutter/README.md) |
 
 ## Running and testing it
 

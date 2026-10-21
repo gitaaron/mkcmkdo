@@ -74,7 +74,7 @@ Sweep timing:
 | Rule | Detail |
 | --- | --- |
 | **First person found wins** | at first sighting with several people in view, the largest detection is taken |
-| **Two centred detections to lock** | a single-frame false positive (coat stand, chair) causes a ≤ 2 s pause, then the sweep resumes; it can't start a recording |
+| **Two centred detections to lock** | a single-frame false positive (coat stand, chair) causes a ≤ 2 s pause, then the sweep resumes; it can't start a recording. Telemetry `centred` counts them; the app beeps once per detection, then chimes when recording starts |
 | **Recording starts on first lock** | `AUTO_RECORD_ON_LOCK`. Stopping the recording keeps tracking; no second auto-recording in the session. `False`: recording via **Record now** |
 | **Nearest, not largest, while tracking** | each detection is matched to the one nearest the last position, within `TRACK_GATE_FRACTION` (45 % of frame width). Detections outside the gate are ignored (bystanders) |
 | **Missing target** | `LOST_HOLD_S` (2 s): hold, ring flashes at 2 Hz. `RESEARCH_AFTER_S` (6 s): sweep toward the last direction of travel. Recording continues; zoom relaxes wide meanwhile |

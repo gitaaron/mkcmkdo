@@ -161,12 +161,36 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
 
 ### Acquiring and lock-on
 
-| Condition | Parameter | Default |
+The same state machine as the camera-only build
+([without UWB, 05](../../../without_uwb/docs/design/05-tracking-system.md#the-state-machine)).
+The difference is SEARCH: the tag gives the subject's location at once, so
+there is no sweep. The head still has to pan and tilt to centre the person.
+
+```
+   idle, no person in frame ──tag on──►  SEARCH   turn to the ranged position
+                                           │
+                                           │ on target 0.5 s, person seen
+                                           ▼
+   idle, person in frame ────tag on────►  CENTRE   vision trims the aim to the middle
+             (skips SEARCH)                │        (nobody seen for 2 s → SEARCH)
+                                           │ 2 consecutive centred detections, on target
+                                           ▼
+                                         TRACK ── first lock starts recording
+```
+
+| Mode | Behaviour | Exit |
 | --- | --- | --- |
-| Pan (and tilt, with A3) within tolerance of the ranged position | `ACQUIRE_POINT_TOL_DEG` | 4° |
-| … held for | `ACQUIRE_SETTLE_S` | 0.5 s |
-| Person detected near centre (box centre within 25 % of frame size) | `ACQUIRE_DETECTIONS` | 2 detections |
-| Report "Can't see you — step into view, facing the camera" | `ACQUIRE_STALLED_S` | 15 s |
+| **idle**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_IDLE` (0.5 fps). Person in frame from a detection until `IDLE_PERSON_HOLD_S` (4 s) pass without one | session start (tag on, or **Start tracking**) → SEARCH (no person in frame) or CENTRE (person in frame) |
+| **SEARCH** | pan (and tilt, with A3) slews to the ranged position | within `ACQUIRE_POINT_TOL_DEG` (4°) for `ACQUIRE_SETTLE_S` (0.5 s) and a person detected → CENTRE |
+| **CENTRE** | vision trims the aim until the box centre is within `ACQUIRE_CENTRE_FRACTION` (25 %) of frame centre | `ACQUIRE_DETECTIONS` (2) consecutive centred detections with the head on the ranged position → TRACK; nobody seen for `CENTRE_TIMEOUT_S` (2 s) → SEARCH |
+| **TRACK** | locked for the rest of the session; a hidden tag or a missed detection is ordinary tracking | session end |
+
+Mapping to app states (telemetry `phase`): idle = `idle`/`no-person-in-frame`
+or `idle`/`person-in-frame`; SEARCH and CENTRE = `tracking`/`acquiring`;
+TRACK = `tracking`/`acquired`. Telemetry `centred` counts the centred
+detections toward the lock; the app beeps once per detection, then chimes
+when recording starts. Not verified after `ACQUIRE_STALLED_S` (15 s): the
+app reports "Can't see you — step into view, facing the camera".
 
 - **Ranging alone never locks.** A sign or calibration error shows as a ring
   that keeps chasing, not a recording of a wall. Session start is usually an

@@ -120,6 +120,7 @@ class LocalApi:
                 "tilt": round(self.head.tilt_deg, 1),
                 "dist": round(self.head.tracker.dist_m, 2) if self.head.tracker.dist_m else None,
                 "phase": self.head.phase,
+                "centred": self.head.tracker.centred if self.head.state in ("tracking", "recording") else 0,
                 "acquireStalled": self.head.acquire_stalled,
                 **self.head.power.telemetry(),
                 **self.head.storage.telemetry(),

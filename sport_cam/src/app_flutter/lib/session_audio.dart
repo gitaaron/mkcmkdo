@@ -6,13 +6,15 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'camera_client.dart';
 import 'models.dart';
 
-/// Plays a chime when the camera starts and stops recording — including with
-/// the app in the background, which is the usual case: the phone is in a
-/// bag at the foot of the wall while you climb.
+/// Plays a beep for each centred detection while the camera locks on, then
+/// a chime when it starts recording (and another when it stops) — including
+/// with the app in the background, which is the usual case: the phone is in
+/// a bag at the foot of the wall while you climb.
 ///
-/// Sounds: `assets/sounds/rec_start.wav` (rising) and `rec_stop.wav`
-/// (falling), rendered by `tool/make_chimes.py` from the same notes as the
-/// web app's chime.
+/// Sounds: `assets/sounds/beep.wav`, `rec_start.wav` (rising) and
+/// `rec_stop.wav` (falling), rendered by `tool/make_chimes.py` from the same
+/// notes as the web app's sounds. They queue rather than cut each other off,
+/// so the start chime plays after the last beep.
 ///
 /// Staying awake in the background needs help on both platforms, and it is
 /// held only while the app is connected to a camera:
@@ -38,6 +40,8 @@ class SessionAudio {
   final AudioPlayer _silence = AudioPlayer();
 
   CamState? _last; // null until the first snapshot after (re)connecting
+  int _lastCentred = 0;
+  Future<void> _queue = Future.value();
   bool _wasConnected = false;
   bool _keepingAwake = false;
 
@@ -92,9 +96,18 @@ class SessionAudio {
     if (!connected) return;
 
     final next = client.state;
+    final centred = client.telemetry.centred;
     final prev = _last;
+    final prevCentred = _lastCentred;
     _last = next;
-    if (prev == null || prev == next) return;
+    _lastCentred = centred;
+    if (prev == null) return;
+    // One update can carry several detections (the relay polls every two
+    // seconds): one beep per step up.
+    for (var i = prevCentred; i < centred; i++) {
+      _play('sounds/beep.wav');
+    }
+    if (prev == next) return;
     if (next == CamState.recording) {
       _play('sounds/rec_start.wav');
     } else if (prev == CamState.recording) {
@@ -102,13 +115,17 @@ class SessionAudio {
     }
   }
 
-  Future<void> _play(String asset) async {
-    try {
-      await _chime.stop();
-      await _chime.play(AssetSource(asset));
-    } catch (_) {
-      // A chime is a nicety; never let audio take the app down.
-    }
+  /// Queue a sound to play after anything already playing.
+  void _play(String asset) {
+    _queue = _queue.then((_) async {
+      try {
+        final done = _chime.onPlayerComplete.first;
+        await _chime.play(AssetSource(asset));
+        await done.timeout(const Duration(seconds: 2));
+      } catch (_) {
+        // A chime is a nicety; never let audio take the app down.
+      }
+    });
   }
 
   Future<void> _keepAwake(bool on) async {

@@ -181,9 +181,9 @@ tuning steps only mean something once the signs are right.
    reads "Looking for a person…" and the ring shows a green light chasing
    round while the camera zooms wide and sweeps left and right, stepping to the
    next tilt row at each end. When it sees you it stops and turns to put you in
-   the middle; after two centred detections it locks on, the ring turns
-   breathing red, recording starts and the app chimes. The zoom then settles
-   with you filling about two-thirds of the frame.
+   the middle; after two centred detections (the app beeps for each) it locks
+   on, the ring turns breathing red, recording starts and the app chimes. The
+   zoom then settles with you filling about two-thirds of the frame.
 2. **Sign checks.** Walk slowly to one side while it follows. If it turns
    *away* from you, flip `PAN_SIGN`; if it tilts away when you crouch or
    stand, flip `TILT_SIGN` (step 4b). Restart the service after each change.

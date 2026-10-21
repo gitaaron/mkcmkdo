@@ -139,8 +139,11 @@ LOST_IDLE_S = 5.0              # no ranges → drop to idle (saving any recordin
 # that happens often.
 AUTO_SESSION = True            # False: the tag only ranges; start from the app
 TAG_PRESENT_S = 1.0            # unbroken ranging this long = the tag is on
-# Locked = the camera is pointing where the tag says, has settled there, AND
-# the person detector has seen someone near the middle of the frame. Vision
+# SEARCH → CENTRE → TRACK, as in the camera-only build, but SEARCH is a turn
+# to the tag's bearing rather than a sweep. CENTRE starts once the camera is
+# pointing where the tag says, has settled there, and the detector sees a
+# person (a session started with a person already in frame starts in CENTRE).
+# Locked = ACQUIRE_DETECTIONS consecutive centred detections in CENTRE. Vision
 # must verify: recording never starts on ranging alone, so a wrong sign or a
 # bad calibration shows up as a ring that keeps chasing, not as a clip of a
 # wall. The start of a climb — standing upright at the foot of the wall — is
@@ -148,9 +151,10 @@ TAG_PRESENT_S = 1.0            # unbroken ranging this long = the tag is on
 # depends on it.
 ACQUIRE_POINT_TOL_DEG = 4.0    # pan (and tilt, with A3) within this of the target
 ACQUIRE_SETTLE_S = 0.5         # ...for this long
-ACQUIRE_DETECTIONS = 2         # centred detections needed while settled
+ACQUIRE_DETECTIONS = 2         # consecutive centred detections, on target, to lock
 ACQUIRE_CENTRE_FRACTION = 0.25 # "centred": box centre within this fraction of
                                # the frame's width and height from the middle
+CENTRE_TIMEOUT_S = 2.0         # CENTRE with nobody seen this long → back to SEARCH
 ACQUIRE_STALLED_S = 15.0       # acquiring this long → the app says "can't see you"
 
 # --- vision ---------------------------------------------------------------

@@ -138,6 +138,7 @@ builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
   "telemetry": { "pan": -12.5, "tilt": 10.0, "zoomMm": 7.4, "dist": 4.2,
                  "phase": "no-person-in-frame" | "person-in-frame"   // idle
                         | "acquiring" | "acquired" | null,          // tracking / recording; off
+                 "centred": 0,      // centred detections toward the lock (2 once locked); apps beep per step up
                  "acquireStalled": false,
                  "battery": 0.82, "batteryWatts": 14.6, "batteryMinutes": 191,
                  "batteryLevel": "ok", "storageMinutes": 212, … },
@@ -156,7 +157,7 @@ builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
 | State ownership | the camera owns its state. On connect it writes its state first, so a recording started offline survives reconnection |
 | App requests | the listener adopts any state written with `stateBy: "app"`, applies it via `apply_state()` (same path as a direct command), and writes back the result |
 | Camera-initiated changes | lock-on starting a recording, low battery, build-specific events: written immediately |
-| Write throttling (free tier) | telemetry on the heartbeat (sooner on a phase change); upload progress every 2 s; previews only while `viewerAt` < 60 s old |
+| Write throttling (free tier) | telemetry on the heartbeat (sooner on a phase change, and on each change of `centred` so the apps can beep per detection); upload progress every 2 s; previews only while `viewerAt` < 60 s old |
 | Credentials | service account restricted to Firestore (`FIREBASE_CREDENTIALS`) |
 | Stand-alone | `CAMERA_KEY` empty: no Firebase connection |
 | `pan` | degrees from centre, negative = left; no 0–360 heading (axis range ±80°) |
@@ -172,7 +173,7 @@ Programs: camera service and wearable tag firmware.
 | Module | Function |
 | --- | --- |
 | `uwb.py` | range parsing (ULA1 frames, or the `dual-serial` sketch), bearing maths, Kalman → (θ, d) |
-| `tracker.py` | control loops from [05](../../with_uwb/docs/design/05-tracking-system.md): pan/tilt from ranging, CV bias trims, framing, focus from distance, lock-on test |
+| `tracker.py` | SEARCH → CENTRE → TRACK state machine and control loops from [05](../../with_uwb/docs/design/05-tracking-system.md): idle person-in-frame watch (`watch_idle()`; a session starts in CENTRE when someone is in frame), turn to the ranged position, pan/tilt from ranging, CV bias trims, framing, focus from distance |
 | `session.py` | tag-driven sessions: tag on → tracking (acquiring) → recording on lock-on; tag off → idle ([01](../product/01-requirements.md#state-machine-with-uwb)) |
 | `rangecal.py` | `python3 -m sportcam.rangecal <metres>`: per-anchor range bias and noise with the tag on the boresight; prints `RANGE_BIAS_M` |
 
@@ -195,8 +196,9 @@ cd ~/sportcam/src/with_uwb/device && python3 -m sportcam.rangecal 5
 
 Tests: `src/with_uwb/device/tests/test_tracker.py` (fresh-only rule, strip
 hint, slew limits, tilt from A3, sign of every vertical correction, framing:
-fill target, edge guard, stale relax); `test_session.py` (lock-on,
-tag-driven sessions).
+fill target, edge guard, stale relax); `test_session.py` (SEARCH →
+CENTRE → TRACK lock-on, idle → CENTRE with a person in frame, tag-driven
+sessions, one telemetry push per centred detection).
 
 ### Where ranges come from
 
@@ -261,7 +263,8 @@ settings, and zoom and focus curves. `camera.py` adds `person_boxes()`.
 Tests: `src/without_uwb/device/tests/test_tracker.py` (idle sub-state and
 sweep skip, sweep and turn-arounds, two-detection lock, bystander gate, correction signs, slew
 limits, framing: fill target, edge guard, stale relax); `test_session.py`
-(auto-record on lock, give-up rule, idle → CENTRE with a person in frame).
+(auto-record on lock, give-up rule, idle → CENTRE with a person in frame,
+one telemetry push per centred detection).
 
 ### Firebase link, without UWB
 

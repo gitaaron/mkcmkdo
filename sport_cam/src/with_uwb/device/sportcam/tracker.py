@@ -14,6 +14,29 @@ to driving the axis from the detector alone, as it always did.
 Zoom and focus both come from distance. Vision then frames the shot: it
 zooms so the person fills ZOOM_FILL_TARGET of the frame with a margin all
 round, and backs the lens off fast if the body nears an edge.
+
+Acquisition runs the same state machine as the camera-only build. The
+difference is SEARCH: the tag gives the subject's location at once, so there
+is no sweep; the head turns straight to the bearing.
+
+    (idle, no person in frame)       (idle, person in frame)
+               │ session start                │ session start
+               ▼                              ▼
+    SEARCH ──on target, person seen──► CENTRE ──N centred detections──► TRACK
+       ▲                                  │
+       └───── nobody seen CENTRE_TIMEOUT_S┘
+
+* **idle** — not a tracker mode: the session has not started. The head is
+  parked with the lens wide and `watch_idle()` runs the detector at
+  DETECT_FPS_IDLE. A session started with a person in frame skips SEARCH and
+  begins in CENTRE.
+* **SEARCH** — turn to the tag's bearing, and hold there ACQUIRE_SETTLE_S
+  until the detector sees a person.
+* **CENTRE** — vision trims the aim to put the person in the middle. It takes
+  ACQUIRE_DETECTIONS consecutive centred detections, with the head on the
+  tag's bearing, to lock.
+* **TRACK** — locked, for the rest of the session: a hidden tag or a missed
+  detection afterwards is ordinary tracking.
 """
 from __future__ import annotations
 
@@ -26,6 +49,8 @@ from . import config
 from .camera import Camera
 from .ptz import Ptz
 from .uwb import UwbArray
+
+SEARCH, CENTRE, TRACK = "search", "centre", "track"
 
 
 class Tracker:
@@ -43,22 +68,61 @@ class Tracker:
         self.last_fix_at = time.monotonic()
         self.dist_m: float | None = None
         self._last_step = time.monotonic()
+        self._idle_seen_at: float | None = None   # last person detection while idle
         self.reset_lock()
 
     def lost_for(self) -> float:
         return time.monotonic() - self.last_fix_at
 
-    # ---- acquisition ------------------------------------------------------
-    # "Locked" means the camera has turned to where the tag says the subject
-    # is, settled there, and the person detector has seen someone near the
-    # middle of the frame. Vision must verify; ranging alone never locks.
-    # Once locked it stays locked for the session: a hidden tag or a missed
-    # detection afterwards is ordinary tracking.
+    # ---- session ----------------------------------------------------------
+    # Vision must verify: ranging alone never locks. Locking takes the camera
+    # pointing where the tag says the subject is AND the detector seeing
+    # someone near the middle of the frame.
     def reset_lock(self) -> None:
-        self.locked = False
+        """Start a new session's acquisition.
+
+        Normally that is SEARCH. If idle had a person in frame, the session
+        starts in CENTRE; if nobody is seen for CENTRE_TIMEOUT_S it falls back
+        to SEARCH.
+        """
+        now = time.monotonic()
+        self.mode = CENTRE if self.idle_person_in_frame else SEARCH
+        self._idle_seen_at = None
         self._settled_since: float | None = None
         self._confirmations = 0
-        self._acquiring_since = time.monotonic()
+        self._acquiring_since = now
+        self._centre_seen_at = now
+
+    # ---- idle --------------------------------------------------------------
+    def watch_idle(self) -> None:
+        """One idle tick: keep the lens wide and note whether anyone is in frame.
+
+        Detection runs at DETECT_FPS_IDLE here. A person counts as in frame
+        until IDLE_PERSON_HOLD_S passes with no detection, so one missed frame
+        does not flip the idle sub-state.
+        """
+        self.ptz.set_zoom_mm(config.ZOOM_MIN_MM)    # retried: zoom is rate-limited
+        box, fresh = self.camera.person_bbox()
+        if fresh and box is not None and self.ptz.zoom_mm <= config.ZOOM_MIN_MM:
+            self._idle_seen_at = time.monotonic()
+
+    @property
+    def idle_person_in_frame(self) -> bool:
+        """Idle sub-state: a person was detected within IDLE_PERSON_HOLD_S."""
+        return (self._idle_seen_at is not None
+                and time.monotonic() - self._idle_seen_at <= config.IDLE_PERSON_HOLD_S)
+
+    # ---- status the rest of the system reads -------------------------------
+    @property
+    def locked(self) -> bool:
+        return self.mode == TRACK
+
+    @property
+    def centred(self) -> int:
+        """Consecutive centred detections toward the lock (ACQUIRE_DETECTIONS once locked)."""
+        if self.mode == TRACK:
+            return config.ACQUIRE_DETECTIONS
+        return self._confirmations if self.mode == CENTRE else 0
 
     @property
     def acquire_stalled(self) -> bool:
@@ -66,9 +130,10 @@ class Tracker:
         return (not self.locked and
                 time.monotonic() - self._acquiring_since > config.ACQUIRE_STALLED_S)
 
-    def _update_lock(self, now: float, have_fix: bool, pan_target: float,
-                     tilt_target: float | None, centred_person: bool) -> None:
-        if self.locked:
+    def _advance(self, now: float, have_fix: bool, pan_target: float,
+                 tilt_target: float | None, saw_person: bool, centred_person: bool) -> None:
+        """SEARCH → CENTRE → TRACK."""
+        if self.mode == TRACK:
             return
         on_target = False
         if have_fix:
@@ -83,14 +148,25 @@ class Tracker:
         if not on_target:
             self._settled_since = None
             self._confirmations = 0
-            return
-        if self._settled_since is None:
+        elif self._settled_since is None:
             self._settled_since = now
-        if centred_person:
-            self._confirmations += 1
-        if (now - self._settled_since >= config.ACQUIRE_SETTLE_S
-                and self._confirmations >= config.ACQUIRE_DETECTIONS):
-            self.locked = True
+
+        if self.mode == SEARCH:
+            settled = (self._settled_since is not None
+                       and now - self._settled_since >= config.ACQUIRE_SETTLE_S)
+            if not (saw_person and settled):
+                return
+            self.mode = CENTRE               # this detection counts toward the lock
+
+        if saw_person:
+            self._centre_seen_at = now
+            self._confirmations = (self._confirmations + 1
+                                   if centred_person and on_target else 0)
+            if self._confirmations >= config.ACQUIRE_DETECTIONS:
+                self.mode = TRACK
+        elif now - self._centre_seen_at > config.CENTRE_TIMEOUT_S:
+            self.mode = SEARCH
+            self._confirmations = 0
 
     def step(self) -> None:
         """One 20 Hz iteration. Commands the PTZ base directly."""
@@ -168,7 +244,7 @@ class Tracker:
             max_tilt = config.TILT_MAX_DPS * dt
             self.ptz.set_tilt(self.ptz.tilt_deg + _clamp(tilt_target - self.ptz.tilt_deg,
                                                          -max_tilt, max_tilt))
-        self._update_lock(now, have_fix, target, tilt_target, centred_person)
+        self._advance(now, have_fix, target, tilt_target, saw_person, centred_person)
 
     @staticmethod
     def _aim_tilt(elev_rad: float, dist_m: float) -> float:

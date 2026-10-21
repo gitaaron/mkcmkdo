@@ -265,36 +265,94 @@ def mechanical_layout():
 # 3. State machine
 # ----------------------------------------------------------------------------
 def state_machine():
-    fig, ax = new_fig(10.5, 5.2, "Camera state machine · LED colours")
-    states = [
-        (1.6, 2.6, "OFF", GREY, "LED off"),
-        (4.4, 2.6, "IDLE", BLUE, "on, not tracking\nLED solid blue"),
-        (7.2, 2.6, "TRACKING", GREEN, "following subject\nLED solid green"),
-        (9.4, 2.6, "RECORDING", RED, "tracking + saving\nLED pulsing red"),
-    ]
-    for x, y, name, c, sub in states:
-        ax.add_patch(Circle((x, y), 0.78, fc="white", ec=c, lw=3))
-        ax.text(x, y + 0.1, name, ha="center", fontsize=10, fontweight="bold", color=c)
-        ax.text(x, y - 1.15, sub, ha="center", fontsize=8.5, color=INK)
+    # Same layout as the camera-only build's diagram: the states are the same.
+    # SEARCH differs: the tag gives the location at once, so it is a turn to
+    # the ranged position rather than a sweep.
+    fig, ax = new_fig(16.5, 8.4, "Camera state machine · LED colours")
+    y = 3.3
+    R = 0.66
 
-    def edge(x1, x2, label, rad, ytxt):
-        ax.annotate("", xy=(x2, 2.6 + (0.55 if rad < 0 else -0.55)),
-                    xytext=(x1, 2.6 + (0.55 if rad < 0 else -0.55)),
-                    arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.5,
-                                    connectionstyle=f"arc3,rad={rad}"))
-        ax.text((x1 + x2) / 2, ytxt, label, ha="center", fontsize=8.5, color=INK,
-                bbox=dict(fc="white", ec="none", pad=1))
+    def node(x, name, c, r=R, fs=9.5):
+        ax.add_patch(Circle((x, y), r, fc="white", ec=c, lw=3, zorder=3))
+        ax.text(x, y, name, ha="center", va="center", fontsize=fs, fontweight="bold",
+                color=c, zorder=4)
 
-    ax.text(4.4, 0.75, "sub-states: person in frame /\nno person in frame", ha="center",
-            fontsize=8.5, color=BLUE)
-    edge(1.6, 4.4, "power on", -0.35, 4.05)
-    edge(4.4, 1.6, "turn off", -0.55, 0.9)
-    edge(4.4, 7.2, "start tracking", -0.35, 4.05)
-    edge(7.2, 4.4, "stop tracking / lost tag", -0.5, 1.25)
-    edge(7.2, 9.4, "start recording", -0.45, 4.15)
-    edge(9.4, 7.2, "stop recording", -0.5, 1.5)
-    ax.text(5.25, 0.25, "\"turn off\" is available from every powered state", fontsize=8.5,
-            color=GREY, ha="center")
+    def link(p1, p2, label="", rad=0.0, color=INK, ls="-", lofs=(0, 0), fs=8.5, ha="center", va="center"):
+        ax.annotate("", xy=p2, xytext=p1, zorder=2,
+                    arrowprops=dict(arrowstyle="-|>", color=color, lw=1.5, ls=ls,
+                                    connectionstyle=f"arc3,rad={rad}",
+                                    shrinkA=0, shrinkB=0))
+        if label:
+            ax.text(lofs[0], lofs[1], label, ha=ha, va=va, fontsize=fs, color=color, zorder=5,
+                    bbox=dict(fc="white", ec="none", pad=1.2))
+
+    # tracking container
+    ax.add_patch(FancyBboxPatch((5.75, 1.45), 7.55, 3.45, boxstyle="round,pad=0.08",
+                                fc="#f2fbf5", ec=GREEN, lw=2, ls="--", zorder=1))
+    ax.text(5.95, 4.62, "TRACKING", fontsize=11, fontweight="bold", color=GREEN, ha="left", va="center")
+
+    # idle container: two sub-states
+    yp = 5.55                                   # "person in frame" row
+    ax.add_patch(FancyBboxPatch((2.55, 2.45), 1.7, 4.15, boxstyle="round,pad=0.08",
+                                fc="#f2f6ff", ec=BLUE, lw=2, ls="--", zorder=1))
+    ax.text(2.7, 6.38, "IDLE", fontsize=11, fontweight="bold", color=BLUE, ha="left", va="center")
+
+    xs = dict(off=1.0, idle=3.4, search=7.1, centre=9.7, lock=12.3, rec=15.3)
+    node(xs["off"], "OFF", GREY)
+    node(xs["idle"], "no person\nin frame", BLUE, fs=8)
+    ax.add_patch(Circle((xs["idle"], yp), R, fc="white", ec=BLUE, lw=3, zorder=3))
+    ax.text(xs["idle"], yp, "person\nin frame", ha="center", va="center", fontsize=8,
+            fontweight="bold", color=BLUE, zorder=4)
+    link((xs["idle"] - 0.25, y + R), (xs["idle"] - 0.25, yp - R), "")
+    link((xs["idle"] + 0.25, yp - R), (xs["idle"] + 0.25, y + R), "")
+    ax.text(xs["idle"] - 0.32, (y + yp) / 2, "seen", fontsize=8, ha="right", va="center", color=INK)
+    ax.text(xs["idle"] + 0.32, (y + yp) / 2, "none\n4 s", fontsize=8, ha="left", va="center", color=INK)
+    node(xs["search"], "SEARCH", GREEN, fs=9)
+    node(xs["centre"], "CENTRE", GREEN, fs=9)
+    node(xs["lock"], "LOCKED", GREEN, fs=9)
+    node(xs["rec"], "RECORDING", RED, r=0.82, fs=8.5)
+
+    # main path
+    link((xs["off"] + R, y + 0.25), (xs["idle"] - R, y + 0.25), "power\non", lofs=(2.2, y + 0.75))
+    link((xs["idle"] - R, y - 0.25), (xs["off"] + R, y - 0.25), "turn off", lofs=(2.2, y - 0.7))
+    link((xs["idle"] + R, y), (xs["search"] - R, y), "tag on /\nstart tracking", lofs=(5.1, y + 0.55), fs=8)
+    # person already in frame: straight to CENTRE
+    ax.annotate("", xy=(xs["centre"], y + R), xytext=(xs["idle"] + R, yp), zorder=2,
+                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.5, shrinkA=0, shrinkB=0,
+                                connectionstyle="angle,angleA=0,angleB=90,rad=0"))
+    ax.text(6.9, yp + 0.3, "tag on / start tracking — person already in frame: skip SEARCH",
+            fontsize=8.5, ha="center", va="center", color=INK, zorder=5,
+            bbox=dict(fc="white", ec="none", pad=1.2))
+    link((xs["search"] + R, y), (xs["centre"] - R, y), "on target,\nperson seen", lofs=(8.4, y + 0.5))
+    link((xs["centre"] + R, y), (xs["lock"] - R, y), "2 centred\ndetections", lofs=(11.0, y + 0.5))
+    link((xs["lock"] + R, y), (xs["rec"] - 0.82, y), "auto-record\non lock", lofs=(13.8, y + 0.5))
+    # CENTRE lost the person -> turn to the tag again
+    link((xs["centre"] - 0.3, y + R), (xs["search"] + 0.3, y + R), "nobody seen 2 s",
+         rad=0.55, lofs=(8.4, 4.4))
+    # tag lost / stop tracking -> IDLE
+    link((6.4, 1.45), (xs["idle"] + 0.35, y - R + 0.05), "", rad=-0.25, color=GREY, ls="--")
+    ax.text(4.0, 1.12, "tag lost 5 s (switched off)\nor stop tracking → idle", fontsize=8.5,
+            color=GREY, ha="center", va="center", bbox=dict(fc="white", ec="none", pad=1.2))
+    # start recording by hand, before lock-on
+    link((xs["search"] + 0.3, y - R), (xs["rec"] - 0.3, y - 0.8), "", rad=0.32, color=RED, ls="--")
+    ax.text(9.7, 1.95, "Start recording (app button, overrides verification)", fontsize=8.5,
+            color=RED, ha="center", va="center", bbox=dict(fc="white", ec="none", pad=1.2))
+    # stop recording -> tracking
+    link((xs["rec"] + 0.3, y - 0.8), (13.3, 1.7), "", rad=-0.6, color=RED)
+    ax.text(15.3, 1.75, "stop recording\n(keeps tracking)", fontsize=8.5, color=RED, ha="center",
+            va="center", bbox=dict(fc="white", ec="none", pad=1.2))
+
+    # per-state captions
+    cap = [(xs["off"], "LED off"), (xs["idle"], "LED solid blue, parked,\nlens wide, detector 0.5 fps"),
+           (xs["search"], "turn to the tag's\nranged position"),
+           (xs["centre"], "vision trims the aim;\napp beeps per detection"),
+           (xs["lock"], "follow the tag,\nvision trims"),
+           (xs["rec"], "LED pulsing red,\napp chimes")]
+    for x, t in cap:
+        ax.text(x, 0.35, t, ha="center", va="center", fontsize=8.5, color=INK)
+    ax.text(10.0, 0.95, "LED chasing green while searching or centring, solid green once locked",
+            fontsize=8.5, color=GREEN, ha="center", va="center", style="italic")
+    ax.text(1.0, 1.9, "\"turn off\" works\nfrom every state", fontsize=8.5, color=GREY, ha="center")
     save(fig, "state-machine.png")
 
 

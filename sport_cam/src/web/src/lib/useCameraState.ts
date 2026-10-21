@@ -4,7 +4,7 @@ import {
 } from "firebase/firestore";
 import { api, recordingUrl, type CamState, type RecordingMeta, type StateSnapshot } from "./api.js";
 import { cameraKey } from "./cameraKey.js";
-import { chime } from "./chime.js";
+import { beep, chime } from "./chime.js";
 import { firestore } from "./firebase.js";
 
 export interface UploadProgress {
@@ -41,15 +41,25 @@ const store = reactive<CameraStore>({
 });
 
 let lastState: CamState | null = null;   // null until the first snapshot
+let lastCentred = 0;
 let seenAt = 0;
 
-/** Chime on recording start and stop — never on the snapshot that arrives at connect. */
-function announce(next: CamState): void {
-  if (lastState !== null && lastState !== next) {
-    if (next === "recording") chime("start");
-    else if (lastState === "recording") chime("stop");
+/**
+ * A beep for each centred detection while locking on, then a chime on
+ * recording start (and on stop) — never for the snapshot that arrives at
+ * connect. One snapshot can carry several detections, so it beeps once per
+ * step up in `centred`; the chime queues behind the beeps.
+ */
+function announce(next: CamState, centred: number): void {
+  if (lastState !== null) {
+    for (let i = lastCentred; i < centred; i++) beep();
+    if (lastState !== next) {
+      if (next === "recording") chime("start");
+      else if (lastState === "recording") chime("stop");
+    }
   }
   lastState = next;
+  lastCentred = centred;
 }
 
 const ms = (t: Timestamp | null | undefined) => (t ? t.toMillis() : 0);
@@ -61,6 +71,7 @@ async function subscribe(key: string): Promise<void> {
   unsubs = [];
   Object.assign(store, { connected: false, recordings: [], upload: null, lastSaved: null });
   lastState = null;
+  lastCentred = 0;
 
   const db = await firestore();
   const cam = doc(db, "cameras", key);
@@ -69,7 +80,7 @@ async function subscribe(key: string): Promise<void> {
     const d = snap.data();
     store.connected = snap.exists();
     if (!d) return;
-    announce(d.state);
+    announce(d.state, d.telemetry?.centred ?? 0);
     seenAt = ms(d.deviceSeenAt);
     Object.assign(store, {
       mode: d.mode,

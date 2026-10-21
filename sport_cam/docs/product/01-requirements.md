@@ -83,24 +83,27 @@ library. Deviations (dropouts, loss, manual control): <!--both-->[with UWB](#sta
    once the climber walks into view.
 2. **Start.** State `tracking`, phase `acquiring` (green light chasing round
    the ring).
+   The climber is already in frame, so tracking starts in **centre** and
+   skips **search**.
    - **With UWB**: the climber switches the tag on. The camera ranges
      continuously, including in idle, and detects the tag within ≈ 1 s; the
-     head turns to the ranged position. App: "Acquiring subject…".
+     head turns to the ranged position. App: "Acquiring subject…". (With
+     nobody in frame, search is that same turn: the location is known at
+     once, so there is no sweep.)
    - **Without UWB**: the user taps **Track & record** (app or the camera's
-     local page). App: "Looking for a person…". The climber is already in
-     frame, so there is no sweep: the head turns straight to them. (With
-     nobody in frame it first sweeps ±80° at 25°/s, zoomed wide, stepping
-     between two tilt rows at each end, until a person is detected.)
-3. **Lock on.** Solid green.
-   - **With UWB**: the aim settles on the ranged position **and** the person
-     detector sees a person near frame centre. Ranging alone never starts a
-     recording.
-   - **Without UWB**: two consecutive detections with the person near frame
-     centre. The first person found is kept; afterwards the tracker follows
-     the detection nearest the last position, so a passing bystander
-     doesn't take the lock.
-4. **Record.** State `recording` (pulsing red, app chime), automatically on
-   the first lock. Pan and tilt keep the climber centred; zoom holds them at
+     local page). App: "Looking for a person…". The head turns straight to
+     the climber. (With nobody in frame, search first sweeps ±80° at 25°/s,
+     zoomed wide, stepping between two tilt rows at each end, until a
+     person is detected.)
+3. **Lock on.** Two consecutive detections with the person near frame
+   centre; the app beeps once for each. Solid green.
+   - **With UWB**: both with the head on the ranged position. Ranging alone
+     never starts a recording.
+   - **Without UWB**: the first person found is kept; afterwards the tracker
+     follows the detection nearest the last position, so a passing
+     bystander doesn't take the lock.
+4. **Record.** State `recording` (pulsing red; the app chimes after the
+   beeps), automatically on the first lock. Pan and tilt keep the climber centred; zoom holds them at
    ≈ 65 % of the frame. H.264 is written on the Pi.
 5. **End.** The clip is saved, the app chimes, state `idle`.
    - **With UWB**: the climber switches the tag off; the session ends 5 s
@@ -140,6 +143,18 @@ Rules:
   detection until 4 s (`IDLE_PERSON_HOLD_S`) pass without one; otherwise
   **no person in frame**. Telemetry `phase`: `person-in-frame` /
   `no-person-in-frame`.
+- `tracking` acquires in three steps, the same in both builds:
+  1. **Search** — get the subject into frame. With UWB the location is
+     known at once, so the head turns to the ranged position; without UWB
+     it sweeps the room.
+  2. **Centre** — pan and tilt to put the person at frame centre. Two
+     consecutive centred detections (`ACQUIRE_DETECTIONS`) lock on; the app
+     beeps once per centred detection.
+  3. **Track** — locked on (phase `acquired`).
+
+  From **person in frame**, tracking starts at centre and skips search. If
+  nobody is seen there for 2 s (`CENTRE_TIMEOUT_S`), it falls back to
+  search.
 - `recording` implies `tracking`. **Stop recording** → `tracking`. **Stop
   tracking** while recording stops both (confirmed in the app).
 - Subject missing > 2 s in `tracking`: hold position, LED flashes at 2 Hz.
@@ -188,9 +203,6 @@ Deviations from the [ideal path](#ideal-path):
   available. A session stopped from the app stays stopped until the tag has
   been off for 5 s and comes back on.
 - `AUTO_SESSION = False` disables tag-driven sessions.
-- The `idle` sub-state (person in frame / no person in frame) is reported to
-  the app only. The tag starts and steers a session; there is no sweep to
-  skip.
 
 Implementation: [`src/with_uwb/device/sportcam/session.py`](../../src/with_uwb/device/sportcam/session.py).
 
@@ -220,9 +232,6 @@ centred directly.
 
 Deviations from the [ideal path](#ideal-path):
 
-- `idle` → `tracking`: from **no person in frame** to search (sweep); from
-  **person in frame** to centre, skipping the sweep. A person seen in idle
-  but not seen again within 2 s (`CENTRE_TIMEOUT_S`): search.
 - Nobody found in 15 s: the app reports it.
 - Person missing 2 s in `tracking`: hold, LED flashes at 2 Hz. Missing 6 s:
   sweep again, toward the last direction of travel; recording continues.

@@ -59,6 +59,7 @@ class Head:
         self._rec_path = ""
         self._rec_started = 0.0
         self._warned = ""          # which warning we last announced
+        self._centred_sent = 0     # tracker.centred as last sent to the app
 
     # convenience for local_api/telemetry — pan and tilt are commanded angles
     @property
@@ -164,6 +165,7 @@ class Head:
         """One 20 Hz tick: watch (idle) / search / track, and advance the session."""
         if self.state in ("tracking", "recording"):
             self.tracker.step()
+            await self.announce_centred()
             self.led.lost = self.tracker.lost_for() > config.LOST_HOLD_S
         else:
             if self.state == "idle":
@@ -241,23 +243,38 @@ class Head:
                     await self.cloud.preview(jpg)   # and, while watched, the app anywhere
             await asyncio.sleep(max(0.0, period - (time.monotonic() - t0)))
 
+    def telemetry(self) -> dict:
+        return {
+            "pan": round(self.ptz.pan_deg, 1),
+            "tilt": round(self.ptz.tilt_deg, 1),
+            "zoomMm": round(self.ptz.zoom_mm, 1),
+            "dist": round(self.tracker.dist_m, 2) if self.tracker.dist_m else None,
+            "phase": self.phase,
+            "centred": self.tracker.centred if self.state in ("tracking", "recording") else 0,
+            "acquireStalled": self.acquire_stalled,
+            **self.power.telemetry(),
+            **self.storage.telemetry(),
+        }
+
+    async def send_telemetry(self) -> None:
+        await self.cloud.telemetry({"type": "telemetry", **self.telemetry()})
+        await self.local.broadcast(self.local.state_payload())
+
+    async def announce_centred(self) -> None:
+        """Each centred detection goes to the app at once, so it can beep for it.
+
+        The app beeps once per step up in `centred`, then chimes when
+        recording starts. Telemetry otherwise goes out once a second, which
+        would merge the detections (about three a second).
+        """
+        if self.tracker.centred != self._centred_sent:
+            self._centred_sent = self.tracker.centred
+            await self.send_telemetry()
+
     async def telemetry_loop(self) -> None:
         while True:
-            payload = {
-                "type": "telemetry",
-                "pan": round(self.ptz.pan_deg, 1),
-                "tilt": round(self.ptz.tilt_deg, 1),
-                "zoomMm": round(self.ptz.zoom_mm, 1),
-                "dist": round(self.tracker.dist_m, 2) if self.tracker.dist_m else None,
-                "phase": self.phase,
-                "acquireStalled": self.acquire_stalled,
-                **self.power.telemetry(),
-                **self.storage.telemetry(),
-            }
-            await self.cloud.telemetry(payload)
-            await self.local.broadcast(self.local.state_payload())
+            await self.send_telemetry()
             await asyncio.sleep(1.0)
-
 
 if __name__ == "__main__":
     head = Head()
