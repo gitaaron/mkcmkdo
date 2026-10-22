@@ -16,8 +16,10 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sportcam import config
+from sportcam.bearingcal import bearing_stats
 from sportcam.rangecal import biases as rangecal_biases, expected_ranges
-from sportcam.uwb import UwbArray, parse_mc, solve_elevation
+from sportcam import uwb as uwb_mod
+from sportcam.uwb import UwbArray, _KalmanAngle, parse_mc, solve_elevation
 
 failures: list[str] = []
 
@@ -196,6 +198,39 @@ def main() -> None:
     fixed = math.degrees(solve_elevation(*[r - g for r, g in zip(r_b, got)], b, back, up))
     check("uncorrected bias skews elevation by degrees", abs(off) > 5.0, f"{off:.1f}")
     check("corrected, a level tag reads level", abs(fixed) < 3.0, f"{fixed:.1f}")
+
+    # ---- 7. bearing noise (bearingcal) -------------------------------------
+    # It must recover a known wander: σ 7°, τ 0.35 s, sampled at 20 Hz.
+    dt, tau, sigma = 0.05, 0.35, 7.0
+    k = math.exp(-dt / tau)
+    rnd, e, series = random.Random(3), 0.0, []
+    for _ in range(4000):
+        e = k * e + sigma * math.sqrt(1 - k * k) * rnd.gauss(0, 1)
+        series.append(2.0 + e)
+    m, s_got, t_got = bearing_stats(series, dt)
+    check("bearingcal recovers the mean, σ and τ",
+          abs(m - 2.0) < 1.0 and abs(s_got - sigma) < 1.0 and abs(t_got - tau) < 0.1,
+          f"{m:.1f} {s_got:.1f} {t_got:.2f}")
+
+    # And config.py's assumed values must match what the Kalman filter does to
+    # the raw bearing noise at this baseline, for a tag standing still.
+    clock = [0.0]
+    real = uwb_mod.time.monotonic
+    uwb_mod.time.monotonic = lambda: clock[0]
+    try:
+        kf = _KalmanAngle(b)
+        raw = math.sqrt(2.0) * config.UWB_RANGE_SIGMA_M / b
+        out = []
+        for _ in range(6000):
+            clock[0] += 1.0 / config.UWB_RATE_HZ
+            out.append(math.degrees(kf.update(rnd.gauss(0, raw))))
+    finally:
+        uwb_mod.time.monotonic = real
+    _, s_kf, t_kf = bearing_stats(out[200:], 1.0 / config.UWB_RATE_HZ)
+    check("the filtered bearing's σ is within TAG_BEARING_SIGMA_DEG",
+          s_kf <= config.TAG_BEARING_SIGMA_DEG, f"{s_kf:.1f}°")
+    check("…and its τ is close to TAG_BEARING_CORR_S",
+          abs(t_kf - config.TAG_BEARING_CORR_S) < 0.1, f"{t_kf:.2f} s")
 
     print()
     if failures:

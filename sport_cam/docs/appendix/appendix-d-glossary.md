@@ -19,11 +19,12 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | **I2C** | the two-wire bus the Pi uses to talk to the PTZ controller and the gauge |
 | **Kalman filter** | a smoothing filter that averages noisy measurements while still following real movement |
 | **Level shifter** | the 74AHCT125 chip that lifts the Pi's 3.3 V data signal to the 5 V the LED ring needs |
-| **Found** | the second sub-state of `tracking`: a person is in frame and the camera follows and frames them as it will while recording. The ring fills with green over 3 s and the app beeps each second; still in frame at the end, recording starts |
+| **Found** | the second sub-state of `tracking`: a person is in frame (with UWB, the person where the tag is) and the camera follows and frames them as it will while recording. The ring fills with green over 3 s and the app beeps each second; still in frame at the end, recording starts |
 | **mDNS / Bonjour** | how a phone finds the camera on the local Wi-Fi by name (`sportcam.local`) without knowing its IP address |
 | **MJPEG** | video sent as a stream of JPEG pictures; the camera's direct live view to phones on its Wi-Fi |
+| **Person boxes** | the boxes the players draw over a recording round each person the camera detected: green the climber, yellow anyone else, red while it can't tell which is the climber. Saved beside the clip as `<clip>.boxes.json` ([08](../design/08-recordings-and-cloud.md#person-boxes)) |
 | **PD (USB Power Delivery)** | the part of USB-C that lets a bank supply more than 5 V. The **PD trigger** board asks the bank for 12 V |
-| **Person in frame / no person in frame** | the two sub-states of `idle`: whether the person detector has seen someone in the last 4 s. Starting a session with a person in frame skips search and goes straight to found. With a person in frame the ring breathes slowly ([01](../product/01-requirements.md#state-machine)) |
+| **Person in frame / no person in frame** | the two sub-states of `idle`: whether the person detector has seen someone in the last 4 s. Without UWB, starting a session with a person in frame skips search and goes straight to found; with UWB it never does, as only the tag can say who they are. With a person in frame the ring breathes slowly ([01](../product/01-requirements.md#state-machine)) |
 | **PETG** | the filament every structural part is printed in |
 | **PTZ** | pan, tilt and zoom. The **PTZ base** is the bought Arducam camera assembly; the **PTZ controller** is its board that drives the servos and lens motors |
 | **Search** | the first sub-state of `tracking`: getting the subject into frame. <!--both-->With UWB the camera turns to the tag; without UWB it sweeps the room<!--/--><!--with_uwb: The camera turns to where the tag is--><!--without_uwb: The camera sweeps the room-->. The ring shows a green light chasing round and the app pings every 3 s |
@@ -43,7 +44,7 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | --- | --- |
 | **A1, A2, A3** | the three anchors: A1 and A2 on the arms either side, A3 on the mast above and behind the lens. The vendor's names for them are A0–A2 |
 | **Anchor** | a UWB radio fixed to the camera head. The tag measures its distance to each one |
-| **Baseline** | the distance between two anchors: 250 mm side to side, and 250 mm up to A3. A longer baseline gives steadier angles |
+| **Baseline** | the distance between two anchors: 400 mm side to side, and 250 mm up to A3. A longer baseline gives steadier angles |
 | **Bearing (θ)** | the subject's angle left or right of straight ahead, worked out from the A1 and A2 distances |
 | **Boresight** | the line straight out of the lens with pan and tilt centred; calibration tapes the tag on it |
 | **DS-TWR** | double-sided two-way ranging: how two UWB radios measure the distance between them by timing messages back and forth |
@@ -53,5 +54,6 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | **Range bias** | how far an anchor's ranges read long or short; measured once with `rangecal` and subtracted |
 | **RTLS firmware** | the vendor's `RTLS_Anchor` / `RTLS_Tag` sketches, which range to every anchor and send all the distances in one frame. The other pair, `RangingAnchor` / `RangingTag`, doesn't work with SportCam |
 | **Tag** | the UWB radio the subject wears, plugged into a small USB bank. Switching it on starts a session |
+| **Tag wearer match** | how the camera tells the person wearing the tag from anyone else in frame: their bearing and distance must agree with the tag's, and beside someone else they must be the nearer to the tag on average ([05](../../with_uwb/docs/design/05-tracking-system.md#telling-the-tag-wearer-from-everyone-else)) |
 | **ULA1** | Haorutech's UWB module (an ESP32 plus a DWM1000), used for the three anchors and the tag |
 | **UWB** | ultra-wideband radio. It measures distance to about 10 cm, through clothing and bodies |

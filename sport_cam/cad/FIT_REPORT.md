@@ -28,19 +28,19 @@ Enclosure Ø141 × 84 mm (floor to lid). Power boards on the floor up to z = 26;
 | ✅ | The Arducam base plate sits on the lid | plate diagonal 79 mm on a Ø141 lid |
 | ✅ | The ribbon and servo leads fit through the lid | opening Ø34, bundle Ø20 |
 | ✅ | The battery tray (sized to the bank) prints in one piece | tray 155 × 77 mm |
-| ✅ | The anchor boards' USB plugs have room for the extension cables | boards turned across the arms, plug towards −X: 12 mm between plug and arm root is too short for the 40 mm socket end, so it runs off to the side |
+| ✅ | The anchor boards' USB plugs have room for the extension cables | 78 mm between plug and arm root |
 | ✅ | The anchor USB cables have a way into the enclosure, and room to plug into the Pi | slot 18×10 mm at 25°, z = 71, behind the Pi's USB ports; 30 mm kept clear beyond them for the plugs |
 | ✅ | The ULA1 hole pattern is inside the board | 32×17 on 40×25 |
 | ✅ | The mast dowel can be cut from the stock length | cut to 246 mm from 914 mm |
 | ✅ | The wearable pod holds the tag plugged straight into its bank | tag in line with the bank: pod 142 × 31 mm (limit 150) |
-| ✅ | Device config matches the geometry | LED_COUNT = 16, UWB_BASELINE_M = 0.25, UWB_A3_BACK_M = 0.089, UWB_A3_UP_M = 0.250 |
+| ✅ | Device config matches the geometry | LED_COUNT = 16, UWB_BASELINE_M = 0.4, UWB_A3_BACK_M = 0.089, UWB_A3_UP_M = 0.250 |
 | ✅ | STLs are rendered from the current CAD and part sizes |  |
-| ✅ | anchor_arm.stl prints in one piece on the Bambu Lab A1 Mini | 69 × 40 × 24 mm |
+| ✅ | anchor_arm.stl prints in one piece on the Bambu Lab A1 Mini | 142 × 28 × 24 mm |
 | ✅ | base_housing.stl prints in one piece on the Bambu Lab A1 Mini | 147 × 149 × 84 mm |
 | ✅ | battery_tray.stl prints in one piece on the Bambu Lab A1 Mini | 155 × 77 × 12 mm |
 | ✅ | led_diffuser_ring.stl prints in one piece on the Bambu Lab A1 Mini | 145 × 145 × 16 mm |
 | ✅ | lid.stl prints in one piece on the Bambu Lab A1 Mini | 141 × 141 × 11 mm |
-| ✅ | mast_cradle.stl prints in one piece on the Bambu Lab A1 Mini | 52 × 25 × 38 mm |
+| ✅ | mast_cradle.stl prints in one piece on the Bambu Lab A1 Mini | 25 × 52 × 38 mm |
 | ✅ | mast_foot.stl prints in one piece on the Bambu Lab A1 Mini | 21 × 25 × 44 mm |
 | ✅ | shelf.stl prints in one piece on the Bambu Lab A1 Mini | 132 × 117 × 3 mm |
 | ✅ | wearable_case.stl prints in one piece on the Bambu Lab A1 Mini | 142 × 74 × 31 mm |

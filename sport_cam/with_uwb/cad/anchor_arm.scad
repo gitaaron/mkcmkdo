@@ -1,5 +1,5 @@
 // Static UWB anchor arm (×2). Bolts to the enclosure's side boss and reaches
-// out so the board centre sits uwb_half_base from the pan axis — 250 mm
+// out so the board centre sits uwb_half_base from the pan axis — 400 mm
 // between the two antennas by default.
 //
 // The arms no longer rotate with the camera, so they can be longer than the

@@ -3,7 +3,8 @@
 Three layers, none of which needs a Pi:
 
   1. AutoSession's rules, on a synthetic clock;
-  2. the tracker's search / found rules, against the fakes from test_tracker;
+  2. the tracker's search / found rules, against the fakes from test_tracker,
+     including picking the tag wearer out from other people;
   3. the whole flow through Head.control_tick(), with fake hardware, which
      is what the LED and the app actually see.
 
@@ -12,8 +13,10 @@ Three layers, none of which needs a Pi:
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 import os
+import random
 import sys
 import time
 
@@ -105,14 +108,143 @@ def session_rules() -> None:
     config.AUTO_SESSION = True
 
 
-def run_tracker(tr: Tracker, seconds: float, until=None) -> float:
+def run_tracker(tr: Tracker, seconds: float, until=None, period=0.005) -> float:
     t0 = time.monotonic()
     while time.monotonic() - t0 < seconds:
         tr.step()
         if until and until():
             break
-        time.sleep(0.005)
+        time.sleep(period)
     return time.monotonic() - t0
+
+
+class People(FakeCamera):
+    """People at real bearings and distances, boxed as the lens would see them.
+
+    Each person is (bearing_deg, dist_m). The boxes follow the head's pan and
+    zoom, so a person only sits where the tag says if they are the tag wearer.
+    """
+
+    def __init__(self, ptz, people):
+        super().__init__(None)
+        self.ptz, self.people = ptz, list(people)
+
+    def boxes(self):
+        pw, ph = config.PREVIEW_SIZE
+        half_w = pw / 2
+        half_fov = math.radians(self.ptz.hfov_deg / 2)
+        out = []
+        for deg, dist in self.people:
+            off = math.radians(deg - self.ptz.pan_deg)
+            if abs(off) >= half_fov:
+                continue
+            cx = half_w + half_w * math.tan(off) / math.tan(half_fov)
+            body = config.SUBJECT_HEIGHT_M * self.ptz.zoom_mm / (config.SENSOR_H_MM * dist) * ph
+            h = int(body / config.PERSON_IN_BOX_H)
+            w = int(h * 0.4)
+            out.append((int(cx - w / 2), ph // 2 - h // 2, w, h))
+        return out
+
+    def person_boxes(self):
+        _, fresh = self.person_bbox()
+        return self.boxes(), fresh
+
+
+class NoisyUwb(FakeUwb):
+    """A tag with the filtered bearing's noise (TAG_BEARING_SIGMA_DEG RMS).
+
+    Filtered, so it wanders rather than jumps: an Ornstein–Uhlenbeck process
+    with a TAG_BEARING_CORR_S correlation time, stepped at the radio's 20 Hz
+    on the real clock and held in between.
+    """
+
+    def __init__(self, theta_deg, dist, sigma_deg=None, seed=1):
+        super().__init__(theta_deg=theta_deg, dist=dist)
+        self.theta = theta_deg
+        self.sigma = config.TAG_BEARING_SIGMA_DEG if sigma_deg is None else sigma_deg
+        self.rng = random.Random(seed)
+        self.err, self.at = 0.0, time.monotonic()
+
+    def fix(self):
+        period = 1.0 / config.UWB_RATE_HZ
+        k = math.exp(-period / config.TAG_BEARING_CORR_S)
+        while time.monotonic() - self.at >= period:
+            self.at += period
+            self.err = k * self.err + self.sigma * math.sqrt(1 - k * k) * self.rng.gauss(0, 1)
+        self.fix_value.theta_rad = math.radians(self.theta + self.err)
+        return self.fix_value
+
+
+def labels_seen(tr: Tracker) -> set[str]:
+    """Every box label the tracker gives from now on, collected as it steps."""
+    seen: set[str] = set()
+    step = tr.step
+
+    def labelled_step() -> None:
+        step()
+        seen.update(label for _, label in tr.labelled)
+    tr.step = labelled_step
+    return seen
+
+
+def tag_wearer() -> None:
+    print("\ntag wearer, not just a person")
+    config.ACQUIRE_SETTLE_S = 0.1
+
+    ptz = FakePtz()
+    tr = Tracker(FakeUwb(theta_deg=0.0, dist=10.0), People(ptz, [(16.0, 10.0)]), ptz)
+    labels = labels_seen(tr)
+    run_tracker(tr, 1.5)
+    check("someone well off the tag's bearing is never found", tr.mode == "search", tr.mode)
+    check("…and moves nothing: no pan bias", tr._pan_bias == 0.0, f"{tr._pan_bias:.2f}")
+    check("…and is boxed yellow: not the climber", labels == {"other"}, f"{labels}")
+
+    ptz = FakePtz()
+    tr = Tracker(FakeUwb(theta_deg=0.0, dist=10.0), People(ptz, [(0.0, 3.0)]), ptz)
+    labels = labels_seen(tr)
+    run_tracker(tr, 1.5)
+    check("someone on the tag's bearing but far nearer the lens is never found",
+          tr.mode == "search", tr.mode)
+    check("…and is boxed yellow too", labels == {"other"}, f"{labels}")
+
+    ptz = FakePtz()
+    tr = Tracker(FakeUwb(theta_deg=0.0, dist=10.0),
+                 People(ptz, [(25.0, 10.0), (0.0, 10.0), (-30.0, 6.0)]), ptz)
+    run_tracker(tr, 2.0, until=lambda: tr.mode == "found")
+    check("the wearer among bystanders is found", tr.mode == "found"
+          and abs(tr._chosen.deg) < 1.0, tr.mode)
+    check("…boxed green, and anyone else in view yellow",
+          [lab for _, lab in tr.labelled].count("climber") == 1
+          and set(lab for _, lab in tr.labelled) <= {"climber", "other"}
+          and abs(tr._box_deg(next(b for b, lab in tr.labelled if lab == "climber"))) < 1.0,
+          f"{tr.labelled}")
+
+    # A belayer beside the climber, with the real bearing noise, at the real
+    # 20 Hz loop rate. 14° is 2.5 m at 10 m; closer pairs take longer (≈ 17 s
+    # at 1.5 m) and are covered by the sweep in 05, too slow for this file.
+    wrong, slow = [], []
+    for seed in (4, 7):
+        ptz = FakePtz()
+        tr = Tracker(NoisyUwb(0.0, 10.0, seed=seed), People(ptz, [(0.0, 10.0), (14.0, 9.5)]), ptz)
+        run_tracker(tr, 20.0, until=lambda: tr.ready_to_record, period=0.05)
+        if not tr.ready_to_record:
+            slow.append(seed)
+        elif abs(tr._chosen.deg) > 1.0:
+            wrong.append(seed)
+    check("climber with a belayer beside them: records the climber", not wrong, f"seeds {wrong}")
+    check("…decided within 20 s", not slow, f"seeds {slow}")
+
+    ptz = FakePtz()
+    tr = Tracker(NoisyUwb(0.0, 10.0), People(ptz, [(-1.0, 10.0), (1.0, 10.0)]), ptz)
+    run_tracker(tr, 6.0, until=lambda: tr.ready_to_record, period=0.05)
+    check("two people too close to tell apart: never records", not tr.ready_to_record,
+          tr.mode)
+    check("…the countdown holds at 1 rather than starting over",
+          tr.mode != "found" or tr.countdown == 1, f"{tr.mode} {tr.countdown}")
+    check("…and the pan bias stands still while they are told apart",
+          tr._pan_bias == 0.0, f"{tr._pan_bias:.2f}")
+    check("…and both are boxed red: it cannot tell which is the climber",
+          [lab for _, lab in tr.labelled] == ["unsure", "unsure"], f"{tr.labelled}")
 
 
 def tracker_found() -> None:
@@ -121,8 +253,7 @@ def tracker_found() -> None:
     config.ACQUIRE_SETTLE_S = 0.1
     config.ACQUIRE_STALLED_S = 0.6
     pw, ph = config.PREVIEW_SIZE
-    centred = (pw // 2 - 50, ph // 2 - 100, 100, 200)
-    off_centre = (int(pw * 0.8), ph // 2 - 100, 100, 200)
+    centred = (pw // 2 - 50, ph // 2 - 150, 100, 300)   # a 1.8 m body at 10 m
 
     ptz = FakePtz()
     tr = Tracker(FakeUwb(theta_deg=40.0), FakeCamera(centred), ptz)
@@ -144,14 +275,15 @@ def tracker_found() -> None:
     check("…and after ACQUIRE_STALLED_S it reports it cannot see anyone",
           tr2.acquire_stalled)
 
-    tr3 = Tracker(FakeUwb(theta_deg=10.0), FakeCamera(off_centre), FakePtz())
+    ptz3 = FakePtz()           # the person stands 6° off where the tag reads: off-centre
+    tr3 = Tracker(FakeUwb(theta_deg=10.0), People(ptz3, [(16.0, 10.0)]), ptz3)
     run_tracker(tr3, 1.5, until=lambda: tr3.ready_to_record)
     check("a person off-centre is still found and recorded (no centring needed)",
           tr3.ready_to_record)
 
-    tr4 = Tracker(FakeUwb(theta_deg=170.0), FakeCamera(centred), FakePtz())
+    tr4 = Tracker(FakeUwb(theta_deg=88.0), FakeCamera(centred), FakePtz())
     run_tracker(tr4, 4.0, until=lambda: tr4.mode == "found")
-    check("subject past the soft limit: found from the limit", tr4.mode == "found")
+    check("subject just past the soft limit: found from the limit", tr4.mode == "found")
 
     tr4.reset_lock()
     check("reset_lock → back to SEARCH", tr4.mode == "search", tr4.mode)
@@ -165,12 +297,15 @@ def tracker_found() -> None:
           tr5.mode == "search" and tr5.countdown == 0, tr5.mode)
 
     cam6 = FakeCamera(centred)
-    tr6 = Tracker(FakeUwb(theta_deg=5.0), cam6, FakePtz())
+    tr6 = Tracker(FakeUwb(theta_deg=0.0), cam6, FakePtz())
     tr6.watch_idle()
     check("idle: a person in frame is noticed", tr6.idle_person_in_frame)
     tr6.reset_lock()
-    check("a session started with a person in frame begins in FOUND",
-          tr6.mode == "found" and not tr6.idle_person_in_frame, tr6.mode)
+    check("a session always starts in SEARCH, even with a person in frame in idle",
+          tr6.mode == "search" and not tr6.idle_person_in_frame, tr6.mode)
+    took = run_tracker(tr6, 2.0, until=lambda: tr6.mode == "found")
+    check("…and is found once settled, when the head already points at the tag",
+          tr6.mode == "found" and took < config.ACQUIRE_SETTLE_S + 0.5, f"{took:.2f}s")
     config.FOUND_CONFIRM_S = confirm_s
 
 
@@ -250,6 +385,7 @@ async def full_flow() -> None:
     print("\nfull flow through Head.control_tick()")
     import sportcam.main as main_mod
     from sportcam.cloud import CloudLink
+    from sportcam.boxlog import BoxLog
     from sportcam.main import Head
 
     async def no_upload(*a, **k):
@@ -265,7 +401,7 @@ async def full_flow() -> None:
     pw, ph = config.PREVIEW_SIZE
     head = Head.__new__(Head)
     head.state = "idle"
-    head.camera = FakeRecCamera((pw // 2 - 50, ph // 2 - 100, 100, 200))
+    head.camera = FakeRecCamera((pw // 2 - 50, ph // 2 - 150, 100, 300))
     head.ptz = FakePtz()
     head.ptz.park = lambda: None
     head.uwb = SwitchableUwb()
@@ -279,6 +415,7 @@ async def full_flow() -> None:
     head.cloud = CloudLink(head)       # not connected: writes are no-ops
     head._rec_path, head._rec_started = "", 0.0
     head._countdown_sent = 0
+    head.boxlog = BoxLog()
 
     countdown_sent: list[int] = []     # what the app hears, in order, to beep on
     send = head.send_telemetry
@@ -312,8 +449,11 @@ async def full_flow() -> None:
     check("…and back to person in frame", head.phase == "person-in-frame", f"{head.phase}")
 
     head.uwb.on_since, head.uwb.off_at = time.monotonic(), None
-    await tick_for(0.25)
-    check("tag on with a person in frame → tracking, found (search skipped), ring fills",
+    await tick_for(0.15)
+    check("tag on with a person in frame → tracking, search (idle cannot say who they are)",
+          head.state == "tracking" and head.phase == "search" and head.led.searching, f"{seen}")
+    await tick_for(config.ACQUIRE_SETTLE_S + 0.4)
+    check("…found once the head is on the tag and vision agrees; ring fills",
           head.state == "tracking" and head.phase == "found" and head.led.found is not None
           and not head.led.searching, f"{seen}")
 
@@ -329,14 +469,18 @@ async def full_flow() -> None:
     await tick_for(1.0)
     check("tag off → back to standby, recording stopped",
           head.state == "idle" and not head.camera.recording, f"{seen}")
+    side = "/tmp/sportcam-test.boxes.json"
+    frames = json.load(open(side))["frames"] if os.path.exists(side) else []
+    check("the clip's person boxes are saved beside it, the climber labelled",
+          any(label == "climber" for _, boxes in frames for *_, label in boxes), f"{frames[:3]}")
 
     order = [s for s, _ in seen]
     dedup = [s for i, s in enumerate(order) if i == 0 or order[i - 1] != s]
     check("states ran idle → tracking → recording → idle",
           dedup == ["idle", "tracking", "recording", "idle"], f"{dedup}")
-    check("idle reports its sub-state; tracking found; recording track",
+    check("idle reports its sub-state; tracking search/found; recording track",
           all(p in ("person-in-frame", "no-person-in-frame") for s, p in seen if s == "idle")
-          and all(p == "found" for s, p in seen if s == "tracking")
+          and all(p in ("search", "found") for s, p in seen if s == "tracking")
           and all(p == "track" for s, p in seen if s == "recording"), f"{seen}")
 
     # --- nobody in frame when the tag goes on: SEARCH, turning to the tag ---------
@@ -376,6 +520,7 @@ def ring_animation() -> None:
 def main() -> None:
     session_rules()
     tracker_found()
+    tag_wearer()
     asyncio.run(full_flow())
     ring_animation()
     print()

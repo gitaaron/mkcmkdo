@@ -178,6 +178,27 @@ python3 -m sportcam.focuscal 30
 After the last run, paste the `FOCUS_GRID = {…}` it prints. Until then,
 focus depends on zoom alone and is soft away from one distance.
 
+**e. Bearing noise (recommended).** When someone stands close beside the
+climber, the camera averages the tag's bearing until it can tell which of
+them is wearing it ([05](../design/05-tracking-system.md#telling-the-tag-wearer-from-everyone-else)).
+How long it averages depends on two numbers that are estimates until you
+measure them: how much the bearing wanders (`TAG_BEARING_SIGMA_DEG`, 7°) and
+how fast (`TAG_BEARING_CORR_S`, 0.35 s). After step a, centre the camera, and
+have someone wear the tag as they will when climbing and stand still 5 m out,
+straight in front of the lens, facing it. Keep everyone else out of the way.
+
+```bash
+python3 -m sportcam.bearingcal 5
+python3 -m sportcam.bearingcal 10        # then again at 10 m
+```
+
+Each run takes a minute and prints the measured σ and τ beside the values in
+`config.py`. Paste the larger σ and the longer τ of the two runs. Higher than
+the defaults means the camera would otherwise decide too soon beside a
+belayer. Lower means it can decide sooner. If it warns that the mean is more
+than 3° off straight ahead, the wearer isn't on the boresight or step a
+needs redoing.
+
 ## 7. Install the services
 
 ```bash
@@ -192,7 +213,7 @@ journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
 | Operation | Command / note |
 | --- | --- |
 | Apply a `config.py` change | `sudo systemctl restart sportcam-head`. Also resets the battery gauge to "full" (step 8): don't restart mid-session on a part-used bank |
-| Before running `rangecal`, `focuscal` or `ptzcheck` | `sudo systemctl stop sportcam-head` (they need exclusive access to the hardware) |
+| Before running `rangecal`, `bearingcal`, `focuscal` or `ptzcheck` | `sudo systemctl stop sportcam-head` (they need exclusive access to the hardware) |
 
 ## 8. Live checks
 
@@ -216,8 +237,10 @@ elevation are right.
    The zoom then settles with you filling about two-thirds of the frame.
    Switch the tag off: 5 s later the ring returns to solid blue and the clip
    is saved. If nothing happens, check `AUTO_SESSION = True` and that ranging
-   works (step 5b). If it keeps chasing and the app says "Can't see you", the
-   camera is pointing somewhere you aren't: recheck steps 1–2.
+   works (step 5b). If it keeps chasing and the app says "Can't pick you out", either
+   someone is standing right beside you (step away: the camera only records
+   the person where the tag is), or the camera is pointing somewhere you
+   aren't: recheck steps 1–2.
 4. **Battery gauge.** Counts energy used since the service started, assuming
    a full bank at that point. Start on a fully charged bank; compare
    minutes-left with a stopwatch over the first 30 min. No app reset control.
@@ -256,6 +279,7 @@ All in `src/with_uwb/device/sportcam/config.py`:
 | `UWB_A3_UP_M`, `UWB_A3_BACK_M` | step 6b, only if the mast differs |
 | `ZOOM_CURVE` | step 6c, by hand |
 | `FOCUS_GRID` | step 6d, `focuscal` |
+| `TAG_BEARING_SIGMA_DEG`, `TAG_BEARING_CORR_S` | step 6e, `bearingcal` |
 | `UWB_THETA_SIGN` | step 8 |
 | `AUTO_SESSION`, the `ACQUIRE_*` and `FOUND_*` settings | defaults are fine; see [05](../design/05-tracking-system.md) to tune |
 | `FIREBASE_PROJECT`, `CAMERA_KEY`, `UPLOAD_API_BASE` | step 4, only with Firebase |

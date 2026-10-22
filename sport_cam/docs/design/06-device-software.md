@@ -31,18 +31,19 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 | `storage.py` | SD free space in minutes of recording; low/critical levels |
 | `focuscal.py` | `python3 -m sportcam.focuscal <metres>`: focus sweep at five focal lengths; prints `FOCUS_GRID` |
 | `uploader.py` | background upload to the backend: progress, retry, boot-time backlog drain ([08](08-recordings-and-cloud.md)) |
+| `boxlog.py` | while recording, the tracker's labelled person boxes from each detection; written beside the clip as `<clip>.boxes.json` and uploaded with it ([08](08-recordings-and-cloud.md#person-boxes)) |
 | `wifi_portal.py` | hotspot and captive setup page when offline ([08](08-recordings-and-cloud.md)) |
 | `local_api.py` | camera-hosted copy of the Firebase API for direct connections ([09](09-direct-connection-and-app.md)) |
 | `discovery.py` | mDNS advertisement, `_sportcam._tcp` |
 | `config.py` | all tunables, including `TRACKING_MODE` (build name, reported to Firebase and phones) and the Firebase settings (`FIREBASE_PROJECT`, `CAMERA_KEY`, `UPLOAD_API_BASE`) |
 | `tracker.py`, `session.py` | present in both builds; build-specific implementations |
-| `uwb.py`, `rangecal.py` | UWB build only |
+| `uwb.py`, `rangecal.py`, `bearingcal.py` | UWB build only |
 
 | Aspect | Detail |
 | --- | --- |
 | Installation | 14 — Software setup, step 3 onward ([with UWB](../../with_uwb/docs/setup/14-software-setup.md), [without UWB](../../without_uwb/docs/setup/14-software-setup.md)). Runs from `/home/pi/sportcam/src/<build>/device` |
 | Privileges | `sportcam-head` runs as an ordinary user (hence SPI for the LED ring; the PWM/DMA driver needs root). `sportcam-wifi` (portal) runs as root |
-| Recording upload | on stop, `main.py` hands the MP4 to `uploader.py` as a background task; tracking and streaming continue. The local copy is deleted after the backend confirms the byte count ([08](08-recordings-and-cloud.md)) |
+| Recording upload | on stop, `main.py` hands the MP4 and its person boxes to `uploader.py` as a background task; tracking and streaming continue. The local copies are deleted after the backend confirms the byte count ([08](08-recordings-and-cloud.md)) |
 
 Live video:
 
@@ -173,9 +174,10 @@ Programs: camera service and wearable tag firmware.
 | Module | Function |
 | --- | --- |
 | `uwb.py` | range parsing (ULA1 frames, or the `dual-serial` sketch), bearing maths, Kalman → (θ, d) |
-| `tracker.py` | SEARCH → FOUND → TRACK state machine and control loops from [05](../../with_uwb/docs/design/05-tracking-system.md): idle person-in-frame watch (`watch_idle()`; a session starts in FOUND when someone is in frame), turn to the ranged position, pan/tilt from ranging, CV bias trims, framing, focus from distance |
+| `tracker.py` | SEARCH → FOUND → TRACK state machine and control loops from [05](../../with_uwb/docs/design/05-tracking-system.md): idle person-in-frame watch (`watch_idle()`, for the LED and app only: a session always starts in SEARCH), turn to the ranged position, the tag-wearer match (`_match_tag()`: only the person where the tag is counts), pan/tilt from ranging, CV bias trims, framing, focus from distance |
 | `session.py` | tag-driven sessions: tag on → tracking (search → found) → recording after 3 s found; tag off → idle ([01](../product/01-requirements.md#state-machine-with-uwb)) |
 | `rangecal.py` | `python3 -m sportcam.rangecal <metres>`: per-anchor range bias and noise with the tag on the boresight; prints `RANGE_BIAS_M` |
+| `bearingcal.py` | `python3 -m sportcam.bearingcal <metres>`: the filtered bearing's noise and correlation time with the wearer standing on the boresight; prints `TAG_BEARING_SIGMA_DEG` and `TAG_BEARING_CORR_S` |
 
 `config.py` additionally holds the anchor geometry and calibration biases.
 
@@ -188,7 +190,7 @@ cd ~/sportcam/src/with_uwb/device && python3 -m sportcam.rangecal 5
 
 ### Vision, with UWB
 
-- `Camera.person_bbox()` returns `(bbox, fresh)`.
+- `Camera.person_boxes()` returns `(boxes, fresh)`: every person the detector sees, so the tracker can pick out the tag wearer. `person_bbox()` returns the largest.
 - The tracker converts the ranged bearing into the pixel column the detector
   searches around.
 - Vision's roles (angle trim, framing, confirming the person before recording) and hold-on-dropout
@@ -197,8 +199,10 @@ cd ~/sportcam/src/with_uwb/device && python3 -m sportcam.rangecal 5
 Tests: `src/with_uwb/device/tests/test_tracker.py` (fresh-only rule, strip
 hint, slew limits, tilt from A3, sign of every vertical correction, framing:
 fill target, edge guard, stale relax); `test_session.py` (SEARCH →
-FOUND → recording after 3 s, idle → FOUND with a person in frame, tag-driven
-sessions, one telemetry push per countdown second, stop recording → idle).
+FOUND → recording after 3 s, always SEARCH first, tag-driven sessions, the
+tag wearer picked out from bystanders, someone nearer the lens and a belayer
+beside them, each box labelled green, yellow or red, one telemetry push per
+countdown second, the boxes saved beside the clip, stop recording → idle).
 
 ### Where ranges come from
 
@@ -217,7 +221,9 @@ or use `dual-serial`.
 
 Tests: `src/with_uwb/device/tests/test_uwb.py` parses the manual's worked
 example; checks the mask, hex scaling, bearing geometry and elevation solve
-(exact to 0.01° across the envelope, including A3's backward offset).
+(exact to 0.01° across the envelope, including A3's backward offset),
+`rangecal`'s bias, and `bearingcal`'s σ and τ, including that the
+`TAG_BEARING_*` defaults match what the Kalman filter does at this baseline.
 
 ### Wearable tag — ULA1 (`src/with_uwb/wearable/`)
 

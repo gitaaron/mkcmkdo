@@ -43,10 +43,9 @@ import math
 import time
 
 from . import config
+from .boxlog import CLIMBER, OTHER, UNSURE, Box
 from .camera import Camera
 from .ptz import Ptz
-
-Box = tuple[int, int, int, int]
 
 SEARCH, FOUND, TRACK = "search", "found", "track"
 
@@ -59,6 +58,10 @@ class Tracker:
         self.confirmed = False             # recording: found people go straight to TRACK
         self._idle_box: Box | None = None  # largest person seen while idle
         self._idle_seen_at: float | None = None
+        # every box of the last fresh detection, labelled for the recording's
+        # overlay (boxlog): climber, other, or unsure
+        self.labelled: list[tuple[Box, str]] = []
+        self.labelled_at: float | None = None
         self.reset_lock()
 
     # ---- session ----------------------------------------------------------
@@ -166,12 +169,18 @@ class Tracker:
 
         if self.mode == SEARCH:
             if boxes:
-                self._first_sighting(now, max(boxes, key=lambda b: b[2] * b[3]))
+                first = max(boxes, key=lambda b: b[2] * b[3])
+                self._first_sighting(now, first)
+                self._label(now, boxes, first)
             else:
+                if fresh:
+                    self._label(now, boxes, None)
                 self._sweep(dt)
             return
 
         matched = self._select(boxes) if boxes else None
+        if fresh:
+            self._label(now, boxes, matched)
         if matched:
             self._seen(now, matched)
         self._relax_zoom_if_stale(now, dt)
@@ -183,6 +192,18 @@ class Tracker:
             self._begin_search(now, direction=self._last_side or self._dir)
         elif self.mode == TRACK and gone > config.RESEARCH_AFTER_S:
             self._begin_search(now, direction=self._last_side or self._dir)
+
+    def _label(self, now: float, boxes: list[Box], followed: Box | None) -> None:
+        """Label a fresh detection's boxes for the recording's overlay.
+
+        Without a tag "the climber" can only mean the person being followed:
+        CLIMBER, and everyone else OTHER. When that person is out of sight
+        and someone else is in frame, the camera cannot tell whether it is
+        them, so every box is UNSURE.
+        """
+        self.labelled_at = now
+        self.labelled = [(b, UNSURE if followed is None else CLIMBER if b == followed else OTHER)
+                         for b in boxes]
 
     # ---- SEARCH ------------------------------------------------------------
     def _sweep(self, dt: float) -> None:

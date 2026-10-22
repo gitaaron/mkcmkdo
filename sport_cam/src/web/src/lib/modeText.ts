@@ -16,7 +16,7 @@ export const MODE_TEXT: Record<TrackingMode, ModeText> = {
   with_uwb: {
     startTracking: "Start tracking",
     searching: "Turning to your tag…",
-    stalled: "Can't see you — step into view, facing the camera",
+    stalled: "Can't pick you out — step into view, away from anyone else",
   },
   without_uwb: {
     startTracking: "Track & record",

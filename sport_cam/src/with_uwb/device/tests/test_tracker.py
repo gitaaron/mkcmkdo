@@ -61,6 +61,10 @@ class FakeCamera:
         self.detections += 1
         return self._bbox, True
 
+    def person_boxes(self):
+        box, fresh = self.person_bbox()
+        return ([box] if box else []), fresh
+
 
 class FakeUwb:
     def __init__(self, theta_deg=0.0, dist=10.0, elev_deg=None):
@@ -187,12 +191,12 @@ def main() -> None:
 
     # ---- 7. vision-only tilt goes the right way ---------------------------
     pw, ph = config.PREVIEW_SIZE
-    low = FakeCamera((pw // 2 - 50, ph // 2 + 60, 100, 200))     # centre well below
+    low = FakeCamera((pw // 2 - 50, ph // 2 - 50, 100, 300))     # centre well below
     ptz8 = FakePtz()
     run(Tracker(FakeUwb(), low, ptz8), 200, 0.005)     # ~1 s: several detections
     check("no A3, subject low in frame → camera tilts down",
           ptz8.tilt_deg < -0.5, f"{ptz8.tilt_deg:.2f} deg")
-    high = FakeCamera((pw // 2 - 50, ph // 2 - 260, 100, 200))   # centre well above
+    high = FakeCamera((pw // 2 - 50, ph // 2 - 310, 100, 300))   # centre well above
     ptz9 = FakePtz()
     run(Tracker(FakeUwb(), high, ptz9), 200, 0.005)
     check("no A3, subject high in frame → camera tilts up",

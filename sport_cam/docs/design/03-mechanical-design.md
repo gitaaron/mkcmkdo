@@ -137,7 +137,7 @@ Additions to the stack:
 | 7 | **UWB anchor arms** | two printed arms on the ±Y wall bosses, each carrying a ULA1 on a USB extension. Extensions enter through a slot high in the wall, behind the Pi's USB ports. **Static:** they don't rotate with the camera ([05](../../with_uwb/docs/design/05-tracking-system.md)) |
 | 8 | **A3 mast** | ½-inch hardwood dowel, 246 mm, in a printed foot on the −X boss behind the lens. A printed cradle holds the third ULA1 **250 mm above A1/A2** (elevation). Out of shot at every tilt angle |
 
-Head envelope: ≈ **30 cm across the arms, 28 cm tall** to the mast top
+Head envelope: ≈ **42 cm across the arms, 28 cm tall** to the mast top
 ([C1](../product/01-requirements.md#non-functional-requirements-with-uwb)).
 
 **Tilt and the mast.** Top frame edge at +85°, full wide: ≈ 27° past
@@ -148,9 +148,12 @@ shot. A taller mast enters the shot; lower `TILT_MAX_DEG` to compensate.
 
 - **Anchor placement:** at the arm ends, antennas level with each other and
   clear of the enclosure. Horizontal baseline sets bearing resolution
-  (250 mm: ≈ 9° RMS filtered; 400 mm: ≈ 7°;
+  (400 mm: ≈ 7° RMS filtered; 250 mm: ≈ 9°;
   [05](../../with_uwb/docs/design/05-tracking-system.md#geometry)). A3 height sets
-  elevation resolution the same way. Minimum 250 mm for both; below that the
+  elevation resolution the same way. The arms give 400 mm, so the camera can
+  tell the climber from a belayer standing close
+  ([05](../../with_uwb/docs/design/05-tracking-system.md#telling-the-tag-wearer-from-everyone-else)).
+  Minimum 250 mm for both; below that the
   noise and the
   [blind corner](../../with_uwb/docs/design/05-tracking-system.md#elevation-from-the-third-anchor)
   grow quickly. Widening: [Appendix A](../appendix/appendix-a-cad-parts.md#with-uwb).

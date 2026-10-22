@@ -55,7 +55,7 @@ class Camera:
         # integrating one measurement over and over.
         self._detect_period = 1.0 / config.DETECT_FPS_TRACKING
         self._detect_at = 0.0
-        self._bbox: tuple[int, int, int, int] | None = None
+        self._boxes: list[tuple[int, int, int, int]] = []
         self._fresh = False
         self._strip_cx: float | None = None      # where UWB thinks the subject is
 
@@ -81,22 +81,29 @@ class Camera:
         return jpg.tobytes() if ok else None
 
     def person_bbox(self) -> tuple[tuple[int, int, int, int] | None, bool]:
-        """Largest detected person → ((x, y, w, h) | None, fresh).
+        """Largest detected person → ((x, y, w, h) | None, fresh)."""
+        boxes, fresh = self.person_boxes()
+        return (max(boxes, key=lambda b: b[2] * b[3]) if boxes else None), fresh
 
-        Rate-limited to `set_detect_fps`. Between detections the previous box
-        comes back with ``fresh=False`` so the caller can tell a new
+    def person_boxes(self) -> tuple[list[tuple[int, int, int, int]], bool]:
+        """Every detected person → ([(x, y, w, h), ...], fresh).
+
+        All of them, not just the largest: the tracker has to pick out the
+        one wearing the tag, and a bystander can be the bigger box.
+        Rate-limited to `set_detect_fps`. Between detections the previous
+        boxes come back with ``fresh=False`` so the caller can tell a new
         measurement from a repeat of the last one.
         """
         if not (self._cam and self._hog):
-            return None, False
+            return [], False
         now = time.monotonic()
         if now - self._detect_at < self._detect_period:
-            return self._bbox, False
+            return self._boxes, False
         self._detect_at = now
-        self._bbox = self._detect()
-        return self._bbox, True
+        self._boxes = self._detect()
+        return self._boxes, True
 
-    def _detect(self) -> tuple[int, int, int, int] | None:
+    def _detect(self) -> list[tuple[int, int, int, int]]:
         rgb = self._cam.capture_array("lores")
         pw, ph = config.PREVIEW_SIZE
 
@@ -111,12 +118,10 @@ class Camera:
         sh = max(1, int(round(rgb.shape[0] * sw / rgb.shape[1])))
         small = cv2.resize(rgb, (sw, sh))
         rects, _ = self._hog.detectMultiScale(small, winStride=(8, 8))
-        if len(rects) == 0:
-            return None
-        x, y, w, h = max(rects, key=lambda r: r[2] * r[3])
         sx = rgb.shape[1] / sw
         sy = ph / sh
-        return int(x * sx) + x0, int(y * sy), int(w * sx), int(h * sy)
+        return [(int(x * sx) + x0, int(y * sy), int(w * sx), int(h * sy))
+                for x, y, w, h in rects]
 
     def start_recording(self) -> str:
         os.makedirs(config.RECORD_DIR, exist_ok=True)

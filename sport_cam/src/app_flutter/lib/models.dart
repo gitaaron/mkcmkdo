@@ -39,7 +39,7 @@ class ModeText {
   static const withUwb = ModeText._(
     startTracking: 'Start tracking',
     searching: 'Turning to your tag',
-    stalled: "Can't see you — step into view, facing the camera",
+    stalled: "Can't pick you out — step into view, away from anyone else",
   );
 
   static const withoutUwb = ModeText._(
@@ -91,6 +91,7 @@ class CameraEndpoint {
 
   String get base => baseUrl ?? 'http://$host:$port';
   String get wsUrl => 'ws://$host:$port/ws';
+
   /// Full-rate MJPEG — only the camera itself serves it. Through Firebase the
   /// live view is the camera's low-rate preview instead.
   String? get streamUrl => direct ? '$base/api/stream.mjpeg' : null;
@@ -147,6 +148,7 @@ class Recording {
     required this.createdAt,
     required this.url,
     this.durationS,
+    this.boxesUrl,
   });
 
   final String name;
@@ -154,6 +156,10 @@ class Recording {
   final DateTime createdAt;
   final String url;
   final double? durationS;
+
+  /// The person boxes to draw over the video ([BoxTrack]); null if the
+  /// camera sent none.
+  final String? boxesUrl;
 
   factory Recording.fromJson(Map<String, dynamic> j) => Recording(
     name: j['name'] as String,
@@ -163,9 +169,16 @@ class Recording {
         DateTime.now(),
     url: j['url'] as String,
     durationS: (j['durationS'] as num?)?.toDouble(),
+    boxesUrl: j['boxesUrl'] as String?,
   );
 
-  String absoluteUrl(String base) => url.startsWith('http') ? url : '$base$url';
+  String absoluteUrl(String base) => _absolute(url, base);
+
+  String? absoluteBoxesUrl(String base) =>
+      boxesUrl == null ? null : _absolute(boxesUrl!, base);
+
+  static String _absolute(String u, String base) =>
+      u.startsWith('http') ? u : '$base$u';
 
   String get sizeLabel => bytes >= 1000000000
       ? '${(bytes / 1e9).toStringAsFixed(1)} GB'
@@ -177,6 +190,83 @@ class Recording {
     final m = d ~/ 60;
     final s = (d % 60).round().toString().padLeft(2, '0');
     return '$m:$s';
+  }
+}
+
+/// Who a person box is, for its colour: the climber (green), anyone else
+/// (yellow), or not yet known (red).
+enum BoxLabel { climber, other, unsure }
+
+BoxLabel boxLabelFrom(Object? s) => switch (s) {
+  'climber' => BoxLabel.climber,
+  'other' => BoxLabel.other,
+  _ => BoxLabel.unsure,
+};
+
+class PersonBox {
+  const PersonBox(this.x, this.y, this.w, this.h, this.label);
+
+  final double x, y, w, h;
+  final BoxLabel label;
+}
+
+/// The person boxes the camera saves beside a clip (`<clip>.boxes.json`,
+/// written by the device's boxlog.py): one frame per detection, a few a
+/// second, each the seconds from the clip's start and the boxes in pixels of
+/// a [width] × [height] frame with the same field of view as the video.
+class BoxTrack {
+  const BoxTrack(this.width, this.height, this.times, this.frames);
+
+  /// A frame's boxes are shown until the next detection, or this long at most.
+  static const holdS = 1.0;
+
+  final double width, height;
+  final List<double> times;
+  final List<List<PersonBox>> frames;
+
+  static BoxTrack? fromJson(Object? json) {
+    if (json is! Map || json['v'] != 1) return null;
+    final size = json['size'];
+    final raw = json['frames'];
+    if (size is! List || size.length != 2 || raw is! List) return null;
+    final times = <double>[];
+    final frames = <List<PersonBox>>[];
+    for (final f in raw) {
+      if (f is! List || f.length != 2 || f[1] is! List) continue;
+      times.add((f[0] as num).toDouble());
+      frames.add([
+        for (final b in f[1] as List)
+          if (b is List && b.length == 5)
+            PersonBox(
+              (b[0] as num).toDouble(),
+              (b[1] as num).toDouble(),
+              (b[2] as num).toDouble(),
+              (b[3] as num).toDouble(),
+              boxLabelFrom(b[4]),
+            ),
+      ]);
+    }
+    return BoxTrack(
+      (size[0] as num).toDouble(),
+      (size[1] as num).toDouble(),
+      times,
+      frames,
+    );
+  }
+
+  /// The boxes on screen at [t] seconds: the last detection at or before it.
+  List<PersonBox> at(double t) {
+    if (times.isEmpty || times.first > t) return const [];
+    var lo = 0, hi = times.length - 1;
+    while (lo < hi) {
+      final mid = (lo + hi + 1) >> 1;
+      if (times[mid] <= t) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return t - times[lo] <= holdS ? frames[lo] : const [];
   }
 }
 

@@ -83,6 +83,19 @@ Sweep timing:
 | **Missing target** | `LOST_HOLD_S` (2 s): hold, ring flashes at 2 Hz. `RESEARCH_AFTER_S` (6 s): sweep toward the last direction of travel. Recording continues; zoom relaxes wide meanwhile |
 | **Empty room** | `tracking`, nobody found for 180 s of sweeping → `idle`. Never applied to a recording |
 
+### Boxes in the recording
+
+Each detection while recording is saved with a label per box
+(`Tracker._label`), and the players draw them over the clip in colour
+([08](../../../docs/design/08-recordings-and-cloud.md#person-boxes)). With no
+tag, "the climber" can only mean the person being followed:
+
+| Label | Colour | When |
+| --- | --- | --- |
+| `climber` | green | the person being followed |
+| `other` | yellow | everyone else |
+| `unsure` | red | every box, while the person being followed is out of sight and someone else is in view: it can't tell whether that is them |
+
 ## Control loops (all run on the Pi, 20 Hz)
 
 ```

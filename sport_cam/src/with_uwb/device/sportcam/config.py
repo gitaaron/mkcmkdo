@@ -62,7 +62,7 @@ PAN_MAX_DPS = 120.0            # slew limit on the pan servo (deg/s)
 TILT_MAX_DPS = 90.0
 
 # --- tracking -------------------------------------------------------------
-UWB_BASELINE_M = 0.25          # anchor separation (cad/config.scad uwb_half_base × 2)
+UWB_BASELINE_M = 0.4          # anchor separation (cad/config.scad uwb_half_base × 2)
 # Raw range noise of the DW1000s after antenna-delay calibration. Angle noise
 # is √2·σ/baseline, so this and the two baselines set how hard uwb.py's
 # filters smooth: 10 cm over 0.25 m is ≈ 32° raw per frame.
@@ -140,20 +140,63 @@ LOST_IDLE_S = 5.0              # no ranges → drop to idle (saving any recordin
 AUTO_SESSION = True            # False: the tag only ranges; start from the app
 TAG_PRESENT_S = 1.0            # unbroken ranging this long = the tag is on
 # SEARCH → FOUND → recording, as in the camera-only build, but SEARCH is a
-# turn to the tag's bearing rather than a sweep. FOUND starts once the camera
-# is pointing where the tag says, has settled there, and the detector sees a
-# person (a session started with a person already in frame starts in FOUND).
-# FOUND tracks exactly as recording does; the person need not be centred.
-# Seen throughout FOUND_CONFIRM_S, it records. Vision must verify: recording
-# never starts on ranging alone, so a wrong sign or a bad calibration shows up
-# as a ring that keeps chasing, not as a clip of a wall. The start of a climb — standing upright at the foot of the wall — is
-# the pose HOG handles best; it only struggles later, and nothing mid-climb
-# depends on it.
+# turn to the tag's bearing rather than a sweep, and every session starts
+# there (there is no idle bypass: idle cannot tell who is wearing the tag).
+# FOUND starts once the camera is pointing where the tag says, has settled
+# there, and the detector sees the tag wearer (below). FOUND tracks exactly
+# as recording does; the person need not be centred. Seen throughout
+# FOUND_CONFIRM_S, it records. Vision must verify: recording never starts on
+# ranging alone, so a wrong sign or a bad calibration shows up as a ring that
+# keeps chasing, not as a clip of a wall. The start of a climb — standing
+# upright at the foot of the wall — is the pose HOG handles best; it only
+# struggles later, and nothing mid-climb depends on it.
 ACQUIRE_POINT_TOL_DEG = 4.0    # pan (and tilt, with A3) within this of the target
 ACQUIRE_SETTLE_S = 0.5         # ...for this long
 FOUND_CONFIRM_S = 3.0          # FOUND this long, the person still in frame → record
-FOUND_LOST_S = 1.0             # FOUND with nobody seen this long → back to SEARCH
+FOUND_LOST_S = 1.0             # FOUND without the tag wearer seen this long → back to SEARCH
 ACQUIRE_STALLED_S = 15.0       # acquiring this long → the app says "can't see you"
+
+# The tag wearer, not just a person. HOG finds people, not *your* person, so
+# each box is checked against the tag before it counts (Tracker._match_tag):
+#   gate    — its bearing within TAG_MATCH_BEARING_DEG of the tag's (plus the
+#             learned vision bias), and the distance its height implies
+#             within a factor TAG_MATCH_RANGE_RATIO of the ranged distance.
+#             Someone off to one side, or walking past close to the lens,
+#             never counts.
+#   follow  — everyone admitted through the gate is followed from one
+#             detection to the next by where they are (moving less than
+#             TAG_FOLLOW_DEG), so a second person cannot take over between
+#             detections. The gate only admits: once in, a person is averaged
+#             on every detection and kept for TAG_FORGET_S out of view, so
+#             bearing noise cannot drop a rival from the comparison.
+#   average — one bearing is too noisy (≈ 7° RMS) to split two people standing
+#             close, but its average over a few seconds is not. Each person
+#             keeps a running mean of box bearing − tag bearing. SEARCH picks
+#             whoever is nearest on average. FOUND records only once everyone
+#             else is further from the tag by a lead of TAG_MATCH_Z standard
+#             errors of those averages (never less than TAG_MATCH_MARGIN_DEG);
+#             the countdown holds at 1 until then. If someone else gets that
+#             lead instead, FOUND switches to them and starts again. Alone in
+#             the gate — most sessions — the wearer records after the usual
+#             3 s. Measured in simulation (bearing noise as below, 48 runs):
+#             a belayer 2.5 m from the climber at 10 m is resolved in ≈ 4–10 s,
+#             1.5 m in ≈ 8 s and 1 m in ≈ 12 s on average, and never the wrong
+#             way; within ≈ 0.5 m they are never told apart, and the app asks
+#             the climber to step away once ACQUIRE_STALLED_S passes.
+#             TAG_BEARING_SIGMA_DEG and TAG_BEARING_CORR_S are estimates until
+#             `python -m sportcam.bearingcal` measures them on your hardware.
+# Bystanders never move the vision tilt or the zoom: only the chosen person
+# does. The pan bias also stands still while more than one person is in the
+# gate, until recording, so it cannot lean the choice toward the first pick.
+TAG_MATCH_BEARING_DEG = 14.0   # ≈ 2 σ of the filtered bearing
+TAG_MATCH_RANGE_RATIO = 2.0    # vision distance within ×/÷ this of the UWB distance
+TAG_FOLLOW_DEG = 6.0           # a person moves less than this between detections
+TAG_FORGET_S = 5.0             # someone admitted is forgotten after this long out of view
+TAG_MATCH_MARGIN_DEG = 4.0     # the chosen person's mean miss beats everyone else's by
+                               # at least this...
+TAG_MATCH_Z = 3.0              # ...and by this many standard errors of the averages
+TAG_BEARING_SIGMA_DEG = 7.0    # filtered bearing noise, RMS, 400 mm baseline (05)
+TAG_BEARING_CORR_S = 0.35      # its correlation time: the Kalman filter's ≈ 7-frame memory
 
 # --- vision ---------------------------------------------------------------
 # With three anchors the detector is a trim, not a source: ranging gives both

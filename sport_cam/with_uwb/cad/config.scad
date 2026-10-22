@@ -67,7 +67,7 @@ ptz_cable_d   = 34;            // central opening: CSI ribbon + servo leads drop
 // The anchors don't rotate with the camera, so the arms bolt to the enclosure
 // wall. Board centres land `uwb_half_base` either side of the pan axis; the
 // tracker subtracts the commanded pan angle (docs/04).
-uwb_half_base = 125;           // half the baseline → 250 mm anchor separation
+uwb_half_base = 190;           // board centre; the antenna sits 10 mm further out → 400 mm
 arm_w = 18; arm_t = 8;
 arm_root_h = 24;               // bracket height where the arm meets the wall
 arm_boss_z = 10;               // bottom of the wall bosses

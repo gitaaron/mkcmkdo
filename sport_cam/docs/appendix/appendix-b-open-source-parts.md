@@ -56,9 +56,9 @@ the repository's git history.
 
 ### UWB anchor arms and mast
 
-No substitute. The arms set the 250 mm baseline used by the bearing maths
+No substitute. The arms set the 400 mm baseline used by the bearing maths
 ([05](../../with_uwb/docs/design/05-tracking-system.md)) and carry a specific board
-at a specific height. Custom designs must keep the antenna spacing (250 mm)
+at a specific height. Custom designs must keep the antenna spacing (400 mm)
 and the mast height (250 mm).
 
 ### Wearable pod

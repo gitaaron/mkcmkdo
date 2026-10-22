@@ -8,7 +8,8 @@ and Wi-Fi provisioning at a new location.
 ```
 stop recording
    └─► Pi finalizes the MP4 (moov atom written — file is playable)
-        └─► background upload  createUploadUrl → PUT → finalizeRecording
+        └─► background upload  createUploadUrl → PUT, for the clip and its boxes
+             │                  → finalizeRecording
              │   (tracking + live streaming continue; app shows progress)
              └─► backend confirms byte count
                   └─► Pi deletes its local copy   (SD card = buffer, not store)
@@ -35,16 +36,60 @@ limit).
 
 | Callable | Function |
 | --- | --- |
-| `createUploadUrl({name})` | V4-signed Cloud Storage `PUT` URL, valid 30 min |
-| `finalizeRecording({name,bytes,durationS})` | verifies the object exists and its size matches; writes `cameras/{key}/recordings/{name}`; clears the app's upload indicator |
-| `getRecordings()` | that collection, newest first (the web app subscribes instead) |
-| `GET /api/recordings/:name?k=<key>` | 302 to a signed Cloud Storage `GET` URL, valid 6 h |
+| `createUploadUrl({name})` | V4-signed Cloud Storage `PUT` URL, valid 30 min, for a clip (`.mp4`) or its boxes (`.boxes.json`) |
+| `finalizeRecording({name,bytes,durationS,boxes})` | verifies the object exists and its size matches, and with `boxes: true` that the boxes were uploaded too; writes `cameras/{key}/recordings/{name}`; clears the app's upload indicator |
+| `getRecordings()` | that collection, newest first, each with `url` and `boxesUrl` (null without boxes; the web app subscribes instead) |
+| `GET /api/recordings/:name?k=<key>` | a clip: 302 to a signed Cloud Storage `GET` URL, valid 6 h. Its boxes: streamed through the function, so the apps can fetch them without CORS on the bucket |
 
 - **Range requests** are required for seeking in a phone `<video>`; Cloud
   Storage supports them.
 - **Emulators:** no URL signing available. `createUploadUrl` returns the
   function's own `PUT /api/recordings/upload/:name`, and playback streams
   through the function with `Range` support. Transparent to the uploader.
+
+### Person boxes
+
+While recording, the camera notes every person the detector finds, a few
+times a second, with the tracker's verdict on each (`boxlog.py`). They are
+saved beside the clip as `<clip>.boxes.json`, uploaded with it, and deleted
+from the card with it. Both apps' players draw them over the video and have a
+**Boxes on / off** control.
+
+| Colour | Label | Means |
+| --- | --- | --- |
+| **green** | `climber` | the person the camera knows is the climber |
+| **yellow** | `other` | anyone else |
+| **red** | `unsure` | the camera can't yet tell which is the climber; every box is red until it can |
+
+<!--both-->
+
+With UWB the climber is the tag wearer, and red means two people
+are still being told apart, or someone near the tag is in view while the
+wearer is out of sight ([05](../../with_uwb/docs/design/05-tracking-system.md#boxes-in-the-recording)). Without UWB the climber is the person being
+followed, and red means they are out of sight while someone else is in
+view ([05](../../without_uwb/docs/design/05-tracking-system.md#boxes-in-the-recording)).<!--/--><!--with_uwb: The climber is the tag wearer. Red means
+two people are still being told apart, or someone near the tag is in view
+while the wearer is out of sight ([05](../../with_uwb/docs/design/05-tracking-system.md#boxes-in-the-recording)).--><!--without_uwb: The climber is
+the person being followed. Red means they are out of sight while someone
+else is in view ([05](../../without_uwb/docs/design/05-tracking-system.md#boxes-in-the-recording)).-->
+
+```json
+{"v": 1, "size": [1280, 720],
+ "frames": [[0.33, [[412, 160, 96, 288, "climber"], [880, 170, 90, 280, "other"]]],
+            [0.66, []]]}
+```
+
+- One frame per detection: seconds from the start of the clip, then boxes as
+  x, y, width and height in pixels of a `size` frame (the preview stream,
+  the same view as the recording).
+- A player shows a frame's boxes until the next detection, or 1 s at most.
+  An empty list means the detector looked and saw nobody.
+- Times are measured from the moment recording was asked for; the encoder
+  starts a fraction of a second later, so boxes can trail the picture
+  slightly.
+- About 3 detections a second: a 5-minute clip's boxes are ≈ 50 KB.
+- Clips without boxes (older ones, or a failed write) play as before, with no
+  control.
 
 Camera configuration (`src/<build>/device/sportcam/config.py`):
 

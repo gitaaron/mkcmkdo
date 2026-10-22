@@ -19,23 +19,20 @@ Acquisition runs the same state machine as the camera-only build. The
 difference is SEARCH: the tag gives the subject's location at once, so there
 is no sweep; the head turns straight to the bearing.
 
-    (idle, no person in frame)       (idle, person in frame)
-               │ session start                │ session start
-               ▼                              ▼
-    SEARCH ──on target, person seen──► FOUND ──FOUND_CONFIRM_S──► TRACK (recording)
-       ▲                                  │
-       └──── nobody seen FOUND_LOST_S ────┘
+    idle ──session start──► SEARCH ──on target, tag wearer seen──► FOUND ──FOUND_CONFIRM_S──► TRACK (recording)
+                               ▲                                      │
+                               └───── tag wearer unseen FOUND_LOST_S ─┘
 
 * **idle** — not a tracker mode: the session has not started. The head is
   parked with the lens wide and `watch_idle()` runs the detector at
-  DETECT_FPS_IDLE. A session started with a person in frame skips SEARCH and
-  begins in FOUND.
+  DETECT_FPS_IDLE for the idle sub-state. That is anyone at all, so unlike
+  the camera-only build it never skips SEARCH.
 * **SEARCH** — turn to the tag's bearing, and hold there ACQUIRE_SETTLE_S
-  until the detector sees a person.
+  until the detector sees the tag wearer (`_match_tag`).
 * **FOUND** — the same pan, tilt, zoom and focus as recording; the person
   does not have to be centred. Seen throughout FOUND_CONFIRM_S (no gap
-  longer than FOUND_LOST_S), the session starts recording and calls
-  `confirm()`.
+  longer than FOUND_LOST_S), and clearly the tag wearer rather than someone
+  beside them, the session starts recording and calls `confirm()`.
 * **TRACK** — recording, for the rest of the session: a hidden tag or a
   missed detection afterwards is ordinary tracking.
 
@@ -50,6 +47,7 @@ import time
 from simple_pid import PID
 
 from . import config
+from .boxlog import CLIMBER, OTHER, UNSURE, Box
 from .camera import Camera
 from .ptz import Ptz
 from .uwb import UwbArray
@@ -73,6 +71,13 @@ class Tracker:
         self.dist_m: float | None = None
         self._last_step = time.monotonic()
         self._idle_seen_at: float | None = None   # last person detection while idle
+        self._people: list[_Person] = []          # everyone in the tag's gate
+        self._chosen: _Person | None = None       # the one taken for the tag wearer
+        self._admitted: list[Box] = []            # boxes of people in the gate, last detection
+        # every box of the last fresh detection, labelled for the recording's
+        # overlay (boxlog): climber, other, or unsure
+        self.labelled: list[tuple[Box, str]] = []
+        self.labelled_at: float | None = None
         self.reset_lock()
 
     def lost_for(self) -> float:
@@ -80,22 +85,21 @@ class Tracker:
 
     # ---- session ----------------------------------------------------------
     # Vision must verify: ranging alone never records. FOUND takes the camera
-    # pointing where the tag says the subject is AND the detector seeing
-    # someone there.
+    # pointing where the tag says the subject is AND the detector seeing the
+    # tag wearer there — not merely someone.
     def reset_lock(self) -> None:
-        """Start a new session's acquisition.
+        """Start a new session's acquisition, always in SEARCH.
 
-        Normally that is SEARCH. If idle had a person in frame, the session
-        starts in FOUND; if nobody is seen for FOUND_LOST_S it falls back to
-        SEARCH.
+        Idle's person in frame is not used: it could be anyone, and only the
+        tag can say who.
         """
         now = time.monotonic()
-        self.mode = FOUND if self.idle_person_in_frame else SEARCH
+        self.mode = SEARCH
         self._idle_seen_at = None
         self._settled_since: float | None = None
         self._acquiring_since = now
-        self._found_since = now
-        self._found_seen_at = now
+        self._people, self._chosen = [], None
+        self._found_since = self._found_seen_at = now
 
     def confirm(self) -> None:
         """Recording has started: hold the subject for the rest of the session."""
@@ -127,8 +131,21 @@ class Tracker:
 
     @property
     def ready_to_record(self) -> bool:
-        """The person has stayed in frame for FOUND_CONFIRM_S."""
-        return self.mode == FOUND and self.found_for() >= config.FOUND_CONFIRM_S
+        """The tag wearer has stayed in frame for FOUND_CONFIRM_S, and is
+        clearly the tag wearer rather than someone beside them."""
+        return (self.mode == FOUND and self.found_for() >= config.FOUND_CONFIRM_S
+                and self._chosen_is_clear())
+
+    def _chosen_is_clear(self) -> bool:
+        """Nobody else in the gate is anywhere near as close to the tag."""
+        c = self._chosen
+        return c is not None and all(
+            p is c or p.miss() >= c.miss() + _lead_needed(c, p) for p in self._people)
+
+    @property
+    def crowded(self) -> bool:
+        """More than one person has come through the tag's gate lately."""
+        return len(self._people) > 1
 
     @property
     def countdown(self) -> int:
@@ -144,7 +161,7 @@ class Tracker:
                 time.monotonic() - self._acquiring_since > config.ACQUIRE_STALLED_S)
 
     def _advance(self, now: float, have_fix: bool, pan_target: float,
-                 tilt_target: float | None, saw_person: bool) -> None:
+                 tilt_target: float | None, saw_wearer: bool) -> None:
         """SEARCH ⇄ FOUND. FOUND → TRACK is the session's call (`confirm()`)."""
         if self.mode == TRACK:
             return
@@ -166,13 +183,119 @@ class Tracker:
         if self.mode == SEARCH:
             settled = (self._settled_since is not None
                        and now - self._settled_since >= config.ACQUIRE_SETTLE_S)
-            if saw_person and settled:
+            if saw_wearer and settled:
                 self.mode = FOUND
                 self._found_since = self._found_seen_at = now
-        elif saw_person:
+        elif saw_wearer:
             self._found_seen_at = now
         elif now - self._found_seen_at > config.FOUND_LOST_S:
             self.mode = SEARCH                # gone: the countdown starts again
+
+    def _box_deg(self, box: tuple[int, int, int, int]) -> float:
+        """A box's centre as a pan bearing, in the same frame as the tag's."""
+        x, _, w, _ = box
+        half_w = config.PREVIEW_SIZE[0] / 2
+        half_fov = math.radians(max(1.0, self.ptz.hfov_deg) / 2)
+        off = math.atan((x + w / 2 - half_w) / half_w * math.tan(half_fov))
+        return self.ptz.pan_deg + math.degrees(off)
+
+    def _range_agrees(self, box: tuple[int, int, int, int], dist_m: float) -> bool:
+        """Does the box's height put the person roughly at the tag's distance?
+
+        Thin lens again: a SUBJECT_HEIGHT_M body h pixels tall is f·H/h away.
+        Loose on purpose (height, pose). A box clipped at the top or bottom
+        shows only part of the body, so it can only prove someone too near.
+        """
+        _, y, _, h = box
+        ph = config.PREVIEW_SIZE[1]
+        edge = config.ZOOM_GUARD_EDGE * ph
+        body_px = max(1.0, h * config.PERSON_IN_BOX_H)
+        seen_m = (config.SUBJECT_HEIGHT_M * self.ptz.zoom_mm / config.SENSOR_H_MM
+                  * ph / body_px)
+        ratio = seen_m / max(0.1, dist_m)
+        if y < edge or y + h > ph - edge:
+            return ratio >= 1 / config.TAG_MATCH_RANGE_RATIO
+        return 1 / config.TAG_MATCH_RANGE_RATIO <= ratio <= config.TAG_MATCH_RANGE_RATIO
+
+    def _match_tag(self, boxes: list[tuple[int, int, int, int]], tag_deg: float | None,
+                   dist_m: float) -> tuple[int, int, int, int] | None:
+        """Pick the tag wearer out of one fresh detection, or None.
+
+        Gate each box on the tag (bearing and distance), follow each person
+        in the gate from one detection to the next, and keep a running
+        average of how far each sits from the tag. See config, "The tag
+        wearer, not just a person".
+        """
+        now = time.monotonic()
+        self._admitted = []
+        if tag_deg is None and (self.mode != TRACK or self._chosen is None):
+            # No ranging. An established subject is followed on position
+            # alone; acquisition never proceeds without the tag.
+            return None
+
+        # Follow: each box goes to the nearest known person not already
+        # taken, if they have moved less than TAG_FOLLOW_DEG. Otherwise it is
+        # someone new, admitted only through the gate. Once admitted, a
+        # person is averaged on every detection, wherever the noisy tag
+        # bearing happens to be, and forgotten only after TAG_FORGET_S out of
+        # view, so a rival is never dropped from the comparison by noise.
+        seen: dict[int, tuple[int, int, int, int]] = {}
+        for box in sorted(boxes, key=lambda b: b[2] * b[3], reverse=True):
+            deg = self._box_deg(box)
+            free = [p for p in self._people if id(p) not in seen]
+            p = min(free, key=lambda p: abs(p.deg - deg), default=None)
+            if p is None or abs(p.deg - deg) > config.TAG_FOLLOW_DEG:
+                if (tag_deg is None
+                        or abs(deg - tag_deg) > config.TAG_MATCH_BEARING_DEG
+                        or not self._range_agrees(box, dist_m)):
+                    continue
+                p = _Person(deg)
+                self._people.append(p)
+            p.deg, p.seen_at = deg, now
+            if tag_deg is not None:
+                if not p.looks:
+                    p.first_at = now
+                p.off_sum += deg - tag_deg
+                p.looks += 1
+            seen[id(p)] = box
+        self._people = [p for p in self._people
+                        if now - p.seen_at <= config.TAG_FORGET_S]
+        if self._chosen is not None and self._chosen not in self._people:
+            self._chosen = None
+        self._admitted = list(seen.values())
+
+        if self.mode == SEARCH or self._chosen is None:
+            # Take whoever has, on average, been nearest the tag so far.
+            if self.mode == FOUND or not seen or tag_deg is None:
+                return None                  # FOUND lost them: FOUND_LOST_S decides
+            self._chosen = min((p for p in self._people if id(p) in seen),
+                               key=lambda p: p.miss())
+        elif self.mode == FOUND:
+            # Someone else has, on average, been clearly nearer the tag: that
+            # is the wearer. Switch to them and count again.
+            best = min(self._people, key=lambda p: p.miss())
+            if (best is not self._chosen and id(best) in seen
+                    and best.miss() + _lead_needed(best, self._chosen) <= self._chosen.miss()):
+                self._chosen = best
+                self._found_since = self._found_seen_at = now
+        return seen.get(id(self._chosen))
+
+    def _label(self, boxes: list[Box], wearer: Box | None,
+               have_fix: bool) -> list[tuple[Box, str]]:
+        """Label each box of a detection for the recording's overlay.
+
+        The wearer is CLIMBER and everyone else OTHER once the camera can
+        tell them apart: recording (TRACK), or the chosen person clear of
+        everyone else in the gate. Boxes that all failed the gate are OTHER:
+        none of them is where the tag is. Otherwise — two people still being
+        told apart, the wearer out of sight while someone in the gate is
+        not, or no ranging to judge by — every box is UNSURE.
+        """
+        if wearer is not None and (self.mode == TRACK or self._chosen_is_clear()):
+            return [(b, CLIMBER if b == wearer else OTHER) for b in boxes]
+        if not self._admitted and (have_fix or self.mode == TRACK):
+            return [(b, OTHER) for b in boxes]
+        return [(b, UNSURE) for b in boxes]
 
     def step(self) -> None:
         """One 20 Hz iteration. Commands the PTZ base directly."""
@@ -194,21 +317,32 @@ class Tracker:
             self._hint_search_column(target)
 
         # Vision runs at a few frames per second, far slower than this loop.
-        # Acting only on a *fresh* box is what stops one measurement being
-        # integrated over and over — with a 3 fps detector and a 20 Hz loop
-        # that would be nearly seven times the intended gain.
-        bbox, fresh = self.camera.person_bbox()
-        saw_person = bool(bbox and fresh)
-        if saw_person:
+        # Acting only on a *fresh* detection is what stops one measurement
+        # being integrated over and over — with a 3 fps detector and a 20 Hz
+        # loop that would be nearly seven times the intended gain. Only the
+        # tag wearer's box is used: a bystander moves nothing.
+        boxes, fresh = self.camera.person_boxes()
+        bbox = None
+        if fresh:
+            bbox = self._match_tag(boxes, target if have_fix else None,
+                                   fix.dist_m if have_fix else (self.dist_m or 0.0))
+        if fresh:
+            self.labelled = self._label(boxes, bbox, have_fix)
+            self.labelled_at = now
+        saw_wearer = bbox is not None
+        if saw_wearer:
             x, y, w, h = bbox
             self._last_seen_at = now
             cx_err = (x + w / 2) - config.PREVIEW_SIZE[0] / 2
             cy_err = (y + h / 2) - config.PREVIEW_SIZE[1] / 2
             # Horizontal: learn a slow bias rather than jogging the axis, so
-            # vision never fights the ranging loop.
-            self._pan_bias = _clamp(
-                self._pan_bias + config.PAN_CV_BIAS_GAIN * cx_err,
-                -config.PAN_CV_BIAS_LIMIT, config.PAN_CV_BIAS_LIMIT)
+            # vision never fights the ranging loop. Not while two people are
+            # still being told apart: the bias would lean toward whoever was
+            # chosen first, and the choice is judged against it.
+            if self.mode == TRACK or not self.crowded:
+                self._pan_bias = _clamp(
+                    self._pan_bias + config.PAN_CV_BIAS_GAIN * cx_err,
+                    -config.PAN_CV_BIAS_LIMIT, config.PAN_CV_BIAS_LIMIT)
             if tilt_target is not None:
                 # Vertical, with A3: the same slow bias as pan. Measured in
                 # degrees rather than pixels, so the gain holds across zoom.
@@ -245,7 +379,7 @@ class Tracker:
             max_tilt = config.TILT_MAX_DPS * dt
             self.ptz.set_tilt(self.ptz.tilt_deg + _clamp(tilt_target - self.ptz.tilt_deg,
                                                          -max_tilt, max_tilt))
-        self._advance(now, have_fix, target, tilt_target, saw_person)
+        self._advance(now, have_fix, target, tilt_target, saw_wearer)
 
     @staticmethod
     def _aim_tilt(elev_rad: float, dist_m: float) -> float:
@@ -318,6 +452,35 @@ class Tracker:
         self._zoom_scale = _clamp(efl_mm / base_mm, config.ZOOM_SCALE_MIN, config.ZOOM_SCALE_MAX)
         self.ptz.set_focus(dist_m)        # first, so a zoom move refocuses for this distance
         self.ptz.set_zoom_mm(efl_mm)
+
+
+class _Person:
+    """Someone in the tag's gate, followed across detections."""
+
+    def __init__(self, deg: float) -> None:
+        self.deg = deg               # bearing of their box, last detection
+        self.seen_at = 0.0
+        self.first_at = 0.0          # first detection against the tag
+        self.off_sum = 0.0           # Σ (box bearing − tag bearing)
+        self.looks = 0
+
+    def miss(self) -> float:
+        """How far, on average, they have been from the tag's bearing."""
+        return abs(self.off_sum / self.looks) if self.looks else math.inf
+
+
+def _lead_needed(a: _Person, b: _Person) -> float:
+    """How much nearer the tag, on average, `a` must be than `b` to be sure.
+
+    The averages share the tag's bearing noise, and their uncertainty falls
+    as the square root of how many independent bearings they span: one per
+    TAG_BEARING_CORR_S, the filtered bearing's correlation time. Require
+    TAG_MATCH_Z of those, and never less than TAG_MATCH_MARGIN_DEG.
+    """
+    span = min(a.seen_at - a.first_at, b.seen_at - b.first_at)
+    n = max(1.0, span / config.TAG_BEARING_CORR_S)
+    return max(config.TAG_MATCH_MARGIN_DEG,
+               config.TAG_MATCH_Z * config.TAG_BEARING_SIGMA_DEG / math.sqrt(n))
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:

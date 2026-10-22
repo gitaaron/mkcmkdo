@@ -191,6 +191,29 @@ describe("recording library", () => {
     expect(part.status).toBe(206);
     expect(part.headers.get("content-range")).toBe(`bytes 100-199/${clip.length}`);
     expect(Buffer.from(await part.arrayBuffer())).toEqual(clip.subarray(100, 200));
+    expect(list[0].boxesUrl).toBeNull();
+  });
+
+  it("keeps the clip's person boxes beside it, for the players to draw", async () => {
+    const boxes = { v: 1, size: [1280, 720], frames: [[0.5, [[10, 20, 30, 90, "climber"]]]] };
+    await upload("rec_5.mp4");
+    expect((await call("finalizeRecording", { name: "rec_5.mp4", bytes: clip.length, boxes: true })).status)
+      .toBe(412);                                       // said it had boxes, never sent them
+    await upload("rec_5.boxes.json", Buffer.from(JSON.stringify(boxes)));
+    const fin = await call("finalizeRecording", { name: "rec_5.mp4", bytes: clip.length, boxes: true });
+    expect(fin.status).toBe(200);
+    expect(fin.body.result.boxesUrl).toMatch(/^\/api\/recordings\/rec_5\.boxes\.json\?k=/);
+
+    const listed = (await call("getRecordings")).body.result.recordings.find((r: any) => r.name === "rec_5.mp4");
+    const got = await fetch(base + listed.boxesUrl);
+    expect(got.status).toBe(200);
+    expect(got.headers.get("content-type")).toMatch(/application\/json/);
+    expect(await got.json()).toEqual(boxes);
+  });
+
+  it("a boxes file is not a recording of its own", async () => {
+    await upload("rec_6.boxes.json", Buffer.from("{}"));
+    expect((await call("finalizeRecording", { name: "rec_6.boxes.json", bytes: 2 })).status).toBe(400);
   });
 
   it("finalize clears the upload progress shown in the app", async () => {

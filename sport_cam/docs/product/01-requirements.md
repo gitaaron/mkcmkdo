@@ -32,7 +32,7 @@ Subject localisation is build-specific: [With UWB](#with-uwb),
 | Session start | tag switched on | **Track & record** in the app |
 | Distinguishes subject from bystanders | yes (tag identity) | no (first person found) |
 | Extra hardware | 3 × ULA1 anchors, 2 anchor arms, A3 mast, wearable pod | none |
-| Head size | ≈ 30 cm across the arms, 28 cm to the mast top; Ø 141 mm enclosure | Ø 135 mm enclosure, no protrusions |
+| Head size | ≈ 42 cm across the arms, 28 cm to the mast top; Ø 141 mm enclosure | Ø 135 mm enclosure, no protrusions |
 | Runtime, 92 Wh bank, tracking + recording | ≈ 6.2 h | ≈ 8.4 h (estimated) |
 | Cost, excluding tripod | ≈ C$1079 | ≈ C$716 |
 | `TRACKING_MODE` | `"with_uwb"` | `"without_uwb"` |
@@ -52,6 +52,7 @@ view; camera-only for lower cost, size and power.
 | F6 | **Remote use.** State, live preview and control from any internet-connected phone or computer. One backend and one app serve both builds; the camera reports its build | [07](../design/07-backend-and-app.md#tracking-mode) |
 | F7 | **Recordings library.** Each stopped recording uploads to the backend and appears in the app's library | [08](../design/08-recordings-and-cloud.md) |
 | F8 | **Direct connection.** On the camera's Wi-Fi, a phone discovers and controls it with no server or internet | [09](../design/09-direct-connection-and-app.md) |
+| F9 | **Person boxes in recordings.** Each recording keeps a box round every person the camera detected: **green** round the climber, **yellow** round anyone else, and **red** round everyone while it can't tell which is the climber. Both apps' players draw them over the video, with a button to show or hide them | [08](../design/08-recordings-and-cloud.md#person-boxes) |
 
 ## Non-functional requirements
 
@@ -87,21 +88,25 @@ library. Deviations (dropouts, loss, manual control): <!--both-->[with UWB](#sta
      continuously, including in idle, and detects the tag within ≈ 1 s.
    - **Without UWB**: the user taps **Track & record** (app or the camera's
      local page).
-3. **Search** — skipped here. The climber is already in frame, so tracking
-   starts at **found**. (With nobody in frame: green light chasing round the
-   ring, the app pings every 3 s.
-   With UWB the location is known at once, so the head turns to the ranged
-   position: "Turning to your tag…". Without UWB it sweeps ±80° at 25°/s,
-   zoomed wide, stepping between two tilt rows at each end: "Looking for a
-   person…". Search ends when a person is detected — with UWB, with the
-   head on the ranged position.)
+3. **Search.** Green light chasing round the ring; the app pings every 3 s.
+   - **With UWB**: the location is known at once, so the head turns to the
+     ranged position: "Turning to your tag…". Search ends when the head is
+     on that position and the person there is detected — under a second
+     here, with the climber already in view. It is never skipped: a person
+     in frame in idle could be anyone.
+   - **Without UWB**: skipped here. The climber is already in frame, so
+     tracking starts at **found**. (With nobody in frame it sweeps ±80° at
+     25°/s, zoomed wide, stepping between two tilt rows at each end:
+     "Looking for a person…", until a person is detected.)
 4. **Found.** The camera follows and frames the climber exactly as it will
    while recording (pan, tilt, zoom, focus); they don't have to be centred.
    The LED ring fills with green over 3 s and the app beeps each second
    ("Found you — recording in 3… 2… 1…"). Ranging alone never starts a
-   recording. Without UWB, the first person found is kept; afterwards the
-   tracker follows the detection nearest the last position, so a passing
-   bystander doesn't take over.
+   recording. With UWB, vision alone doesn't either: only the person where
+   the tag is counts, so a belayer beside the climber or someone walking
+   past is never found, and never followed. Without UWB, the first person
+   found is kept; afterwards the tracker follows the detection nearest the
+   last position, so a passing bystander doesn't take over.
 5. **Record.** Still in frame after 3 s (`FOUND_CONFIRM_S`): state
    `recording` (pulsing red; the app chimes after the beeps). Pan and tilt
    keep the climber in frame; zoom holds them at ≈ 65 % of the frame. H.264
@@ -149,14 +154,17 @@ Rules:
   1. **Search** (phase `search`) — get the subject into frame. With UWB the
      location is known at once, so the head turns to the ranged position;
      without UWB it sweeps the room. The app pings every 3 s.
-  2. **Found** (phase `found`) — a person is detected. The camera runs the
+  2. **Found** (phase `found`) — a person is detected (with UWB: the
+     person where the tag is, not just anyone). The camera runs the
      same pan, tilt, zoom and focus routine as in `recording`; the person
      need not be centred. Still in frame 3 s later (`FOUND_CONFIRM_S`), the
      camera starts recording. Nobody seen for 1 s (`FOUND_LOST_S`): back to
      search, and the countdown starts again. Telemetry `countdown` carries
      the seconds left; the app beeps on each.
 
-  From **person in frame**, tracking starts at found and skips search.
+  Without UWB, tracking started from **person in frame** begins at found
+  and skips search. With UWB it always begins at search, because only the
+  tag says who the subject is.
 - Recording always follows found; there is no manual record button.
 - **Stop recording** saves the clip and ends the session: `recording` →
   `idle`. **Stop tracking** cancels a session that hasn't started
@@ -185,8 +193,8 @@ ranges the tag at 20 Hz through body and clothing and points at the result.
 
 | # | Requirement | Value | Rationale | Set in |
 | --- | --- | --- | --- | --- |
-| C1 | **Compact head** | ≤ 30 cm across, ≤ 30 cm tall to the top of the A3 mast (enclosure floor up), excluding the tripod | must fit small rooms | `uwb_half_base`, `uwb_v_base` in `with_uwb/cad/config.scad` |
-| C2 | **Anchor spacing** | A1–A2 **250 mm** horizontal; A3 **250 mm** above them, ≈ 89 mm behind the pan axis | angle noise ∝ 1/spacing: 250 mm gives ≈ 9° RMS filtered (≈ 7° at 400 mm); the vision trim absorbs the difference ([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)). Below 250 mm, error and A3's blind corner grow quickly | `with_uwb/cad/config.scad`; `UWB_BASELINE_M`, `UWB_A3_UP_M`, `UWB_A3_BACK_M` in `src/with_uwb/device/sportcam/config.py` |
+| C1 | **Compact head** | ≤ 45 cm across, ≤ 30 cm tall to the top of the A3 mast (enclosure floor up), excluding the tripod | must fit small rooms; the width follows the anchor spacing (C2) | `uwb_half_base`, `uwb_v_base` in `with_uwb/cad/config.scad` |
+| C2 | **Anchor spacing** | A1–A2 **400 mm** horizontal; A3 **250 mm** above them, ≈ 89 mm behind the pan axis | angle noise ∝ 1/spacing: 400 mm gives ≈ 7° RMS filtered (≈ 9° at 250 mm) ([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)). Telling the climber from a belayer beside them waits on that noise: at 400 mm someone 1.5 m away is resolved in ≈ 8 s rather than ≈ 17 s, and 1 m away in ≈ 12 s rather than never. Measure it with `bearingcal`. Below 250 mm, error and A3's blind corner grow quickly | `with_uwb/cad/config.scad`; `UWB_BASELINE_M`, `UWB_A3_UP_M`, `UWB_A3_BACK_M` in `src/with_uwb/device/sportcam/config.py` |
 
 ### State machine, with UWB
 
@@ -201,8 +209,16 @@ Deviations from the [ideal path](#ideal-path):
   body-shadowed tag are indistinguishable, so a dropout > 5 s also ends the
   session; the tag returning starts a new one (two clips). Raise
   `LOST_IDLE_S` if this happens.
-- Tracking for 15 s without recording (vision can't confirm the person):
-  the app reports it.
+- Only the tag wearer is found: a detection counts only if its bearing and
+  distance match the tag's. When two people both match, the one nearer the
+  tag on average wins, once the averages are firm enough to be sure
+  ([05](../../with_uwb/docs/design/05-tracking-system.md#telling-the-tag-wearer-from-everyone-else)).
+  The countdown holds at 1 until then: a few extra seconds with a belayer
+  2.5 m away, ≈ 8 s at 1.5 m, ≈ 12 s at 1 m. Within ≈ 0.5 m the two can't be
+  told apart and it doesn't record.
+- Tracking for 15 s without recording (vision can't confirm the person, or
+  someone is standing too close to the climber to tell apart): the app
+  reports it.
 - **Start tracking** in the app starts a session without the tag; it
   records after found the same way. A session stopped from the app
   (**Stop tracking** or **Stop recording**) stays stopped until the tag has

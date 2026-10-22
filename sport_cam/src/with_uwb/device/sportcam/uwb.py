@@ -70,7 +70,7 @@ class _KalmanAngle:
         # filtered error at 250 mm from ≈ 12° to ≈ 9° RMS, and the lag it adds
         # is less than the jitter it removes.
         self.q = q
-        # measurement noise (rad²): σθ ≈ √2·σr / baseline, ≈ 32° raw at 0.25 m
+        # measurement noise (rad²): σθ ≈ √2·σr / baseline, ≈ 20° raw at 0.4 m
         self.r = 2.0 * config.UWB_RANGE_SIGMA_M ** 2 / baseline_m ** 2
         self.t = time.monotonic()
 

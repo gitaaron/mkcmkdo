@@ -27,7 +27,7 @@ both angles, frames the shot, and confirms the person before recording.
 
 | Anchor | Position | Purpose |
 | --- | --- | --- |
-| A1, A2 | on arms bolted to the enclosure; 250 mm apart (baseline b), symmetric about the pan axis | bearing, distance |
+| A1, A2 | on arms bolted to the enclosure; **400 mm apart** (baseline b), symmetric about the pan axis | bearing, distance |
 | A3 | on a mast behind the lens; **250 mm above** A1/A2, ≈ 89 mm back | elevation |
 
 - All anchors are **static**: they don't move with the lens.
@@ -44,17 +44,21 @@ d  = (r₁ + r₂) / 2                     # distance to subject
 θ  ≈ asin( (r₁² − r₂²) / (2·b·d) )     # bearing from the anchor bar's normal
 ```
 
-**Bearing noise.** σ_θ ≈ √2·σ_range / b. With b = 0.25 m and σ_range ≈ 10 cm:
-≈ 32° raw per sample. A 1-D Kalman filter on θ feeds the pan loop; its
+**Bearing noise.** σ_θ ≈ √2·σ_range / b. With b = 0.40 m and σ_range ≈ 10 cm:
+≈ 20° raw per sample. A 1-D Kalman filter on θ feeds the pan loop; its
 measurement noise is derived from the baseline and `UWB_RANGE_SIGMA_M`, so
 it smooths more on shorter baselines. Simulated subject crossing at 5 m, up
-to 1.8 m/s: **≈ 9° RMS** filtered. Wide-end horizontal FOV is 96°, so the
+to 1.8 m/s: **≈ 7° RMS** filtered (≈ 5.4° for a subject standing still,
+wandering with a ≈ 0.35 s correlation time; `bearingcal` measures both on
+your hardware). 400 mm rather than the earlier 250 mm because the
+[tag-wearer match](#telling-the-tag-wearer-from-everyone-else) waits on this
+noise: beside a belayer it decides in about half the time. Wide-end horizontal FOV is 96°, so the
 subject stays in frame; the vision trim removes the remainder.
 
 | Baseline | Raw σ_θ | Filtered, moving subject | Head width |
 | --- | --- | --- | --- |
-| 400 mm | ≈ 20° | ≈ 7° RMS | ≈ 45 cm |
-| **250 mm** | **≈ 32°** | **≈ 9° RMS** | **≈ 30 cm** |
+| **400 mm** | **≈ 20°** | **≈ 7° RMS** | **≈ 42 cm** |
+| 250 mm | ≈ 32° | ≈ 9° RMS | ≈ 30 cm |
 | 200 mm | ≈ 40° | ≈ 11° RMS | ≈ 25 cm |
 
 ### Elevation from the third anchor
@@ -165,25 +169,27 @@ The same state machine as the camera-only build
 ([without UWB, 05](../../../without_uwb/docs/design/05-tracking-system.md#the-state-machine)).
 The difference is SEARCH: the tag gives the subject's location at once, so
 there is no sweep. The head still has to pan and tilt to bring the person
-into frame.
+into frame. Every session starts in SEARCH: idle's person in frame could be
+anyone, so unlike the camera-only build it never skips straight to FOUND.
 
 ```
-   idle, no person in frame ──tag on──►  SEARCH   turn to the ranged position
-                                           │
-                                           │ on target 0.5 s, person seen
-                                           ▼
-   idle, person in frame ────tag on────►  FOUND    track and frame as when recording
-             (skips SEARCH)                │        (nobody seen for 1 s → SEARCH)
-                                           │ still in frame 3 s later
-                                           ▼
-                                         TRACK ── recording
+   idle ──tag on / Start tracking──►  SEARCH   turn to the ranged position
+                                        │
+                                        │ on target 0.5 s, tag wearer seen
+                                        ▼
+                                      FOUND    track and frame as when recording
+                                        │      (tag wearer unseen for 1 s → SEARCH)
+                                        │ still in frame 3 s later,
+                                        │ and clearly the tag wearer
+                                        ▼
+                                      TRACK ── recording
 ```
 
 | Mode | Behaviour | Exit |
 | --- | --- | --- |
-| **idle**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_IDLE` (0.5 fps). Person in frame from a detection until `IDLE_PERSON_HOLD_S` (4 s) pass without one | session start (tag on, or **Start tracking**) → SEARCH (no person in frame) or FOUND (person in frame) |
-| **SEARCH** | pan (and tilt, with A3) slews to the ranged position | within `ACQUIRE_POINT_TOL_DEG` (4°) for `ACQUIRE_SETTLE_S` (0.5 s) and a person detected → FOUND |
-| **FOUND** | the full tracking loop, as in recording: ranged pan and tilt, vision trim, zoom and focus. The person need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) → recording (TRACK); nobody seen for `FOUND_LOST_S` (1 s) → SEARCH |
+| **idle**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_IDLE` (0.5 fps). Person in frame from a detection of anyone until `IDLE_PERSON_HOLD_S` (4 s) pass without one; it drives the LED and app only | session start (tag on, or **Start tracking**) → SEARCH |
+| **SEARCH** | pan (and tilt, with A3) slews to the ranged position | within `ACQUIRE_POINT_TOL_DEG` (4°) for `ACQUIRE_SETTLE_S` (0.5 s) and the tag wearer detected (below) → FOUND |
+| **FOUND** | the full tracking loop, as in recording: ranged pan and tilt, vision trim, zoom and focus, all from the tag wearer's box. The person need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) and nobody else as near the tag → recording (TRACK); tag wearer unseen for `FOUND_LOST_S` (1 s) → SEARCH |
 | **TRACK** | recording, for the rest of the session; a hidden tag or a missed detection is ordinary tracking | session end |
 
 Mapping to app states (telemetry `phase`): idle = `idle`/`no-person-in-frame`
@@ -191,12 +197,14 @@ or `idle`/`person-in-frame`; SEARCH = `tracking`/`search` (the app pings
 every 3 s); FOUND = `tracking`/`found`; TRACK = `recording`/`track`.
 Telemetry `countdown` carries the seconds left in FOUND (3, 2, 1); the app
 beeps on each, then chimes when recording starts. Not recording after
-`ACQUIRE_STALLED_S` (15 s): the app reports "Can't see you — step into view,
-facing the camera".
+`ACQUIRE_STALLED_S` (15 s): the app reports "Can't pick you out — step
+into view, away from anyone else".
 
 - **Ranging alone never records.** A sign or calibration error shows as a
   ring that keeps chasing, not a recording of a wall. Session start is
   usually an upright climber at the wall base, HOG's best case.
+- **Vision alone never records either**: a person only counts if they are
+  where the tag is (next section).
 - Once recording, nothing depends on vision; detector loss mid-route doesn't
   stop the clip.
 - A subject beyond a soft limit is found from the limit.
@@ -204,11 +212,76 @@ facing the camera".
   started it ([01](../../../docs/product/01-requirements.md#state-machine-with-uwb)).
   **Stop recording** ends the session.
 
+### Telling the tag wearer from everyone else
+
+The detector finds people, not *the* person. A belayer, a spotter or
+someone walking past can be in frame too, and is often the bigger box.
+So in SEARCH and FOUND a detection only counts if it is the tag wearer,
+decided in `Tracker._match_tag` in three steps:
+
+| Step | Rule | Rejects |
+| --- | --- | --- |
+| **Gate** | a new box is admitted only if its bearing (pan angle + its position in the frame at the current zoom) is within `TAG_MATCH_BEARING_DEG` (14°, ≈ 2σ of the filtered bearing) of the tag's, and the distance its height implies (thin lens, `SUBJECT_HEIGHT_M`) is within ×/÷ `TAG_MATCH_RANGE_RATIO` (2) of the ranged distance. A box clipped at the top or bottom can only fail as too near | anyone off to the side; anyone much nearer or farther than the tag, such as a person walking past the lens |
+| **Follow** | the gate only admits. Each person admitted is followed from detection to detection by bearing (moved < `TAG_FOLLOW_DEG`, 6°), averaged on every detection, and forgotten only after `TAG_FORGET_S` (5 s) out of view | a second person taking over between detections; a rival dropping out of the comparison because bearing noise briefly pushed them outside the gate |
+| **Average** | each person keeps the running mean of (box bearing − tag bearing). SEARCH takes whoever is nearest on average. FOUND records only once everyone else is further from the tag by `TAG_MATCH_Z` (3) standard errors of those averages, and at least `TAG_MATCH_MARGIN_DEG` (4°). The standard error is `TAG_BEARING_SIGMA_DEG` (7°) over √(seconds watched / `TAG_BEARING_CORR_S`), where 0.35 s is the Kalman filter's memory. Both are estimates until `bearingcal` measures them ([Calibration](#calibration), step 4). Until then the countdown holds at 1. If someone else earns that lead instead, FOUND switches to them and the countdown starts again | someone standing beside the wearer |
+
+The average is what makes this work. One bearing is ≈ 7° RMS, too noisy to
+split a climber from a belayer standing 1 m away at 10 m (≈ 6°). But the
+noise averages down over time and the two people don't. The lead it asks
+for shrinks as the averages firm up. The test is repeated on every
+detection, which raises the chance of a lucky wrong call. Z = 3 was chosen
+by simulation for that reason: 2 and 2.5 each made the occasional wrong
+call. Simulated with the bearing noise above (`NoisyUwb` in
+`test_session.py`):
+
+| Second person, 10 m out | Records the climber | Wrong person |
+| --- | --- | --- |
+| alone in the gate | after the usual 3 s | — |
+| 2.5 m away (14°) | in ≈ 4–10 s | 0 of 12 |
+| 1.5 m away (8.6°) | in ≈ 8 s on average, all within 18 s | 0 of 12 |
+| 1 m away (5.7°) | in ≈ 12 s on average, all within 30 s | 0 of 12 |
+| 0.5 m away (2.9°) | not within 30 s | 0 of 12 |
+
+With the earlier 250 mm baseline (9°, 0.6 s) 1.5 m took ≈ 17 s and 1 m
+never resolved.
+
+Too close to tell apart, the camera never records. After
+`ACQUIRE_STALLED_S` (15 s) the app asks the climber to step away from
+others. The anchor baseline is the hardware lever: the bearing noise
+falls with spacing ([C2](../../../docs/product/01-requirements.md#non-functional-requirements-with-uwb)).
+
+While more than one person is being compared, the vision pan bias stands
+still until recording. Otherwise it would lean toward whoever was picked
+first, and the averages are measured against it. Bystanders never move
+tilt, zoom or focus. In TRACK the chosen person is followed and others in
+frame are ignored. During a tag dropout mid-climb they are followed by
+position alone.
+
+This relies on the range bias calibration below. A bearing off by
+more than about half the gap between two people can favour the wrong one.
+The single-person case, which is most sessions, is unaffected: one box in
+the gate is the wearer.
+
+### Boxes in the recording
+
+Each detection while recording is saved with a label per box
+(`Tracker._label`), and the players draw them over the clip in colour
+([08](../../../docs/design/08-recordings-and-cloud.md#person-boxes)):
+
+| Label | Colour | When |
+| --- | --- | --- |
+| `climber` | green | the tag wearer, once they can be told from everyone else: in TRACK, or chosen and clear of the rest of the gate |
+| `other` | yellow | everyone else at that point. Also every box when none of them passed the gate: none is where the tag is |
+| `unsure` | red | every box, while two people in the gate are still being told apart, while the wearer is out of sight but someone in the gate is not, or with no ranging to judge by |
+
+Recording starts only once the wearer is clear, so red in a clip mostly
+means the wearer went out of view beside someone else.
+
 ## Camera placement envelope
 
 | # | Constraint | Limit |
 | --- | --- | --- |
-| 1 | **UWB link** | bearing error is independent of distance (σ_θ ≈ √2·σ_r / b; ≈ 9° filtered at 5 m or 30 m). Reliable 20 Hz DS-TWR to **≈ 25–35 m** in a gym (steel, concrete); 50 m+ outdoors line-of-sight |
+| 1 | **UWB link** | bearing error is independent of distance (σ_θ ≈ √2·σ_r / b; ≈ 7° filtered at 5 m or 30 m). Reliable 20 Hz DS-TWR to **≈ 25–35 m** in a gym (steel, concrete); 50 m+ outdoors line-of-sight |
 | 2 | **Resolution (zoom)** — binding | 1.8 m subject at full zoom: 65 % of frame to ≈ 8.3 m, 40 % at 13.5 m, 18 % at 30 m; full body from ≈ 1.5 m ([03](../../../docs/design/03-mechanical-design.md#how-far-the-zoom-reaches)) |
 | 3 | **Geometry** | < 5 m from a tall wall: steep tilt (foreshortening) and high angular rates. At 8–12 m a 15 m route spans ≈ 50–60° of tilt |
 | 4 | **Pan range ±80°** | at 8 m the sweep is ≈ 22 m wide (any bouldering wall, most routes). Aim at the centre of the area; check both ends before starting |
@@ -223,7 +296,8 @@ below the framing target; beyond ≈ 30 m the UWB link fails first.
 | 1 | **Antenna delay** (optional) | tune each board's DW1000 antenna-delay constant until its range to a taped 5.00 m is close | only if the firmware exposes it; step 2 absorbs the remainder. Skip with stock ULA1 firmware |
 | 2 | **Range bias** | pan centred; tag **5.00 m** out on the boresight, level with A1/A2; `python3 -m sportcam.rangecal 5` | 300 frames; median range per anchor vs geometric truth (A1/A2: hypot(d, b/2); A3: hypot(d + back, up)); prints `RANGE_BIAS_M`. Also corrects A1–A2 imbalance. Reports per-anchor noise; investigate if well above `UWB_RANGE_SIGMA_M`. A3 bias is critical: 5 cm ≈ 12° elevation at 10 m |
 | 3 | **A3 geometry** | measure A3 height above A1/A2 and distance behind the pan axis; set `UWB_A3_UP_M`, `UWB_A3_BACK_M` | defaults 0.250 / 0.089 (kept in step with the CAD by `cad/fit.py`) match the printed mast with the dowel cut to 246 mm and fully seated. Check: tag level with the anchors at 5 m reads ≈ 0° |
-| 4 | **Lens and servos** | zoom curve, focus grid, axis centre and direction | same in both builds; procedure in [14 — Software setup](../setup/14-software-setup.md#6-calibrate). With A3, `TILT_SIGN` matters as much as `PAN_SIGN`: a wrong sign drives the camera away from the subject |
+| 4 | **Bearing noise** | after step 2; the wearer stands still on the boresight with the tag worn as in use; `python3 -m sportcam.bearingcal 5`, then `10` | filtered bearing through the tracker's own Kalman filter, 60 s per run; prints σ (RMS about the mean) and τ (autocorrelation falls to 1/e) for `TAG_BEARING_SIGMA_DEG` and `TAG_BEARING_CORR_S`, which set how long the [tag-wearer match](#telling-the-tag-wearer-from-everyone-else) averages. Take the larger σ and longer τ: overestimates only make it slower, underestimates can let it pick the wrong person. Mean over 3° flags a stale step 2 or a wearer off the boresight |
+| 5 | **Lens and servos** | zoom curve, focus grid, axis centre and direction | same in both builds; procedure in [14 — Software setup](../setup/14-software-setup.md#6-calibrate). With A3, `TILT_SIGN` matters as much as `PAN_SIGN`: a wrong sign drives the camera away from the subject |
 
 ## Wearing the tag
 

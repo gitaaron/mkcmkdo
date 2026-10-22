@@ -47,10 +47,7 @@ void main() {
   final t = Telemetry.fromJson(state['telemetry'] as Map<String, dynamic>?);
   check('telemetry parses', t.pan == 90.0 && t.tilt == 12.0 && t.distM == 4.2);
   check('telemetry tolerates null', Telemetry.fromJson(null).pan == null);
-  final acq = Telemetry.fromJson({
-    'phase': 'search',
-    'acquireStalled': true,
-  });
+  final acq = Telemetry.fromJson({'phase': 'search', 'acquireStalled': true});
   check(
     'search phase and stall flag parse',
     acq.phase == 'search' && acq.acquireStalled,
@@ -102,6 +99,54 @@ void main() {
     'duration label',
     recs.first.durationLabel == '0:03',
     recs.first.durationLabel,
+  );
+  check(
+    'no boxes → no boxes url',
+    recs.first.boxesUrl == null &&
+        recs.first.absoluteBoxesUrl('http://b') == null,
+  );
+  final withBoxes = Recording.fromJson({
+    ...(recJson['recordings'] as List<dynamic>).first as Map<String, dynamic>,
+    'boxesUrl': '/api/recordings/rec_20260921010951.boxes.json',
+  });
+  check(
+    'boxes url resolves against base',
+    withBoxes.absoluteBoxesUrl('http://10.0.0.5:8787') ==
+        'http://10.0.0.5:8787/api/recordings/rec_20260921010951.boxes.json',
+  );
+
+  // The person boxes beside a clip, as the device's boxlog.py writes them.
+  final track = BoxTrack.fromJson(
+    jsonDecode(
+      '{"v":1,"size":[1280,720],"frames":['
+      '[0.5,[[10,20,30,90,"unsure"],[300,20,30,90,"unsure"]]],'
+      '[1.0,[[12,20,30,90,"climber"],[300,20,30,90,"other"]]],'
+      '[1.33,[]],'
+      '[3.0,[[14,20,30,90,"climber"]]]]}',
+    ),
+  );
+  check(
+    'box track parses',
+    track != null && track.width == 1280 && track.frames.length == 4,
+  );
+  check('no boxes before the first detection', track!.at(0.2).isEmpty);
+  final now = track.at(1.2);
+  check(
+    'boxes at a moment are the last detection before it',
+    now.length == 2 &&
+        now[0].label == BoxLabel.climber &&
+        now[0].x == 12 &&
+        now[1].label == BoxLabel.other,
+  );
+  check('an empty detection clears them', track.at(1.5).isEmpty);
+  check('…and a stale one is not shown past the hold', track.at(4.2).isEmpty);
+  check(
+    'unknown labels read as unsure',
+    boxLabelFrom('bogus') == BoxLabel.unsure,
+  );
+  check(
+    'a box file of another version is ignored',
+    BoxTrack.fromJson({'v': 2}) == null,
   );
 
   // Endpoint URL construction — what the app actually connects to.

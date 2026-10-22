@@ -12,6 +12,7 @@ Two layers, neither of which needs a Pi:
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 
@@ -105,6 +106,7 @@ async def full_flow() -> None:
     print("\nfull flow through Head")
     import sportcam.main as main_mod
     from sportcam.cloud import CloudLink
+    from sportcam.boxlog import BoxLog
     from sportcam.main import Head
 
     async def no_upload(*a, **k):
@@ -128,6 +130,7 @@ async def full_flow() -> None:
     head.cloud = CloudLink(head)       # not connected: writes are no-ops
     head._rec_path, head._rec_started = "", 0.0
     head._countdown_sent = 0
+    head.boxlog = BoxLog()
 
     countdown_sent: list[int] = []     # what the app hears, in order, to beep on
     send = head.send_telemetry
@@ -196,6 +199,10 @@ async def full_flow() -> None:
     # --- stop recording: the session ends --------------------------------------------
     await head.apply_state("tracking")          # what an older app sends
     check("stop recording → idle", head.state == "idle" and not head.camera.recording)
+    side = "/tmp/sportcam-test.boxes.json"
+    frames = json.load(open(side))["frames"] if os.path.exists(side) else []
+    check("the clip's person boxes are saved beside it, the climber labelled",
+          any(label == "climber" for _, boxes in frames for *_, label in boxes), f"{frames[:3]}")
 
     # --- a person who walks off during the countdown -----------------------------------
     person.visible, person.bearing = False, 40.0

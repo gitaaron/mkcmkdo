@@ -9,7 +9,9 @@
  *   - listens to that document and adopts any state an app asked for
  *   - posts preview frames to cameras/{key}/live/preview while an app watches
  *   - when a "recording" stops, uploads sim/sample.mp4 through the API
- *     (createUploadUrl → PUT → finalizeRecording), like uploader.py
+ *     (createUploadUrl → PUT → finalizeRecording), like uploader.py, with
+ *     made-up person boxes beside it so the players' overlay has something
+ *     to show
  *
  * Environment (npm run dev sets these):
  *   FIRESTORE_EMULATOR_HOST   e.g. 127.0.0.1:8080
@@ -70,17 +72,40 @@ async function call(name, data) {
   return body.result;
 }
 
+/**
+ * Person boxes in the device's boxlog.py format: a climber drifting across,
+ * a belayer standing still, and the first second and a half unsure.
+ */
+function sampleBoxes(durationS) {
+  const frames = [];
+  for (let t = 0; t <= durationS; t += 1 / 3) {
+    const sure = t > 1.5;
+    const climber = [Math.round(380 + 40 * Math.sin(t / 2)), 120 - Math.round(10 * t) % 60, 150, 420];
+    const belayer = [820, 230, 140, 400];
+    frames.push([Math.round(t * 100) / 100, [
+      [...climber, sure ? "climber" : "unsure"],
+      [...belayer, sure ? "other" : "unsure"],
+    ]]);
+  }
+  return Buffer.from(JSON.stringify({ v: 1, size: [1280, 720], frames }));
+}
+
+async function put(name, bytes) {
+  const target = await call("createUploadUrl", { name });
+  const url = target.url.startsWith("/") ? API + target.url : target.url;
+  const res = await fetch(url, { method: target.method, headers: target.headers, body: bytes });
+  if (!res.ok) throw new Error(`upload HTTP ${res.status}`);
+}
+
 /** The same flow as the Pi's uploader.py. */
 async function uploadSample(durationS) {
   const name = `rec_${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}.mp4`;
   const bytes = readFileSync(SAMPLE);
-  const target = await call("createUploadUrl", { name });
-  const url = target.url.startsWith("/") ? API + target.url : target.url;
   await cam.update({ upload: { name, sent: 0, total: bytes.length } });
-  const put = await fetch(url, { method: target.method, headers: target.headers, body: bytes });
-  if (!put.ok) throw new Error(`upload HTTP ${put.status}`);
+  await put(name, bytes);
   await cam.update({ upload: { name, sent: bytes.length, total: bytes.length } });
-  await call("finalizeRecording", { name, bytes: bytes.length, durationS });
+  await put(name.replace(/\.mp4$/, ".boxes.json"), sampleBoxes(durationS ?? 10));
+  await call("finalizeRecording", { name, bytes: bytes.length, durationS, boxes: true });
   console.log(`[sim] recording saved: ${name}`);
 }
 

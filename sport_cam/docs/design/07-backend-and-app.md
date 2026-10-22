@@ -124,7 +124,8 @@ src/web/src/
     VideoView.vue        WHEP video when the camera offers it and it's reachable, else the preview
     StatusRing.vue       top-right circular indicator, colours = LED colours
     ControlBar.vue       bottom buttons, swap with state
-    LibraryView.vue      recordings list + <video> player (range-seekable)
+    LibraryView.vue      recordings list
+    RecordingPlayer.vue  <video> player (range-seekable) with the person boxes drawn over it
     KeyPrompt.vue        asks for the camera key if the link didn't carry it
   lib/api.ts             call(name, data) with the camera key + typed wrappers
   lib/firebase.ts        Firestore: the emulator in dev, /__/firebase/init.json deployed
@@ -132,6 +133,7 @@ src/web/src/
   lib/useCameraState.ts  live camera document, recordings and preview via onSnapshot
   lib/chime.ts           search pings, countdown beeps, recording start/stop chimes (Web Audio)
   lib/modeText.ts        the wording that differs between with_uwb and without_uwb
+  lib/boxes.ts           a clip's person boxes: parsing, and which to draw at a moment
 ```
 
 Behaviour (requirement F5 in [01](../product/01-requirements.md#functional-requirements)):
@@ -141,7 +143,7 @@ Behaviour (requirement F5 in [01](../product/01-requirements.md#functional-requi
   camera's state, with the colours, labels and buttons in
   [01 — State machine](../product/01-requirements.md#state-machine). The
   ring is hollow while the camera is offline. If tracking stalls, a pill
-  says <!--with_uwb-->"Can't see you — step into view, facing the camera"<!--/--><!--both--> (with UWB) or<!--/--><!--without_uwb--> "Can't
+  says <!--with_uwb-->"Can't pick you out — step into view, away from anyone else"<!--/--><!--both--> (with UWB) or<!--/--><!--without_uwb--> "Can't
   find anyone — step into the room, facing the camera" (<!--/--><!--both-->without UWB, <!--/--><!--without_uwb-->after
   15 s with nobody found)<!--/-->.
 - **Sounds** (`lib/chime.ts`): a sonar ping every 3 s while telemetry
@@ -156,9 +158,13 @@ Behaviour (requirement F5 in [01](../product/01-requirements.md#functional-requi
   consistent.
 - **Recording library:** ▶ button (top left, clip-count badge) opens
   `LibraryView`. Upload progress pill during upload; **"Recording saved —
-  watch now"** toast when it lands. Playback: plain `<video>` on the playback
+  watch now"** toast when it lands. Playback: `<video>` on the playback
   URL (redirects to Cloud Storage; Range requests make seeking work on
-  phones).
+  phones), with the clip's [person boxes](08-recordings-and-cloud.md#person-boxes)
+  drawn on a canvas over it. A **Boxes on / off** button in the player's
+  corner shows or hides them (remembered in the browser), and a legend under
+  the video names the colours. The player has its own fullscreen button: the
+  browser's would show the video without the boxes.
 
 ## Configuration
 

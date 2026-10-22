@@ -6,7 +6,7 @@ sufficient.
 
 | Build | Parts | PETG | Machine time |
 | --- | --- | --- | --- |
-| [With UWB](#with-uwb) | 10 (5 common + 2 arms, mast foot, mast cradle, wearable pod) | ≈ 420 g | ≈ 40 h |
+| [With UWB](#with-uwb) | 10 (5 common + 2 arms, mast foot, mast cradle, wearable pod) | ≈ 430 g | ≈ 41 h |
 | [Without UWB](#without-uwb) | 5 (the common parts) | ≈ 280 g | ≈ 26 h |
 
 | Topic | Reference |
@@ -51,7 +51,8 @@ Sizes with the assumed parts (bounding box, mm):
 | LED diffuser band | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->Ø 145 × 16<!--/--><!--both--> / <!--/--><!--without_uwb-->Ø 139 × 16<!--/--> | 25+ |
 | Battery tray | both | 155 × 77 × 12 | 15 |
 | Wearable pod | with UWB | 142 × 74 × 31 | 28 |
-| Anchor arm, mast foot, mast cradle | with UWB | ≤ 69 mm | 100+ |
+| Anchor arm | with UWB | 142 × 28 × 24 | 28 |
+| Mast foot, mast cradle | with UWB | ≤ 69 mm | 100+ |
 
 - **Build volume is the only hard requirement:** 160 × 155 mm clears every
   part at the assumed sizes; the A1 Mini's 180 × 180 leaves margin.
@@ -189,7 +190,7 @@ Additional parts:
 
 | Part | Walls | Infill | Layer | Est. mass | Est. time |
 | --- | --- | --- | --- | --- | --- |
-| [Anchor arm](../../with_uwb/cad/anchor_arm.scad) ×2 | 4 | 25 % | 0.2 | ≈ 16 g each | ≈ 1.7 h each |
+| [Anchor arm](../../with_uwb/cad/anchor_arm.scad) ×2 | 4 | 25 % | 0.2 | ≈ 22 g each | ≈ 2.3 h each |
 | [Mast foot](../../with_uwb/cad/anchor_mast.scad) | 4 | 25 % | 0.2 | ≈ 11 g | ≈ 1.5 h |
 | [Mast cradle](../../with_uwb/cad/anchor_mast.scad) | 4 | 25 % | 0.2 | ≈ 14 g | ≈ 1.5 h |
 | [Wearable pod](../../with_uwb/cad/wearable_case.scad) | 2 | 20 % | 0.2 | ≈ 44 g | ≈ 4 h |

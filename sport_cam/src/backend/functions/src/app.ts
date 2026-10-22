@@ -2,7 +2,8 @@
  * The SportCam API — one Express app, served as a single HTTPS function.
  *
  *   POST /api/call/:name             body { data } → 200 { result } | 4xx/5xx { error }
- *   GET  /api/recordings/:name?k=    playback (302 to a signed URL; streamed under the emulator)
+ *   GET  /api/recordings/:name?k=    playback (302 to a signed URL; streamed under the emulator),
+ *                                    or <clip>.boxes.json, the person boxes (always streamed)
  *   PUT  /api/recordings/upload/:name?k=   emulator only: stand-in for the signed upload URL
  *   GET  /api/health
  *

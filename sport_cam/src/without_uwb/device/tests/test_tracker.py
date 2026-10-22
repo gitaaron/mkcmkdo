@@ -12,6 +12,8 @@ What is checked is what is easy to get wrong and impossible to eyeball:
     the soft limits and never exceeds the slew limit;
   * the first person seen is the one followed, and a bystander does not steal
     the lock;
+  * the recording's boxes: the person followed green, others yellow, red
+    while the person is out of sight and someone else is not;
   * a lone false positive does not lock;
   * following converges without overshoot, and follows someone who moves;
   * losing the person starts a new sweep;
@@ -241,6 +243,33 @@ def main() -> None:
     check("a nearer bystander does not take over",
           abs(ptz.pan_deg - 30.0) < 5.0 and locked(tr), f"pan {ptz.pan_deg:.1f}")
     check("detector searches a strip around the person", cam.column is not None)
+
+    # ---- 4b. boxes for the recording's overlay ---------------------------------
+    print("\nboxes")
+    a = Person(20.0)
+    tr, cam, ptz = world(a)
+    run(tr, 20, until=lambda: locked(tr))
+    run(tr, 2)
+    _pw, ph = config.PREVIEW_SIZE
+    stranger = (10, ph // 2 - 100, 60, 200)      # at the frame's edge, outside the follow gate
+
+    def next_detection() -> None:
+        n = cam.detections
+        run(tr, 2, until=lambda: cam.detections > n)
+
+    cam.spurious = [stranger]
+    next_detection()
+    labels = dict((box, label) for box, label in tr.labelled)
+    check("the person followed is boxed green, anyone else yellow",
+          labels.get(stranger) == "other" and list(labels.values()).count("climber") == 1,
+          f"{tr.labelled}")
+    a.visible = False
+    cam.spurious = [stranger]
+    next_detection()
+    check("…and with them out of sight, someone else is boxed red: it cannot tell",
+          tr.labelled == [(stranger, "unsure")], f"{tr.labelled}")
+    next_detection()
+    check("…and nobody in view, no boxes", tr.labelled == [], f"{tr.labelled}")
 
     # ---- 5. following ----------------------------------------------------------
     print("\nfollowing")

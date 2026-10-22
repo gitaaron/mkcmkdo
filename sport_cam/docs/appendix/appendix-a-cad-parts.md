@@ -123,7 +123,8 @@ cables come in. Three more files:
 | `wearable_case.scad` | Wearable pod body + lid, strap bars, USB-C slot; sized by `fit.py` for the ULA1 plugged straight into the end of its bank |
 
 One dimension worth *choosing* rather than measuring: `uwb_half_base`. It is
-set to 125 mm (a 250 mm baseline) to keep the head compact — see
+set to 190 mm, which puts the antennas 400 mm apart (each sits 10 mm
+further out than the board's centre) — see
 [constraints C1–C2](../product/01-requirements.md#non-functional-requirements-with-uwb). Bearing noise
 scales as 1/baseline
 ([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)), so if you have the

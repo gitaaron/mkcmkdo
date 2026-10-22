@@ -31,6 +31,7 @@ export interface RecordingMeta {
   createdAt: string;
   durationS: number | null;
   url: string;
+  boxesUrl: string | null; // person boxes to draw over the video (lib/boxes.ts)
 }
 
 /**

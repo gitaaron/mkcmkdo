@@ -28,6 +28,7 @@ import asyncio
 import time
 
 from . import config
+from .boxlog import BoxLog
 from .camera import Camera
 from .cloud import CloudLink
 from .discovery import Advertiser
@@ -58,6 +59,7 @@ class Head:
         self.mdns = Advertiser()
         self._rec_path = ""
         self._rec_started = 0.0
+        self.boxlog = BoxLog()     # person boxes beside the clip, for the players' overlay
         self._warned = ""          # which warning we last announced
         self._countdown_sent = 0   # tracker.countdown as last sent to the app
 
@@ -128,10 +130,12 @@ class Head:
         if old != "recording" and new == "recording":
             self._rec_path = self.camera.start_recording()
             self._rec_started = time.monotonic()
+            self.boxlog.start(self._rec_path, self._rec_started)
             self.tracker.confirm()
             print(f"[rec] → {self._rec_path}")
         elif old == "recording" and new != "recording":
             self.camera.stop_recording()
+            self.boxlog.stop()
             duration = time.monotonic() - self._rec_started
             print(f"[rec] stopped ({duration:.0f}s) — uploading in background")
             asyncio.create_task(
@@ -169,6 +173,8 @@ class Head:
         """One 20 Hz tick: track, notice a lost tag, and run the tag session."""
         if self.state in ("tracking", "recording"):
             self.tracker.step()
+            if self.state == "recording":
+                self.boxlog.note(self.tracker.labelled_at, self.tracker.labelled)
             await self.announce_countdown()
             self.led.lost = self.tracker.lost_for() > config.LOST_HOLD_S
             if self.tracker.lost_for() > config.LOST_IDLE_S:
@@ -176,7 +182,7 @@ class Head:
                 await self.report_state()
         else:
             if self.state == "idle":
-                self.tracker.watch_idle()     # person in frame? (a session started now starts in FOUND)
+                self.tracker.watch_idle()     # person in frame? (LED and app only: sessions start in SEARCH)
             self.led.lost = False
         # The tag switching on (or the person found for FOUND_CONFIRM_S) can move the
         # state, through the same apply_state() as any other command.

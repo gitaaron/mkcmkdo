@@ -9,6 +9,7 @@ safeguards that stop that ending in a truncated recording.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import shutil
 import sys
@@ -17,7 +18,9 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from sportcam import config, storage, uploader
+from aiohttp import web
+
+from sportcam import boxlog, config, storage, uploader
 
 failures: list[str] = []
 
@@ -120,6 +123,67 @@ def main() -> None:
     check("empty card → nothing to do", asyncio.run(uploader.drain_pending(noop)) == 0)
 
     uploader.upload_recording = real
+
+    # ---- 8. the person boxes are written beside the clip -------------------
+    clip = make_clip(tmp, "rec_boxes.mp4")
+    log = boxlog.BoxLog()
+    log.start(clip, started=100.0)
+    log.note(100.5, [((10, 20, 30, 90), boxlog.CLIMBER), ((300, 20, 30, 90), boxlog.OTHER)])
+    log.note(100.5, [((10, 20, 30, 90), boxlog.CLIMBER)])      # the same detection again
+    log.note(100.9, [])
+    side = log.stop()
+    doc = json.load(open(side)) if side else {}
+    check("boxes are saved as <clip>.boxes.json",
+          side == os.path.join(tmp, "rec_boxes.boxes.json"), f"{side}")
+    check("…one frame per detection, timed from the clip's start, labels kept",
+          doc.get("frames") == [[0.5, [[10, 20, 30, 90, "climber"], [300, 20, 30, 90, "other"]]],
+                                [0.9, []]], f"{doc.get('frames')}")
+    check("…with the frame size the boxes are measured in",
+          doc.get("size") == list(config.PREVIEW_SIZE) and doc.get("v") == 1)
+    check("nothing recording → nothing written", boxlog.BoxLog().stop() is None)
+
+    # ---- 9. the clip and its boxes upload together -------------------------
+    got: dict[str, object] = {}
+
+    async def call(req: web.Request) -> web.Response:
+        data = (await req.json())["data"]
+        if req.match_info["fn"] == "createUploadUrl":
+            return web.json_response({"result": {"url": f"/put/{data['name']}", "method": "PUT"}})
+        got["finalize"] = data
+        return web.json_response({"result": {"name": data["name"]}})
+
+    async def put(req: web.Request) -> web.Response:
+        got[req.match_info["name"]] = len(await req.read())
+        return web.json_response({})
+
+    async def run_upload() -> None:
+        app = web.Application()
+        app.router.add_post("/api/call/{fn}", call)
+        app.router.add_put("/put/{name}", put)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "127.0.0.1", 0)
+        await site.start()
+        port = site._server.sockets[0].getsockname()[1]
+        base, key, keep = config.UPLOAD_API_BASE, config.CAMERA_KEY, config.DELETE_AFTER_UPLOAD
+        config.UPLOAD_API_BASE, config.CAMERA_KEY = f"http://127.0.0.1:{port}", "k"
+        config.DELETE_AFTER_UPLOAD = True
+        try:
+            await uploader.upload_recording(clip, 12.0, noop)
+        finally:
+            config.UPLOAD_API_BASE, config.CAMERA_KEY, config.DELETE_AFTER_UPLOAD = base, key, keep
+            await runner.cleanup()
+
+    asyncio.run(run_upload())
+    check("the clip and its boxes are both uploaded",
+          got.get("rec_boxes.mp4") == 1_000_000 and got.get("rec_boxes.boxes.json", 0) > 0,
+          f"{list(got)}")
+    check("…and the backend is told the clip has boxes",
+          isinstance(got.get("finalize"), dict) and got["finalize"].get("boxes") is True,
+          f"{got.get('finalize')}")
+    check("…and both leave the card once confirmed",
+          not os.path.exists(clip) and not os.path.exists(side or ""))
+
     shutil.rmtree(tmp, ignore_errors=True)
 
     print()

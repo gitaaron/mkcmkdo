@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import type { RecordingMeta } from "../lib/api";
+import RecordingPlayer from "./RecordingPlayer.vue";
 
 defineProps<{ recordings: readonly RecordingMeta[] }>();
 const emit = defineEmits<{ close: [] }>();
@@ -47,8 +48,7 @@ function fmtDur(s: number | null): string {
         <h2>{{ fmtWhen(playing.createdAt) }}</h2>
         <button class="close" aria-label="Back to list" @click="playing = null">✕</button>
       </div>
-      <!-- range-capable endpoint → seeking works on phones -->
-      <video :src="playing.url" controls autoplay playsinline />
+      <RecordingPlayer :recording="playing" />
     </template>
   </div>
 </template>
@@ -100,5 +100,4 @@ ul { list-style: none; overflow-y: auto; }
 .play { color: var(--idle); font-size: 13px; }
 .meta { display: flex; flex-direction: column; gap: 2px; }
 .sub { color: var(--muted); font-size: 12.5px; }
-video { flex: 1; width: 100%; min-height: 0; background: #000; border-radius: 10px; }
 </style>

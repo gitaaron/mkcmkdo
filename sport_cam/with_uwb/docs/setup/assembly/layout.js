@@ -3,11 +3,11 @@ window.SPORTCAM_LAYOUT = {
  "R_in": 67.5,
  "a3_back": 89.1,
  "a3_up": 250,
- "antenna_x": 10.0,
+ "antenna_x": 0.0,
  "arm_boss_r": 74.5,
  "base_d": 141,
  "base_h": 84,
- "baseline": 250.0,
+ "baseline": 400.0,
  "below_lid": 2,
  "boxes": {
   "buck": {
@@ -406,8 +406,8 @@ window.SPORTCAM_LAYOUT = {
  },
  "tilt_z": 138,
  "tray_z": -52.4,
- "ula1_radial_room": 12.5,
- "ula1_tangential": true,
+ "ula1_radial_room": 77.5,
+ "ula1_tangential": false,
  "usb_entry": {
   "ang": 25,
   "h": 10,
@@ -424,7 +424,7 @@ window.SPORTCAM_LAYOUT = {
   "anchor_board_z": 22,
   "arm_boss_z": 10,
   "mast_floor": 2,
-  "uwb_half_base": 125,
+  "uwb_half_base": 190,
   "uwb_v_base": 250
  },
  "vent_high_z": 64.75,

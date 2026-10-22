@@ -5,7 +5,8 @@ After a recording stops, pushes the finished MP4 to the recording backend and
 a store. Talks to the Firebase API (config.UPLOAD_API_BASE,
 "https://<project>.web.app"), naming this camera with config.CAMERA_KEY.
 
-Flow:  createUploadUrl → PUT file (chunked, with progress) → finalizeRecording
+Flow:  createUploadUrl → PUT file (chunked, with progress) → the same for its
+       person boxes (`<clip>.boxes.json`, boxlog.py), if any → finalizeRecording
 
 The PUT goes straight to Cloud Storage on a signed URL; under the emulator
 the URL is relative and points back at the API.
@@ -20,6 +21,7 @@ from typing import Awaitable, Callable
 import aiohttp
 
 from . import config
+from .boxlog import sidecar
 from .storage import pending_files
 
 ProgressFn = Callable[[dict], Awaitable[None]]
@@ -40,48 +42,62 @@ async def _call(session: aiohttp.ClientSession, name: str, data: dict) -> dict:
         return body["result"]
 
 
+async def _put(session: aiohttp.ClientSession, path: str,
+               progress: ProgressFn | None) -> None:
+    """PUT one file to the URL the backend signs for it."""
+    name = os.path.basename(path)
+    total = os.path.getsize(path)
+    target = await _call(session, "createUploadUrl", {"name": name})
+    url = target["url"]
+    if url.startswith("/"):
+        url = config.UPLOAD_API_BASE + url
+
+    sent = 0
+    last_report = 0.0
+
+    async def body():
+        nonlocal sent, last_report
+        with open(path, "rb") as f:
+            while chunk := f.read(CHUNK):
+                yield chunk
+                sent += len(chunk)
+                now = asyncio.get_event_loop().time()
+                if progress and (now - last_report > 1.0 or sent == total):
+                    last_report = now
+                    await progress({"type": "uploadProgress", "name": name,
+                                    "sent": sent, "total": total})
+
+    async with session.request(
+        target.get("method", "PUT"), url, data=body(),
+        headers={**target.get("headers", {}), "Content-Length": str(total)},
+        timeout=aiohttp.ClientTimeout(total=3600),
+    ) as resp:
+        if resp.status not in (200, 201):
+            raise RuntimeError(f"upload HTTP {resp.status}: {(await resp.text())[:200]}")
+
+
 async def upload_recording(path: str, duration_s: float | None, progress: ProgressFn) -> None:
-    """Upload one file; reports {"type":"uploadProgress",...} via `progress`."""
+    """Upload one clip and its boxes; reports {"type":"uploadProgress",...} via `progress`."""
     if not (config.UPLOAD_API_BASE and config.CAMERA_KEY):
         raise RuntimeError("no recording backend set (UPLOAD_API_BASE, CAMERA_KEY) — kept on the card")
     name = os.path.basename(path)
     total = os.path.getsize(path)
+    boxes = sidecar(path)
+    has_boxes = os.path.exists(boxes)
 
     async with aiohttp.ClientSession() as session:
-        target = await _call(session, "createUploadUrl", {"name": name})
-        url = target["url"]
-        if url.startswith("/"):
-            url = config.UPLOAD_API_BASE + url
-
-        sent = 0
-        last_report = 0.0
-
-        async def body():
-            nonlocal sent, last_report
-            with open(path, "rb") as f:
-                while chunk := f.read(CHUNK):
-                    yield chunk
-                    sent += len(chunk)
-                    now = asyncio.get_event_loop().time()
-                    if now - last_report > 1.0 or sent == total:
-                        last_report = now
-                        await progress({"type": "uploadProgress", "name": name,
-                                        "sent": sent, "total": total})
-
-        async with session.request(
-            target.get("method", "PUT"), url, data=body(),
-            headers={**target.get("headers", {}), "Content-Length": str(total)},
-            timeout=aiohttp.ClientTimeout(total=3600),
-        ) as resp:
-            if resp.status not in (200, 201):
-                raise RuntimeError(f"upload HTTP {resp.status}: {(await resp.text())[:200]}")
-
+        await _put(session, path, progress)
+        if has_boxes:
+            await _put(session, boxes, None)
         meta = await _call(session, "finalizeRecording",
-                           {"name": name, "bytes": total, "durationS": duration_s})
+                           {"name": name, "bytes": total, "durationS": duration_s,
+                            "boxes": has_boxes})
         print(f"[upload] confirmed: {json.dumps(meta)[:120]}")
 
     if config.DELETE_AFTER_UPLOAD:
         os.remove(path)
+        if has_boxes:
+            os.remove(boxes)
         print(f"[upload] local copy removed: {path}")
 
 

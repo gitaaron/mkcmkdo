@@ -3,6 +3,7 @@ import {
   collection, doc, limit, onSnapshot, orderBy, query, type Timestamp, type Unsubscribe,
 } from "firebase/firestore";
 import { api, recordingUrl, type CamState, type RecordingMeta, type StateSnapshot } from "./api.js";
+import { boxesName } from "./boxes.js";
 import { cameraKey } from "./cameraKey.js";
 import { beep, chime, ping } from "./chime.js";
 import { firestore } from "./firebase.js";
@@ -123,6 +124,7 @@ async function subscribe(key: string): Promise<void> {
           durationS: v.durationS ?? null,
           createdAt: new Date(ms(v.createdAt)).toISOString(),
           url: recordingUrl(v.name),
+          boxesUrl: v.boxes ? recordingUrl(boxesName(v.name)) : null,
         };
       });
       const newest = store.recordings[0];

@@ -5,7 +5,8 @@ API speaks (src/backend/functions), so the app talks to both identically:
 
     POST /api/call/<name>          {"data": …} → {"result": …} | {"error": …}
     GET  /api/stream.mjpeg         live MJPEG (multipart/x-mixed-replace)
-    GET  /api/recordings/:name     local clip, HTTP Range supported
+    GET  /api/recordings/:name     local clip, HTTP Range supported, or its
+                                   <clip>.boxes.json (person boxes, boxlog.py)
     WS   /ws                       state + recordings broadcasts
     GET  /api/health               {"ok":true,"backend":"device", …}
 
@@ -27,6 +28,7 @@ from typing import Any, Awaitable, Callable
 from aiohttp import WSMsgType, web
 
 from . import config
+from .boxlog import sidecar
 
 CallableFn = Callable[[Any], Awaitable[Any]]
 
@@ -158,12 +160,16 @@ class LocalApi:
                 if not name.endswith(".mp4"):
                     continue
                 st = os.stat(os.path.join(config.RECORD_DIR, name))
+                boxes = os.path.basename(sidecar(name))
                 out.append({
                     "name": name,
                     "bytes": st.st_size,
                     "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(st.st_mtime)),
                     "durationS": None,
                     "url": f"/api/recordings/{name}",
+                    "boxesUrl": (f"/api/recordings/{boxes}"
+                                 if os.path.isfile(os.path.join(config.RECORD_DIR, boxes))
+                                 else None),
                 })
         return {"recordings": out}
 
@@ -214,7 +220,9 @@ class LocalApi:
 
     async def _handle_recording(self, req: web.Request) -> web.StreamResponse:
         name = req.match_info["name"]
-        if "/" in name or ".." in name or not name.endswith(".mp4"):
+        kind = ("video/mp4" if name.endswith(".mp4")
+                else "application/json" if name.endswith(".boxes.json") else None)
+        if "/" in name or ".." in name or kind is None:
             return web.json_response(
                 {"error": {"code": "invalid-argument", "message": "bad name"}}, status=400)
         path = os.path.join(config.RECORD_DIR, name)
@@ -222,7 +230,7 @@ class LocalApi:
             return web.json_response(
                 {"error": {"code": "not-found", "message": "no such recording"}}, status=404)
         # FileResponse implements Range/If-Range — phones need it to seek.
-        return web.FileResponse(path, headers={"Content-Type": "video/mp4"})
+        return web.FileResponse(path, headers={"Content-Type": kind})
 
     async def _handle_ws(self, req: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse(heartbeat=20)
