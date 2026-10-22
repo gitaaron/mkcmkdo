@@ -7,7 +7,7 @@ API speaks (src/backend/functions), so the app talks to both identically:
     GET  /api/stream.mjpeg         live MJPEG (multipart/x-mixed-replace)
     GET  /api/recordings/:name     local clip, HTTP Range supported, or its
                                    <clip>.boxes.json (person boxes, boxlog.py)
-    WS   /ws                       state + recordings broadcasts
+    WS   /ws                       state, recordings and live person-box broadcasts
     GET  /api/health               {"ok":true,"backend":"device", …}
 
 Why the camera serves its own API: on gym Wi-Fi (or the camera's own

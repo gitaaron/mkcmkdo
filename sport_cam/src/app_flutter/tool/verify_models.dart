@@ -162,6 +162,39 @@ void main() {
         1,
   );
 
+  // The live view's boxes: a `boxes` message on the device's WebSocket, and
+  // the same shape inside `getPreview` from Firebase.
+  final boxesMsg = jsonDecode('''
+  {"type":"boxes","size":[1280,720],
+   "boxes":[[412,160,96,288,"climber"],[820,230,140,400,"other"]]}
+  ''') as Map<String, dynamic>;
+  final live = LiveBoxes.fromJson(boxesMsg['size'], boxesMsg['boxes']);
+  check(
+    'live boxes parse',
+    live != null &&
+        live.width == 1280 &&
+        live.boxes.length == 2 &&
+        live.boxes.first.label == BoxLabel.climber &&
+        live.boxes.last.x == 820,
+  );
+  check(
+    'an empty list is "looked and saw nobody", not "no boxes"',
+    LiveBoxes.fromJson([1280, 720], [])?.boxes.isEmpty == true,
+  );
+  check(
+    'a preview from an older camera has no boxes',
+    LiveBoxes.fromJson(null, null) == null,
+  );
+  check(
+    'malformed boxes are skipped, not fatal',
+    LiveBoxes.fromJson([1280, 720], [
+          [1, 2, 3],
+          ['a', 2, 3, 4, 'other'],
+          [1, 2, 3, 4, 'bogus'],
+        ])?.boxes.single.label ==
+        BoxLabel.unsure,
+  );
+
   final upload = const UploadProgress('rec.mp4', 45, 90);
   check('upload fraction', upload.fraction == 0.5);
   check(

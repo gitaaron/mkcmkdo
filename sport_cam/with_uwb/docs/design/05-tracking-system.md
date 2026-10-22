@@ -266,7 +266,9 @@ the gate is the wearer.
 
 Each detection while recording is saved with a label per box
 (`Tracker._label`), and the players draw them over the clip in colour
-([08](../../../docs/design/08-recordings-and-cloud.md#person-boxes)):
+([08](../../../docs/design/08-recordings-and-cloud.md#person-boxes)). The
+live view shows the same labels as they are made; in idle, before anyone is
+picked, every box is `unsure`. While recording:
 
 | Label | Colour | When |
 | --- | --- | --- |

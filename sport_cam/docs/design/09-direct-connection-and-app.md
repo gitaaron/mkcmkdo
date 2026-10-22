@@ -17,6 +17,7 @@ protocol** as the Firebase function:
 | Live view | preview, ~1 frame/s, while watched | `GET /api/stream.mjpeg`, 15 fps (or WebRTC) |
 | `GET /api/recordings/:name` | signed URL | ✅ (clips not yet uploaded) |
 | Live state | Firestore document | `WS /ws` |
+| Live person boxes | with each preview frame | `WS /ws` `boxes` message, each detection |
 | Works at the gym | needs internet | ✅ **needs nothing** |
 
 - Same protocol, so the app's calls are identical; only the base URL changes.
@@ -85,7 +86,8 @@ Same layout as the web app, plus a connection badge:
 | Element | Behaviour |
 | --- | --- |
 | **Top left — connection** (`ConnectionBadge`) | green **"SportCam · Direct · 10.0.0.42"**; blue **"Firebase"**; amber pulsing **"Searching…"**; red **"Offline — tap to retry"**. Tap to re-scan |
-| **Below the badge** | recordings button with clip-count badge |
+| **Below the badge** | recordings button with clip-count badge; under it, **Boxes on / off** for the live view (remembered on the phone, separately from the player's) |
+| **Live view** | the MJPEG stream (direct) or the preview (Firebase), with the camera's [person boxes](08-recordings-and-cloud.md#in-the-live-view) painted over it (`widgets/person_boxes.dart`) |
 | **Top right, stalled-tracking pill, bottom buttons** | as in the web app ([07](07-backend-and-app.md#web-app-srcweb)) |
 | **Recording player** (`lib/screens/library_screen.dart`) | the native player with the clip's [person boxes](08-recordings-and-cloud.md#person-boxes) painted over it, a **Boxes on / off** button beside play/pause (remembered on the phone) and a legend. Over the direct connection the boxes come from the camera's card (`/api/recordings/<clip>.boxes.json`) |
 | **Sounds** (`lib/session_audio.dart`) | a sonar ping every 3 s while searching, a beep each second of the found countdown (3, 2, 1), then a rising chime on record start; falling on stop. Queued, so the chime follows the last beep. Plays **including in the background**. While connected the app stays awake: Android foreground service with a "SportCam connected" notification; iOS background audio mode (looped silence). Mixes over music; plays with the iOS silent switch on. Platform setup: [`src/app_flutter/README.md`](../../src/app_flutter/README.md) |

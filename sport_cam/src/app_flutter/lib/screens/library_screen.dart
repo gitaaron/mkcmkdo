@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 
 import '../models.dart';
 import '../theme.dart';
+import '../widgets/person_boxes.dart';
 
 /// Recording library. Playback uses `video_player` — ExoPlayer on Android,
 /// AVPlayer on iOS — so H.264 decoding is hardware-accelerated and seeking
@@ -91,14 +92,6 @@ class LibraryScreen extends StatelessWidget {
       '${d.day}/${d.month} ${d.hour.toString().padLeft(2, '0')}:'
       '${d.minute.toString().padLeft(2, '0')}';
 }
-
-/// Box colours: green for the climber, yellow for anyone else, red while
-/// the camera can't tell which is the climber.
-const boxColours = {
-  BoxLabel.climber: Color(0xFF34C759),
-  BoxLabel.other: Color(0xFFFFCC00),
-  BoxLabel.unsure: Color(0xFFFF3B30),
-};
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({
@@ -264,7 +257,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         ),
                     ],
                   ),
-                  if (track != null && _showBoxes) const _Legend(),
+                  if (track != null && _showBoxes) const BoxLegend(),
                 ],
               )
             : const CircularProgressIndicator(),
@@ -282,54 +275,14 @@ class _BoxPainter extends CustomPainter {
   final double t;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final sx = size.width / track.width;
-    final sy = size.height / track.height;
-    for (final b in track.at(t)) {
-      final paint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..color = boxColours[b.label]!;
-      canvas.drawRect(
-        Rect.fromLTWH(b.x * sx, b.y * sy, b.w * sx, b.h * sy),
-        paint,
-      );
-    }
-  }
+  void paint(Canvas canvas, Size size) => paintBoxes(
+    canvas,
+    Offset.zero & size,
+    track.width,
+    track.height,
+    track.at(t),
+  );
 
   @override
   bool shouldRepaint(_BoxPainter old) => old.t != t || old.track != track;
-}
-
-class _Legend extends StatelessWidget {
-  const _Legend();
-
-  @override
-  Widget build(BuildContext context) {
-    Widget key(BoxLabel l, String text) => Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            border: Border.all(color: boxColours[l]!, width: 2),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: const TextStyle(color: SportColors.muted, fontSize: 12.5),
-        ),
-      ],
-    );
-    return Wrap(
-      spacing: 14,
-      children: [
-        key(BoxLabel.climber, 'climber'),
-        key(BoxLabel.other, 'someone else'),
-        key(BoxLabel.unsure, "can't tell yet"),
-      ],
-    );
-  }
 }

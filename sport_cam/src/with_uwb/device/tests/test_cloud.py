@@ -158,8 +158,11 @@ async def main() -> None:
     check("no preview while nobody watches", preview() is None)
     the_doc.update({"viewerAt": time.time()})
     await asyncio.sleep(0.05)
-    await link.preview(b"\xff\xd8one")
+    await link.preview(b"\xff\xd8one", [[10, 20, 30, 60, "climber"]])
     check("posts a preview while watched", preview() is not None and preview()["jpeg"] == b"\xff\xd8one")
+    check("…with its person boxes, as maps (Firestore can't nest arrays)",
+          preview()["boxes"] == [{"x": 10, "y": 20, "w": 30, "h": 60, "label": "climber"}]
+          and preview()["size"] == list(config.PREVIEW_SIZE), f"{preview()}")
     await link.preview(b"\xff\xd8two")
     check("previews are rate-limited", preview()["jpeg"] == b"\xff\xd8one")
     await link.preview(b"x" * (config.PREVIEW_MAX_BYTES + 1))

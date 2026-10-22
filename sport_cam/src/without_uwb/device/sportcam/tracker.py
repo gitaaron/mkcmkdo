@@ -93,9 +93,15 @@ class Tracker:
         Detection runs at DETECT_FPS_IDLE here. A person counts as in frame
         until IDLE_PERSON_HOLD_S passes with no detection, so one missed frame
         does not flip the idle sub-state.
+
+        Every box is labelled UNSURE for the live view: with no session
+        running, nobody has been picked as the climber yet.
         """
         self.ptz.set_zoom_mm(config.ZOOM_MIN_MM)    # retried: zoom is rate-limited
         boxes, fresh = self.camera.person_boxes()
+        if fresh:
+            self.labelled_at = time.monotonic()
+            self.labelled = [(b, UNSURE) for b in boxes]
         if fresh and boxes and self.ptz.zoom_mm <= config.ZOOM_MIN_MM:
             self._idle_box = max(boxes, key=lambda b: b[2] * b[3])
             self._idle_seen_at = time.monotonic()

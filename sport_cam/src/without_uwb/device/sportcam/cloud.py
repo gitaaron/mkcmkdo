@@ -164,7 +164,10 @@ class CloudLink:
             self._tele_sent = time.monotonic()
             await self._write(self._doc, {"telemetry": self._telemetry})
 
-    async def preview(self, jpeg: bytes) -> None:
+    async def preview(self, jpeg: bytes, boxes: list[list] | None = None) -> None:
+        """One frame for the remote live view, with the person boxes seen in
+        it (`[[x, y, w, h, label], …]` in PREVIEW_SIZE pixels). Firestore
+        can't nest arrays, so each box is stored as a map."""
         now = time.monotonic()
         if not self.watched or now - self._preview_sent < 1.0 / config.PREVIEW_FPS:
             return
@@ -173,7 +176,12 @@ class CloudLink:
         self._preview_sent = now
         if self.connected and self._preview is not None:
             try:
-                await asyncio.to_thread(self._preview.set, {"jpeg": jpeg, "at": server_time()})
+                await asyncio.to_thread(self._preview.set, {
+                    "jpeg": jpeg, "at": server_time(),
+                    "size": list(config.PREVIEW_SIZE),
+                    "boxes": [{"x": x, "y": y, "w": w, "h": h, "label": label}
+                              for x, y, w, h, label in boxes or []],
+                })
             except Exception as err:     # noqa: BLE001
                 print(f"[cloud] preview failed: {err}")
 

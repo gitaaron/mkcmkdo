@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../camera_client.dart';
 import '../models.dart';
@@ -6,6 +7,7 @@ import '../theme.dart';
 import '../widgets/connection_badge.dart';
 import '../widgets/control_bar.dart';
 import '../widgets/mjpeg_view.dart';
+import '../widgets/person_boxes.dart';
 import '../widgets/status_ring.dart';
 import 'library_screen.dart';
 
@@ -24,13 +26,28 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // The live view's own Boxes on / off, remembered on the phone (the
+  // recording player has another).
+  static const _showBoxesKey = 'showLiveBoxes';
+
   CameraClient get client => widget.client;
+  bool _showBoxes = true;
 
   @override
   void initState() {
     super.initState();
     client.addListener(_onChange);
     client.connect();
+    SharedPreferences.getInstance().then((prefs) {
+      final show = prefs.getBool(_showBoxesKey) ?? true;
+      if (mounted) setState(() => _showBoxes = show);
+    });
+  }
+
+  Future<void> _toggleBoxes() async {
+    setState(() => _showBoxes = !_showBoxes);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_showBoxesKey, _showBoxes);
   }
 
   void _onChange() => setState(() {});
@@ -59,6 +76,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final upload = client.upload;
     final saved = client.justSaved;
     final text = ModeText.of(client.mode);
+    final picture = client.link == LinkMode.relay
+        ? client.preview != null
+        : client.isConnected && client.state != CamState.off;
+    final live = picture ? client.liveBoxes : null;
 
     return Scaffold(
       body: Stack(
@@ -81,6 +102,12 @@ class _HomeScreenState extends State<HomeScreen> {
             MjpegView(
               streamUrl: client.streamUrl,
               active: client.isConnected && client.state != CamState.off,
+            ),
+
+          // person boxes from the camera's last detection
+          if (live != null && _showBoxes)
+            IgnorePointer(
+              child: CustomPaint(painter: LiveBoxesPainter(live)),
             ),
 
           // top-left: connection status to the camera
@@ -116,6 +143,14 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: _openLibrary,
             ),
           ),
+
+          // person boxes on / off, under the recordings button
+          if (picture)
+            Positioned(
+              top: top + 110,
+              left: 14,
+              child: _BoxesButton(show: _showBoxes, onTap: _toggleBoxes),
+            ),
 
           // tracking for a while and still not recording: nobody found / vision cannot see the climber
           if (client.state == CamState.tracking &&
@@ -197,6 +232,42 @@ class _LibraryButton extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _BoxesButton extends StatelessWidget {
+  const _BoxesButton({required this.show, required this.onTap});
+
+  final bool show;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      toggled: show,
+      label: 'Person boxes',
+      child: Tooltip(
+        message: show ? 'Hide the person boxes' : 'Show the person boxes',
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: SportColors.panel.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: SportColors.border),
+            ),
+            child: Icon(
+              Icons.crop_free,
+              size: 20,
+              color: show ? boxColours[BoxLabel.climber] : SportColors.muted,
+            ),
+          ),
+        ),
       ),
     );
   }

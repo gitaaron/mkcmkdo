@@ -7,7 +7,8 @@
  *
  *   - writes cameras/{key}: mode, state, telemetry and a heartbeat
  *   - listens to that document and adopts any state an app asked for
- *   - posts preview frames to cameras/{key}/live/preview while an app watches
+ *   - posts preview frames to cameras/{key}/live/preview while an app watches,
+ *     with made-up live person boxes
  *   - when a "recording" stops, uploads sim/sample.mp4 through the API
  *     (createUploadUrl → PUT → finalizeRecording), like uploader.py, with
  *     made-up person boxes beside it so the players' overlay has something
@@ -79,15 +80,19 @@ async function call(name, data) {
 function sampleBoxes(durationS) {
   const frames = [];
   for (let t = 0; t <= durationS; t += 1 / 3) {
-    const sure = t > 1.5;
-    const climber = [Math.round(380 + 40 * Math.sin(t / 2)), 120 - Math.round(10 * t) % 60, 150, 420];
-    const belayer = [820, 230, 140, 400];
-    frames.push([Math.round(t * 100) / 100, [
-      [...climber, sure ? "climber" : "unsure"],
-      [...belayer, sure ? "other" : "unsure"],
-    ]]);
+    frames.push([Math.round(t * 100) / 100, boxesAt(t, t > 1.5)]);
   }
   return Buffer.from(JSON.stringify({ v: 1, size: [1280, 720], frames }));
+}
+
+/** The two people at `t` seconds, labelled once the camera is `sure` who climbs. */
+function boxesAt(t, sure) {
+  const climber = [Math.round(380 + 40 * Math.sin(t / 2)), 120 - Math.round(10 * t) % 60, 150, 420];
+  const belayer = [820, 230, 140, 400];
+  return [
+    [...climber, sure ? "climber" : "unsure"],
+    [...belayer, sure ? "other" : "unsure"],
+  ];
 }
 
 async function put(name, bytes) {
@@ -251,11 +256,23 @@ setInterval(() => {
   }
 }, 50);
 
+/**
+ * The live view's boxes, like the device: everyone "unsure" in idle (nobody
+ * picked yet), the climber and belayer once found, nobody while searching.
+ */
+function liveBoxes() {
+  const t = Date.now() / 1000;
+  const p = phase();
+  const boxes = p === "search" || p === "no-person-in-frame" ? []
+    : boxesAt(t, state === "recording" || p === "found");
+  return boxes.map(([x, y, w, h, label]) => ({ x, y, w, h, label }));
+}
+
 // Preview frames, only while someone is watching.
 let i = 0;
 setInterval(() => {
   if (state === "off" || !frames.length || Date.now() - viewerAt > VIEWER_WINDOW_MS) return;
   cam.collection("live").doc("preview")
-    .set({ jpeg: frames[i++ % frames.length], at: Timestamp.now() })
+    .set({ jpeg: frames[i++ % frames.length], at: Timestamp.now(), size: [1280, 720], boxes: liveBoxes() })
     .catch((e) => console.error("[sim] preview failed:", e.message));
 }, PREVIEW_MS);

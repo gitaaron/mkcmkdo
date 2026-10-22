@@ -102,7 +102,7 @@ client with two possible backends.
 | `startTracking` / `stopTracking` | `idle` → `tracking`; `tracking`/`recording` → `idle` (stopping and saving a recording) |
 | `startRecording` / `stopRecording` | `tracking` → `recording` → `tracking` |
 | `watch` | an app is showing the live view: keep previews coming for a minute |
-| `getPreview` | the latest preview frame, base64 (for clients that poll) |
+| `getPreview` | the latest preview frame, base64, with its person boxes (`size`, `boxes`) (for clients that poll) |
 | `createUploadUrl` / `finalizeRecording` / `getRecordings` | the recording library ([08](08-recordings-and-cloud.md)) |
 
 Errors:
@@ -121,11 +121,13 @@ framework — one screen:
 src/web/src/
   App.vue                shell; library button, upload pill, toast; key prompt if no key
   components/
-    VideoView.vue        WHEP video when the camera offers it and it's reachable, else the preview
+    VideoView.vue        WHEP video when the camera offers it and it's reachable, else the preview; live person boxes over it
     StatusRing.vue       top-right circular indicator, colours = LED colours
     ControlBar.vue       bottom buttons, swap with state
     LibraryView.vue      recordings list
     RecordingPlayer.vue  <video> player (range-seekable) with the person boxes drawn over it
+    BoxesToggle.vue      the Boxes on / off button (player and live view)
+    BoxLegend.vue        what the box colours mean
     KeyPrompt.vue        asks for the camera key if the link didn't carry it
   lib/api.ts             call(name, data) with the camera key + typed wrappers
   lib/firebase.ts        Firestore: the emulator in dev, /__/firebase/init.json deployed
@@ -133,12 +135,17 @@ src/web/src/
   lib/useCameraState.ts  live camera document, recordings and preview via onSnapshot
   lib/chime.ts           search pings, countdown beeps, recording start/stop chimes (Web Audio)
   lib/modeText.ts        the wording that differs between with_uwb and without_uwb
-  lib/boxes.ts           a clip's person boxes: parsing, and which to draw at a moment
+  lib/boxes.ts           person boxes: a clip's (which to draw at a moment), the live view's, drawing
+  lib/showBoxes.ts       a remembered Boxes on / off switch
 ```
 
 Behaviour (requirement F5 in [01](../product/01-requirements.md#functional-requirements)):
 
 - **Live view on open:** `VideoView` mounts immediately; no play button.
+  The [person boxes](08-recordings-and-cloud.md#in-the-live-view) that come
+  with each preview frame are drawn over it, with a **Boxes on / off** button
+  under the recordings button (remembered in the browser, separately from
+  the player's).
 - **The status ring** (top right) and **the bottom buttons** follow the
   camera's state, with the colours, labels and buttons in
   [01 — State machine](../product/01-requirements.md#state-machine). The

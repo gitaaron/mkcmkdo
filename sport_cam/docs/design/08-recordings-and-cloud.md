@@ -53,7 +53,8 @@ While recording, the camera notes every person the detector finds, a few
 times a second, with the tracker's verdict on each (`boxlog.py`). They are
 saved beside the clip as `<clip>.boxes.json`, uploaded with it, and deleted
 from the card with it. Both apps' players draw them over the video and have a
-**Boxes on / off** control.
+**Boxes on / off** control. The same boxes are drawn over the
+[live view](#in-the-live-view), with a control of its own.
 
 | Colour | Label | Means |
 | --- | --- | --- |
@@ -90,6 +91,26 @@ else is in view ([05](../../without_uwb/docs/design/05-tracking-system.md#boxes-
 - About 3 detections a second: a 5-minute clip's boxes are ≈ 50 KB.
 - Clips without boxes (older ones, or a failed write) play as before, with no
   control.
+
+#### In the live view
+
+The last detection's labelled boxes (`Head.live_boxes()`), in every state
+from `idle` on. In `idle` nobody has been picked as the climber yet, so
+every box is `unsure` (red).
+
+| Link | How they arrive | Rate |
+| --- | --- | --- |
+| Direct (Flutter app) | WebSocket message `{"type": "boxes", "size": [1280, 720], "boxes": [[x, y, w, h, label], …]}` on each fresh detection | every detection: ≈ 3/s tracking, 1 per 2 s idle |
+| Firebase (web app, Flutter relay) | inside the preview frame they belong to: `cameras/{key}/live/preview` gets `size` and `boxes: [{x, y, w, h, label}, …]` (maps: Firestore can't nest arrays). `getPreview` returns them as `[x, y, w, h, label]` lists | with each preview frame, 1/s |
+
+- An empty list means the detector looked and saw nobody. The camera drops
+  boxes older than 3 s (`LIVE_BOXES_MAX_AGE_S`), and the apps drop them 3 s
+  after they arrive if nothing replaces them.
+- Over WebRTC the picture is full-rate but the boxes still come with the
+  preview, once a second, so they lag a moving climber.
+- **Boxes on / off** sits under the recordings button. It is remembered
+  separately from the player's (web: `sportcam.showLiveBoxes`; Flutter:
+  `showLiveBoxes`).
 
 Camera configuration (`src/<build>/device/sportcam/config.py`):
 

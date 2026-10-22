@@ -13,11 +13,12 @@ import 'models.dart';
 /// itself (direct, preferred) or the Firebase backend. Both speak the same
 /// protocol, so the calls are the same; only how state arrives differs:
 ///
-///   direct   the camera's WebSocket pushes state and recordings, and its
-///            MJPEG stream is the live view
+///   direct   the camera's WebSocket pushes state, recordings and the live
+///            person boxes, and its MJPEG stream is the live view
 ///   relay    Firebase: poll `getState` and `getRecordings`, and show the
-///            preview frames the camera posts while someone is watching
-///            (`watch` / `getPreview`). Every call carries the camera key.
+///            preview frames (with their person boxes) the camera posts
+///            while someone is watching (`watch` / `getPreview`). Every call
+///            carries the camera key.
 ///
 /// Connection strategy on launch:
 ///   1. mDNS sweep for `_sportcam._tcp` → connect directly to the camera
@@ -52,6 +53,8 @@ class CameraClient extends ChangeNotifier {
   int _pollTick = 0;
   int _pollFailures = 0;
   Uint8List? _preview;
+  LiveBoxes? _liveBoxes;
+  Timer? _liveBoxesExpiry;
   bool _disposed = false;
 
   LinkMode get link => _link;
@@ -70,6 +73,21 @@ class CameraClient extends ChangeNotifier {
 
   /// Latest preview frame when connected through Firebase (null when direct).
   Uint8List? get preview => _preview;
+
+  /// The person boxes of the camera's last detection, for the live view;
+  /// null when none have arrived in [LiveBoxes.hold].
+  LiveBoxes? get liveBoxes => _liveBoxes;
+
+  void _setLiveBoxes(LiveBoxes? boxes) {
+    _liveBoxes = boxes;
+    _liveBoxesExpiry?.cancel();
+    if (boxes != null) {
+      _liveBoxesExpiry = Timer(LiveBoxes.hold, () {
+        _liveBoxes = null;
+        if (!_disposed) notifyListeners();
+      });
+    }
+  }
 
   // ---- connection ---------------------------------------------------------
 
@@ -150,6 +168,7 @@ class CameraClient extends ChangeNotifier {
       final jpeg = p?['jpeg'] as String?;
       if (jpeg != null) {
         _preview = base64Decode(jpeg);
+        _setLiveBoxes(LiveBoxes.fromJson(p?['size'], p?['boxes']));
         notifyListeners();
       }
     }
@@ -205,6 +224,9 @@ class CameraClient extends ChangeNotifier {
       return;
     }
     switch (msg['type']) {
+      case 'boxes':
+        _setLiveBoxes(LiveBoxes.fromJson(msg['size'], msg['boxes']));
+        notifyListeners();
       case 'state':
         _applyState(msg);
         notifyListeners();
@@ -347,6 +369,7 @@ class CameraClient extends ChangeNotifier {
     _poll?.cancel();
     _poll = null;
     _preview = null;
+    _setLiveBoxes(null);
     await _wsSub?.cancel();
     _wsSub = null;
     await _ws?.sink.close();

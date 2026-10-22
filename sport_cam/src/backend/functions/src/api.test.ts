@@ -141,6 +141,17 @@ describe("live view", () => {
     await cam().collection("live").doc("preview").set({ jpeg: Buffer.from([0xff, 0xd8, 1, 2]), at: Timestamp.now() });
     const r = await call("getPreview");
     expect(Buffer.from(r.body.result.jpeg, "base64")).toEqual(Buffer.from([0xff, 0xd8, 1, 2]));
+    expect(r.body.result.boxes).toEqual([]);   // a camera from before live boxes
+  });
+
+  it("getPreview returns the frame's person boxes as the players draw them", async () => {
+    await cam().collection("live").doc("preview").set({
+      jpeg: Buffer.from([0xff, 0xd8]), at: Timestamp.now(), size: [1280, 720],
+      boxes: [{ x: 10, y: 20, w: 30, h: 60, label: "climber" }, { x: 400, y: 20, w: 30, h: 60, label: "other" }],
+    });
+    const r = await call("getPreview");
+    expect(r.body.result.size).toEqual([1280, 720]);
+    expect(r.body.result.boxes).toEqual([[10, 20, 30, 60, "climber"], [400, 20, 30, 60, "other"]]);
   });
 });
 

@@ -3,7 +3,7 @@ import {
   collection, doc, limit, onSnapshot, orderBy, query, type Timestamp, type Unsubscribe,
 } from "firebase/firestore";
 import { api, recordingUrl, type CamState, type RecordingMeta, type StateSnapshot } from "./api.js";
-import { boxesName } from "./boxes.js";
+import { boxesName, liveBoxesFromPreview, type LiveBoxes } from "./boxes.js";
 import { cameraKey } from "./cameraKey.js";
 import { beep, chime, ping } from "./chime.js";
 import { firestore } from "./firebase.js";
@@ -20,6 +20,7 @@ interface CameraStore extends StateSnapshot {
   upload: UploadProgress | null;
   lastSaved: RecordingMeta | null; // most recent arrival — drives the toast
   previewUrl: string | null;       // latest preview frame (object URL)
+  liveBoxes: LiveBoxes | null;     // the person boxes the camera sent with it
 }
 
 /** Matches the API: a camera that hasn't beaten its heart in this long is offline. */
@@ -39,6 +40,7 @@ const store = reactive<CameraStore>({
   upload: null,
   lastSaved: null,
   previewUrl: null,
+  liveBoxes: null,
 });
 
 let lastState: CamState | null = null;   // null until the first snapshot
@@ -138,6 +140,7 @@ async function subscribe(key: string): Promise<void> {
     if (!p?.jpeg) return;
     const old = store.previewUrl;
     store.previewUrl = URL.createObjectURL(new Blob([p.jpeg.toUint8Array()], { type: "image/jpeg" }));
+    store.liveBoxes = liveBoxesFromPreview(p);
     if (old) URL.revokeObjectURL(old);
   }));
 }

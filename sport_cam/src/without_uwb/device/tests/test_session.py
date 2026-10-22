@@ -59,8 +59,14 @@ class FakeRing:
 
 
 class FakeLocal:
+    def __init__(self):
+        self.sent: list[dict] = []
+
     async def broadcast(self, msg):
-        pass
+        self.sent.append(msg)
+
+    def last_boxes(self):
+        return next((m for m in reversed(self.sent) if m.get("type") == "boxes"), None)
 
     def state_payload(self):
         return {}
@@ -97,6 +103,10 @@ class RecCamera(SimCamera):
         self.recording = False
 
 
+def labels(boxes: list) -> set[str]:
+    return {b[4] for b in boxes}
+
+
 def countdown_heard(sent: list[int]) -> list[int]:
     """The countdown values the app heard, without repeats or zeros (one beep each)."""
     return [c for i, c in enumerate(sent) if c and (i == 0 or sent[i - 1] != c)]
@@ -112,6 +122,7 @@ async def full_flow() -> None:
     async def no_upload(*a, **k):
         return None
     main_mod.upload_with_retry = no_upload
+    main_mod.time = CLOCK              # live boxes are aged on the tracker's clock
 
     person = Person(55.0, dist=5.0)
     ptz = FakePtz()
@@ -131,6 +142,7 @@ async def full_flow() -> None:
     head._rec_path, head._rec_started = "", 0.0
     head._countdown_sent = 0
     head._near_focus = False
+    head._boxes_sent_at = None
     head.boxlog = BoxLog()
 
     countdown_sent: list[int] = []     # what the app hears, in order, to beep on
@@ -184,6 +196,10 @@ async def full_flow() -> None:
     await tick_for(2.0)
     check("camera is pointing at the person", abs(head.ptz.pan_deg - person.bearing) < 5.0,
           f"pan {head.ptz.pan_deg:.1f}")
+    msg = head.local.last_boxes()
+    check("live view: each detection goes to direct viewers, the climber labelled",
+          msg is not None and msg["size"] == list(config.PREVIEW_SIZE)
+          and labels(msg["boxes"]) == {"climber"}, f"{msg}")
 
     # --- they walk off: recording continues, camera sweeps again --------------------
     person.visible = False
@@ -238,6 +254,11 @@ async def full_flow() -> None:
     await tick_for(3.0)
     check("idle sub-state: person in frame; the ring breathes", head.phase == "person-in-frame"
           and head.led.idle_person, f"{head.phase}")
+    check("live view: idle boxes are all 'can't tell' (nobody picked yet)",
+          head.live_boxes() and labels(head.live_boxes()) == {"unsure"}, f"{head.live_boxes()}")
+    head.state = "off"
+    check("…and none while off", head.live_boxes() == [])
+    head.state = "idle"
     await head.apply_state("tracking")
     check("track / record with a person in frame → found, the sweep is skipped",
           head.tracker.mode == "found" and head.phase == "found", head.tracker.mode)

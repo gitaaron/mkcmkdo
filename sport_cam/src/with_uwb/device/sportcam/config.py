@@ -34,6 +34,10 @@ UPLOAD_API_BASE = ""
 HEARTBEAT_S = 5.0            # heartbeat + telemetry to Firestore; apps call it offline after 20 s
 PREVIEW_FPS = 1.0            # live preview frames to Firestore, only while an app is watching
 PREVIEW_MAX_BYTES = 200_000
+# Person boxes in the live view (docs/01 F9): the last detection's boxes go
+# out with each preview frame and, on the direct link, as each detection
+# lands. Older than this (idle detects every 2 s) and they're dropped.
+LIVE_BOXES_MAX_AGE_S = 3.0
 VIEWER_WINDOW_S = 60.0       # how long an app's "watch" keeps previews coming
 DELETE_AFTER_UPLOAD = True   # SD card is a buffer, not a store
 

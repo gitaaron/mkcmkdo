@@ -2,7 +2,8 @@
  * The camera's live state, kept in one Firestore document per camera:
  *
  *   cameras/{cameraKey}                 this file's CameraDoc
- *   cameras/{cameraKey}/live/preview    low-rate JPEG preview, while someone watches
+ *   cameras/{cameraKey}/live/preview    low-rate JPEG preview, while someone watches,
+ *                                       with the person boxes seen in it
  *   cameras/{cameraKey}/recordings/*    the recording library (recordings.ts)
  *
  * The camera key is the document id: a long random string the camera and
@@ -150,10 +151,28 @@ export async function watch(ref: DocumentReference): Promise<{ ok: true }> {
   return { ok: true };
 }
 
-/** The latest preview frame, for clients that poll rather than listen (the Flutter relay). */
-export async function getPreview(ref: DocumentReference): Promise<{ jpeg: string; at: string } | null> {
+/** A person box as the camera stores it beside a preview frame (Firestore can't nest arrays). */
+interface StoredBox { x: number; y: number; w: number; h: number; label: string }
+
+/** A person box as the apps draw it: [x, y, w, h, label], as in a clip's boxes. */
+export type PreviewBox = [number, number, number, number, string];
+
+export interface Preview {
+  jpeg: string;                 // base64
+  at: string;
+  size: [number, number] | null; // the frame the boxes are measured in
+  boxes: PreviewBox[];
+}
+
+/** The latest preview frame and its person boxes, for clients that poll rather than listen (the Flutter relay). */
+export async function getPreview(ref: DocumentReference): Promise<Preview | null> {
   const snap = await ref.collection("live").doc("preview").get();
   if (!snap.exists) return null;
-  const p = snap.data() as { jpeg: Buffer | Uint8Array; at: Timestamp };
-  return { jpeg: Buffer.from(p.jpeg).toString("base64"), at: p.at.toDate().toISOString() };
+  const p = snap.data() as { jpeg: Buffer | Uint8Array; at: Timestamp; size?: number[]; boxes?: StoredBox[] };
+  return {
+    jpeg: Buffer.from(p.jpeg).toString("base64"),
+    at: p.at.toDate().toISOString(),
+    size: p.size?.length === 2 ? [p.size[0]!, p.size[1]!] : null,
+    boxes: (p.boxes ?? []).map((b) => [b.x, b.y, b.w, b.h, b.label]),
+  };
 }

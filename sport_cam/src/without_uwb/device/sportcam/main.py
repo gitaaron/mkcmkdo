@@ -80,6 +80,7 @@ class Head:
         self.boxlog = BoxLog()     # person boxes beside the clip, for the players' overlay
         self._warned = ""          # which warning we last announced
         self._countdown_sent = 0   # tracker.countdown as last sent to the app
+        self._boxes_sent_at: float | None = None   # tracker.labelled_at last sent live
 
     # convenience for local_api/telemetry — pan and tilt are commanded angles
     @property
@@ -217,6 +218,7 @@ class Head:
             print(f"[session] {self.state} → {want}")
             await self.apply_state(want)
             await self.report_state()
+        await self.send_boxes()
         self.led.idle_person = self.phase == "person-in-frame"
         self.led.searching = self.state == "tracking" and self.phase == "search"
         self.led.found = (self.tracker.found_for() / config.FOUND_CONFIRM_S
@@ -320,8 +322,26 @@ class Head:
                 jpg = self.camera.preview_jpeg()
                 if jpg:
                     self.local.publish_frame(jpg)   # direct viewers
-                    await self.cloud.preview(jpg)   # and, while watched, the app anywhere
+                    await self.cloud.preview(jpg, self.live_boxes())   # and, while watched, the app anywhere
             await asyncio.sleep(max(0.0, period - (time.monotonic() - t0)))
+
+    def live_boxes(self) -> list[list]:
+        """The last detection's labelled boxes for the live view, `[[x, y, w,
+        h, label], …]` in PREVIEW_SIZE pixels; none once stale or not up."""
+        at = self.tracker.labelled_at
+        if (at is None or self.state in ("off", *BOOT_STATES)
+                or time.monotonic() - at > config.LIVE_BOXES_MAX_AGE_S):
+            return []
+        return [[*map(int, box), label] for box, label in self.tracker.labelled]
+
+    async def send_boxes(self) -> None:
+        """Each fresh detection to direct viewers at once, for their overlay
+        (an empty list means it looked and saw nobody)."""
+        if self.tracker.labelled_at == self._boxes_sent_at:
+            return
+        self._boxes_sent_at = self.tracker.labelled_at
+        await self.local.broadcast({"type": "boxes", "size": list(config.PREVIEW_SIZE),
+                                    "boxes": self.live_boxes()})
 
     def telemetry(self) -> dict:
         return {

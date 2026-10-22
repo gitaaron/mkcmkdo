@@ -319,8 +319,14 @@ class FakeRing:
 
 
 class FakeLocal:
+    def __init__(self):
+        self.sent: list[dict] = []
+
     async def broadcast(self, msg):
-        pass
+        self.sent.append(msg)
+
+    def last_boxes(self):
+        return next((m for m in reversed(self.sent) if m.get("type") == "boxes"), None)
 
     def state_payload(self):
         return {}
@@ -376,6 +382,10 @@ class FakeRecCamera(FakeCamera):
         pass
 
 
+def labels(boxes: list) -> set[str]:
+    return {b[4] for b in boxes}
+
+
 def countdown_heard(sent: list[int]) -> list[int]:
     """The countdown values the app heard, without repeats or zeros (one beep each)."""
     return [c for i, c in enumerate(sent) if c and (i == 0 or sent[i - 1] != c)]
@@ -416,6 +426,7 @@ async def full_flow() -> None:
     head._rec_path, head._rec_started = "", 0.0
     head._countdown_sent = 0
     head._near_focus = False
+    head._boxes_sent_at = None
     head.boxlog = BoxLog()
 
     countdown_sent: list[int] = []     # what the app hears, in order, to beep on
@@ -448,6 +459,8 @@ async def full_flow() -> None:
     head.camera._bbox = bbox
     await tick_for(0.5)
     check("…and back to person in frame", head.phase == "person-in-frame", f"{head.phase}")
+    check("live view: idle boxes are all 'can't tell' (nobody picked yet)",
+          head.live_boxes() and labels(head.live_boxes()) == {"unsure"}, f"{head.live_boxes()}")
 
     head.uwb.on_since, head.uwb.off_at = time.monotonic(), None
     await tick_for(0.15)
@@ -464,6 +477,10 @@ async def full_flow() -> None:
           f"{seen}")
     check("the app heard 3, 2, 1 (one beep each)", countdown_heard(countdown_sent) == [3, 2, 1],
           f"{countdown_sent}")
+    msg = head.local.last_boxes()
+    check("live view: each detection goes to direct viewers, the climber labelled",
+          msg is not None and msg["size"] == list(config.PREVIEW_SIZE)
+          and "climber" in labels(msg["boxes"]), f"{msg}")
 
     head.uwb.on_since, head.uwb.off_at = None, time.monotonic()
     head.tracker.last_fix_at = time.monotonic()

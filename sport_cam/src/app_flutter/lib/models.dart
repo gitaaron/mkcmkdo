@@ -208,6 +208,24 @@ class PersonBox {
 
   final double x, y, w, h;
   final BoxLabel label;
+
+  /// One `[x, y, w, h, label]` box as the camera sends it; null if malformed.
+  static PersonBox? fromJson(Object? b) {
+    if (b is! List || b.length != 5) return null;
+    final n = b.take(4).whereType<num>().toList();
+    if (n.length != 4) return null;
+    return PersonBox(
+      n[0].toDouble(),
+      n[1].toDouble(),
+      n[2].toDouble(),
+      n[3].toDouble(),
+      boxLabelFrom(b[4]),
+    );
+  }
+
+  static List<PersonBox> listFromJson(Object? list) => list is List
+      ? list.map(PersonBox.fromJson).whereType<PersonBox>().toList()
+      : const [];
 }
 
 /// The person boxes the camera saves beside a clip (`<clip>.boxes.json`,
@@ -234,17 +252,7 @@ class BoxTrack {
     for (final f in raw) {
       if (f is! List || f.length != 2 || f[1] is! List) continue;
       times.add((f[0] as num).toDouble());
-      frames.add([
-        for (final b in f[1] as List)
-          if (b is List && b.length == 5)
-            PersonBox(
-              (b[0] as num).toDouble(),
-              (b[1] as num).toDouble(),
-              (b[2] as num).toDouble(),
-              (b[3] as num).toDouble(),
-              boxLabelFrom(b[4]),
-            ),
-      ]);
+      frames.add(PersonBox.listFromJson(f[1]));
     }
     return BoxTrack(
       (size[0] as num).toDouble(),
@@ -267,6 +275,29 @@ class BoxTrack {
       }
     }
     return t - times[lo] <= holdS ? frames[lo] : const [];
+  }
+}
+
+/// The live view's person boxes: the camera's last detection, in pixels of a
+/// [width] × [height] frame with the same field of view as the live picture.
+/// Direct, a `boxes` message on the WebSocket at each detection; through
+/// Firebase, with each preview frame from `getPreview`.
+class LiveBoxes {
+  const LiveBoxes(this.width, this.height, this.boxes);
+
+  /// Dropped this long after arriving unless replaced. The camera sends a
+  /// fresh list at least every 2 s, so this only bites when it goes quiet.
+  static const hold = Duration(seconds: 3);
+
+  final double width, height;
+  final List<PersonBox> boxes;
+
+  /// `size` is `[width, height]`; `boxes` a list of `[x, y, w, h, label]`.
+  static LiveBoxes? fromJson(Object? size, Object? boxes) {
+    if (size is! List || size.length != 2 || boxes is! List) return null;
+    final w = size[0], h = size[1];
+    if (w is! num || h is! num || w <= 0 || h <= 0) return null;
+    return LiveBoxes(w.toDouble(), h.toDouble(), PersonBox.listFromJson(boxes));
   }
 }
 

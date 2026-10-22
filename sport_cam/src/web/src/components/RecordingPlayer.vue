@@ -1,36 +1,21 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { RecordingMeta } from "../lib/api";
-import { BOX_COLOURS, boxesAt, parseBoxTrack, type BoxTrack } from "../lib/boxes";
+import { boxesAt, drawBoxes, parseBoxTrack, prepareCanvas, type BoxTrack } from "../lib/boxes";
+import { useShowBoxes } from "../lib/showBoxes";
+import BoxesToggle from "./BoxesToggle.vue";
+import BoxLegend from "./BoxLegend.vue";
 
 const props = defineProps<{ recording: RecordingMeta }>();
 
-const STORAGE = "sportcam.showBoxes";
 const wrap = ref<HTMLDivElement | null>(null);
 const video = ref<HTMLVideoElement | null>(null);
 const canvas = ref<HTMLCanvasElement | null>(null);
 const track = ref<BoxTrack | null>(null);
-const show = ref(readShow());
+const { show, toggle } = useShowBoxes("sportcam.showBoxes");
 const canFullscreen = typeof document !== "undefined" && !!document.fullscreenEnabled;
 const hasBoxes = computed(() => !!track.value);
-
-function readShow(): boolean {
-  try {
-    return localStorage.getItem(STORAGE) !== "0";
-  } catch {
-    return true;
-  }
-}
-
-function toggle(): void {
-  show.value = !show.value;
-  try {
-    localStorage.setItem(STORAGE, show.value ? "1" : "0");
-  } catch {
-    /* storage blocked: lasts for this visit */
-  }
-  draw();
-}
+watch(show, () => draw());
 
 async function load(url: string | null): Promise<void> {
   track.value = null;
@@ -49,33 +34,11 @@ function draw(): void {
   const v = video.value;
   const c = canvas.value;
   if (!v || !c) return;
-  const dpr = window.devicePixelRatio || 1;
-  const cw = v.clientWidth;
-  const ch = v.clientHeight;
-  if (c.width !== Math.round(cw * dpr) || c.height !== Math.round(ch * dpr)) {
-    c.width = Math.round(cw * dpr);
-    c.height = Math.round(ch * dpr);
-  }
-  const g = c.getContext("2d");
-  if (!g) return;
-  g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.clearRect(0, 0, cw, ch);
+  const g = prepareCanvas(c, v.clientWidth, v.clientHeight);
   const t = track.value;
-  if (!show.value || !t || !v.videoWidth) return;
-
-  // object-fit: contain — where the picture actually sits in the element
-  const scale = Math.min(cw / v.videoWidth, ch / v.videoHeight);
-  const pw = v.videoWidth * scale;
-  const ph = v.videoHeight * scale;
-  const ox = (cw - pw) / 2;
-  const oy = (ch - ph) / 2;
-  const sx = pw / t.size[0];
-  const sy = ph / t.size[1];
-  g.lineWidth = 2.5;
-  for (const [x, y, w, h, label] of boxesAt(t, v.currentTime)) {
-    g.strokeStyle = BOX_COLOURS[label] ?? BOX_COLOURS.unsure;
-    g.strokeRect(ox + x * sx, oy + y * sy, w * sx, h * sy);
-  }
+  if (!g || !show.value || !t || !v.videoWidth) return;
+  drawBoxes(g, v.clientWidth, v.clientHeight, v.videoWidth, v.videoHeight, t.size,
+    boxesAt(t, v.currentTime));
 }
 
 // Redraw on every video frame while playing, and on seeks and resizes.
@@ -130,25 +93,13 @@ watch(() => props.recording.boxesUrl, (url) => void load(url));
     />
     <canvas ref="canvas" aria-hidden="true" />
     <div class="tools">
-      <button
-        v-if="hasBoxes"
-        class="tool"
-        :aria-pressed="show"
-        :title="show ? 'Hide the boxes' : 'Show the boxes'"
-        @click="toggle"
-      >
-        <span class="swatch" />{{ show ? "Boxes on" : "Boxes off" }}
-      </button>
+      <BoxesToggle v-if="hasBoxes" :show="show" @toggle="toggle" />
       <button v-if="canFullscreen" class="tool" title="Full screen" aria-label="Full screen" @click="fullscreen">
         ⛶
       </button>
     </div>
   </div>
-  <p v-if="hasBoxes && show" class="legend">
-    <span><i :style="{ borderColor: BOX_COLOURS.climber }" />climber</span>
-    <span><i :style="{ borderColor: BOX_COLOURS.other }" />someone else</span>
-    <span><i :style="{ borderColor: BOX_COLOURS.unsure }" />can't tell yet</span>
-  </p>
+  <BoxLegend v-if="hasBoxes && show" />
 </template>
 
 <style scoped>
@@ -188,21 +139,4 @@ canvas {
   font-size: 13px;
   cursor: pointer;
 }
-.swatch {
-  width: 12px;
-  height: 12px;
-  border: 2px solid #34c759;
-  border-radius: 2px;
-}
-.tool[aria-pressed="false"] .swatch { border-color: var(--muted); }
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 12.5px;
-}
-.legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend i { width: 12px; height: 12px; border: 2px solid; border-radius: 2px; }
 </style>
