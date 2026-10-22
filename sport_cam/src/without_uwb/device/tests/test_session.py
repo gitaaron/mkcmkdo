@@ -130,6 +130,7 @@ async def full_flow() -> None:
     head.cloud = CloudLink(head)       # not connected: writes are no-ops
     head._rec_path, head._rec_started = "", 0.0
     head._countdown_sent = 0
+    head._near_focus = False
     head.boxlog = BoxLog()
 
     countdown_sent: list[int] = []     # what the app hears, in order, to beep on

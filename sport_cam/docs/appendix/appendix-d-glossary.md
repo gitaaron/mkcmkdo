@@ -24,6 +24,7 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | **MJPEG** | video sent as a stream of JPEG pictures; the camera's direct live view to phones on its Wi-Fi |
 | **Person boxes** | the boxes the players draw over a recording round each person the camera detected: green the climber, yellow anyone else, red while it can't tell which is the climber. Saved beside the clip as `<clip>.boxes.json` ([08](../design/08-recordings-and-cloud.md#person-boxes)) |
 | **PD (USB Power Delivery)** | the part of USB-C that lets a bank supply more than 5 V. The **PD trigger** board asks the bank for 12 V |
+| **Pairing** | giving the camera a new Wi-Fi network at power on: it reads the phone's Wi-Fi share QR code, or takes it from its setup page ([01](../product/01-requirements.md#pairing)) |
 | **Person in frame / no person in frame** | the two sub-states of `idle`: whether the person detector has seen someone in the last 4 s. Without UWB, starting a session with a person in frame skips search and goes straight to found; with UWB it never does, as only the tag can say who they are. With a person in frame the ring breathes slowly ([01](../product/01-requirements.md#state-machine)) |
 | **PETG** | the filament every structural part is printed in |
 | **PTZ** | pan, tilt and zoom. The **PTZ base** is the bought Arducam camera assembly; the **PTZ controller** is its board that drives the servos and lens motors |
@@ -31,7 +32,7 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | **Slew limit** | a cap on how fast the camera may turn, so it glides between measurements instead of snapping |
 | **Soft limits** | the pan and tilt angles the software won't go past, set short of where the bracket hits anything |
 | **SPI** | the Pi's serial bus used to send colour data to the LED ring |
-| **State** | what the camera is doing: `off`, `idle`, `tracking` or `recording` ([01](../product/01-requirements.md#state-machine)) |
+| **State** | what the camera is doing: `off`, `connecting`, `pairing`, `idle`, `tracking` or `recording` ([01](../product/01-requirements.md#state-machine)). Apps see `connecting` and `pairing` as `off` |
 | **`TRACKING_MODE`** | the setting in the camera's `config.py` that names its build, `with_uwb` or `without_uwb`. The apps word their buttons from it |
 | **WebRTC / WHEP** | an optional low-latency video path from the camera to a phone on its Wi-Fi, through MediaMTX on the Pi |
 | **WS2812B** | the individually addressable LEDs in the status ring |

@@ -46,7 +46,7 @@ run() {   # run <name> <command...>
 
 # Python test environment for the Pi software (system python lacks its deps).
 venv="$app/.venv-test"
-py_deps="aiohttp zeroconf pyserial simple-pid numpy"
+py_deps="aiohttp zeroconf pyserial simple-pid numpy opencv-python-headless"
 ensure_venv() {
     [ -x "$venv/bin/python" ] && [ "$(cat "$venv/.deps" 2>/dev/null)" = "$py_deps" ] && return 0
     if command -v uv >/dev/null; then

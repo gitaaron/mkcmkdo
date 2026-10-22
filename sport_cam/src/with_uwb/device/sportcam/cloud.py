@@ -30,6 +30,7 @@ import time
 from typing import Any, Callable
 
 from . import config
+from .wifi_link import BOOT_STATES, public_state
 
 try:                                    # not installed on a bench without the cloud link
     from google.cloud import firestore
@@ -104,7 +105,7 @@ class CloudLink:
         # left behind is superseded.
         self._doc.set({
             "mode": config.TRACKING_MODE,
-            "state": self.head.state,
+            "state": public_state(self.head.state),
             "stateBy": "device",
             "telemetry": self._telemetry,
             "deviceSeenAt": server_time(),
@@ -128,8 +129,8 @@ class CloudLink:
                 asyncio.run_coroutine_threadsafe(self._adopt(want), self._loop)
 
     async def _adopt(self, want: str) -> None:
-        if want == self.head.state:
-            return
+        if want == self.head.state or self.head.state in BOOT_STATES:
+            return                       # not up yet: nothing to adopt
         print(f"[cloud] app asked for {want}")
         await self.head.apply_state(want)
         await self.head.report_state()
@@ -151,7 +152,7 @@ class CloudLink:
 
     # ---- what the head reports ------------------------------------------
     async def report_state(self, state: str) -> None:
-        await self._write(self._doc, {"state": state, "stateBy": "device", "updatedAt": server_time()})
+        await self._write(self._doc, {"state": public_state(state), "stateBy": "device", "updatedAt": server_time()})
 
     async def telemetry(self, payload: dict) -> None:
         """Keep the latest; send it now only if the phase or the countdown

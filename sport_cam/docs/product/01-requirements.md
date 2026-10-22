@@ -47,12 +47,13 @@ view; camera-only for lower cost, size and power.
 | F1 | **Pan, tilt, zoom.** Pan 160° (±80°); tilt 130° (−45° to +85°); optical zoom 96° → 33° horizontal (≈ 3.5×). All three from the Arducam PTZ base | [03](../design/03-mechanical-design.md) |
 | F2 | **Follow a person** <!--both-->by UWB tag or by vision, per build<!--/--><!--with_uwb: by the UWB tag they wear--><!--without_uwb: by vision alone-->, and zoom to keep them framed | <!--both-->05 tracking ([with UWB](../../with_uwb/docs/design/05-tracking-system.md), [without UWB](../../without_uwb/docs/design/05-tracking-system.md))<!--/--><!--with_uwb:[05](../../with_uwb/docs/design/05-tracking-system.md)--><!--without_uwb:[05](../../without_uwb/docs/design/05-tracking-system.md)--> |
 | F3 | **Record unattended.** Recording starts once a found person has stayed in frame for 3 s, and stops at session end. A clip is saved even when the battery runs out | [Ideal path](#ideal-path) |
-| F4 | **LED status ring** showing each state and sub-state (idle with or without a person in frame, search, found, recording) and low battery | [State machine](#state-machine) |
+| F4 | **LED status ring** showing each state and sub-state (connecting, pairing, idle with or without a person in frame, search, found, recording) and low battery | [State machine](#state-machine) |
 | F5 | **Companion app**: opens into the live view; state-dependent bottom buttons; status ring top right in the LED colours | [07](../design/07-backend-and-app.md#web-app-srcweb) |
 | F6 | **Remote use.** State, live preview and control from any internet-connected phone or computer. One backend and one app serve both builds; the camera reports its build | [07](../design/07-backend-and-app.md#tracking-mode) |
 | F7 | **Recordings library.** Each stopped recording uploads to the backend and appears in the app's library | [08](../design/08-recordings-and-cloud.md) |
 | F8 | **Direct connection.** On the camera's Wi-Fi, a phone discovers and controls it with no server or internet | [09](../design/09-direct-connection-and-app.md) |
 | F9 | **Person boxes in recordings.** Each recording keeps a box round every person the camera detected: **green** round the climber, **yellow** round anyone else, and **red** round everyone while it can't tell which is the climber. Both apps' players draw them over the video, with a button to show or hide them | [08](../design/08-recordings-and-cloud.md#person-boxes) |
+| F10 | **Wi-Fi setup at a new gym.** With no saved network in range, the camera enters [pairing](#pairing) on its own; the phone shows its Wi-Fi share QR code to the lens, so the password is never retyped. The network is remembered for next time | [Pairing](#pairing); [08](../design/08-recordings-and-cloud.md#connecting-the-camera-to-gym-wi-fi-from-your-phone) |
 
 ## Non-functional requirements
 
@@ -78,7 +79,9 @@ One successful session, end to end: subject found, filmed, clip in the
 library. Deviations (dropouts, loss, manual control): <!--both-->[with UWB](#state-machine-with-uwb),
 [without UWB](#state-machine-without-uwb)<!--/--><!--with_uwb: [state machine, with UWB](#state-machine-with-uwb)--><!--without_uwb: [state machine, without UWB](#state-machine-without-uwb)-->.
 
-1. **Power on.** Pi boots, joins Wi-Fi, connects to Firebase. State `idle`
+1. **Power on.** State `connecting` (white light chasing round the ring):
+   the Pi joins a saved Wi-Fi network (at a new gym, [pairing](#pairing)
+   first), then connects to Firebase. State `idle`
    (solid blue): head parked, lens wide. The app opens into the live view;
    the status ring reads "On — no one in frame", then "On — person in frame"
    once the climber walks into view, and the LED ring and the app's ring
@@ -130,6 +133,8 @@ each have two sub-states, reported to the app as telemetry `phase`.
 | State | LED | App status ring | App sound | Bottom buttons |
 | --- | --- | --- | --- | --- |
 | `off` | off | grey | — | *(app shows reconnect screen)* |
+| `connecting` | white, chasing round the ring | grey, as `off` | — | *(app shows reconnect screen)* |
+| `pairing` | white, blinking slowly (1 s on, 1 s off) | grey, as `off` | — | *(app shows reconnect screen)* |
 | `idle`, no person in frame | solid blue | blue, "On — no one in frame" | — | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
 | `idle`, person in frame | blue, breathing slowly | blue (slow breath), "On — person in frame" | — | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
 | `tracking`, search | green, chasing round the ring | green (fast blink), <!--with_uwb-->"Turning to your tag…"<!--/--><!--both--> / <!--/--><!--without_uwb-->"Looking for a person…"<!--/--> | sonar ping every 3 s | **Turn off** · **Stop tracking** |
@@ -173,9 +178,65 @@ Rules:
   Next step is build-specific.
 - Battery < 20 %: ring dims and blinks orange at 1 Hz over the state colour.
   Battery < 7 %: save, park, drop to `idle`.
+- `connecting` and `pairing` happen only at power on, before `idle`; no app
+  can reach the camera yet, so every app shows it as `off`. Wi-Fi lost
+  after that changes nothing: the camera carries on, and NetworkManager
+  rejoins when it can ([Pairing](#pairing)).
 - The camera is the single source of truth. App commands are requests; the
   camera applies them and reports the result. The camera may also change
   state on its own and reports that the same way.
+
+### Pairing
+
+How the camera gets onto a network it hasn't seen. Shared by both builds.
+The head has no buttons, keyboard or display, and a phone can't hand a
+saved Wi-Fi password to an app or web page (neither iOS nor Android
+exposes it), so the password travels as the phone's own **Wi-Fi share QR
+code**, read through the lens.
+
+1. **Connecting.** At power on (state `connecting`) the Pi tries its saved
+   networks. One joins: `idle`. None in range at the first scan (≈ 10 s,
+   `FIRST_SCAN_S`), or none joined within 60 s (`BOOT_GRACE_S`): `pairing`.
+2. **Pairing.** The camera raises its hotspot **`SportCam-Setup`**, parks
+   facing forward with the lens wide and focused near, and the ring blinks
+   white.
+3. **Give it the network**, either way:
+   - **QR code (no typing).** On the phone, already on the gym's Wi-Fi,
+     open the network's share code and hold it 15–30 cm in front of the
+     lens:
+     - Android: Settings → Wi-Fi → the network → **Share**;
+     - iPhone (iOS 18+): Passwords → Wi-Fi → the network → **Show Network
+       QR Code**.
+
+     The camera reads the standard `WIFI:S:<ssid>;T:<type>;P:<password>;;`
+     code twice a second. The phone never leaves the gym's Wi-Fi.
+   - **Setup page (fallback).** Join `SportCam-Setup` from the phone (its
+     password is on the head's label); the setup page opens by itself, or
+     go to `http://10.42.0.1`. Pick the network and paste the password
+     (both phones can copy a saved Wi-Fi password from their settings).
+4. **Join.** Back to `connecting` while the camera joins. NetworkManager
+   saves the network, so the next visit to the same gym needs no pairing.
+   Join fails (wrong password, out of range): back to `pairing`; the setup
+   page says why, and the same QR code is tried again after 20 s
+   (`QR_RETRY_S`).
+5. **Idle.** Joined: `idle`, and the camera connects to Firebase as in the
+   [ideal path](#ideal-path).
+
+Rules:
+
+- No network to join (C7): **Use without Wi-Fi** on the setup page sends
+  the camera to `idle` with the hotspot still up, and a phone on
+  `SportCam-Setup` controls it directly
+  ([09](../design/09-direct-connection-and-app.md)). Recordings upload
+  once it's on a network.
+- Pairing happens only at power on. Saved networks are tried strongest
+  first; several gyms can be saved.
+- A QR code that isn't a Wi-Fi share code is ignored.
+- Not supported: networks with a browser sign-in page or WPA-Enterprise
+  (username + password; its QR code is refused). Use a phone hotspot
+  instead, paired the same way.
+- `SportCam-Setup` is protected by a password made at install and printed
+  on the head's label, not a shared default.
 
 ---
 

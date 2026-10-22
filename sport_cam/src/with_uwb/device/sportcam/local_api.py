@@ -29,6 +29,7 @@ from aiohttp import WSMsgType, web
 
 from . import config
 from .boxlog import sidecar
+from .wifi_link import public_state
 
 CallableFn = Callable[[Any], Awaitable[Any]]
 
@@ -40,6 +41,8 @@ HTTP_BY_CODE = {
 }
 
 TRANSITIONS = {
+    "connecting": [],              # getting on a network: reported as "off"
+    "pairing": [],
     "off": ["idle"],
     "idle": ["off", "tracking"],
     "tracking": ["off", "idle", "recording"],
@@ -116,7 +119,7 @@ class LocalApi:
         return {
             "type": "state",
             "mode": config.TRACKING_MODE,
-            "state": self.head.state,
+            "state": public_state(self.head.state),
             "telemetry": {
                 "pan": round(self.head.pan_deg, 1),
                 "tilt": round(self.head.tilt_deg, 1),
@@ -194,7 +197,7 @@ class LocalApi:
 
     async def _handle_health(self, _req: web.Request) -> web.Response:
         return web.json_response({"ok": True, "backend": "device",
-                                  "state": self.head.state, "name": config.CAMERA_NAME})
+                                  "state": public_state(self.head.state), "name": config.CAMERA_NAME})
 
     async def _handle_mjpeg(self, req: web.Request) -> web.StreamResponse:
         boundary = "sportcamframe"

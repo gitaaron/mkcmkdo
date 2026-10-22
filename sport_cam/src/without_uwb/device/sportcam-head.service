@@ -1,7 +1,10 @@
 [Unit]
 Description=SportCam head-unit service
-After=network-online.target
-Wants=network-online.target
+# Not network-online.target: the camera has to be up, with its ring showing
+# "connecting" or "pairing", while it has no network. sportcam-wifi says
+# which (/run/sportcam-wifi.json).
+After=sportcam-wifi.service
+Wants=sportcam-wifi.service
 
 [Service]
 Type=simple

@@ -14,7 +14,9 @@ Runs at once:
   * an optional **Firebase link** (cloud.py) — keeps the camera's Firestore
     document current so the app works from anywhere, and picks up the app's
     commands from it;
-  * the **status ring** and the **battery gauge**.
+  * the **status ring** and the **battery gauge**;
+  * the **Wi-Fi gate** (wifi_link.py): the camera boots into `connecting`,
+    and `pairing` if it has no network it knows, before `idle`.
 
 State lives on the device. Whichever channel a command arrives on, it goes
 through `apply_state()` and is then broadcast to all of them — so the app, the
@@ -27,7 +29,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from . import config
+from . import config, wifi_link
 from .boxlog import BoxLog
 from .camera import Camera
 from .cloud import CloudLink
@@ -40,12 +42,28 @@ from .session import AutoSession
 from .storage import StorageMonitor
 from .tracker import Tracker
 from .uploader import drain_pending, upload_with_retry
+from .wifi_link import BOOT_STATES, public_state
+
+
+def boot_state(status: dict | None, waited_s: float) -> str:
+    """The head state for the portal's Wi-Fi status, at boot.
+
+    No status file yet: still connecting, unless the portal hasn't written
+    one in WIFI_STATUS_WAIT_S — it isn't installed (bench Pi, dev machine),
+    so don't wait for it. Online, or told to work offline: idle.
+    """
+    if status is None:
+        return "connecting" if waited_s < config.WIFI_STATUS_WAIT_S else "idle"
+    return status["state"] if status["state"] in BOOT_STATES else "idle"
 from .uwb import UwbArray
 
 
 class Head:
     def __init__(self) -> None:
-        self.state = "idle"
+        self.state = "connecting"     # until the Wi-Fi gate lets it go (wifi_loop)
+        self._boot_at = time.monotonic()
+        self._qr_sent: dict[str, float] = {}   # Wi-Fi QR code → when it was last sent
+        self._near_focus = False      # focus moved in for the QR code; home() before idle
         self.camera = Camera()
         self.ptz = Ptz()
         self.uwb = UwbArray()
@@ -96,7 +114,7 @@ class Head:
         self.ptz.home()
         self.uwb.start()
         await self.local.start()
-        await self.mdns.start(self.state)
+        await self.mdns.start(public_state(self.state))
         # The local API and mDNS stay up regardless of the internet; the
         # Firebase link reconnects forever in the background.
         await asyncio.gather(
@@ -108,6 +126,7 @@ class Head:
             self.power.run(),
             self.health_loop(),
             self.upload_loop(),
+            self.wifi_loop(),
         )
 
     # ---- state ------------------------------------------------------------
@@ -145,14 +164,20 @@ class Head:
         self.camera.set_detect_fps(
             config.DETECT_FPS_TRACKING if new in ("tracking", "recording")
             else config.DETECT_FPS_IDLE)
-        if new in ("idle", "off"):
+        if new in ("idle", "off", *BOOT_STATES):
             self.ptz.park()
+        if new == "pairing" and not self._near_focus:
+            self.ptz.set_focus(config.QR_FOCUS_M)   # a phone held up to the lens
+            self._near_focus = True
+        elif new not in BOOT_STATES and self._near_focus:
+            self.ptz.home()                         # back to the boot focus and zoom
+            self._near_focus = False
 
     async def report_state(self) -> None:
         """Tell everyone: direct app clients, Firestore, mDNS TXT."""
         await self.local.broadcast(self.local.state_payload())
         await self.cloud.report_state(self.state)
-        await self.mdns.update_state(self.state)
+        await self.mdns.update_state(public_state(self.state))
 
     async def on_upload_progress(self, msg: dict) -> None:
         await self.cloud.upload_progress(msg)
@@ -171,6 +196,8 @@ class Head:
 
     async def control_tick(self, now: float) -> None:
         """One 20 Hz tick: track, notice a lost tag, and run the tag session."""
+        if self.state in BOOT_STATES:
+            return                            # no tracking, no sessions, until it is up
         if self.state in ("tracking", "recording"):
             self.tracker.step()
             if self.state == "recording":
@@ -210,7 +237,7 @@ class Head:
             batt, store = self.power.level(), self.storage.level()
             self.led.warn = "low" in (batt, store)
 
-            if batt == "critical" and self.state != "off":
+            if batt == "critical" and self.state not in ("off", *BOOT_STATES):
                 print("[power] critical — stopping and parking")
                 await self.apply_state("idle")
                 await self.report_state()
@@ -247,6 +274,45 @@ class Head:
                 except Exception as err:        # noqa: BLE001 — never fatal
                     print(f"[upload] drain failed: {err}")
             await asyncio.sleep(config.UPLOAD_RETRY_INTERVAL_S)
+
+    async def wifi_loop(self) -> None:
+        """Hold the camera in connecting / pairing until it has a network.
+
+        Only at boot: Wi-Fi dropping later is NetworkManager's to fix and
+        never interrupts a session. While pairing, read the phone's Wi-Fi
+        share QR code through the lens and hand it to the portal, which
+        joins it and reports back through the status file.
+        """
+        while self.state in BOOT_STATES:
+            want = boot_state(wifi_link.read_status(), time.monotonic() - self._boot_at)
+            if want != self.state:
+                print(f"[wifi] {self.state} → {want}")
+                await self.apply_state(want)
+                await self.report_state()
+            if self.state == "pairing":
+                await self.scan_qr()
+            await asyncio.sleep(config.QR_SCAN_PERIOD_S)
+
+    async def scan_qr(self) -> None:
+        text = await asyncio.to_thread(self.camera.qr_text)
+        if not text:
+            return
+        try:
+            creds = wifi_link.parse_wifi_qr(text)
+        except wifi_link.NotWifiQr:
+            return                            # some other QR code
+        except wifi_link.UnsupportedWifi as err:
+            print(f"[wifi] QR code: {err}")
+            return
+        # The phone is held up for several scans, and a code that failed
+        # (wrong password) is still in front of the lens: don't resend it at once.
+        key = f"{creds['ssid']}\0{creds['psk']}"
+        now = time.monotonic()
+        if now - self._qr_sent.get(key, float("-inf")) < config.QR_RETRY_S:
+            return
+        self._qr_sent[key] = now
+        print(f"[wifi] QR code for {creds['ssid']!r} — joining")
+        await wifi_link.request_join(creds)
 
     async def frame_loop(self) -> None:
         period = 1.0 / config.MJPEG_FPS

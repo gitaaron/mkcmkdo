@@ -43,6 +43,13 @@ CAMERA_NAME = "SportCam"     # shown in the app's camera picker
 MDNS_HOSTNAME = "sportcam.local"
 WHEP_URL = None              # set when MediaMTX runs on the Pi (WebRTC)
 
+# --- Wi-Fi setup: connecting → pairing (wifi_portal.py, wifi_link.py) -------
+# The portal service decides when to pair; these are the head unit's side.
+WIFI_STATUS_WAIT_S = 15.0    # no word from the portal by then (not installed): go idle
+QR_SCAN_PERIOD_S = 0.5       # look for a Wi-Fi QR code this often while pairing
+QR_RETRY_S = 20.0            # don't resend the same code sooner (it failed, or is joining)
+QR_FOCUS_M = 0.5             # a phone held 15–30 cm from the lens; set_focus's floor
+
 # --- pan / tilt (Arducam PTZ controller, I2C 0x0C) ------------------------
 # Angles are degrees from centre. Raw servo values are 0-180; CENTER_RAW is
 # the raw value that aims the lens straight ahead of the enclosure, and SIGN

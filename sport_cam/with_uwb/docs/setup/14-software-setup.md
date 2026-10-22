@@ -201,6 +201,16 @@ needs redoing.
 
 ## 7. Install the services
 
+Give the camera's setup hotspot its own password, and write it on the
+head's label: you need it only for the setup page, the fallback to the QR
+code ([Pairing](../../../docs/product/01-requirements.md#pairing)).
+
+```bash
+sudo mkdir -p /etc/sportcam
+tr -dc 'a-z0-9' </dev/urandom | head -c 10 | sudo tee /etc/sportcam/hotspot-password; echo
+sudo chmod 600 /etc/sportcam/hotspot-password
+```
+
 ```bash
 sudo cp ~/sportcam/src/with_uwb/device/sportcam-head.service ~/sportcam/src/with_uwb/device/sportcam-wifi.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -208,7 +218,7 @@ sudo systemctl enable --now sportcam-head sportcam-wifi
 journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
 ```
 
-**Done when** the LED ring is blue (idle): solid, or breathing slowly if the camera can see you.
+**Done when** the LED ring chases white (connecting), then turns blue (idle): solid, or breathing slowly if the camera can see you. Blinking white instead: it has no Wi-Fi it knows; pair it as below.
 
 | Operation | Command / note |
 | --- | --- |
@@ -264,9 +274,15 @@ elevation are right.
 Both word their buttons for this build: the camera reports
 `TRACKING_MODE = "with_uwb"` itself ([07 — Tracking mode](../../../docs/design/07-backend-and-app.md#tracking-mode)).
 
-**At a new gym:** power on, join the camera's `SportCam-Setup` hotspot from
-your phone, open `http://10.42.0.1` and pick the gym's network. The camera
-remembers it.
+**At a new gym:** power on. The ring chases white while the camera looks
+for a network it knows, then blinks white: it's pairing. On your phone
+(already on the gym's Wi-Fi) open the network's share code (Android:
+Settings → Wi-Fi → the network → **Share**; iPhone, iOS 18+: Passwords →
+Wi-Fi → the network → **Show Network QR Code**) and hold it 15–30 cm in
+front of the lens. The ring chases white, then turns blue. The camera
+remembers the network. Code not read: join the `SportCam-Setup` hotspot
+(password on the label), open `http://10.42.0.1`, pick the network and
+paste the password.
 
 ## Values you end up setting
 

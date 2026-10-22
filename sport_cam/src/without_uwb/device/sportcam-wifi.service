@@ -1,7 +1,8 @@
 [Unit]
-Description=SportCam Wi-Fi provisioning portal (hotspot + captive page when offline)
+Description=SportCam Wi-Fi: saved networks, else pairing (hotspot, setup page, QR join)
 After=NetworkManager.service
 Wants=NetworkManager.service
+Before=sportcam-head.service
 
 [Service]
 Type=simple

@@ -30,6 +30,8 @@ from . import config
 # state → (r, g, b), matching the app's status ring and docs/01
 COLOURS = {
     "off":       (0, 0, 0),
+    "connecting": (0xC8, 0xC8, 0xC8),   # white chasing: trying the saved Wi-Fi networks
+    "pairing":   (0xC8, 0xC8, 0xC8),    # white, slow blink: show me a Wi-Fi QR code
     "idle":      (0x2F, 0x6F, 0xED),    # blue: solid, or breathing slowly with a person in frame
     "tracking":  (0x1F, 0x9D, 0x55),    # green: chasing (search), filling (found)
     "recording": (0xD6, 0x45, 0x41),    # breathing red
@@ -83,12 +85,15 @@ class StatusRing:
             k = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(2 * math.pi * t))   # 1 Hz breath
         elif self.state == "idle" and self.idle_person:
             k = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(math.pi * t))         # 0.5 Hz breath
+        elif self.state == "pairing":
+            k = 1.0 if (t % 2.0) < 1.0 else 0.08                         # 0.5 Hz blink
         elif self.lost and self.state in ("tracking", "recording"):
             k = 1.0 if (t % 0.5) < 0.25 else 0.15                        # 2 Hz flash
         else:
             k = 1.0
         colour = (int(r * k), int(g * k), int(b * k))
-        if self.state == "tracking" and self.searching and not self.lost:
+        if self.state == "connecting" or (
+                self.state == "tracking" and self.searching and not self.lost):
             for i, c in enumerate(chase(colour, t, config.LED_COUNT)):
                 self._pixels[i] = c
         elif self.state == "tracking" and self.found is not None:

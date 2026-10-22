@@ -32,7 +32,8 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 | `focuscal.py` | `python3 -m sportcam.focuscal <metres>`: focus sweep at five focal lengths; prints `FOCUS_GRID` |
 | `uploader.py` | background upload to the backend: progress, retry, boot-time backlog drain ([08](08-recordings-and-cloud.md)) |
 | `boxlog.py` | while recording, the tracker's labelled person boxes from each detection; written beside the clip as `<clip>.boxes.json` and uploaded with it ([08](08-recordings-and-cloud.md#person-boxes)) |
-| `wifi_portal.py` | hotspot and captive setup page when offline ([08](08-recordings-and-cloud.md)) |
+| `wifi_portal.py` | `sportcam-wifi`: tries the saved networks, else pairing: hotspot, setup page and `/api/join`; writes `/run/sportcam-wifi.json` ([08](08-recordings-and-cloud.md#connecting-the-camera-to-gym-wi-fi-from-your-phone)) |
+| `wifi_link.py` | the head's side: boot states `connecting` / `pairing` from the status file, Wi-Fi share QR code parser, join request; both report as `off` to apps |
 | `local_api.py` | camera-hosted copy of the Firebase API for direct connections ([09](09-direct-connection-and-app.md)) |
 | `discovery.py` | mDNS advertisement, `_sportcam._tcp` |
 | `config.py` | all tunables, including `TRACKING_MODE` (build name, reported to Firebase and phones) and the Firebase settings (`FIREBASE_PROJECT`, `CAMERA_KEY`, `UPLOAD_API_BASE`) |
@@ -42,7 +43,7 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 | Aspect | Detail |
 | --- | --- |
 | Installation | 14 — Software setup, step 3 onward ([with UWB](../../with_uwb/docs/setup/14-software-setup.md), [without UWB](../../without_uwb/docs/setup/14-software-setup.md)). Runs from `/home/pi/sportcam/src/<build>/device` |
-| Privileges | `sportcam-head` runs as an ordinary user (hence SPI for the LED ring; the PWM/DMA driver needs root). `sportcam-wifi` (portal) runs as root |
+| Privileges | `sportcam-head` runs as an ordinary user (hence SPI for the LED ring; the PWM/DMA driver needs root). `sportcam-wifi` (portal) runs as root and is the only thing that changes the network; the head reads its QR codes and asks it to join |
 | Recording upload | on stop, `main.py` hands the MP4 and its person boxes to `uploader.py` as a background task; tracking and streaming continue. The local copies are deleted after the backend confirms the byte count ([08](08-recordings-and-cloud.md)) |
 
 Live video:

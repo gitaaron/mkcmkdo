@@ -39,6 +39,7 @@ class Camera:
         self._cam = None
         self._encoder = None
         self._hog = None
+        self._qr = None
         if Picamera2:
             self._cam = Picamera2()
             cfg = self._cam.create_video_configuration(
@@ -117,6 +118,21 @@ class Camera:
         sy = ph / sh
         return [(int(x * sx) + x0, int(y * sy), int(w * sx), int(h * sy))
                 for x, y, w, h in rects]
+
+    def qr_text(self) -> str | None:
+        """Whatever QR code is in front of the lens, or None.
+
+        Used only while pairing, to read the phone's Wi-Fi share code
+        (wifi_link.py). A full-frame decode costs ≈ 50–100 ms on a Pi 4, so
+        the caller runs it off the event loop, a couple of times a second.
+        """
+        if not (self._cam and cv2):
+            return None
+        if self._qr is None:
+            self._qr = cv2.QRCodeDetector()
+        grey = cv2.cvtColor(self._cam.capture_array("lores"), cv2.COLOR_RGB2GRAY)
+        text, _pts, _ = self._qr.detectAndDecode(grey)
+        return text or None
 
     def start_recording(self) -> str:
         os.makedirs(config.RECORD_DIR, exist_ok=True)
