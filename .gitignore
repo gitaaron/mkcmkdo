@@ -1,0 +1,2 @@
+# tools for the Docker sandbox, kept on the host (sbx_setup.sh)
+.sbx-cache/

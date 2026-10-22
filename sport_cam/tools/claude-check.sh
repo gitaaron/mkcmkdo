@@ -6,6 +6,7 @@
 #                                  the failures to stderr and exit 2, which
 #                                  tells Claude to keep working and fix them.
 #   tools/claude-check.sh all      run every check (also: npm run check)
+#   tools/claude-check.sh venv     just create the Python test env (sbx_setup.sh)
 #
 # Wired up in the repo's .claude/settings.json as a Stop hook. A state that
 # already passed is remembered (by a hash of the diff), so an unchanged tree
@@ -55,6 +56,8 @@ ensure_venv() {
         python3 -m venv "$venv" && "$venv/bin/pip" install -q $py_deps
     fi && echo "$py_deps" >"$venv/.deps"
 }
+[ "$mode" = venv ] && { ensure_venv; exit; }
+
 device_tests() {   # device_tests <build>
     local dir="src/$1/device" t rc=0
     for t in "$dir"/tests/test_*.py; do

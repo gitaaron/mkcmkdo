@@ -125,7 +125,7 @@ cables come in. Three more files:
 One dimension worth *choosing* rather than measuring: `uwb_half_base`. It is
 set to 190 mm, which puts the antennas 400 mm apart (each sits 10 mm
 further out than the board's centre) — see
-[constraints C1–C2](../product/01-requirements.md#non-functional-requirements-with-uwb). Bearing noise
+[constraints C1–C2](../product/01-requirements.md#non-functional-requirements). Bearing noise
 scales as 1/baseline
 ([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)), so if you have the
 room, widening it buys accuracy as long as the tripod stays stable and the

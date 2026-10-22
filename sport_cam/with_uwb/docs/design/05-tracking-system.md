@@ -32,7 +32,7 @@ both angles, frames the shot, and confirms the person before recording.
 
 - All anchors are **static**: they don't move with the lens.
 - Spacing is a compromise between head size
-  ([C1, C2](../../../docs/product/01-requirements.md#non-functional-requirements-with-uwb))
+  ([C1, C2](../../../docs/product/01-requirements.md#non-functional-requirements))
   and angle noise, which grows as spacing shrinks.
 - The tag ranges each anchor in turn and broadcasts one frame with r₁, r₂, r₃.
   A single frame means one timestamp: the formulas below assume simultaneous
@@ -248,7 +248,7 @@ never resolved.
 Too close to tell apart, the camera never records. After
 `ACQUIRE_STALLED_S` (15 s) the app asks the climber to step away from
 others. The anchor baseline is the hardware lever: the bearing noise
-falls with spacing ([C2](../../../docs/product/01-requirements.md#non-functional-requirements-with-uwb)).
+falls with spacing ([C2](../../../docs/product/01-requirements.md#non-functional-requirements)).
 
 While more than one person is being compared, the vision pan bias stands
 still until recording. Otherwise it would lean toward whoever was picked

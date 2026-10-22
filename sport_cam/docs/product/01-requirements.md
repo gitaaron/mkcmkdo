@@ -58,12 +58,14 @@ view; camera-only for lower cost, size and power.
 ## Non-functional requirements
 
 Constraints the design must meet. A change that breaks one must state why
-in the doc that makes it. C1 and C2 are build-specific
-(<!--both-->[with UWB](#non-functional-requirements-with-uwb),
-[without UWB](#non-functional-requirements-without-uwb)<!--/--><!--with_uwb: [with UWB](#non-functional-requirements-with-uwb)--><!--without_uwb: [without UWB](#non-functional-requirements-without-uwb)-->).
+in the doc that makes it. C1 and C2 differ by build.
 
 | # | Requirement | Value | Rationale | Set in |
 | --- | --- | --- | --- | --- |
+| C1 | **Compact head**, with UWB | ≤ 45 cm across, ≤ 30 cm tall to the top of the A3 mast (enclosure floor up), excluding the tripod | must fit small rooms; the width follows the anchor spacing (C2) | `uwb_half_base`, `uwb_v_base` in `with_uwb/cad/config.scad` |
+| C1 | **Compact head**, without UWB | Ø 135 mm enclosure (assumed part sizes), camera on top, no side protrusions, excluding the tripod | must fit small rooms | `base_d_min` in `without_uwb/cad/config.scad`; `cad/fit.py` widens it only if parts require |
+| C2 | **Anchor spacing**, with UWB | A1–A2 **400 mm** horizontal; A3 **250 mm** above them, ≈ 89 mm behind the pan axis | angle noise ∝ 1/spacing: 400 mm gives ≈ 7° RMS filtered (≈ 9° at 250 mm) ([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)). Telling the climber from a belayer beside them waits on that noise: at 400 mm someone 1.5 m away is resolved in ≈ 8 s rather than ≈ 17 s, and 1 m away in ≈ 12 s rather than never. Measure it with `bearingcal`. Below 250 mm, error and A3's blind corner grow quickly | `with_uwb/cad/config.scad`; `UWB_BASELINE_M`, `UWB_A3_UP_M`, `UWB_A3_BACK_M` in `src/with_uwb/device/sportcam/config.py` |
+| C2 | **Pan range ±80°**, without UWB | soft limits `PAN_MIN_DEG` / `PAN_MAX_DEG` = ∓80°; no continuous rotation | the base fouls before 180° and can't turn 360°; the search covers this range only | `src/without_uwb/device/sportcam/config.py` |
 | C3 | **Standard tripod mount** | 3/8-16 brass insert in the floor; removable 3/8-16 → 1/4-20 reducer bushing | photo tripods use 1/4-20, video heads 3/8-16; one socket takes both without an adapter plate | `tripod_boss_d`, `tripod_hole_d` in `<build>/cad/config.scad`; BOM |
 | C4 | **Battery operation** | ≥ 4 h tracking + recording from a USB-C PD bank; remaining-time gauge; clean save and stop at 7 % | no wall socket; no lost clip at end of charge | [04 — Runtime](../design/04-electronics.md#runtime) |
 | C5 | **Printable on a Bambu Lab A1 Mini** | every part ≤ 170 mm on every axis, as oriented for printing | the printer in use | [11](../setup/11-3d-printing.md#design-rule-every-part-prints-on-a-bambu-lab-a1-mini); `cad/fit.py` |
@@ -250,13 +252,6 @@ The camera, 6–12 m back
 ([placement envelope](../../with_uwb/docs/design/05-tracking-system.md#camera-placement-envelope)),
 ranges the tag at 20 Hz through body and clothing and points at the result.
 
-### Non-functional requirements, with UWB
-
-| # | Requirement | Value | Rationale | Set in |
-| --- | --- | --- | --- | --- |
-| C1 | **Compact head** | ≤ 45 cm across, ≤ 30 cm tall to the top of the A3 mast (enclosure floor up), excluding the tripod | must fit small rooms; the width follows the anchor spacing (C2) | `uwb_half_base`, `uwb_v_base` in `with_uwb/cad/config.scad` |
-| C2 | **Anchor spacing** | A1–A2 **400 mm** horizontal; A3 **250 mm** above them, ≈ 89 mm behind the pan axis | angle noise ∝ 1/spacing: 400 mm gives ≈ 7° RMS filtered (≈ 9° at 250 mm) ([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)). Telling the climber from a belayer beside them waits on that noise: at 400 mm someone 1.5 m away is resolved in ≈ 8 s rather than ≈ 17 s, and 1 m away in ≈ 12 s rather than never. Measure it with `bearingcal`. Below 250 mm, error and A3's blind corner grow quickly | `with_uwb/cad/config.scad`; `UWB_BASELINE_M`, `UWB_A3_UP_M`, `UWB_A3_BACK_M` in `src/with_uwb/device/sportcam/config.py` |
-
 ### State machine, with UWB
 
 ![State machine, with UWB](../../with_uwb/docs/images/state-machine.png)
@@ -300,13 +295,6 @@ Nothing is worn. **Track & record** in the app starts a wide-angle pan
 sweep; the first person detected is followed and, still in frame 3 s later,
 recorded. If idle already has a person in frame, the sweep is skipped and
 that person is followed directly.
-
-### Non-functional requirements, without UWB
-
-| # | Requirement | Value | Rationale | Set in |
-| --- | --- | --- | --- | --- |
-| C1 | **Compact head** | Ø 135 mm enclosure (assumed part sizes), camera on top, no side protrusions, excluding the tripod | must fit small rooms | `base_d_min` in `without_uwb/cad/config.scad`; `cad/fit.py` widens it only if parts require |
-| C2 | **Pan range ±80°** | soft limits `PAN_MIN_DEG` / `PAN_MAX_DEG` = ∓80°; no continuous rotation | the base fouls before 180° and can't turn 360°; the search covers this range only | `src/without_uwb/device/sportcam/config.py` |
 
 ### State machine, without UWB
 

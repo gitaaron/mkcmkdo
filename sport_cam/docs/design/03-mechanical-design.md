@@ -138,7 +138,7 @@ Additions to the stack:
 | 8 | **A3 mast** | ½-inch hardwood dowel, 246 mm, in a printed foot on the −X boss behind the lens. A printed cradle holds the third ULA1 **250 mm above A1/A2** (elevation). Out of shot at every tilt angle |
 
 Head envelope: ≈ **42 cm across the arms, 28 cm tall** to the mast top
-([C1](../product/01-requirements.md#non-functional-requirements-with-uwb)).
+([C1](../product/01-requirements.md#non-functional-requirements)).
 
 **Tilt and the mast.** Top frame edge at +85°, full wide: ≈ 27° past
 vertical. A3 board: ≈ 30° past vertical from the tilt axis, so just out of
@@ -168,7 +168,7 @@ shot. A taller mast enters the shot; lower `TILT_MAX_DEG` to compensate.
 
 The common stack is the whole head. Enclosure wall plain all round; no side
 protrusions
-([C1](../product/01-requirements.md#non-functional-requirements-without-uwb)).
+([C1](../product/01-requirements.md#non-functional-requirements)).
 
 **Tilt and the search.** The search uses two tilt rows (5° and 22°); the
 rest of the tilt range is used for tracking once the person is found.
