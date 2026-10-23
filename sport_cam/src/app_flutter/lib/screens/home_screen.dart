@@ -6,13 +6,15 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets/connection_badge.dart';
 import '../widgets/control_bar.dart';
+import '../widgets/joystick.dart';
 import '../widgets/mjpeg_view.dart';
 import '../widgets/person_boxes.dart';
 import '../widgets/status_ring.dart';
 import 'library_screen.dart';
 
 /// The single screen: live video, connection badge (top-left), camera-state
-/// ring (top-right), state-dependent controls at the bottom.
+/// ring (top-right), state-dependent controls at the bottom, and in awake a
+/// joystick (bottom-right) to aim the camera by hand.
 ///
 /// Opening the app starts streaming — discovery runs on launch and the
 /// video view attaches as soon as a camera answers.
@@ -183,6 +185,14 @@ class _HomeScreenState extends State<HomeScreen> {
               text: 'Recording saved — watch now',
               accent: SportColors.tracking,
               onTap: _openLibrary,
+            ),
+
+          // awake, on the camera's own Wi-Fi link: aim it by hand
+          if (client.canAim && client.foreground)
+            Positioned(
+              right: 18,
+              bottom: 96 + MediaQuery.of(context).padding.bottom,
+              child: Joystick(onMove: client.aim),
             ),
 
           Align(

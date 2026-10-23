@@ -145,6 +145,7 @@ async def full_flow() -> None:
     head._countdown_sent = 0
     head._near_focus = False
     head._boxes_sent_at = None
+    head._jog, head._jog_at = (0.0, 0.0), float("-inf")
     head._awake_since = CLOCK.t
     head.boxlog = BoxLog()
 
@@ -330,6 +331,19 @@ async def full_flow() -> None:
     check("…then it sweeps", head.phase == "search" and head.ptz.pan_deg != 0.0,
           f"pan {head.ptz.pan_deg:.1f}")
     await head.apply_state("awake")
+
+    # the app's joystick turns the head in awake, and stops when the app stops sending
+    head.ptz.park()
+    head.jog(-1.0, 0.5)
+    await tick_for(0.2)
+    check("joystick: awake, pulled up and left, the head turns left and up",
+          head.ptz.jogs > 0 and head.ptz.pan_deg < 0 and head.ptz.tilt_deg > 0,
+          f"pan {head.ptz.pan_deg:.1f}, tilt {head.ptz.tilt_deg:.1f}")
+    await tick_for(config.JOG_TIMEOUT_S + 0.2)
+    held = head.ptz.jogs
+    await tick_for(0.3)
+    check("…and stops JOG_TIMEOUT_S after the last message", head.ptz.jogs == held,
+          f"{head.ptz.jogs - held} more moves")
 
 
 def ring_animation() -> None:

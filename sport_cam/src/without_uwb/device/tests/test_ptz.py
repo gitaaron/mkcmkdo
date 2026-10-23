@@ -93,6 +93,31 @@ def main() -> None:
     check("a zoom move refocuses for the last ranged distance",
           focus_after == focus_raw(10.6, 4.0, GRID), f"{focus_after}")
 
+    # ---- the app's joystick: speed grows with the square of the pull --------
+    p = Ptz()
+    p.focuser = RecordingFocuser()
+
+    def jogged(x, y, dt=1.0):
+        p.park()
+        p.jog(x, y, dt)
+        return p.pan_deg, p.tilt_deg
+    check("full pull right pans right at JOG_PAN_MAX_DPS",
+          jogged(1.0, 0.0) == (config.JOG_PAN_MAX_DPS, 0.0), f"{jogged(1.0, 0.0)}")
+    check("full pull left pans left", jogged(-1.0, 0.0)[0] == -config.JOG_PAN_MAX_DPS)
+    check("full pull up tilts up at JOG_TILT_MAX_DPS",
+          jogged(0.0, 1.0) == (0.0, config.JOG_TILT_MAX_DPS), f"{jogged(0.0, 1.0)}")
+    check("half a pull turns at a quarter of the speed",
+          abs(jogged(0.5, 0.0)[0] - config.JOG_PAN_MAX_DPS / 4) < 1e-9, f"{jogged(0.5, 0.0)}")
+    pan, tilt = jogged(1.0, 1.0)
+    check("a pull past the rim counts as the rim, in the same direction",
+          abs(pan / config.JOG_PAN_MAX_DPS - 0.5 ** 0.5) < 1e-9
+          and abs(tilt / config.JOG_TILT_MAX_DPS - 0.5 ** 0.5) < 1e-9, f"{pan:.1f}, {tilt:.1f}")
+    check("…and the soft limits still hold", jogged(1.0, 0.0, dt=10.0)[0] == config.PAN_MAX_DEG)
+    p.park()
+    p.focuser.writes.clear()
+    p.jog(0.0, 0.0, 1.0)
+    check("knob at the centre: no servo writes", p.focuser.writes == [])
+
     print()
     if failures:
         print(f"{len(failures)} check(s) failed: " + ", ".join(failures))

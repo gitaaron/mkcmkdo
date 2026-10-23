@@ -18,6 +18,7 @@ protocol** as the Firebase function:
 | `GET /api/recordings/:name` | signed URL | ✅ (clips not yet uploaded) |
 | Live state | Firestore document | `WS /ws` |
 | Live person boxes | with each preview frame | `WS /ws` `boxes` message, each detection |
+| Joystick (aim by hand) | — | the app sends `WS /ws` `jog` messages ([below](#aiming-by-hand)) |
 | Works at the gym | needs internet | ✅ **needs nothing** |
 
 - Same protocol, so the app's calls are identical; only the base URL changes.
@@ -88,9 +89,26 @@ Same layout as the web app, plus a connection badge:
 | **Top left — connection** (`ConnectionBadge`) | green **"SportCam · Direct · 10.0.0.42"**; blue **"Firebase"**; amber pulsing **"Searching…"**; red **"Offline — tap to retry"**. Tap to re-scan |
 | **Below the badge** | recordings button with clip-count badge; under it, **Boxes on / off** for the live view (remembered on the phone, separately from the player's) |
 | **Live view** | the MJPEG stream (direct) or the preview (Firebase), with the camera's [person boxes](08-recordings-and-cloud.md#in-the-live-view) painted over it (`widgets/person_boxes.dart`). Only in `awake`, `tracking` and `recording`; in `sleep` the sensor is off and the screen says the camera is asleep |
+| **Bottom right — joystick** (`widgets/joystick.dart`) | in `awake` over the direct connection only: a knob in a ring to aim the camera by hand ([below](#aiming-by-hand)) |
 | **Top right, stalled-tracking pill, bottom buttons** | as in the web app ([07](07-backend-and-app.md#web-app-srcweb)) |
 | **Recording player** (`lib/screens/library_screen.dart`) | the native player with the clip's [person boxes](08-recordings-and-cloud.md#person-boxes) painted over it, a **Boxes on / off** button beside play/pause (remembered on the phone) and a legend. Over the direct connection the boxes come from the camera's card (`/api/recordings/<clip>.boxes.json`) |
 | **Sounds** (`lib/session_audio.dart`) | a sonar ping every 3 s while searching, a beep each second of the found countdown (3, 2, 1), then a rising chime on record start; falling on stop. Queued, so the chime follows the last beep. Plays **including in the background**. While connected the app stays awake: Android foreground service with a "SportCam connected" notification; iOS background audio mode (looped silence). Mixes over music; plays with the iOS silent switch on. Platform setup: [`src/app_flutter/README.md`](../../src/app_flutter/README.md) |
+
+## Aiming by hand
+
+The joystick sits bottom right of the live view, above the buttons. Drag the
+knob and the camera turns towards the pull: left pans left, up tilts up. The
+further the knob is from the centre, the faster it turns. Let go and the knob
+springs back and the camera stops where it is.
+
+| | |
+| --- | --- |
+| When | `awake` only, over the direct connection. In `tracking` and `recording` the tracker drives the head; in `sleep` there is no picture to aim by; through Firebase a command takes about a second, so the camera would overshoot. The web app has no joystick for the same reason |
+| Message | while held, the app sends `{"type": "jog", "pan": x, "tilt": y}` on the WebSocket every 50 ms, even with the finger still: `x` right +, `y` up +, each the knob's offset as a fraction of its travel (the rim is 1). Releasing sends one `(0, 0)` |
+| Speed | the camera turns at `JOG_PAN_MAX_DPS × r × x` and `JOG_TILT_MAX_DPS × r × y` (60°/s and 45°/s at the rim), where `r` is the distance from the centre: speed grows with the square of the pull, so a small pull aims finely. The soft limits still apply |
+| Dead man | the camera moves only within `JOG_TIMEOUT_S` (0.3 s) of the last message, so a dropped Wi-Fi link or a backgrounded app can't leave it turning |
+| Where it runs | `LocalApi._on_jog` checks and clamps each message; `Head.jog` notes it; `Head.manual_aim` turns the head once per control tick (`Ptz.jog`), so it moves smoothly however unevenly messages arrive. Using it keeps the camera awake |
+| Then | a session started afterwards begins from where you aimed it: <!--with_uwb-->the camera turns from there to the tag<!--/--><!--both--> (with UWB), or <!--/--><!--without_uwb-->the sweep starts from there, and with a person in frame it skips the sweep<!--/--><!--both--> (without)<!--/-->. Going to sleep, and a session ending, re-centre the head |
 
 ## Running and testing it
 

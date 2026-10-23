@@ -85,6 +85,15 @@ TILT_MIN_DEG, TILT_MAX_DEG = -45.0, 85.0
 PAN_MAX_DPS = 120.0            # slew limit on the pan servo (deg/s)
 TILT_MAX_DPS = 90.0
 
+# --- manual aim: the phone app's joystick (awake only) ---------------------
+# The knob's pull, as a fraction of the ring's radius, sets the speed: it
+# grows with the square of the pull, so a small pull aims finely and a full
+# pull turns at these rates.
+JOG_PAN_MAX_DPS = 60.0
+JOG_TILT_MAX_DPS = 45.0
+JOG_TIMEOUT_S = 0.3            # no joystick message this long: stop. A dropped
+                               # connection can't leave the head turning
+
 # --- tracking -------------------------------------------------------------
 UWB_BASELINE_M = 0.4          # anchor separation (cad/config.scad uwb_half_base × 2)
 # Raw range noise of the DW1000s after antenna-delay calibration. Angle noise

@@ -40,6 +40,7 @@ lib/
     status_ring.dart           top-right: camera state (LED colours)
     mjpeg_view.dart            native MJPEG decoder with auto-reconnect
     control_bar.dart           state-dependent bottom buttons
+    joystick.dart              awake: aim the camera by hand, faster the further you pull
 assets/sounds/                 rec_start.wav, rec_stop.wav, silence.wav
 tool/
   make_chimes.py               renders assets/sounds/ (same notes as the web chime)

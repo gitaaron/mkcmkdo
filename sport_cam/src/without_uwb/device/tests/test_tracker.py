@@ -71,6 +71,7 @@ class FakePtz:
         self.zoom_mm = config.ZOOM_MIN_MM
         self.focus_dist: float | None = None
         self.max_pan_step = 0.0
+        self.jogs = 0
 
     @property
     def hfov_deg(self) -> float:
@@ -86,6 +87,11 @@ class FakePtz:
     def set_tilt(self, deg: float) -> float:
         self.tilt_deg = max(config.TILT_MIN_DEG, min(config.TILT_MAX_DEG, deg))
         return self.tilt_deg
+
+    def jog(self, x: float, y: float, dt: float) -> None:
+        self.jogs += 1
+        self.set_pan(self.pan_deg + x * config.JOG_PAN_MAX_DPS * dt)
+        self.set_tilt(self.tilt_deg + y * config.JOG_TILT_MAX_DPS * dt)
 
     def set_zoom_mm(self, mm: float) -> None:
         self.zoom_mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, mm))

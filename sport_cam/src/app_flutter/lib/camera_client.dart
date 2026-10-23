@@ -360,6 +360,21 @@ class CameraClient extends ChangeNotifier {
   Future<void> stopRecording() => _call('stopRecording').then((_) {});
   Future<void> setPower(bool on) => _call('setPower', {'on': on}).then((_) {});
 
+  /// The joystick works in awake, over the direct connection: tracking and
+  /// recording own the head, asleep there is no picture to aim by, and
+  /// through Firebase the second of lag would make it overshoot.
+  bool get canAim => _link == LinkMode.direct && _state == CamState.awake;
+
+  /// Turn the camera at a speed set by the joystick's pull ([Joystick]):
+  /// pan right +, tilt up +, each −1…1. Sent on the WebSocket, ≈ 20 a second
+  /// while it is held; the camera stops when they stop.
+  void aim(double pan, double tilt) {
+    final ws = _ws;
+    if (ws == null || _link != LinkMode.direct) return;
+    double r(double v) => (v.clamp(-1.0, 1.0) * 1000).roundToDouble() / 1000;
+    ws.sink.add(jsonEncode({'type': 'jog', 'pan': r(pan), 'tilt': r(tilt)}));
+  }
+
   /// `announce`: a new newest recording shows the "saved" toast (the relay's
   /// polling; direct connections get that from the WebSocket).
   Future<void> refreshRecordings({bool announce = false}) async {

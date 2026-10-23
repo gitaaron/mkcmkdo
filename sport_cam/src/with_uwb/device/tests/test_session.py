@@ -428,6 +428,7 @@ async def full_flow() -> None:
     head._countdown_sent = 0
     head._near_focus = False
     head._boxes_sent_at = None
+    head._jog, head._jog_at = (0.0, 0.0), float("-inf")
     head._awake_since = time.monotonic()
     head.boxlog = BoxLog()
 
@@ -452,6 +453,20 @@ async def full_flow() -> None:
 
     await tick_for(0.3)
     check("standby with the tag off", head.state == "awake")
+
+    # the app's joystick turns the head in awake, and stops when the app stops sending
+    head.jog(-1.0, 0.5)
+    await tick_for(0.2)
+    check("joystick: awake, pulled up and left, the head turns left and up",
+          head.ptz.jogs > 0 and head.ptz.pan_deg < 0 and head.ptz.tilt_deg > 0,
+          f"pan {head.ptz.pan_deg:.1f}, tilt {head.ptz.tilt_deg:.1f}")
+    await tick_for(config.JOG_TIMEOUT_S + 0.2)
+    held = head.ptz.jogs
+    await tick_for(0.3)
+    check("…and stops JOG_TIMEOUT_S after the last message", head.ptz.jogs == held,
+          f"{head.ptz.jogs - held} more moves")
+    head.ptz.set_pan(0.0)
+    head.ptz.set_tilt(0.0)
     check("awake sub-state: person in frame; the ring breathes",
           head.phase == "person-in-frame" and head.led.awake_person, f"{head.phase}")
     bbox, head.camera._bbox = head.camera._bbox, None

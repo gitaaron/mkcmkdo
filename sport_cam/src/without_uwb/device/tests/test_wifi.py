@@ -182,6 +182,7 @@ def make_head():
     head.camera, head.ptz, head.led = FakeCamera(), FakePtz(), FakeRing()
     head.storage = FakeStorage()
     head.cloud = head.mdns = head.local = FakeReporter()
+    head._jog, head._jog_at = (0.0, 0.0), float("-inf")
     return head
 
 

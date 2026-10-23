@@ -82,6 +82,9 @@ class StubHead:
         self.tilt_deg = 0.0
         self.local = LocalApi(self)
 
+    def jog(self, pan: float, tilt: float) -> None:
+        print(f"[stub] jog pan {pan:+.2f} tilt {tilt:+.2f}")
+
     async def apply_state(self, new: str) -> None:
         if new == "recording":
             with open(os.path.join(config.RECORD_DIR, "rec_stub.mp4"), "wb") as f:

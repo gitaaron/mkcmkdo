@@ -87,6 +87,8 @@ class Head:
         self._warned = ""          # which warning we last announced
         self._countdown_sent = 0   # tracker.countdown as last sent to the app
         self._boxes_sent_at: float | None = None   # tracker.labelled_at last sent live
+        self._jog = (0.0, 0.0)              # the app's joystick: pan, tilt in −1…1
+        self._jog_at = float("-inf")        # when it last sent one
 
     # convenience for local_api/telemetry — pan and tilt are commanded angles
     @property
@@ -251,6 +253,7 @@ class Head:
                 await self.report_state()
         else:
             if self.state == "awake":
+                self.manual_aim()
                 self.tracker.watch_awake()     # person in frame? (LED and app only: sessions start in SEARCH)
             self.led.lost = False
         # The tag switching on (or the person found for FOUND_CONFIRM_S) can move the
@@ -273,6 +276,28 @@ class Head:
         self.led.searching = self.state == "tracking" and self.phase == "search"
         self.led.found = (self.tracker.found_for() / config.FOUND_CONFIRM_S
                           if self.state == "tracking" and self.phase == "found" else None)
+
+    def jog(self, pan: float, tilt: float) -> None:
+        """The app's joystick, sent ≈ 20 times a second while it is held.
+
+        Only noted here; control_tick turns the head (manual_aim), so it moves
+        at the control rate however fast messages arrive.
+        """
+        self._jog = (pan, tilt)
+        self._jog_at = time.monotonic()
+
+    def manual_aim(self) -> None:
+        """Awake: turn the head by the joystick, until it stops sending.
+
+        Only in awake. Tracking and recording own the head, and sleep and
+        the boot states have no picture to aim by.
+        """
+        if time.monotonic() - self._jog_at > config.JOG_TIMEOUT_S:
+            return
+        pan, tilt = self._jog
+        if pan or tilt:
+            self.ptz.jog(pan, tilt, 1.0 / config.UWB_RATE_HZ)
+            self._awake_since = time.monotonic()   # someone is using it
 
     async def health_loop(self) -> None:
         """Watch the two things that run out: charge and card space.

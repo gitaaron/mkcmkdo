@@ -81,7 +81,11 @@ class StubHead:
         self.pan_deg = 0.0
         self.tilt_deg = 0.0
         self.recorded: list[str] = []
+        self.jogs: list[tuple[float, float]] = []
         self.local = LocalApi(self)
+
+    def jog(self, pan: float, tilt: float) -> None:
+        self.jogs.append((pan, tilt))
 
     async def apply_state(self, new: str) -> None:
         if new == "recording":
@@ -199,6 +203,15 @@ async def main() -> None:
                 third = json.loads((await ws.receive(timeout=5)).data)
                 check("WS broadcasts state change",
                       third["type"] == "state" and third["state"] == "tracking", str(third)[:80])
+
+                # the app's joystick, over the same socket
+                await ws.send_json({"type": "jog", "pan": -0.4, "tilt": 0.25})
+                await ws.send_json({"type": "jog", "pan": 3, "tilt": -9})
+                await ws.send_json({"type": "jog", "pan": "left", "tilt": 0})
+                await ws.send_json({"type": "ping"})
+                await ws.receive(timeout=5)            # the pong: the jogs before it are in
+                check("WS jog reaches the head, clamped to −1…1, malformed dropped",
+                      head.jogs == [(-0.4, 0.25), (1.0, -1.0)], str(head.jogs))
 
         # --- mDNS -------------------------------------------------------
         await mdns.start("awake")

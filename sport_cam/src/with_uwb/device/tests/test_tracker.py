@@ -88,6 +88,7 @@ class FakePtz:
         self.zoom_mm = config.ZOOM_MIN_MM
         self.tilt_calls = 0
         self.focus_dist = None
+        self.jogs = 0
 
     @property
     def hfov_deg(self):
@@ -101,6 +102,11 @@ class FakePtz:
     def set_tilt(self, deg):
         self.tilt_deg = max(config.TILT_MIN_DEG, min(config.TILT_MAX_DEG, deg))
         return self.tilt_deg
+
+    def jog(self, x: float, y: float, dt: float) -> None:
+        self.jogs += 1
+        self.set_pan(self.pan_deg + x * config.JOG_PAN_MAX_DPS * dt)
+        self.set_tilt(self.tilt_deg + y * config.JOG_TILT_MAX_DPS * dt)
 
     def nudge_tilt(self, d):
         self.tilt_calls += 1

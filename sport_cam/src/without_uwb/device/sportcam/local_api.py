@@ -8,7 +8,9 @@ API speaks (src/backend/functions), so the app talks to both identically:
                                    frames in sleep, when the sensor is off
     GET  /api/recordings/:name     local clip, HTTP Range supported, or its
                                    <clip>.boxes.json (person boxes, boxlog.py)
-    WS   /ws                       state, recordings and live person-box broadcasts
+    WS   /ws                       state, recordings and live person-box broadcasts;
+                                   the app sends {"type":"jog","pan":x,"tilt":y}
+                                   (each −1…1) while its joystick is held
     GET  /api/health               {"ok":true,"backend":"device", …}
 
 Why the camera serves its own API: on gym Wi-Fi (or the camera's own
@@ -21,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import mimetypes
 import os
 import time
@@ -178,6 +181,17 @@ class LocalApi:
                 })
         return {"recordings": out}
 
+    def _on_jog(self, data: dict) -> None:
+        """The joystick: on the socket, not a call, so it costs no request
+        per message. Anything malformed is dropped."""
+        try:
+            pan, tilt = float(data.get("pan", 0.0)), float(data.get("tilt", 0.0))
+        except (TypeError, ValueError):
+            return
+        if not (math.isfinite(pan) and math.isfinite(tilt)):
+            return
+        self.head.jog(max(-1.0, min(1.0, pan)), max(-1.0, min(1.0, tilt)))
+
     # ---- HTTP handlers ----------------------------------------------------
     async def _handle_call(self, req: web.Request) -> web.Response:
         name = req.match_info["name"]
@@ -255,6 +269,8 @@ class LocalApi:
                         continue
                     if data.get("type") == "ping":
                         await ws.send_json({"type": "pong"})
+                    elif data.get("type") == "jog":
+                        self._on_jog(data)
         finally:
             self._ws_clients.discard(ws)
         return ws

@@ -131,6 +131,22 @@ class Ptz:
     def nudge_tilt(self, delta_deg: float) -> float:
         return self.set_tilt(self._tilt + delta_deg)
 
+    def jog(self, x: float, y: float, dt: float) -> None:
+        """Turn for `dt` seconds at a speed set by the app's joystick.
+
+        `x` (right +) and `y` (up +) are the knob's offset from centre as a
+        fraction of the ring's radius. The speed grows with the square of the
+        offset, so a small pull aims finely and a full one turns at
+        JOG_PAN_MAX_DPS / JOG_TILT_MAX_DPS. The soft limits still apply.
+        """
+        r = math.hypot(x, y)
+        if r == 0.0:
+            return
+        if r > 1.0:
+            x, y, r = x / r, y / r, 1.0
+        self.set_pan(self._pan + x * r * config.JOG_PAN_MAX_DPS * dt)
+        self.set_tilt(self._tilt + y * r * config.JOG_TILT_MAX_DPS * dt)
+
     def park(self) -> None:
         """Centre both axes and relax the lens. Called on shutdown."""
         self.set_pan(0.0)
