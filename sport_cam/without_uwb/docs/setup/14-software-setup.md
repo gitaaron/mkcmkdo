@@ -198,7 +198,7 @@ tuning steps only mean something once the signs are right.
    round while the camera zooms wide and sweeps left and right, stepping to the
    next tilt row at each end; the app pings every 3 s while it searches. When it sees you it stops and follows you;
    the ring fills with green over 3 s and the app beeps 3, 2, 1. Still in
-   frame at the end, the ring turns breathing red, recording starts and the
+   frame at the end, the ring turns solid red, recording starts and the
    app chimes. The
    zoom then settles with you filling about two-thirds of the frame.
 2. **Sign checks.** Walk slowly to one side while it follows. If it turns

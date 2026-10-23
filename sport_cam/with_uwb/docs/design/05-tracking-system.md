@@ -161,7 +161,7 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
 | **Zoom** | initial setting from distance (1.8 m subject at 45 % of frame height); vision then frames to 65 % with an edge guard ([06](../../../docs/design/06-device-software.md#framing-and-focus)). Vision scale limited to 0.5–2.5× the distance zoom and to the lens range (no windup) |
 | **Focus** | ranged distance + focal length → `FOCUS_GRID` ([06](../../../docs/design/06-device-software.md#framing-and-focus)); no hunting |
 | **Detector** | OpenCV HOG on the 720p preview, 3 fps (0.5 idle); record stream untouched 1080p. Each detection used once; search strip ≈ 40 % of frame width around the ranged bearing ([06](../../../docs/design/06-device-software.md#vision-and-why-it-runs-slowly)). Sufficient: a climber at 0.3 m/s seen from 10 m moves 1.7°/s, and the 17 % framing margin gives several seconds of tolerance |
-| **Lost tag** | > 2 s without ranges: hold, LED flashes. > 5 s: `idle` (recording saved first). Same path as a tag switched off |
+| **Lost tag** | > 2 s without ranges: hold, LED flashes (solid red while recording). > 5 s: `idle` (recording saved first). Same path as a tag switched off |
 
 ### Search, found and recording
 

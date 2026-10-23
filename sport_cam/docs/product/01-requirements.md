@@ -113,7 +113,7 @@ library. Deviations (dropouts, loss, manual control): <!--both-->[with UWB](#sta
    found is kept; afterwards the tracker follows the detection nearest the
    last position, so a passing bystander doesn't take over.
 5. **Record.** Still in frame after 3 s (`FOUND_CONFIRM_S`): state
-   `recording` (pulsing red; the app chimes after the beeps). Pan and tilt
+   `recording` (solid red; the app chimes after the beeps). Pan and tilt
    keep the climber in frame; zoom holds them at ≈ 65 % of the frame. H.264
    is written on the Pi.
 6. **End.** The clip is saved, the app chimes, state `idle`.
@@ -141,7 +141,7 @@ each have two sub-states, reported to the app as telemetry `phase`.
 | `idle`, person in frame | blue, breathing slowly | blue (slow breath), "On — person in frame" | — | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
 | `tracking`, search | green, chasing round the ring | green (fast blink), <!--with_uwb-->"Turning to your tag…"<!--/--><!--both--> / <!--/--><!--without_uwb-->"Looking for a person…"<!--/--> | sonar ping every 3 s | **Turn off** · **Stop tracking** |
 | `tracking`, found | green, filling round the ring over 3 s | solid green, "Found you — recording in 3…" | a beep each second (3, 2, 1) | **Turn off** · **Stop tracking** |
-| `recording` | pulsing red | red (pulsing) | rising chime on start, falling chime on stop<!--both-->; without UWB, pings again if it loses the person and searches<!--/--><!--without_uwb: ; pings again if it loses the person and searches--> | **Turn off** · **Stop recording** |
+| `recording` | solid red | red (solid) | rising chime on start, falling chime on stop<!--both-->; without UWB, pings again if it loses the person and searches<!--/--><!--without_uwb: ; pings again if it loses the person and searches--> | **Turn off** · **Stop recording** |
 
 <!--both-->
 
@@ -176,7 +176,7 @@ Rules:
 - **Stop recording** saves the clip and ends the session: `recording` →
   `idle`. **Stop tracking** cancels a session that hasn't started
   recording.
-- Subject missing > 2 s in `recording`: hold position, LED flashes at 2 Hz.
+- Subject missing > 2 s in `recording`: hold position; the LED stays solid red.
   Next step is build-specific.
 - Battery < 20 %: ring dims and blinks orange at 1 Hz over the state colour.
   Battery < 7 %: save, park, drop to `idle`.
@@ -258,7 +258,8 @@ ranges the tag at 20 Hz through body and clothing and points at the result.
 
 Deviations from the [ideal path](#ideal-path):
 
-- Tag lost > 2 s in `tracking` or `recording`: hold, LED flashes. Lost > 5 s: `idle`
+- Tag lost > 2 s in `tracking` or `recording`: hold, LED flashes (stays solid red
+  while recording). Lost > 5 s: `idle`
   (any recording saved first). A subject crossing a pan soft limit behaves
   the same way.
 - The 5 s delay rides over short dropouts. A switched-off tag and a
@@ -303,7 +304,7 @@ that person is followed directly.
 Deviations from the [ideal path](#ideal-path):
 
 - Nobody found in 15 s: the app reports it.
-- Person missing 2 s in `recording`: hold, LED flashes at 2 Hz. Missing 6 s:
+- Person missing 2 s in `recording`: hold; the LED stays solid red. Missing 6 s:
   sweep again (phase `search`; the app pings), toward the last direction of
   travel; recording continues. The next person found is followed at once,
   with no countdown.

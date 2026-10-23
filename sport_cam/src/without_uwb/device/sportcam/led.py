@@ -34,7 +34,7 @@ COLOURS = {
     "pairing":   (0xC8, 0xC8, 0xC8),    # white, slow blink: show me a Wi-Fi QR code
     "idle":      (0x2F, 0x6F, 0xED),    # blue: solid, or breathing slowly with a person in frame
     "tracking":  (0x1F, 0x9D, 0x55),    # green: chasing (search), filling (found)
-    "recording": (0xD6, 0x45, 0x41),    # breathing red
+    "recording": (0xD6, 0x45, 0x41),    # solid red, never blinks
     "error":     (0xF2, 0xA9, 0x3B),    # flashing orange
 }
 
@@ -43,7 +43,7 @@ class StatusRing:
     def __init__(self) -> None:
         self._pixels = None
         self.state = "idle"
-        self.lost = False          # tracking but no ranges → flash
+        self.lost = False          # tracking but no ranges → flash (not while recording)
         self.warn = False          # battery or storage low: dim + orange blink
         self.idle_person = False   # idle, person in frame → slow blue breath
         self.searching = False     # tracking, search → green chase
@@ -82,12 +82,12 @@ class StatusRing:
         else:
             self._pixels.brightness = config.LED_BRIGHTNESS
         if self.state == "recording":
-            k = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(2 * math.pi * t))   # 1 Hz breath
+            k = 1.0                                                      # solid, even when lost
         elif self.state == "idle" and self.idle_person:
             k = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(math.pi * t))         # 0.5 Hz breath
         elif self.state == "pairing":
             k = 1.0 if (t % 2.0) < 1.0 else 0.08                         # 0.5 Hz blink
-        elif self.lost and self.state in ("tracking", "recording"):
+        elif self.lost and self.state == "tracking":
             k = 1.0 if (t % 0.5) < 0.25 else 0.15                        # 2 Hz flash
         else:
             k = 1.0

@@ -8,7 +8,7 @@ import '../theme.dart';
 ///   idle       blue: solid, or breathing slowly with a person in frame
 ///   tracking   green: blinking in search (turning to the tag with UWB,
 ///              sweeping the room without); solid when found, counting down
-///   recording  pulsing red
+///   recording  solid red
 class StatusRing extends StatefulWidget {
   const StatusRing({
     super.key,
@@ -53,7 +53,7 @@ class _StatusRingState extends State<StatusRing>
   }
 
   void _syncAnimation() {
-    // Search blinks fast; recording pulses; idle with a person in frame
+    // Search blinks fast; idle with a person in frame
     // breathes slowly — like the LED ring.
     final period = Duration(
       milliseconds: widget.searching
@@ -67,9 +67,7 @@ class _StatusRingState extends State<StatusRing>
         ..stop()
         ..duration = period;
     }
-    if (widget.state == CamState.recording ||
-        widget.searching ||
-        widget.idlePerson) {
+    if (widget.searching || widget.idlePerson) {
       if (!_pulse.isAnimating) _pulse.repeat(reverse: true);
     } else {
       _pulse

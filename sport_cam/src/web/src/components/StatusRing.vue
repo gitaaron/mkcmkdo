@@ -20,7 +20,7 @@ const color = computed(() =>
 //   tracking     search: a quick blink (the LED chases round; with UWB the
 //                camera is turning to the tag, without UWB sweeping the room).
 //                found: solid (the LED fills round over the 3 s countdown)
-//   recording    pulsing
+//   recording    solid
 const phase = computed(() => props.cam.telemetry?.phase);
 const idlePerson = computed(() => props.cam.state === "idle" && phase.value === "person-in-frame");
 const searching = computed(() => props.cam.state === "tracking" && phase.value === "search");
@@ -53,7 +53,7 @@ const label = computed(
 <template>
   <div
     class="ring"
-    :class="{ pulsing: cam.state === 'recording', breathing: idlePerson, searching, hollow: !cam.connected }"
+    :class="{ breathing: idlePerson, searching, hollow: !cam.connected }"
     :style="{ '--c': color }"
     :title="label"
     role="status"
@@ -69,9 +69,6 @@ const label = computed(
   background: var(--c);
   border: 3px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 0 12px color-mix(in srgb, var(--c) 60%, transparent);
-}
-.ring.pulsing {
-  animation: pulse 1.2s ease-in-out infinite;
 }
 .ring.breathing {
   /* idle with a person in frame: the LED ring breathes slowly */

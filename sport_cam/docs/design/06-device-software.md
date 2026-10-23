@@ -123,7 +123,7 @@ is already clipped. Relaxing wider is the safe failure direction.
 
 `led.py`, 16 × WS2812B on SPI0 MOSI. Colours per state:
 [01 — State machine](../product/01-requirements.md#state-machine). Overlays:
-2 Hz flash for a lost subject; 1 Hz orange blink over the state colour for low
+2 Hz flash for a lost subject while tracking (recording stays solid red); 1 Hz orange blink over the state colour for low
 battery or low card space.
 
 ## Firebase link

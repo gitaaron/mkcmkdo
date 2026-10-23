@@ -312,7 +312,7 @@ def state_machine():
            (xs["idle"], "LED blue: solid,\nbreathing with a person in frame"),
            (xs["search"], "LED chasing green;\nsweep pan ±80°, lens wide"),
            (xs["found"], "LED fills green over 3 s;\nframe them as when recording"),
-           (xs["rec"], "LED pulsing red")]
+           (xs["rec"], "LED solid red")]
     for x, t in cap:
         ax.text(x, 0.3, t, ha="center", va="center", fontsize=13.6, color=INK)
     ax.text(1.0, 1.6, "\"turn off\" works\nfrom every state", fontsize=13.6, color=GREY, ha="center")

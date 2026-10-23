@@ -80,7 +80,7 @@ Sweep timing:
 | **3 s in frame to record** | a single-frame false positive (coat stand, chair) causes a ≈ 1 s pause, then the sweep resumes; it can't start a recording. Telemetry `countdown` carries the seconds left; the app beeps on each, then chimes when recording starts |
 | **Recording always follows found** | no manual record button. **Stop recording** saves the clip and ends the session (`idle`) |
 | **Nearest, not largest, once found** | each detection is matched to the one nearest the last position, within `TRACK_GATE_FRACTION` (45 % of frame width). Detections outside the gate are ignored (bystanders) |
-| **Missing target** | `LOST_HOLD_S` (2 s): hold, ring flashes at 2 Hz. `RESEARCH_AFTER_S` (6 s): sweep toward the last direction of travel. Recording continues; zoom relaxes wide meanwhile |
+| **Missing target** | `LOST_HOLD_S` (2 s): hold, ring flashes at 2 Hz (stays solid red while recording). `RESEARCH_AFTER_S` (6 s): sweep toward the last direction of travel. Recording continues; zoom relaxes wide meanwhile |
 | **Empty room** | `tracking`, nobody found for 180 s of sweeping → `idle`. Never applied to a recording |
 
 ### Boxes in the recording
