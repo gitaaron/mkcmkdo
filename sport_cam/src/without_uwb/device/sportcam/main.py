@@ -33,6 +33,7 @@ Run:  python -m sportcam.main          (from device/)
 from __future__ import annotations
 
 import asyncio
+import signal
 import time
 
 from . import config, wifi_link
@@ -134,6 +135,36 @@ class Head:
             self.upload_loop(),
             self.wifi_loop(),
         )
+
+    async def serve(self) -> None:
+        """run() until systemd stops the service with SIGTERM, then power_off().
+
+        The power switch going off is a shutdown (docs/04, the power latch),
+        so this is how a recording survives it."""
+        task = asyncio.current_task()
+        asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, task.cancel)
+        try:
+            await self.run()
+        except asyncio.CancelledError:
+            await self.power_off()
+
+    async def power_off(self) -> None:
+        """Close any recording, park the head and darken the ring.
+
+        The latch keeps the power on until the Pi has halted, but not a
+        moment longer. The clip is complete on the card; upload_loop sends
+        it after the next boot.
+        """
+        print(f"[power] switched off in {self.state} — saving and parking")
+        if self.state == "recording":
+            await self.apply_state("sleep")     # stops the encoder, closing the file
+        try:
+            await asyncio.wait_for(self.report_state(), 2.0)
+        except Exception:                       # noqa: BLE001 — going down regardless
+            pass
+        self.ptz.park()
+        self.led.park()
+        await self.mdns.stop()
 
     # ---- state ------------------------------------------------------------
     async def apply_state(self, new: str) -> None:
@@ -403,7 +434,7 @@ class Head:
 if __name__ == "__main__":
     head = Head()
     try:
-        asyncio.run(head.run())
+        asyncio.run(head.serve())
     except KeyboardInterrupt:
         head.ptz.park()
         head.led.park()

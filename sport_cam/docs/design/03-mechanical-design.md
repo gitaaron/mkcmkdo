@@ -36,7 +36,7 @@ The UWB build adds anchor arms and a mast to this stack ([below](#with-uwb)).
 
 | Layer | Contents | Mounting |
 | --- | --- | --- |
-| Floor | USB-C PD trigger (socket at the wall inlet), rocker switch and 5 V jack in the wall, battery gauge, buck converter | foam tape; switch and jack panel-mount |
+| Floor | USB-C PD trigger (socket at the wall inlet), rocker switch (on/off) and 5 V jack in the wall, power latch, battery gauge, buck converter | foam tape; switch and jack panel-mount |
 | LED window | WS2812B ring, LEDs down, lighting a 12 mm window all round; translucent band over the window outside | ring foam-taped under the shelf; band slides onto a ledge |
 | Shelf | Raspberry Pi 4, level shifter | Pi on M2.5 nylon standoffs; shelf on three wall posts, M3 into inserts |
 | Lid | Arducam base | ring under the lid drops into the mouth; four M3 through the wall into inserts in the ring |

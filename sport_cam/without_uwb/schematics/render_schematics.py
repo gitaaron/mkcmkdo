@@ -30,8 +30,10 @@ def head_schematic():
         d.config(fontsize=11)
         pi = d.add(elm.Ic(
             pins=[
-                pin("SPI MOSI G10", "left", "2/2", "MOSI"),
-                pin("USB-C 5V", "left", "1/2", "USBC"),
+                pin("SPI MOSI G10", "left", "4/4", "MOSI"),
+                pin("HOLD G17", "left", "3/4", "HOLD"),
+                pin("SENSE G27", "left", "2/4", "SENSE"),
+                pin("USB-C 5V", "left", "1/4", "USBC"),
                 pin("CSI", "right", "4/4"),
                 pin("SDA G2", "right", "3/4", "SDA"),
                 pin("SCL G3", "right", "2/4", "SCL"),
@@ -68,6 +70,13 @@ def head_schematic():
               .label("SPI0 MOSI → 74AHCT125 → DIN", "top", fontsize=8.5))
         d.add(elm.Dot(open=True).label("WS2812B ring ×16\n(SPI, so nothing runs as root)",
                                        "left", fontsize=9))
+
+        d.add(elm.Line().at(pi.HOLD).left(5)
+              .label("HOLD → latch: power on until halted", "top", fontsize=8.5))
+        d.add(elm.Dot(open=True))
+        d.add(elm.Line().at(pi.SENSE).left(5)
+              .label("SENSE ← rocker switch, 2.8 V", "top", fontsize=8.5))
+        d.add(elm.Dot(open=True).label("power latch\n(12 V, docs/04)", "left", fontsize=9))
 
         d.add(elm.Vdd().at(pi.USBC).label("+5 V rail (see power tree)", fontsize=9))
     save(d, "schematic-head.png")

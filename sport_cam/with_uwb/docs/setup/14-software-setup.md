@@ -225,6 +225,44 @@ journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
 | Apply a `config.py` change | `sudo systemctl restart sportcam-head`. Also resets the battery gauge to "full" (step 8): don't restart mid-session on a part-used bank |
 | Before running `rangecal`, `bearingcal`, `focuscal` or `ptzcheck` | `sudo systemctl stop sportcam-head` (they need exclusive access to the hardware) |
 
+### Power switch
+
+The rocker switch signals the Pi, and a latch keeps the power on until the Pi
+has shut down ([wiring](12-wiring.md#power-latch)). The Pi needs three settings
+for that. Without them, switching off cuts the power at once, like pulling the
+cable.
+
+```bash
+# HOLD (GPIO17) high from the first second of boot; SENSE (GPIO27) falling = power key
+sudo tee -a /boot/firmware/config.txt <<'CFG'
+
+# SportCam power latch (12-wiring, S3 and S4)
+gpio=17=op,dh
+dtoverlay=gpio-shutdown,gpio_pin=27,active_low=1,gpio_pull=off
+CFG
+
+# A halted Pi turns its 3.3 V off, so HOLD drops and the latch lets go
+sudo rpi-eeprom-config > /tmp/eeprom.txt
+sed -i -e '/^POWER_OFF_ON_HALT/d' -e '/^WAKE_ON_GPIO/d' /tmp/eeprom.txt
+printf 'POWER_OFF_ON_HALT=1\nWAKE_ON_GPIO=0\n' >> /tmp/eeprom.txt
+sudo rpi-eeprom-config --apply /tmp/eeprom.txt
+
+# A hung Pi or a hung shutdown resets, which drops HOLD too
+sudo sed -i -e 's/^#\?RuntimeWatchdogSec=.*/RuntimeWatchdogSec=15s/' \
+            -e 's/^#\?RebootWatchdogSec=.*/RebootWatchdogSec=2min/' /etc/systemd/system.conf
+sudo reboot
+```
+
+**Done when:** the camera is awake, you switch off, and the ring goes dark
+within a few seconds. About 10 s later the buck's LED goes out too: the Pi has
+halted and the latch has cut the power. Switch on again and it boots as usual.
+Then do it while recording: the clip appears in the library after the next
+boot, playable to the end.
+
+If it ever stays on after you switch off (a Pi that won't shut down), the
+watchdog resets it within 2 minutes and that cuts the power. Unplugging the
+bank's cable always works too.
+
 ## 8. Live checks
 
 With the service running and the tag **off**, the ring is blue (breathing slowly while it sees you; one dim pixel once it has gone to sleep, and **Wake up** in the app brings it back). Do

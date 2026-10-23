@@ -72,7 +72,7 @@ Conventions:
 | | **Design** | [`docs/design/`](docs/design/), `<build>/docs/design/` | |
 | 02 | [System architecture](docs/design/02-system-architecture.md) | shared | Subsystems, key decisions, each build's architecture |
 | 03 | [Mechanical design](docs/design/03-mechanical-design.md) | shared | PTZ base, enclosure, shelf and lid, layout inside, ranges of motion, printed parts |
-| 04 | [Electronics](docs/design/04-electronics.md) | shared | Why a Pi 4, PTZ controller, LED ring, power budget and runtime, SD card, bring-up |
+| 04 | [Electronics](docs/design/04-electronics.md) | shared | Why a Pi 4, PTZ controller, LED ring, power switch and latch, power budget and runtime, SD card, bring-up |
 | 05 | Tracking system: [with UWB](with_uwb/docs/design/05-tracking-system.md) · [without UWB](without_uwb/docs/design/05-tracking-system.md) | per build | <!--with_uwb-->UWB geometry, anchors and control loops<!--/--><!--both--> · <!--/--><!--without_uwb-->search sweep, found → record and vision loops<!--/--> |
 | 06 | [Device software](docs/design/06-device-software.md) | shared | Pi camera service, motion, vision, status ring, the Firebase link |
 | 07 | [Backend & app](docs/design/07-backend-and-app.md) | shared | Firebase (one function, Firestore, Storage), the camera key, the API, the Vue app |

@@ -470,7 +470,7 @@ def power_tree():
     fig, ax = new_fig(11.5, 6.4, "Power distribution — battery")
     box(ax, 0.3, 4.1, 2.7, 1.7, "USB-C PD power bank",
         ["25 000 mAh · 92 Wh label", "≈ 84 Wh at 12 V", "65 W+, 100 W cable"], fc="#fdf6e8")
-    box(ax, 3.7, 4.1, 2.4, 1.7, "PD trigger → 12 V", ["+ rocker switch"], fc="#fdf6e8")
+    box(ax, 3.7, 4.1, 2.4, 1.7, "PD trigger → 12 V", ["+ power latch", "rocker = on/off"], fc="#fdf6e8")
     box(ax, 6.8, 4.1, 2.3, 1.7, "INA260 gauge",
         ["I2C 0x40", "shunt on die", "Wh integration"], fc="#f2fff5")
     box(ax, 3.7, 2.3, 2.4, 1.3, "Buck 12→5 V 8 A", ["5.1 V under load", "≈ 92 % efficient"], fc="#f2f7ff")
@@ -486,7 +486,7 @@ def power_tree():
     arrow(ax, (7.9, 4.1), (5.5, 3.5), "12 V sensed", lofs=(0.55, 0.2))
     arrow(ax, (6.1, 2.95), (7.0, 2.95), "5 V")
     arrow(ax, (8.7, 1.95), (8.7, 1.72), "", color=GREEN)
-    ax.text(5.4, 1.1, "No mains. The 7 % cutoff\nstops and saves the recording\nbefore the pack dies.",
+    ax.text(5.4, 0.9, "No mains. The 7 % cutoff\nstops and saves the recording\nbefore the pack dies.\nSwitching off does the same,\nthen the latch cuts the power.",
             fontsize=8.5, color=GREY, ha="center")
     save(fig, "power-tree.png")
 

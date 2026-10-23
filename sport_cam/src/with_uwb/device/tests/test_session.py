@@ -568,11 +568,58 @@ def ring_animation() -> None:
           and lit(fill((0, 200, 0), 1.0, 16)) == 16)
 
 
+async def switched_off() -> None:
+    """The power switch going off: systemd sends SIGTERM, and the recording is
+    closed and the head parked before the service exits (docs/04, power latch)."""
+    print("\nswitched off while recording")
+    import signal
+    import sportcam.main as main_mod
+    from sportcam.main import Head
+
+    async def no_upload(*a, **k):
+        return None
+    main_mod.upload_with_retry = no_upload
+
+    class Stub:
+        """Accepts any call; records the ones the test asks about."""
+        def __init__(self, *coroutines: str):
+            self.calls: list[str] = []
+            self.coroutines = coroutines
+
+        def __getattr__(self, name):
+            def call(*a, **k):
+                self.calls.append(name)
+                if name in self.coroutines:
+                    return asyncio.sleep(0)
+                return "/tmp/sportcam-test.mp4" if name == "start_recording" else None
+            return call
+
+    head = Head.__new__(Head)
+    head.state = "recording"
+    head.camera, head.ptz, head.led, head.tracker = Stub(), Stub(), Stub(), Stub()
+    head.boxlog, head.local = Stub(), Stub("broadcast")
+    head.cloud, head.mdns = Stub("report_state"), Stub("update_state", "stop")
+    head._rec_path, head._rec_started = "/tmp/sportcam-test.mp4", main_mod.time.monotonic()
+    head._near_focus = False
+
+    async def run_forever():
+        await asyncio.sleep(3600)
+    head.run = run_forever
+    asyncio.get_running_loop().call_later(0.1, os.kill, os.getpid(), signal.SIGTERM)
+    await asyncio.wait_for(head.serve(), 5.0)
+    check("SIGTERM ends serve()", True)
+    check("…with the recording stopped", "stop_recording" in head.camera.calls and head.state == "sleep",
+          f"{head.state}, camera {head.camera.calls}")
+    check("…the head parked and the ring dark", "park" in head.ptz.calls and "park" in head.led.calls)
+    check("…and mDNS withdrawn", "stop" in head.mdns.calls)
+
+
 def main() -> None:
     session_rules()
     tracker_found()
     tag_wearer()
     asyncio.run(full_flow())
+    asyncio.run(switched_off())
     ring_animation()
     print()
     if failures:

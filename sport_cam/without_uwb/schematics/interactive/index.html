@@ -51,7 +51,12 @@ const graph = {
   edges: [],
   children: [
     node("bank", "USB-C PD bank 92 Wh", [port("bank_out", "USB-C PD", "OUTPUT")]),
-    node("trig", "PD trigger 12 V + switch", [port("tr_in", "USB-C", "INPUT"), port("tr_out", "12V", "OUTPUT")]),
+    node("trig", "PD trigger 12 V", [port("tr_in", "USB-C", "INPUT"), port("tr_out", "12V", "OUTPUT")]),
+    node("sw", "Rocker switch (on/off)", [port("sw_in", "12V", "INPUT"), port("sw_out", "SW", "OUTPUT")]),
+    node("latch", "Power latch (IRF4905)", [
+      port("la_in", "12V", "INPUT"), port("la_sw", "SW", "INPUT"), port("la_hold", "HOLD", "INPUT"),
+      port("la_out", "12V switched", "OUTPUT"), port("la_sense", "SENSE 2.8 V", "OUTPUT"),
+    ]),
     node("ina", "INA260 / INA226 gauge (0x40)", [port("ina_in", "12V", "INPUT"), port("ina_out", "12V", "OUTPUT"), port("ina_i2c", "I2C", "OUTPUT")]),
     node("buck", "Buck 12→5 V 8 A", [port("bk_in", "12V", "INPUT"), port("bk_out", "5V rail", "OUTPUT")]),
     node("pi", "Raspberry Pi 4 — camera unit", [
@@ -59,6 +64,7 @@ const graph = {
       port("pi_csi", "CSI", "OUTPUT"), port("pi_i2c", "I2C G2/G3", "OUTPUT"),
       port("pi_i2c_in", "I2C gauge", "INPUT"),
       port("pi_spi", "SPI0 MOSI G10", "OUTPUT"),
+      port("pi_hold", "HOLD G17", "OUTPUT"), port("pi_sense", "SENSE G27", "INPUT"),
     ]),
     node("ptz", "Arducam PTZ ctrl (0x0C)", [
       port("ptz_i2c", "I2C", "INPUT"), port("ptz_5v", "5V", "INPUT"),
@@ -80,7 +86,12 @@ const edge = (srcNode, srcPort, dstNode, dstPort, name) => ({
 });
 graph.edges = [
   edge("bank", "bank_out", "trig", "tr_in", "PD negotiate"),
-  edge("trig", "tr_out", "ina", "ina_in", "12V"),
+  edge("trig", "tr_out", "latch", "la_in", "12V"),
+  edge("trig", "tr_out", "sw", "sw_in", "12V, < 1 mA"),
+  edge("sw", "sw_out", "latch", "la_sw", "on/off"),
+  edge("latch", "la_out", "ina", "ina_in", "12V"),
+  edge("pi", "pi_hold", "latch", "la_hold", "keep on until halted"),
+  edge("latch", "la_sense", "pi", "pi_sense", "switch off → shutdown"),
   edge("ina", "ina_out", "buck", "bk_in", "12V sensed"),
   edge("ina", "ina_i2c", "pi", "pi_i2c_in", "battery I2C"),
   edge("buck", "bk_out", "pi", "pi_5v", "5V 5A"),

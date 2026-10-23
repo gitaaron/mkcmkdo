@@ -35,6 +35,16 @@ window.SPORTCAM_LAYOUT = {
    "z0": 4.0,
    "z1": 15.0
   },
+  "latch": {
+   "ang": 150,
+   "cx": 20.0,
+   "cy": 44.0,
+   "l": 30.0,
+   "name": "power latch",
+   "w": 24.0,
+   "z0": 4.0,
+   "z1": 14.0
+  },
   "shifter": {
    "ang": 0,
    "cx": -48.0,
@@ -119,6 +129,13 @@ window.SPORTCAM_LAYOUT = {
    "hole_d": 8.2,
    "max_panel_t": 4.0,
    "measured": false
+  },
+  "latch": {
+   "bom": "13a",
+   "h": 10,
+   "l": 30,
+   "measured": false,
+   "w": 24
   },
   "led_ring": {
    "bom": 7,

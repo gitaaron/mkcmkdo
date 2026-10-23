@@ -84,6 +84,14 @@ l = 22.9
 w = 22.9
 h = 12                # including the screw terminal
 
+[latch]
+name = "Power latch (P-MOSFET and two transistors on a scrap of perfboard)"
+bom = "13a"
+measured = false
+l = 30
+w = 24
+h = 10                # the IRF4905 is bent over flat on the board, not standing up
+
 [switch]
 name = "Panel-mount rocker switch, 10 A"
 bom = 13

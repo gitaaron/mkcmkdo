@@ -21,7 +21,7 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 
 | Module | Function |
 | --- | --- |
-| `main.py` | asyncio supervisor: state handling (including `awake` → `sleep` after `AWAKE_TIMEOUT_S`, held off while an app watches the live view); control, frame and telemetry loops |
+| `main.py` | asyncio supervisor: state handling (including `awake` → `sleep` after `AWAKE_TIMEOUT_S`, held off while an app watches the live view); control, frame and telemetry loops. On SIGTERM (the power switch going off, through systemd) `power_off()` closes any recording, parks the head and darkens the ring before the Pi halts ([04](04-electronics.md#power-switch)) |
 | `cloud.py` | Firebase link: Firestore document, app requests, previews ([below](#firebase-link)) |
 | `camera.py` | Picamera2: 720p preview (JPEG + person detection); 1080p **hardware** H.264 recording to `/home/pi/recordings`; sensor stopped in `sleep`, with a `CAMERA_WARMUP_S` settle on waking before the first detection |
 | `ptz.py` | PTZ controller at I2C 0x0C: pan, tilt, zoom, focus, soft limits, homing |

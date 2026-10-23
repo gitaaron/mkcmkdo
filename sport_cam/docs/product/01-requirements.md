@@ -34,7 +34,7 @@ Subject localisation is build-specific: [With UWB](#with-uwb),
 | Extra hardware | 3 × ULA1 anchors, 2 anchor arms, A3 mast, wearable pod | none |
 | Head size | ≈ 42 cm across the arms, 28 cm to the mast top; Ø 141 mm enclosure | Ø 135 mm enclosure, no protrusions |
 | Runtime, 92 Wh bank, tracking + recording | ≈ 6.2 h | ≈ 8.4 h (estimated) |
-| Cost, excluding tripod | ≈ C$1079 | ≈ C$716 |
+| Cost, excluding tripod | ≈ C$1094 | ≈ C$731 |
 | `TRACKING_MODE` | `"with_uwb"` | `"without_uwb"` |
 
 Selection: UWB when the subject must be distinguished from other people in
@@ -55,6 +55,7 @@ view; camera-only for lower cost, size and power.
 | F9 | **Person boxes in recordings and the live view.** A box round every person the camera detects: **green** round the climber, **yellow** round anyone else, and **red** round everyone while it can't tell which is the climber (in `awake` nobody has been picked yet, so every box is red). Each recording keeps its boxes and both apps' players draw them over the video; both apps' live views draw them over the picture as the camera detects. The player and the live view each have a **Boxes on / off** button, remembered on that phone or browser | [08](../design/08-recordings-and-cloud.md#person-boxes) |
 | F10 | **Wi-Fi setup at a new gym.** With no saved network in range, the camera enters [pairing](#pairing) on its own; the phone shows its Wi-Fi share QR code to the lens, so the password is never retyped. The network is remembered for next time | [Pairing](#pairing); [08](../design/08-recordings-and-cloud.md#connecting-the-camera-to-gym-wi-fi-from-your-phone) |
 | F11 | **Sleep to save the battery.** Awake 30 s with no session started and nobody watching the live view, the camera sleeps: its sensor stops and the head parks, while the Pi stays reachable. From sleep the app offers **Wake up** and **Record**; Record goes straight to the search. No live view in sleep | [State machine](#state-machine) |
+| F12 | **On/off switch.** A rocker switch in the enclosure wall turns the camera on and off; no unplugging. Off is a clean shutdown from any state: a recording in progress is saved (and uploads at the next boot), the head parks and the ring goes dark, then the camera cuts its own power. Nothing draws from the bank while it is off | [04 — Power switch](../design/04-electronics.md#power-switch) |
 
 ## Non-functional requirements
 
@@ -138,7 +139,9 @@ library. Deviations (dropouts, loss, manual control): <!--both-->[with UWB](#sta
    `recording` (saving any recording first): both axes centre and the
    sensor stops. The same happens on its own after 30 s in `awake` with
    nobody watching the live view, and at
-   7 % battery. To power off, unplug the bank.
+   7 % battery. To power off, switch it off at the rocker
+   ([F12](#functional-requirements)): it saves any recording, parks, and
+   cuts its own power ≈ 15 s later.
 
 ## State machine
 
@@ -215,7 +218,9 @@ Rules:
   Battery < 7 %: save, park, `sleep`.
 - `connecting` and `pairing` happen only at power on, before `awake`; no app
   can reach the camera yet, so every app shows it as `off`. `off` is never
-  asked for: the camera has no software off, only `sleep`. Wi-Fi lost
+  asked for: the camera has no software off, only `sleep`; the rocker switch
+  is the off. Switched off in any state, it saves a recording, parks and
+  shuts down (the apps lose it and show `off`). Wi-Fi lost
   after that changes nothing: the camera carries on, and NetworkManager
   rejoins when it can ([Pairing](#pairing)).
 - The camera is the single source of truth. App commands are requests; the

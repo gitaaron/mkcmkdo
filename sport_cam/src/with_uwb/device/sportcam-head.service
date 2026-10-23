@@ -13,6 +13,10 @@ WorkingDirectory=/home/pi/sportcam/src/with_uwb/device
 ExecStart=/usr/bin/python3 -m sportcam.main
 Restart=always
 RestartSec=3
+# The power switch going off stops this service first: it saves the recording
+# and parks (Head.power_off), then the Pi halts and the power latch lets go.
+# Bounded, so a hung stop can't keep the camera on.
+TimeoutStopSec=20
 
 [Install]
 WantedBy=multi-user.target

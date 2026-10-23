@@ -105,7 +105,7 @@ const PHASES = ["Prepare", "Enclosure", "Camera", "Power & cables", "Finish"];
 
 // part groups, in assembly order
 const SHELL = ["base_housing", "insert"];
-const POWER = ["jack", "trigger", "switch", "ina226", "buck", ...(LY.shifter_on === "deck" ? ["shifter"] : [])];
+const POWER = ["jack", "trigger", "switch", "latch", "ina226", "buck", ...(LY.shifter_on === "deck" ? ["shifter"] : [])];
 const SHELF = ["shelf", "ledring", ...(LY.shifter_on === "shelf" ? ["shifter"] : [])];
 const PI = ["pi", "cooler"];
 const LED = ["led_diffuser_ring"];
@@ -151,24 +151,25 @@ const STEPS = [
   },
   {
     id: "power", phase: 1, title: "Power boards onto the floor", time: "60 min",
-    parts: ["USB-C PD trigger board (12 V)", "Rocker switch", "INA260 battery gauge", "12 V → 5 V 8 A buck", "Panel-mount barrel jack", "18 AWG silicone wire, 470 µF", "Double-sided foam tape"],
+    parts: ["USB-C PD trigger board (12 V)", "Rocker switch", "Power latch, built on perfboard (IRF4905, 2 × 2N3904, 8 resistors)", "INA260 battery gauge", "12 V → 5 V 8 A buck", "Panel-mount barrel jack", "18 AWG silicone wire, 470 µF", "Double-sided foam tape"],
     tools: ["Soldering iron", "Multimeter", "4 A dummy load"],
     steps: [
-      "<b>Wiring:</b> connections P1–P5 and R1 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, steps 1–3.",
+      "<b>Wiring:</b> connections P1–P6, S1–S2 and R1 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, steps 1–3. Build the power latch on its scrap of perfboard first, from the <a href='../12-wiring.md#power-latch' target='_blank'>latch circuit</a>.",
       "<b>Bench-set the buck to 5.1 V under a 4 A dummy load before it goes anywhere near the Pi.</b> Open-circuit voltage tells you nothing; a unit that reads 5.1 V unloaded and 4.8 V loaded will brown the Pi out under load.",
       "Set the PD trigger to <b>12 V</b> (solder jumper or resistor, per its silkscreen) and confirm with a meter on a real bank before wiring anything else.",
       `<b>PD trigger:</b> foam-tape it to the floor at the ${where(LY.usbc.ang)} of the enclosure, its USB-C socket hard against the inside of the rectangular inlet low in the wall. The bank's cable plugs in from outside.`,
       "<b>Switch and jack:</b> the rocker snaps into its cut-out — the wall is thinned round it so the clips grip — and the barrel jack (the 5 V service tap) goes through the round hole and takes its nut inside.",
-      "<b>Gauge and buck:</b> foam-tape them to the floor where the model shows them, clear of the posts and the tripod boss. Everything on the floor stays below the LED window.",
-      "Wire the chain: trigger 12 V out → rocker switch → gauge <b>VIN+</b>, gauge <b>VOUT+</b> → buck 12 V in. Grounds common. The gauge has to sit in series on the positive line or it measures nothing. If you couldn't source one, set <code>POWER_MONITOR = \"none\"</code> and skip it — you lose the low-battery warning, nothing else.",
-      "Put the 470 µF across the buck output. Leave the buck's 5 V out on 18 AWG, and the gauge's SDA/SCL leads, long enough (≈ 15 cm) to reach up past the shelf to the Pi, the LED ring and the lid.",
+      "<b>Latch, gauge and buck:</b> foam-tape them to the floor where the model shows them, clear of the posts and the tripod boss. Everything on the floor stays below the LED window.",
+      "Wire the chain: trigger 12 V out → latch <b>IN</b>, latch <b>OUT</b> → gauge <b>VIN+</b>, gauge <b>VOUT+</b> → buck 12 V in. Grounds common. The rocker only signals the latch (S1, S2): it carries under 1 mA, and the latch keeps the power on after you switch off until the Pi has saved the clip and shut down. The gauge has to sit in series on the positive line or it measures nothing. If you couldn't source one, set <code>POWER_MONITOR = \"none\"</code> and skip it — you lose the low-battery warning, nothing else.",
+      "Put the 470 µF across the buck output. Leave the buck's 5 V out on 18 AWG, the gauge's SDA/SCL leads and the latch's HOLD and SENSE leads, long enough (≈ 15 cm) to reach up past the shelf to the Pi, the LED ring and the lid.",
     ],
     warn: "Use the USB-C cable from the bill of materials. Before closing anything up, check the trigger really negotiates 12 V from your bank through the wall inlet.",
-    scene: { show: SHELL, add: [["trigger", 0, 0, 60], ["switch", 0, 0, 60], ["jack", 0, 0, 60], ["ina226", 0, 0, 70], ["buck", 0, 0, 70]],
+    scene: { show: SHELL, add: [["trigger", 0, 0, 60], ["switch", 0, 0, 60], ["jack", 0, 0, 60], ["latch", 0, 0, 70], ["ina226", 0, 0, 70], ["buck", 0, 0, 70]],
              view: "iso-high", focus: "all", render: "power",
              marks: [[bx("trigger").cx, bx("trigger").cy, bx("trigger").z1, "PD trigger → 12 V, at the USB-C inlet", 30, 30, 45],
                      [bx("gauge").cx, bx("gauge").cy, bx("gauge").z1, "battery gauge (0x40)", 40, 20, 40],
                      [bx("buck").cx, bx("buck").cy, bx("buck").z1, "buck → 5.1 V @ 8 A", 40, -30, 40],
+                     [bx("latch").cx, bx("latch").cy, bx("latch").z1, "power latch", -40, 30, 40],
                      [bx("switch").cx, bx("switch").cy, bx("switch").z1, "rocker switch", -30, -30, 35],
                      [bx("jack").cx, bx("jack").cy, bx("jack").z1, "5 V service jack", -40, 20, 30]] },
   },
@@ -196,7 +197,7 @@ const STEPS = [
     parts: ["Raspberry Pi 4 Model B 4 GB + heatsink/fan + 64 GB microSD", "4 × M2.5 × 6", "4 × M2.5 nylon standoffs, 6 mm", "3 × M3 × 8", "USB-C pigtail"],
     tools: ["2 mm driver", "2.5 mm hex key"],
     steps: [
-      "<b>Wiring:</b> connection R2 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, step 4; the gauge's I2C (I1–I4) is step 5.",
+      "<b>Wiring:</b> connection R2 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, step 4; the gauge's I2C (I1–I4) is step 5, and the latch's HOLD and SENSE leads (S3, S4) go on in the same step. Do the Pi setup for the latch (<a href='../14-software-setup.md#power-switch' target='_blank'>software setup</a>) before you rely on the switch to turn it off.",
       "Fit the heatsinks to the Pi <b>before</b> mounting it. It sits in a closed enclosure and you won't reach the chips afterwards. A fan case is taller: put its height in <code>ordered_parts.toml</code> and re-run <code>fit.py</code> first.",
       "Flash the card and enable I2C and SPI in <code>raspi-config</code>. If the camera is not detected on first boot, add <code>dtoverlay=imx477</code> to <code>/boot/firmware/config.txt</code>. The <code>usb_max_current_enable</code> flag is a Pi 5 thing and is not needed here.",
       "Screw the four 6 mm nylon standoffs into the shelf's Pi holes from underneath and mount the Pi on them with M2.5 × 6 — USB-C socket towards the shelf's cut-away side.",
@@ -278,6 +279,7 @@ const STEPS = [
       "<b>Spread the legs.</b> The whole head is about 14 cm across and 15 cm tall to the top of the camera, so a small tripod is fine — but the camera sits high, and a narrow stance with a bank hanging off it tips over.",
       "Level the enclosure, then point the lens at the middle of what you are filming. At 8 m back the ±80° sweep covers about 22 m of wall, so aim it once and the limits never come up.",
       "Switch on. The ring should come up solid blue.",
+      "Switch off to finish. The ring goes dark within a few seconds, once the clip is saved and the head parked, and the camera cuts its own power a few seconds after that. There's no need to unplug the bank.",
     ],
     scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...BATT, ...CABLES], add: [["tripod", 0, 0, -170]],
              view: "iso-low", focus: "all", render: "complete" },
@@ -618,6 +620,12 @@ const PARTS = {
       at(mesh(box(b.l, b.w, 1.6), COL.pcb), 0, 0, 0.8),
       at(mesh(box(b.l * 0.35, b.w * 0.8, b.z1 - b.z0 - 1.6), COL.blue), b.l * 0.28, 0, (b.z1 - b.z0 + 1.6) / 2),
       at(mesh(box(4, 4, 1.2), COL.black), -b.l * 0.2, 0, 2.2)]) },
+  latch: { grp: "static", build: () => placed("latch", (b) => [
+      at(mesh(box(b.l, b.w, 1.6), COL.pcb), 0, 0, 0.8),
+      at(mesh(box(10, 15, 4.5), COL.black), -b.l * 0.15, 0, 3.85),                  // IRF4905, bent flat
+      at(mesh(box(10, 6, 1.3), COL.steel, { metal: 0.5 }), -b.l * 0.15 - 9.5, 0, 2.25), // its tab
+      at(mesh(box(4.5, 3.5, 4.5), COL.black), b.l * 0.3, b.w * 0.2, 3.85),         // 2N3904s
+      at(mesh(box(4.5, 3.5, 4.5), COL.black), b.l * 0.3, -b.w * 0.2, 3.85)]) },
   buck: { grp: "static", build: () => placed("buck", (b) => [
       at(mesh(box(b.l, b.w, 1.6), COL.blue), 0, 0, 0.8),
       at(mesh(box(b.l * 0.3, b.w * 0.5, b.z1 - b.z0 - 1.6), COL.black), -b.l * 0.15, 0, (b.z1 - b.z0 + 1.6) / 2),
@@ -675,9 +683,9 @@ const PARTS = {
   pwr_pi: { grp: "static", build: () => {
     const p = LY.parts.pi, u = [Math.cos(LY.gap_ang * Math.PI / 180), Math.sin(LY.gap_ang * Math.PI / 180)];
     const gp = [u[0] * (LY.gap_d + 8), u[1] * (LY.gap_d + 8)], plug = piPoint(p.usbc_x - p.l / 2, -p.w / 2 - 12, 3);
-    const B = bx("buck"), G = bx("gauge"), T = bx("trigger");
+    const B = bx("buck"), G = bx("gauge"), T = bx("trigger"), L = bx("latch");
     return group(cable([[B.cx, B.cy, B.z1], [gp[0], gp[1], (B.z1 + SHELF_Z) / 2], [gp[0], gp[1], LY.shelf_top + 2], plug], 2.2, COL.wire),
-                 cable([[T.cx, T.cy, T.z1], [G.cx, G.cy, G.z1 + 2], [B.cx, B.cy, B.z1 - 4]], 2.0, COL.wire));
+                 cable([[T.cx, T.cy, T.z1], [L.cx, L.cy, L.z1 + 2], [G.cx, G.cy, G.z1 + 2], [B.cx, B.cy, B.z1 - 4]], 2.0, COL.wire));
   } },
   i2c_lead: { grp: "static", build: () => {
     const p = LY.parts.pi, u = [Math.cos(LY.gap_ang * Math.PI / 180), Math.sin(LY.gap_ang * Math.PI / 180)];

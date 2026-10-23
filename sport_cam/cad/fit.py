@@ -63,6 +63,8 @@ EPS = 1e-6
 # Printed parts and how many separate bodies each STL should contain
 # (the wearable is printed as body + lid side by side).
 EXPECTED_BODIES = {"wearable_case.stl": 2}
+# Boards taped to the enclosure floor, placed in this order after the PD trigger.
+DECK_BOARDS = (("buck", "buck converter"), ("gauge", "battery gauge"), ("latch", "power latch"))
 MAX_DECK_TRIES = 40        # floor arrangements tried per enclosure size before going wider
 
 
@@ -279,7 +281,7 @@ def solve_at(build, P, C, base_d, raised=False):
     # ---- wall features: heights and footprints --------------------------
     tr, sw, jk = P["pd_trigger"], P["switch"], P["jack"]
     deck_z = FZ + C["tape_t"]
-    # buck and gauge: on the floor, or on risers just clear of the tripod boss
+    # buck, gauge and power latch: on the floor, or on risers just clear of the tripod boss
     riser_h = C["tripod_boss_h"] + 1 - FZ if raised else 0.0
     board_z = deck_z + riser_h
     usbc_zc = deck_z + tr["h"] - tr["port_h"] / 2
@@ -414,7 +416,7 @@ def solve_at(build, P, C, base_d, raised=False):
 
     def place_deck(obstacles, trig):
         deck = {"trigger": trig}
-        for key, label in (("buck", "buck converter"), ("gauge", "battery gauge")):
+        for key, label in DECK_BOARDS:
             spots = deck_spots(P[key], label, obstacles)
             if not spots:
                 return None, f"the {label} ({P[key]['l']}×{P[key]['w']} mm) has no room on the floor"
@@ -425,7 +427,7 @@ def solve_at(build, P, C, base_d, raised=False):
         return deck, ""
 
     # quick no: a board that doesn't fit on an empty floor won't fit anywhere
-    for key, label in (("buck", "buck converter"), ("gauge", "battery gauge")):
+    for key, label in DECK_BOARDS:
         if not deck_spots(P[key], label, [boss], first=True):
             raise NoFit(f"the {label} ({P[key]['l']}×{P[key]['w']} mm) doesn't fit on a Ø{2 * R_in:.0f} floor at all")
     deck_cache = {}
@@ -491,7 +493,7 @@ def solve_at(build, P, C, base_d, raised=False):
             if deck is None:
                 last_err = err
                 continue
-            obstacles = [boss, *posts, *wall_parts, deck["buck"], deck["gauge"]]
+            obstacles = [boss, *posts, *wall_parts, *(deck[k] for k, _ in DECK_BOARDS)]
 
             # ---- shifter: on the shelf beside the Pi, else on the floor --
             sh = P["shifter"]
@@ -614,7 +616,7 @@ def solve_at(build, P, C, base_d, raised=False):
 
             risers = []
             if raised:
-                for k in ("buck", "gauge"):
+                for k, _ in DECK_BOARDS:
                     for pad in riser_pads(deck[k]):
                         risers.append([round(pad.cx, 3), round(pad.cy, 3), pad.ang, round(riser_h, 3)])
             L = {
@@ -637,6 +639,7 @@ def solve_at(build, P, C, base_d, raised=False):
                 "shifter_on": shifter[0],
                 "boxes": {
                     "trigger": box_d(deck["trigger"]), "buck": box_d(deck["buck"]), "gauge": box_d(deck["gauge"]),
+                    "latch": box_d(deck["latch"]),
                     "switch": box_d(swb), "jack": box_d(jkb), "shifter": box_d(shifter[1]),
                 },
                 "pi_boxes": [box_d(b) for b in pi_world],
@@ -881,7 +884,7 @@ class Audit:
 def scene(build, P, C, L):
     """Every bought part and every printed obstacle inside the enclosure."""
     R_in, FZ = L["R_in"], L["floor_z"]
-    objs = [box_from(L["boxes"][k]) for k in ("trigger", "buck", "gauge", "switch", "jack", "shifter")]
+    objs = [box_from(L["boxes"][k]) for k in ("trigger", "buck", "gauge", "latch", "switch", "jack", "shifter")]
     objs += [box_from(b) for b in L["pi_boxes"]]
     ring = P["led_ring"]
     objs.append(Cyl("LED ring", 0, 0, ring["od"] / 2, L["ring_z0"], L["ring_z1"]))
@@ -941,7 +944,7 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
             "; ".join(sorted(set(clashes))) or f"{len(allp)} envelopes checked pairwise")
 
     # 3. light path
-    deck_names = ["PD trigger", "buck converter", "battery gauge", "rocker switch", "barrel jack"]
+    deck_names = ["PD trigger", "buck converter", "battery gauge", "power latch", "rocker switch", "barrel jack"]
     deck_top = max(o.z1 for o in objs if o.name in deck_names or (o.name == "level shifter" and L["shifter_on"] == "deck"))
     A.check(deck_top <= L["window_z"] + EPS, "The power boards sit below the LED window",
             f"tallest at z = {deck_top:.1f}; window {L['window_z']:.1f}–{L['window_z'] + C['led_window_h']:.1f}")
