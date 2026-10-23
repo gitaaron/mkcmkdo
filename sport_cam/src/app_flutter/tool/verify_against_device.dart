@@ -65,7 +65,7 @@ Future<void> main(List<String> args) async {
     var parsed = camStateFrom(
       (res['result'] as Map<String, dynamic>)['state'] as String?,
     );
-    check('getState parses to a CamState', parsed == CamState.idle, '$parsed');
+    check('getState parses to a CamState', parsed == CamState.awake, '$parsed');
 
     final telemetry = Telemetry.fromJson(
       (res['result'] as Map<String, dynamic>)['telemetry']
@@ -106,7 +106,7 @@ Future<void> main(List<String> args) async {
     parsed = camStateFrom(
       (res['result'] as Map<String, dynamic>)['state'] as String?,
     );
-    check('stopRecording → idle (ends the session)', parsed == CamState.idle, '$parsed');
+    check('stopRecording → awake (ends the session)', parsed == CamState.awake, '$parsed');
 
     // --- recordings, parsed into the library model -----------------------
     res = await call(client, base, 'getRecordings');

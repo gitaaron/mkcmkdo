@@ -46,6 +46,10 @@ class FakeCamera:
         self._at = 0.0
         self.column = None
         self.detections = 0
+        self.awake = True
+
+    def set_awake(self, on):
+        self.awake = on
 
     def set_detect_fps(self, fps):
         self._period = 1.0 / max(0.1, fps)
@@ -55,6 +59,8 @@ class FakeCamera:
 
     def person_bbox(self):
         now = time.monotonic()
+        if not self.awake:
+            return None, False
         if now - self._at < self._period:
             return self._bbox, False
         self._at = now

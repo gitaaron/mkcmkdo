@@ -94,13 +94,13 @@ else is in view ([05](../../without_uwb/docs/design/05-tracking-system.md#boxes-
 
 #### In the live view
 
-The last detection's labelled boxes (`Head.live_boxes()`), in every state
-from `idle` on. In `idle` nobody has been picked as the climber yet, so
+The last detection's labelled boxes (`Head.live_boxes()`), in `awake`,
+`tracking` and `recording`; none in `sleep`, when the sensor is off. In `awake` nobody has been picked as the climber yet, so
 every box is `unsure` (red).
 
 | Link | How they arrive | Rate |
 | --- | --- | --- |
-| Direct (Flutter app) | WebSocket message `{"type": "boxes", "size": [1280, 720], "boxes": [[x, y, w, h, label], …]}` on each fresh detection | every detection: ≈ 3/s tracking, 1 per 2 s idle |
+| Direct (Flutter app) | WebSocket message `{"type": "boxes", "size": [1280, 720], "boxes": [[x, y, w, h, label], …]}` on each fresh detection | every detection: ≈ 3/s tracking, 1 per 2 s awake |
 | Firebase (web app, Flutter relay) | inside the preview frame they belong to: `cameras/{key}/live/preview` gets `size` and `boxes: [{x, y, w, h, label}, …]` (maps: Firestore can't nest arrays). `getPreview` returns them as `[x, y, w, h, label]` lists | with each preview frame, 1/s |
 
 - An empty list means the detector looked and saw nobody. The camera drops
@@ -174,7 +174,7 @@ Wi-Fi → the network → **Show Network QR Code**), and the camera can read
 that. Requirements and states: [01 — Pairing](../product/01-requirements.md#pairing).
 
 1. Power on. State `connecting` (ring: white chase). A saved network joins:
-   `idle`, done.
+   `awake`, done.
 2. None of the saved networks in range at the first scan (≈ 10 s), or none
    joined in 60 s: state `pairing` (ring: white, slow blink). Hotspot
    **`SportCam-Setup`** up, head parked, lens wide and focused near.
@@ -185,7 +185,7 @@ that. Requirements and states: [01 — Pairing](../product/01-requirements.md#pa
 4. `connecting` while the Pi drops the hotspot and joins; NetworkManager
    stores the network for next time. Wrong password: the hotspot returns,
    `pairing` again.
-5. Joined: `idle`. Open the app.
+5. Joined: `awake`. Open the app.
 
 Two services share the job ([06](06-device-software.md)):
 
@@ -193,7 +193,7 @@ Two services share the job ([06](06-device-software.md)):
  sportcam-wifi (root)                        sportcam-head (pi)
  wifi_portal.py                              main.py + wifi_link.py
  ─────────────────────────                   ─────────────────────────────
- try saved networks ──► /run/sportcam-wifi.json ──► state connecting / pairing / idle
+ try saved networks ──► /run/sportcam-wifi.json ──► state connecting / pairing / awake
  hotspot + setup page                              LED ring, PTZ park + near focus
  POST /api/join  ◄──────── {ssid, psk, hidden} ◄── Camera.qr_text() 2×/s
    writes "connecting", answers 202,               parse_wifi_qr()
@@ -203,14 +203,14 @@ Two services share the job ([06](06-device-software.md)):
 | Implementation | Detail |
 | --- | --- |
 | Network control | `nmcli` (NetworkManager, standard on Raspberry Pi OS Bookworm) |
-| Status file | `/run/sportcam-wifi.json`: `{state: connecting \| pairing \| online \| offline, message, ssid}`, written atomically by the portal. The head waits for it up to 15 s (`WIFI_STATUS_WAIT_S`), then assumes no portal is installed and goes `idle` |
+| Status file | `/run/sportcam-wifi.json`: `{state: connecting \| pairing \| online \| offline, message, ssid}`, written atomically by the portal. The head waits for it up to 15 s (`WIFI_STATUS_WAIT_S`), then assumes no portal is installed and goes `awake` |
 | QR reading | OpenCV `QRCodeDetector` on the 720p preview, off the event loop; ≈ 50–100 ms a frame on a Pi 4. A failed code isn't resent for 20 s (`QR_RETRY_S`) |
 | QR format | `WIFI:S:<ssid>;T:<WPA\|SAE\|WEP\|nopass>;P:<password>;H:<true\|false>;;`, fields in any order, `\;` `\:` `\,` `\\` `\"` escaped. Enterprise (`T:WPA2-EAP`, `E:`) is refused |
 | Focus | `QR_FOCUS_M` = 0.5 m while pairing (the nearest `set_focus` allows; `FOCUS_GRID` is clamped at its nearest row, so add a 0.5 m row with `focuscal` if codes don't read). Re-homed on leaving |
 | Online check | `wlan0` connected to anything but the hotspot (NetworkManager counts its own hotspot as "connected") |
 | Hotspot password | `/etc/sportcam/hotspot-password`, made at install and printed on the head's label (14 — Software setup, step 6). Missing: `sportcam123` |
 | Portal auto-open | serves Android `/generate_204` and iOS `/hotspot-detect.html` |
-| No network at all | **Use without Wi-Fi** on the setup page: status `offline`, the head goes `idle`, hotspot stays up for direct control ([09](09-direct-connection-and-app.md)) |
+| No network at all | **Use without Wi-Fi** on the setup page: status `offline`, the head goes `awake`, hotspot stays up for direct control ([09](09-direct-connection-and-app.md)) |
 | Privileges | the portal runs as root (network configuration); the head never touches the network |
 
 **Limitation:** networks with their own browser login page, and

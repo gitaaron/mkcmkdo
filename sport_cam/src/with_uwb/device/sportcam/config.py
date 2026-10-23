@@ -36,7 +36,7 @@ PREVIEW_FPS = 1.0            # live preview frames to Firestore, only while an a
 PREVIEW_MAX_BYTES = 200_000
 # Person boxes in the live view (docs/01 F9): the last detection's boxes go
 # out with each preview frame and, on the direct link, as each detection
-# lands. Older than this (idle detects every 2 s) and they're dropped.
+# lands. Older than this (awake detects every 2 s) and they're dropped.
 LIVE_BOXES_MAX_AGE_S = 3.0
 VIEWER_WINDOW_S = 60.0       # how long an app's "watch" keeps previews coming
 DELETE_AFTER_UPLOAD = True   # SD card is a buffer, not a store
@@ -49,10 +49,23 @@ WHEP_URL = None              # set when MediaMTX runs on the Pi (WebRTC)
 
 # --- Wi-Fi setup: connecting → pairing (wifi_portal.py, wifi_link.py) -------
 # The portal service decides when to pair; these are the head unit's side.
-WIFI_STATUS_WAIT_S = 15.0    # no word from the portal by then (not installed): go idle
+WIFI_STATUS_WAIT_S = 15.0    # no word from the portal by then (not installed): go awake
 QR_SCAN_PERIOD_S = 0.5       # look for a Wi-Fi QR code this often while pairing
 QR_RETRY_S = 20.0            # don't resend the same code sooner (it failed, or is joining)
 QR_FOCUS_M = 0.5             # a phone held 15–30 cm from the lens; set_focus's floor
+
+# --- sleep and awake --------------------------------------------------------
+# Sleep saves the battery: the camera sensor is stopped (no preview, detector
+# or live view) and the head parked, while the Pi keeps its API, Firebase link
+# and mDNS up to be woken. Power on joins Wi-Fi and comes up awake; awake this
+# long with no session started, it goes back to sleep. An app showing the live
+# view (the stream here, or a Firebase "watch") keeps it awake; the timeout
+# counts from when it stops watching.
+# With UWB the radios keep ranging in sleep, so switching the tag on still
+# starts a session (straight from sleep to tracking).
+AWAKE_TIMEOUT_S = 30.0
+CAMERA_WARMUP_S = 1.0        # after waking, let exposure settle before the first detection
+SLEEP_LED_LEVEL = 0.25       # sleep: a single ring pixel at this level, to show it is on
 
 # --- pan / tilt (Arducam PTZ controller, I2C 0x0C) ------------------------
 # Angles are degrees from centre. Raw servo values are 0-180; CENTER_RAW is
@@ -139,20 +152,20 @@ TILT_PID = dict(Kp=0.04, Ki=0.0, Kd=0.008)   # deg per pixel-error
 TILT_STEP_GAIN = 0.15          # fraction of the PID output applied per detection
 
 LOST_HOLD_S = 2.0              # no ranges → hold + flash
-LOST_IDLE_S = 5.0              # no ranges → drop to idle (saving any recording)
+LOST_END_S = 5.0              # no ranges → drop to awake (saving any recording)
 
 # --- tag-driven sessions (session.py) --------------------------------------
 # Turning the tag on is the start button: standby → search → found → recording,
-# and turning it off ends the session LOST_IDLE_S later. A switched-off tag
+# and turning it off ends the session LOST_END_S later. A switched-off tag
 # looks exactly like one hidden behind a body, so a dropout longer than that
 # also ends the session — and the tag reappearing then starts a new one, so
-# the climb is split into two clips rather than lost. Raise LOST_IDLE_S if
+# the climb is split into two clips rather than lost. Raise LOST_END_S if
 # that happens often.
 AUTO_SESSION = True            # False: the tag only ranges; start from the app
 TAG_PRESENT_S = 1.0            # unbroken ranging this long = the tag is on
 # SEARCH → FOUND → recording, as in the camera-only build, but SEARCH is a
 # turn to the tag's bearing rather than a sweep, and every session starts
-# there (there is no idle bypass: idle cannot tell who is wearing the tag).
+# there (there is no awake bypass: awake cannot tell who is wearing the tag).
 # FOUND starts once the camera is pointing where the tag says, has settled
 # there, and the detector sees the tag wearer (below). FOUND tracks exactly
 # as recording does; the person need not be centred. Seen throughout
@@ -218,10 +231,10 @@ TAG_BEARING_CORR_S = 0.35      # its correlation time: the Kalman filter's ≈ 7
 # Rates are deliberately modest: HOG on a Pi 4 takes a few hundred ms, and
 # tilt only needs to keep up with ~1.7 deg/s of subject motion.
 DETECT_FPS_TRACKING = 3.0
-DETECT_FPS_IDLE = 0.5
-IDLE_PERSON_HOLD_S = 4.0       # idle: a person stays "in frame" this long after the
-                               # last detection (two idle detections), so one
-                               # missed frame does not flip the idle sub-state
+DETECT_FPS_AWAKE = 0.5
+AWAKE_PERSON_HOLD_S = 4.0       # awake: a person stays "in frame" this long after the
+                               # last detection (two awake detections), so one
+                               # missed frame does not flip the awake sub-state
 
 # Ultra-wideband already knows where the subject is horizontally, so the
 # detector only has to answer "how high". Searching a vertical strip centred
@@ -307,7 +320,7 @@ FOCUS_RATE_LIMIT_S = 0.5
 # makes every estimate roughly 10 % optimistic. For a 74 Wh bank, use 67.
 BATTERY_WH = 84.0
 BATTERY_LOW_FRAC = 0.20        # warn: LED ring flashes orange
-BATTERY_CRITICAL_FRAC = 0.07   # stop recording, park, drop to idle
+BATTERY_CRITICAL_FRAC = 0.07   # stop recording, park, go to sleep
 # Which current sensor is fitted. "ina260" has the shunt on the die and is
 # the easier part to buy and wire; "ina226" needs an external shunt; "none"
 # builds without a gauge, losing the low-battery warning and the auto-save.

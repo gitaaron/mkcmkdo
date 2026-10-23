@@ -100,7 +100,7 @@ async function subscribe(key: string): Promise<void> {
     store.connected = snap.exists();
     if (!d) return;
     announce(d.state, d.telemetry?.countdown ?? 0);
-    pingWhile(d.state !== "idle" && d.state !== "off" && d.telemetry?.phase === "search");
+    pingWhile(d.state !== "awake" && d.state !== "off" && d.telemetry?.phase === "search");
     seenAt = ms(d.deviceSeenAt);
     Object.assign(store, {
       mode: d.mode,

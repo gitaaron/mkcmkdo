@@ -1,6 +1,10 @@
 import { cameraKey } from "./cameraKey";
 
-export type CamState = "off" | "idle" | "tracking" | "recording";
+/** "off": booting (or never reached). "sleep": on, camera off to save the battery — no live view. */
+export type CamState = "off" | "sleep" | "awake" | "tracking" | "recording";
+
+/** States with the camera running, and so a live view. */
+export const LIVE_STATES: readonly CamState[] = ["awake", "tracking", "recording"];
 
 /** Which hardware build the camera is — the camera reports it. */
 export type TrackingMode = "with_uwb" | "without_uwb";

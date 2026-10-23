@@ -9,28 +9,30 @@ const props = defineProps<{ cam: StateSnapshot & { connected: boolean } }>();
 const color = computed(() =>
   ({
     off: "var(--off)",
-    idle: "var(--idle)",
+    sleep: "var(--sleep)",
+    awake: "var(--awake)",
     tracking: "var(--tracking)",
     recording: "var(--recording)",
   })[props.cam.state],
 );
 
 // Same patterns as the LED ring, per sub-state (telemetry `phase`):
-//   idle         solid, or a slow breath with a person in frame
+//   sleep        solid, dim (the LED shows one dim pixel)
+//   awake        solid, or a slow breath with a person in frame
 //   tracking     search: a quick blink (the LED chases round; with UWB the
 //                camera is turning to the tag, without UWB sweeping the room).
 //                found: solid (the LED fills round over the 3 s countdown)
 //   recording    solid
 const phase = computed(() => props.cam.telemetry?.phase);
-const idlePerson = computed(() => props.cam.state === "idle" && phase.value === "person-in-frame");
+const awakePerson = computed(() => props.cam.state === "awake" && phase.value === "person-in-frame");
 const searching = computed(() => props.cam.state === "tracking" && phase.value === "search");
 const found = computed(() => props.cam.state === "tracking" && phase.value === "found");
 
-// Idle's sub-state: is anyone in frame? (older cameras don't report it)
-const idleLabel = computed(() => {
-  if (phase.value === "person-in-frame") return "On — person in frame";
-  if (phase.value === "no-person-in-frame") return "On — no one in frame";
-  return "On — not tracking";
+// Awake's sub-state: is anyone in frame? (older cameras don't report it)
+const awakeLabel = computed(() => {
+  if (phase.value === "person-in-frame") return "Awake — person in frame";
+  if (phase.value === "no-person-in-frame") return "Awake — no one in frame";
+  return "Awake — not recording";
 });
 
 const trackingLabel = computed(() => {
@@ -43,7 +45,8 @@ const label = computed(
   () =>
     ({
       off: "Off",
-      idle: idleLabel.value,
+      sleep: "Asleep — camera off",
+      awake: awakeLabel.value,
       tracking: trackingLabel.value,
       recording: "Recording",
     })[props.cam.state],
@@ -53,7 +56,7 @@ const label = computed(
 <template>
   <div
     class="ring"
-    :class="{ breathing: idlePerson, searching, hollow: !cam.connected }"
+    :class="{ breathing: awakePerson, searching, hollow: !cam.connected }"
     :style="{ '--c': color }"
     :title="label"
     role="status"
@@ -71,7 +74,7 @@ const label = computed(
   box-shadow: 0 0 12px color-mix(in srgb, var(--c) 60%, transparent);
 }
 .ring.breathing {
-  /* idle with a person in frame: the LED ring breathes slowly */
+  /* awake with a person in frame: the LED ring breathes slowly */
   animation: pulse 2.4s ease-in-out infinite;
 }
 .ring.searching {

@@ -4,7 +4,8 @@ This is the second implementation of the callable protocol the Firebase
 API speaks (src/backend/functions), so the app talks to both identically:
 
     POST /api/call/<name>          {"data": …} → {"result": …} | {"error": …}
-    GET  /api/stream.mjpeg         live MJPEG (multipart/x-mixed-replace)
+    GET  /api/stream.mjpeg         live MJPEG (multipart/x-mixed-replace); no
+                                   frames in sleep, when the sensor is off
     GET  /api/recordings/:name     local clip, HTTP Range supported, or its
                                    <clip>.boxes.json (person boxes, boxlog.py)
     WS   /ws                       state, recordings and live person-box broadcasts
@@ -43,10 +44,10 @@ HTTP_BY_CODE = {
 TRANSITIONS = {
     "connecting": [],              # getting on a network: reported as "off"
     "pairing": [],
-    "off": ["idle"],
-    "idle": ["off", "tracking"],
-    "tracking": ["off", "idle", "recording"],
-    "recording": ["off", "idle"],
+    "sleep": ["awake", "tracking"],    # record from sleep skips awake
+    "awake": ["sleep", "tracking"],
+    "tracking": ["sleep", "awake", "recording"],
+    "recording": ["sleep", "awake"],
 }
 
 
@@ -71,14 +72,15 @@ class LocalApi:
         self._frame: bytes | None = None
         self._frame_seq = 0
         self._frame_event = asyncio.Event()
+        self.viewers = 0                 # open /api/stream.mjpeg connections
 
         self.fns: dict[str, CallableFn] = {
             "getState": self._get_state,
             "setPower": self._set_power,
             "startTracking": lambda d: self._transition("tracking"),
-            "stopTracking": lambda d: self._transition("idle"),
+            "stopTracking": lambda d: self._transition("awake"),
             "startRecording": lambda d: self._transition("recording"),
-            "stopRecording": lambda d: self._transition("idle"),
+            "stopRecording": lambda d: self._transition("awake"),
             "getRecordings": self._get_recordings,
         }
 
@@ -143,8 +145,8 @@ class LocalApi:
     async def _set_power(self, data: Any) -> dict:
         if not isinstance(data, dict) or not isinstance(data.get("on"), bool):
             raise FnError("invalid-argument", "expected { on: boolean }")
-        target = "idle" if data["on"] else "off"
-        if self.head.state == target or (data["on"] and self.head.state != "off"):
+        target = "awake" if data["on"] else "sleep"
+        if self.head.state == target or (data["on"] and self.head.state != "sleep"):
             return await self._get_state(None)
         return await self._transition(target)
 
@@ -207,6 +209,7 @@ class LocalApi:
         })
         await resp.prepare(req)
         last = -1
+        self.viewers += 1
         try:
             while True:
                 if self._frame is not None and self._frame_seq != last:
@@ -220,6 +223,8 @@ class LocalApi:
                 await asyncio.wait_for(self._frame_event.wait(), timeout=5.0)
         except (asyncio.TimeoutError, ConnectionResetError, asyncio.CancelledError):
             pass
+        finally:
+            self.viewers -= 1
         return resp
 
     async def _handle_recording(self, req: web.Request) -> web.StreamResponse:

@@ -11,7 +11,7 @@ companion app.
 | Zoom | optical, 96° → 33° horizontal FOV (≈ 3.5×) |
 | Recording | 1080p H.264, 12 Mbit/s, on the Pi; uploaded to Firebase after each clip |
 | Power | USB-C PD power bank, 92 Wh: <!--with_uwb-->6.2 h<!--/--><!--both--> (with UWB) / <!--/--><!--without_uwb-->8.4 h<!--/--><!--both--> (without UWB)<!--/--> tracking and recording |
-| States | off, idle, tracking, recording ([01](docs/product/01-requirements.md#state-machine)) |
+| States | sleep, awake, tracking (initiate recording), recording ([01](docs/product/01-requirements.md#state-machine)) |
 | Control | web app and Flutter app; from anywhere through Firebase, or direct on the camera's Wi-Fi |
 
 ## Builds

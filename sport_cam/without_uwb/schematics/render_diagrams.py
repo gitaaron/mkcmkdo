@@ -20,6 +20,7 @@ BLUE = "#2f6fed"
 GREEN = "#1f9d55"
 RED = "#d64541"
 GREY = "#8a93a6"
+SLATE = "#4a5d85"   # sleep
 BGBOX = "#f4f6fb"
 
 
@@ -228,7 +229,7 @@ def mechanical_layout():
 # 3. State machine
 # ----------------------------------------------------------------------------
 def state_machine():
-    fig, ax = new_fig(16.5, 7.4, "Camera state machine · LED ring")
+    fig, ax = new_fig(16.5, 8.2, "Camera state machine · LED ring")
     ax.title.set_fontsize(22)
     y = 3.3
     R = 0.9
@@ -248,37 +249,46 @@ def state_machine():
             ax.text(lofs[0], lofs[1], label, ha=ha, va=va, fontsize=fs, color=color, zorder=5,
                     bbox=dict(fc="white", ec="none", pad=1.2))
 
-    xs = dict(off=1.0, idle=3.75, search=7.6, found=11.0, rec=14.9)
+    xs = dict(sleep=1.0, awake=3.75, search=7.6, found=11.0, rec=14.9)
     yp = 5.55                                   # "person in frame" row
 
     # initiate-tracking container: two sub-states
     ax.add_patch(FancyBboxPatch((6.15, 1.75), 6.1, 3.2, boxstyle="round,pad=0.08",
                                 fc="#f2fbf5", ec=GREEN, lw=2, ls="--", zorder=1))
-    ax.text(6.35, 4.67, "INITIATE TRACKING", fontsize=17.6, fontweight="bold", color=GREEN,
+    ax.text(6.35, 4.67, "INITIATE RECORDING", fontsize=17.6, fontweight="bold", color=GREEN,
             ha="left", va="center")
 
-    # idle container: two sub-states
+    # awake container: two sub-states
     ax.add_patch(FancyBboxPatch((2.65, 2.2), 2.2, 4.75, boxstyle="round,pad=0.08",
                                 fc="#f2f6ff", ec=BLUE, lw=2, ls="--", zorder=1))
-    ax.text(2.8, 6.75, "IDLE", fontsize=17.6, fontweight="bold", color=BLUE, ha="left", va="center")
+    ax.text(2.8, 6.75, "AWAKE", fontsize=17.6, fontweight="bold", color=BLUE, ha="left", va="center")
 
-    node(xs["off"], "OFF", GREY)
-    node(xs["idle"], "no person\nin frame", BLUE, fs=12.8)
-    node(xs["idle"], "person\nin frame", BLUE, fs=12.8, yy=yp)
-    link((xs["idle"] - 0.25, y + R), (xs["idle"] - 0.25, yp - R), "")
-    link((xs["idle"] + 0.25, yp - R), (xs["idle"] + 0.25, y + R), "")
-    ax.text(xs["idle"] - 0.32, (y + yp) / 2, "seen", fontsize=12.8, ha="right", va="center", color=INK)
-    ax.text(xs["idle"] + 0.32, (y + yp) / 2, "none\n4 s", fontsize=12.8, ha="left", va="center", color=INK)
+    node(xs["sleep"], "SLEEP", SLATE, fs=14.4)
+    node(xs["awake"], "no person\nin frame", BLUE, fs=12.8)
+    node(xs["awake"], "person\nin frame", BLUE, fs=12.8, yy=yp)
+    link((xs["awake"] - 0.25, y + R), (xs["awake"] - 0.25, yp - R), "")
+    link((xs["awake"] + 0.25, yp - R), (xs["awake"] + 0.25, y + R), "")
+    ax.text(xs["awake"] - 0.32, (y + yp) / 2, "seen", fontsize=12.8, ha="right", va="center", color=INK)
+    ax.text(xs["awake"] + 0.32, (y + yp) / 2, "none\n4 s", fontsize=12.8, ha="left", va="center", color=INK)
     node(xs["search"], "SEARCH", GREEN, fs=14.4)
     node(xs["found"], "FOUND", GREEN, fs=14.4)
     node(xs["rec"], "RECORDING", RED, r=1.1, fs=13.6)
 
     # main path
-    link((xs["off"] + R, y + 0.25), (xs["idle"] - R, y + 0.25), "power\non", lofs=(2.3, y + 0.75))
-    link((xs["idle"] - R, y - 0.25), (xs["off"] + R, y - 0.25), "turn\noff", lofs=(2.3, y - 0.75))
-    link((xs["idle"] + R, y), (xs["search"] - R, y), "Track &\nrecord", lofs=(5.5, y + 0.6), fs=12.8)
+    link((xs["sleep"] + R, y + 0.25), (xs["awake"] - R, y + 0.25), "wake\nup", lofs=(2.3, y + 0.75))
+    link((xs["awake"] - R, y - 0.25), (xs["sleep"] + R, y - 0.25), "30 s, no\nsession or\nlive view", lofs=(2.3, y - 0.95), fs=12.8)
+    # power on: Wi-Fi joined, straight to awake
+    link((1.75, yp + 0.75), (2.57, yp + 0.75), "")
+    ax.text(1.25, yp + 0.75, "power\non", fontsize=12.8, ha="center", va="center", color=INK)
+    # record from sleep skips awake: over the top, into SEARCH
+    xr, yr = xs["sleep"] - 0.45, 7.55
+    ax.plot([xr, xr, xs["search"] - 0.45], [y + 0.78, yr, yr], color=SLATE, lw=1.5, zorder=2)
+    link((xs["search"] - 0.45, yr), (xs["search"] - 0.45, y + 0.78), "", color=SLATE)
+    ax.text(4.4, yr, "Record from sleep — SEARCH: still until the first look, then sweep", fontsize=13.6, color=SLATE, ha="left", va="center", zorder=5,
+            bbox=dict(fc="white", ec="none", pad=1.2))
+    link((xs["awake"] + R, y), (xs["search"] - R, y), "Track &\nrecord", lofs=(5.5, y + 0.6), fs=12.8)
     # person already in frame: straight to FOUND
-    ax.annotate("", xy=(xs["found"], y + R), xytext=(xs["idle"] + R, yp), zorder=2,
+    ax.annotate("", xy=(xs["found"], y + R), xytext=(xs["awake"] + R, yp), zorder=2,
                 arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.5, shrinkA=0, shrinkB=0,
                                 connectionstyle="angle,angleA=0,angleB=90,rad=0"))
     ax.text(8.9, yp + 0.3, "Track & record — person already in frame: skip the sweep",
@@ -296,26 +306,26 @@ def state_machine():
     ax.text(xs["rec"], y + 2.3, "lost 6 s: sweep again,\nstill recording", fontsize=13.6,
             color=RED, ha="center", va="center", bbox=dict(fc="white", ec="none", pad=1.2))
 
-    # stop recording -> IDLE, under everything
-    x_in = xs["idle"] + 0.12
+    # stop recording -> AWAKE, under everything
+    x_in = xs["awake"] + 0.12
     ax.plot([xs["rec"], xs["rec"], x_in], [y - 1.1, 1.0, 1.0], color=RED, lw=1.5, zorder=2)
     link((x_in, 1.0), (x_in, y - R + 0.01), "", color=RED)
-    ax.text(10.6, 1.0, "stop recording → idle", fontsize=13.6, color=RED,
+    ax.text(10.6, 1.0, "stop recording → awake", fontsize=13.6, color=RED,
             ha="center", va="center", zorder=5, bbox=dict(fc="white", ec="none", pad=1.2))
-    # stop tracking (and the build's automatic exit) -> IDLE
-    link((6.4, 1.75), (xs["idle"] + 0.55, y - 0.38), "", rad=-0.3, color=GREY, ls="--")
-    ax.text(5.3, 1.3, "stop tracking, or 180 s\nnobody found → idle", fontsize=13.6,
+    # stop tracking (and the build's automatic exit) -> AWAKE
+    link((6.4, 1.75), (xs["awake"] + 0.55, y - 0.38), "", rad=-0.3, color=GREY, ls="--")
+    ax.text(5.3, 1.3, "stop tracking, or 180 s\nnobody found → awake", fontsize=13.6,
             color=GREY, ha="center", va="center", bbox=dict(fc="white", ec="none", pad=1.2))
 
     # per-state captions: the LED ring
-    cap = [(xs["off"], "LED off"),
-           (xs["idle"], "LED blue: solid,\nbreathing with a person in frame"),
+    cap = [(xs["sleep"], "LED: one dim pixel;\ncamera off"),
+           (xs["awake"], "LED blue: solid,\nbreathing with a person in frame"),
            (xs["search"], "LED chasing green;\nsweep pan ±80°, lens wide"),
            (xs["found"], "LED fills green over 3 s;\nframe them as when recording"),
            (xs["rec"], "LED solid red")]
     for x, t in cap:
         ax.text(x, 0.3, t, ha="center", va="center", fontsize=13.6, color=INK)
-    ax.text(1.0, 1.6, "\"turn off\" works\nfrom every state", fontsize=13.6, color=GREY, ha="center")
+    ax.text(1.0, 1.6, "\"sleep\" from\nany awake state", fontsize=13.6, color=GREY, ha="center")
     save(fig, "state-machine.png", dpi=220)
 
 
@@ -394,8 +404,8 @@ def search_and_track():
     state(*T, 2.9, 1.3, "RECORDING", "follow the first person\nfound, by vision only", RED)
 
     link((S[0] + 1.15, S[1] + 0.2), (C[0] - 1.15, C[1] + 0.2), "person seen", (10.25, 5.1))
-    # session start: where the loop is entered depends on idle's sub-state
-    link((S[0] - 0.5, S[1] + 1.45), (S[0] - 0.5, S[1] + 0.65), "start, nobody\nin frame",
+    # session start: where the loop is entered depends on awake's sub-state
+    link((S[0] - 0.5, S[1] + 1.45), (S[0] - 0.5, S[1] + 0.65), "start, nobody in\nframe or just woken",
          (S[0] - 0.6, S[1] + 1.1), ha="right")
     link((C[0] + 0.5, C[1] + 1.45), (C[0] + 0.5, C[1] + 0.65), "start, person in\nframe (no sweep)",
          (C[0] + 0.6, C[1] + 1.1), ha="left")
@@ -413,27 +423,28 @@ def search_and_track():
 # 5. App UI mock
 # ----------------------------------------------------------------------------
 def app_ui():
-    fig, ax = new_fig(10.8, 7.2, "Companion app — three states")
+    fig, ax = new_fig(14.3, 7.2, "Companion app — four states")
     labels = [
-        ("IDLE", BLUE, ["Turn off", "Track & record"], "Idle"),
-        ("TRACKING", GREEN, ["Turn off", "Stop tracking"], "Looking for a person…"),
-        ("RECORDING", RED, ["Turn off", "Stop recording"], "Recording · following"),
+        ("SLEEP", SLATE, ["Wake up", "Record"], "Asleep — camera off"),
+        ("AWAKE", BLUE, ["Sleep", "Track & record"], "Awake"),
+        ("INITIATE RECORDING", GREEN, ["Sleep", "Stop tracking"], "Looking for a person…"),
+        ("RECORDING", RED, ["Sleep", "Stop recording"], "Recording · following"),
     ]
     for i, (name, c, buttons, status) in enumerate(labels):
         x0 = 0.5 + i * 3.5
         ax.add_patch(FancyBboxPatch((x0, 0.6), 2.9, 5.9, boxstyle="round,pad=0.08",
                                     fc="white", ec=INK, lw=2))
         ax.add_patch(Rectangle((x0 + 0.15, 2.05), 2.6, 4.05, fc="#0d1420", ec="none"))
-        ax.text(x0 + 1.45, 4.15, "live video\n(WebRTC / MJPEG)", ha="center",
-                fontsize=8.5, color="#7f8ea8")
-        if i > 0:   # a person is only in frame once one has been found
+        ax.text(x0 + 1.45, 4.15, "camera asleep:\nno live view" if i == 0 else "live video\n(WebRTC / MJPEG)",
+                ha="center", fontsize=8.5, color="#7f8ea8")
+        if i > 1:   # a person is only in frame once one has been found
             sx, sy = x0 + 1.45, 3.1
             ax.add_patch(Circle((sx, sy + 0.55), 0.13, fc="none", ec="#cbd6ea", lw=1.5))
             ax.plot([sx, sx], [sy + 0.42, sy - 0.05], color="#cbd6ea", lw=1.5)
             ax.plot([sx - 0.22, sx, sx + 0.22], [sy - 0.4, sy - 0.05, sy - 0.4], color="#cbd6ea", lw=1.5)
             ax.plot([sx - 0.22, sx + 0.22], [sy + 0.25, sy + 0.25], color="#cbd6ea", lw=1.5)
         ax.add_patch(Circle((x0 + 2.45, 5.75), 0.20, fc=c, ec="white", lw=2))
-        if i == 0:
+        if i == 1:
             ax.annotate("status ring", xy=(x0 + 2.45, 5.75), xytext=(x0 + 1.15, 6.75),
                         fontsize=8, color=GREY,
                         arrowprops=dict(arrowstyle="->", color=GREY, lw=1))
@@ -441,10 +452,11 @@ def app_ui():
                 style="italic")
         for j, b in enumerate(buttons):
             bx = x0 + 0.2 + j * 1.3
-            fc = "#eef1f7" if j == 0 else c
+            bc = RED if name == "SLEEP" else c     # Record: a session that records
+            fc = "#eef1f7" if j == 0 else bc
             tc = INK if j == 0 else "white"
             ax.add_patch(FancyBboxPatch((bx, 0.85), 1.2, 0.8, boxstyle="round,pad=0.05",
-                                        fc=fc, ec=INK if j == 0 else c))
+                                        fc=fc, ec=INK if j == 0 else bc))
             ax.text(bx + 0.6, 1.25, b.replace(" ", "\n", 1), ha="center", va="center",
                     fontsize=8, color=tc, fontweight="bold")
         ax.text(x0 + 1.45, 0.25, name, ha="center", fontsize=11, fontweight="bold", color=c)
@@ -467,7 +479,7 @@ def power_tree():
          "LED ring  1.5 W"], fc="#f2f7ff")
     box(ax, 7.0, 0.1, 3.4, 1.6, "Runtime (84 Wh at 12 V)",
         ["tracking + recording  8.4 h", "tracking only  8.9 h",
-         "idle  12 h"], fc="#f2fff5")
+         "awake  12 h"], fc="#f2fff5")
 
     arrow(ax, (3.0, 4.95), (3.7, 4.95), "USB-C PD")
     arrow(ax, (6.1, 4.95), (6.8, 4.95), "12 V")

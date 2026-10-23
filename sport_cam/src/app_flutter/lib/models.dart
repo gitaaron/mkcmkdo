@@ -2,10 +2,23 @@
 library;
 
 /// Camera states — identical to the Firebase API's and the device's state machine.
-enum CamState { off, idle, tracking, recording }
+/// `off`: booting (or never reached). `sleep`: on, with the camera's sensor off
+/// to save the battery — no live view.
+enum CamState {
+  off,
+  sleep,
+  awake,
+  tracking,
+  recording;
+
+  /// The sensor is running, so there is a live view.
+  bool get isLive =>
+      this == awake || this == tracking || this == recording;
+}
 
 CamState camStateFrom(String? s) => switch (s) {
-  'idle' => CamState.idle,
+  'sleep' => CamState.sleep,
+  'awake' => CamState.awake,
   'tracking' => CamState.tracking,
   'recording' => CamState.recording,
   _ => CamState.off,
@@ -27,7 +40,7 @@ class ModeText {
     required this.stalled,
   });
 
-  /// Primary button in idle.
+  /// Primary button in awake.
   final String startTracking;
 
   /// Status label while tracking, in search.
@@ -118,7 +131,7 @@ class Telemetry {
   final double? tilt;
   final double? distM;
 
-  /// idle: 'person-in-frame' or 'no-person-in-frame'. Tracking: 'search'
+  /// awake: 'person-in-frame' or 'no-person-in-frame'. Tracking: 'search'
   /// (with UWB turning to the tag, without sweeping the room — the app pings
   /// every three seconds), then 'found'. Recording: 'track' ('search' again,
   /// without UWB, while it looks for a person it has lost).

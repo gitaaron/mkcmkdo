@@ -130,17 +130,23 @@ async function waitForEmulators() {
 
 await waitForEmulators();
 
-let state = "idle";
+let state = "awake";              // like the device after Wi-Fi: awake, asleep 30 s later
+let awakeSince = Date.now();
 let recStarted = 0;
 let trackingSince = 0;
 let searchMs = 0;
-// Idle sub-state: someone walks into frame for 10 s of every 20.
+// Awake sub-state: someone walks into frame for 10 s of every 20.
 const personInFrame = () => Math.floor(Date.now() / 10000) % 2 === 1;
 // Tracking: search for searchMs (0 with a person already in frame; a turn to
 // the tag with UWB, a sweep without), then found for FOUND_CONFIRM_MS, then
 // recording.
 const SEARCH_MS = MODE === "with_uwb" ? 1500 : 4000;
 const FOUND_CONFIRM_MS = 3000;
+// Record from sleep: the camera starts and takes its first look before it
+// sweeps, since the person may already be in front of it.
+const FIRST_LOOK_MS = 1000;
+const AWAKE_TIMEOUT_MS = 30_000;  // awake this long without a session or a viewer → sleep
+const LIVE = ["awake", "tracking", "recording"];   // the sensor is on; sleep has no picture
 let pan = 0;
 let panDir = 1;
 let wh = 0;
@@ -162,10 +168,13 @@ console.log(`[sim] camera '${KEY}' online (${MODE}, ${frames.length} test frames
 function adopt(next) {
   const prev = state;
   state = next;
+  if (next === "awake") awakeSince = Date.now();
   if (next === "tracking") {
     trackingSince = Date.now();
-    // A session started with a person in frame skips search.
-    searchMs = personInFrame() ? 0 : SEARCH_MS;
+    // A session started with a person in frame skips search; from sleep the
+    // camera has to look first.
+    const look = prev === "sleep" ? FIRST_LOOK_MS : 0;
+    searchMs = personInFrame() ? look : look + SEARCH_MS;
   }
   if (next === "recording") recStarted = Date.now();
   if (prev === "recording" && next !== "recording") {
@@ -196,7 +205,7 @@ if (lib.empty && statSync(SAMPLE, { throwIfNoEntry: false })) {
 const tracking = () => state === "tracking" || state === "recording";
 
 function phase() {
-  if (state === "idle") return personInFrame() ? "person-in-frame" : "no-person-in-frame";
+  if (state === "awake") return personInFrame() ? "person-in-frame" : "no-person-in-frame";
   if (state === "recording") return "track";
   if (state !== "tracking") return null;
   return Date.now() - trackingSince < searchMs ? "search" : "found";
@@ -209,8 +218,10 @@ function countdown() {
   return Math.max(1, Math.ceil(left / 1000));
 }
 
+const watts = () => (state === "sleep" ? 3.5 : state === "awake" ? 7.5 : 14.5);
+
 function telemetry() {
-  const watts = state === "idle" ? 7.5 : 14.5;
+  const w = watts();
   const frac = Math.max(0, 1 - wh / 92);
   return {
     pan: Math.round(pan * 10) / 10,
@@ -222,8 +233,8 @@ function telemetry() {
     acquireStalled: false,
     ...(MODE === "with_uwb" ? { tagPresent: true } : {}),
     battery: Math.round(frac * 1000) / 1000,
-    batteryWatts: watts,
-    batteryMinutes: Math.round(((92 * frac) / watts) * 60),
+    batteryWatts: w,
+    batteryMinutes: Math.round(((92 * frac) / w) * 60),
     batteryLevel: frac <= 0.07 ? "critical" : frac <= 0.2 ? "low" : "ok",
   };
 }
@@ -234,7 +245,7 @@ setInterval(() => {
     pan += 3.6 * panDir;
     if (pan >= 80 || pan <= -80) panDir = -panDir;
   }
-  wh += (state === "idle" ? 7.5 : 14.5) / 3600;
+  wh += watts() / 3600;
   cam.update({ deviceSeenAt: Timestamp.now(), telemetry: telemetry() })
     .catch((e) => console.error("[sim] heartbeat failed:", e.message));
 }, 1000);
@@ -254,10 +265,15 @@ setInterval(() => {
     adopt("recording");
     cam.update({ state, stateBy: "device", updatedAt: Timestamp.now() });
   }
+  if (state === "awake" && Date.now() - viewerAt < VIEWER_WINDOW_MS) awakeSince = Date.now(); // live view open
+  if (state === "awake" && Date.now() - awakeSince >= AWAKE_TIMEOUT_MS) {
+    adopt("sleep");
+    cam.update({ state, stateBy: "device", updatedAt: Timestamp.now() });
+  }
 }, 50);
 
 /**
- * The live view's boxes, like the device: everyone "unsure" in idle (nobody
+ * The live view's boxes, like the device: everyone "unsure" in awake (nobody
  * picked yet), the climber and belayer once found, nobody while searching.
  */
 function liveBoxes() {
@@ -271,7 +287,7 @@ function liveBoxes() {
 // Preview frames, only while someone is watching.
 let i = 0;
 setInterval(() => {
-  if (state === "off" || !frames.length || Date.now() - viewerAt > VIEWER_WINDOW_MS) return;
+  if (!LIVE.includes(state) || !frames.length || Date.now() - viewerAt > VIEWER_WINDOW_MS) return;
   cam.collection("live").doc("preview")
     .set({ jpeg: frames[i++ % frames.length], at: Timestamp.now(), size: [1280, 720], boxes: liveBoxes() })
     .catch((e) => console.error("[sim] preview failed:", e.message));

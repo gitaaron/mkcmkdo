@@ -7,7 +7,7 @@ import type { TrackingMode } from "./api.js";
  *   without_uwb  no tag; the camera sweeps the room for a person
  */
 export interface ModeText {
-  startTracking: string;   // primary button in idle
+  startTracking: string;   // primary button in awake
   searching: string;       // status label while tracking, in search
   stalled: string;         // hint when tracking has gone on too long without recording
 }

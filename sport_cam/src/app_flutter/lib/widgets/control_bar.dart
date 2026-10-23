@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 
-/// Bottom buttons — same rules as the web app (the idle label depends on the
+/// Bottom buttons — same rules as the web app (the awake label depends on the
 /// build, see [ModeText]):
-///   idle      → Turn off · Start tracking | Track & record
-///   tracking  → Turn off · Stop tracking (search → found → recording runs by itself)
-///   recording → Turn off · Stop recording (saves the clip, back to idle)
+///   off       → none (the camera is still booting)
+///   sleep     → Wake up · Record (skips awake: straight into the search)
+///   awake     → Sleep · Start tracking | Track & record
+///   tracking  → Sleep · Stop tracking (search → found → recording runs by itself)
+///   recording → Sleep · Stop recording (saves the clip, back to awake)
 class ControlBar extends StatelessWidget {
   const ControlBar({
     super.key,
@@ -30,15 +32,17 @@ class ControlBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (String leftLabel, VoidCallback leftAction) = switch (state) {
-      CamState.off => ('Turn on', () => onSetPower(true)),
-      CamState.idle => ('Turn off', () => onSetPower(false)),
-      CamState.tracking => ('Turn off', () => onSetPower(false)),
-      CamState.recording => ('Turn off', () => onSetPower(false)),
+    final (String? leftLabel, VoidCallback? leftAction) = switch (state) {
+      CamState.off => (null, null),
+      CamState.sleep => ('Wake up', () => onSetPower(true)),
+      CamState.awake => ('Sleep', () => onSetPower(false)),
+      CamState.tracking => ('Sleep', () => onSetPower(false)),
+      CamState.recording => ('Sleep', () => onSetPower(false)),
     };
     final (String? rightLabel, VoidCallback? rightAction) = switch (state) {
       CamState.off => (null, null),
-      CamState.idle => (text.startTracking, onStartTracking),
+      CamState.sleep => ('Record', onStartTracking),
+      CamState.awake => (text.startTracking, onStartTracking),
       CamState.tracking => ('Stop tracking', onStopTracking),
       CamState.recording => ('Stop recording', onStopRecording),
     };
@@ -59,22 +63,26 @@ class ControlBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: _Btn(
-              label: leftLabel,
-              onTap: enabled ? leftAction : null,
-              background: SportColors.panel,
-              foreground: SportColors.ink,
-              border: SportColors.border,
+          if (leftLabel != null)
+            Expanded(
+              child: _Btn(
+                label: leftLabel,
+                onTap: enabled ? leftAction : null,
+                background: SportColors.panel,
+                foreground: SportColors.ink,
+                border: SportColors.border,
+              ),
             ),
-          ),
           if (rightLabel != null) ...[
             const SizedBox(width: 10),
             Expanded(
               child: _Btn(
                 label: rightLabel,
                 onTap: enabled ? rightAction : null,
-                background: SportColors.forState(state),
+                // Record from sleep starts a recording session: red
+                background: state == CamState.sleep
+                    ? SportColors.recording
+                    : SportColors.forState(state),
                 foreground: Colors.white,
               ),
             ),

@@ -1,9 +1,9 @@
 """Session rules: track / record starts a search; a person found for
 FOUND_CONFIRM_S starts recording.
 
-    idle ─(app: track/record)─► tracking (search → found, 3 s) ─► recording
-    tracking, nobody found for SEARCH_GIVE_UP_S ─► idle
-    recording ─(app: stop recording)─► idle
+    awake ─(app: track/record)─► tracking (search → found, 3 s) ─► recording
+    tracking, nobody found for SEARCH_GIVE_UP_S ─► awake
+    recording ─(app: stop recording)─► awake
 
 This module decides only *when* to change state on the device's own
 initiative. `Head.apply_state()` still makes every change, so a session
@@ -14,9 +14,9 @@ Rules:
 
 * **It records once the person has been found for FOUND_CONFIRM_S**, so the
   clip is of the person rather than of an empty room being swept. Stopping
-  the recording ends the session: the camera goes back to idle.
+  the recording ends the session: the camera goes back to awake.
 * **It gives up on an empty room.** Tracking, and SEARCH_GIVE_UP_S of
-  sweeping without finding anyone, the camera goes back to idle. A recording
+  sweeping without finding anyone, the camera goes back to awake. A recording
   is never abandoned this way — losing and re-finding people is normal
   there, and stopping it is the user's call.
 """
@@ -36,5 +36,5 @@ class AutoSession:
         if ready:
             return "recording"
         if searching_for_s > config.SEARCH_GIVE_UP_S:
-            return "idle"
+            return "awake"
         return None

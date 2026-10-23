@@ -1,4 +1,4 @@
-"""Session flow: track / record → search → found (3 s) → recording → idle.
+"""Session flow: track / record → search → found (3 s) → recording → awake.
 
 Two layers, neither of which needs a Pi:
 
@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -38,21 +39,21 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 def session_rules() -> None:
     print("session rules")
     s = AutoSession()
-    check("idle: nothing happens", s.update("idle", False, 0.0) is None)
+    check("awake: nothing happens", s.update("awake", False, 0.0) is None)
     check("tracking, still searching: nothing yet", s.update("tracking", False, 5.0) is None)
     check("found for FOUND_CONFIRM_S → recording", s.update("tracking", True, 0.0) == "recording")
     check("recording: left alone", s.update("recording", False, 0.0) is None)
     check("empty-room timeout never ends a recording",
           s.update("recording", False, 9999.0) is None)
-    check("nobody found for SEARCH_GIVE_UP_S → idle",
-          s.update("tracking", False, config.SEARCH_GIVE_UP_S + 1) == "idle")
+    check("nobody found for SEARCH_GIVE_UP_S → awake",
+          s.update("tracking", False, config.SEARCH_GIVE_UP_S + 1) == "awake")
 
 
 # ---- fakes for the full flow --------------------------------------------------
 class FakeRing:
     def __init__(self):
-        self.state, self.lost, self.warn = "idle", False, False
-        self.idle_person, self.searching, self.found = False, False, None
+        self.state, self.lost, self.warn = "awake", False, False
+        self.awake_person, self.searching, self.found = False, False, None
 
     def set_state(self, s):
         self.state = s
@@ -61,6 +62,7 @@ class FakeRing:
 class FakeLocal:
     def __init__(self):
         self.sent: list[dict] = []
+        self.viewers = 0
 
     async def broadcast(self, msg):
         self.sent.append(msg)
@@ -128,7 +130,7 @@ async def full_flow() -> None:
     ptz = FakePtz()
     ptz.park = lambda: (ptz.set_pan(0.0), ptz.set_tilt(0.0))    # as the real one: centre
     head = Head.__new__(Head)
-    head.state = "idle"
+    head.state = "awake"
     head.camera = RecCamera(ptz, [person])
     head.ptz = ptz
     head.tracker = Tracker(head.camera, ptz)
@@ -143,6 +145,7 @@ async def full_flow() -> None:
     head._countdown_sent = 0
     head._near_focus = False
     head._boxes_sent_at = None
+    head._awake_since = CLOCK.t
     head.boxlog = BoxLog()
 
     countdown_sent: list[int] = []     # what the app hears, in order, to beep on
@@ -167,15 +170,21 @@ async def full_flow() -> None:
                 return
 
     await tick_for(3.0)
-    check("idle: camera does not move", head.ptz.pan_deg == 0.0 and head.state == "idle")
-    check("idle sub-state: no person in frame (they are outside the wide view)",
+    check("awake: camera does not move", head.ptz.pan_deg == 0.0 and head.state == "awake")
+    check("awake sub-state: no person in frame (they are outside the wide view)",
           head.phase == "no-person-in-frame", f"{head.phase}")
 
     # --- the app's track / record button -----------------------------------------
     await head.apply_state("tracking")
     await head.report_state()
+    looks = head.camera.detections
+    pans: list[float] = []             # before each tick's look
+    await tick_for(2.0, until=lambda: head.camera.detections > looks or pans.append(head.ptz.pan_deg))
+    check("pressing track / record → tracking, search: holds still for the first look",
+          head.state == "tracking" and head.phase == "search" and max(map(abs, pans)) == 0.0,
+          f"pan {pans}")
     await tick_for(0.3)
-    check("pressing track / record → tracking, search: ring chases, camera sweeping",
+    check("…nobody in that look: ring chases, camera sweeping",
           head.state == "tracking" and head.phase == "search" and head.led.searching
           and head.ptz.pan_deg != 0.0, f"{seen}")
     check("not recording while it has found nobody", not head.camera.recording)
@@ -215,7 +224,7 @@ async def full_flow() -> None:
 
     # --- stop recording: the session ends --------------------------------------------
     await head.apply_state("tracking")          # what an older app sends
-    check("stop recording → idle", head.state == "idle" and not head.camera.recording)
+    check("stop recording → awake", head.state == "awake" and not head.camera.recording)
     side = "/tmp/sportcam-test.boxes.json"
     frames = json.load(open(side))["frames"] if os.path.exists(side) else []
     check("the clip's person boxes are saved beside it, the climber labelled",
@@ -223,7 +232,7 @@ async def full_flow() -> None:
 
     # --- a person who walks off during the countdown -----------------------------------
     person.visible, person.bearing = False, 40.0
-    await tick_for(config.IDLE_PERSON_HOLD_S + 1.0)
+    await tick_for(config.AWAKE_PERSON_HOLD_S + 1.0)
     await head.apply_state("tracking")
     person.visible = True
     await tick_for(20, until=lambda: head.phase == "found")
@@ -233,32 +242,32 @@ async def full_flow() -> None:
     check("person gone during found → back to search, not recording",
           head.state == "tracking" and head.phase == "search" and not head.camera.recording,
           f"{seen[-3:]}")
-    await head.apply_state("idle")
+    await head.apply_state("awake")
 
     # --- an empty room ---------------------------------------------------------------
     config.SEARCH_GIVE_UP_S = 10.0
     person.visible = False
     await head.apply_state("tracking")
-    await tick_for(30, until=lambda: head.state == "idle")
-    check("nobody there: gives up and goes back to idle, never recorded",
-          head.state == "idle" and not head.camera.recording)
+    await tick_for(30, until=lambda: head.state == "awake")
+    check("nobody there: gives up and goes back to awake, never recorded",
+          head.state == "awake" and not head.camera.recording)
 
     order = [s for s, _ in seen]
     dedup = [s for i, s in enumerate(order) if i == 0 or order[i - 1] != s]
-    check("states ran idle → tracking → recording → idle → tracking → idle …",
-          dedup[:5] == ["idle", "tracking", "recording", "idle", "tracking"], f"{dedup}")
+    check("states ran awake → tracking → recording → awake → tracking → awake …",
+          dedup[:5] == ["awake", "tracking", "recording", "awake", "tracking"], f"{dedup}")
 
     # --- someone already in frame when the session starts ------------------------------
     config.SEARCH_GIVE_UP_S = 180.0
     person.visible, person.bearing = True, 15.0
     await tick_for(3.0)
-    check("idle sub-state: person in frame; the ring breathes", head.phase == "person-in-frame"
-          and head.led.idle_person, f"{head.phase}")
-    check("live view: idle boxes are all 'can't tell' (nobody picked yet)",
+    check("awake sub-state: person in frame; the ring breathes", head.phase == "person-in-frame"
+          and head.led.awake_person, f"{head.phase}")
+    check("live view: awake boxes are all 'can't tell' (nobody picked yet)",
           head.live_boxes() and labels(head.live_boxes()) == {"unsure"}, f"{head.live_boxes()}")
-    head.state = "off"
-    check("…and none while off", head.live_boxes() == [])
-    head.state = "idle"
+    head.state = "sleep"
+    check("…and none while asleep", head.live_boxes() == [])
+    head.state = "awake"
     await head.apply_state("tracking")
     check("track / record with a person in frame → found, the sweep is skipped",
           head.tracker.mode == "found" and head.phase == "found", head.tracker.mode)
@@ -269,7 +278,58 @@ async def full_flow() -> None:
           head.state == "recording" and CLOCK.t - t0 < config.FOUND_CONFIRM_S + 0.2
           and min(pans) >= -0.5 and max(pans) <= person.bearing + 5.0,
           f"{CLOCK.t - t0:.1f}s, pan {min(pans):.1f}..{max(pans):.1f}")
-    await head.apply_state("idle")
+    await head.apply_state("awake")
+
+    # --- sleep: awake AWAKE_TIMEOUT_S with no session ------------------------------
+    head.local.viewers = 1
+    await tick_for(config.AWAKE_TIMEOUT_S + 5.0)
+    check("live view open on the stream: stays awake past AWAKE_TIMEOUT_S", head.state == "awake")
+    head.local.viewers = 0
+    head.cloud.viewer_at = time.time()
+    await tick_for(config.AWAKE_TIMEOUT_S + 5.0)
+    check("…and while the app watches through Firebase", head.state == "awake")
+    head.cloud.viewer_at = 0.0
+    t0 = CLOCK.t
+    await tick_for(config.AWAKE_TIMEOUT_S + 1.0, until=lambda: head.state == "sleep")
+    check("…then sleeps AWAKE_TIMEOUT_S after the viewer leaves",
+          head.state == "sleep" and CLOCK.t - t0 >= config.AWAKE_TIMEOUT_S - 0.1, f"{CLOCK.t - t0:.1f}s")
+    check("awake AWAKE_TIMEOUT_S with no session → sleep: camera off, parked",
+          head.state == "sleep" and not head.camera.awake and head.ptz.pan_deg == 0.0
+          and head.led.state == "sleep" and head.phase is None, f"{head.state} {head.phase}")
+    person.visible, person.bearing = True, 5.0
+    looks = head.camera.detections
+    await tick_for(3.0)
+    check("…asleep: nothing is looked at, no live view",
+          head.camera.detections == looks and head.live_boxes() == [])
+
+    # --- the app's Record from sleep, the person already in front -------------------
+    await head.apply_state("tracking")
+    check("record from sleep → tracking, search, skipping awake; camera on",
+          head.state == "tracking" and head.phase == "search" and head.camera.awake, f"{head.phase}")
+    pans = []
+    await tick_for(10, until=lambda: (pans.append(head.ptz.pan_deg), head.phase == "found")[1])
+    check("…holds still until its first look, then finds them without sweeping",
+          head.phase == "found" and max(abs(p) for p in pans) < 0.5,
+          f"{head.phase}, pan {min(pans):.1f}..{max(pans):.1f}")
+    await tick_for(10, until=lambda: head.state == "recording")
+    check("…and records after FOUND_CONFIRM_S", head.state == "recording" and head.camera.recording)
+    await head.apply_state("sleep")
+    check("Sleep while recording saves the clip and sleeps",
+          head.state == "sleep" and not head.camera.recording and not head.camera.awake)
+
+    # --- Record from sleep with nobody in front: look first, then sweep -------------
+    person.visible = False
+    await head.apply_state("tracking")
+    looks = head.camera.detections
+    pans, t0 = [], CLOCK.t
+    await tick_for(5.0, until=lambda: head.camera.detections > looks or pans.append(head.ptz.pan_deg))
+    check("nobody in front: still through the warm-up until its first look",
+          head.camera.detections > looks and max(map(abs, pans)) == 0.0
+          and CLOCK.t - t0 >= config.CAMERA_WARMUP_S, f"{CLOCK.t - t0:.2f}s, pan {max(pans):.1f}")
+    await tick_for(1.0)
+    check("…then it sweeps", head.phase == "search" and head.ptz.pan_deg != 0.0,
+          f"pan {head.ptz.pan_deg:.1f}")
+    await head.apply_state("awake")
 
 
 def ring_animation() -> None:

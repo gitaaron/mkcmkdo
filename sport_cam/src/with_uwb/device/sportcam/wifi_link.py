@@ -28,7 +28,7 @@ STATUS_PATH = "/run/sportcam-wifi.json"   # written by the portal (root), read b
 JOIN_URL = "http://127.0.0.1/api/join"    # the portal, while it is pairing
 
 # Portal status → head state. Anything that isn't "still getting on a
-# network" lets the camera carry on to idle.
+# network" lets the camera carry on to awake.
 CONNECTING, PAIRING, ONLINE, OFFLINE = "connecting", "pairing", "online", "offline"
 
 
@@ -128,6 +128,9 @@ async def request_join(creds: dict, url: str | None = None) -> bool:
 # The camera's own states before it has a network. No app can reach it yet,
 # so to every app it is still "off".
 BOOT_STATES = (CONNECTING, PAIRING)
+
+# States with the sensor running, and so a live view. Sleep has none.
+LIVE_STATES = ("awake", "tracking", "recording")
 
 
 def public_state(state: str) -> str:

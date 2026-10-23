@@ -36,7 +36,7 @@ PREVIEW_FPS = 1.0            # live preview frames to Firestore, only while an a
 PREVIEW_MAX_BYTES = 200_000
 # Person boxes in the live view (docs/01 F9): the last detection's boxes go
 # out with each preview frame and, on the direct link, as each detection
-# lands. Older than this (idle detects every 2 s) and they're dropped.
+# lands. Older than this (awake detects every 2 s) and they're dropped.
 LIVE_BOXES_MAX_AGE_S = 3.0
 VIEWER_WINDOW_S = 60.0       # how long an app's "watch" keeps previews coming
 DELETE_AFTER_UPLOAD = True   # SD card is a buffer, not a store
@@ -49,10 +49,21 @@ WHEP_URL = None              # set when MediaMTX runs on the Pi (WebRTC)
 
 # --- Wi-Fi setup: connecting → pairing (wifi_portal.py, wifi_link.py) -------
 # The portal service decides when to pair; these are the head unit's side.
-WIFI_STATUS_WAIT_S = 15.0    # no word from the portal by then (not installed): go idle
+WIFI_STATUS_WAIT_S = 15.0    # no word from the portal by then (not installed): go awake
 QR_SCAN_PERIOD_S = 0.5       # look for a Wi-Fi QR code this often while pairing
 QR_RETRY_S = 20.0            # don't resend the same code sooner (it failed, or is joining)
 QR_FOCUS_M = 0.5             # a phone held 15–30 cm from the lens; set_focus's floor
+
+# --- sleep and awake --------------------------------------------------------
+# Sleep saves the battery: the camera sensor is stopped (no preview, detector
+# or live view) and the head parked, while the Pi keeps its API, Firebase link
+# and mDNS up to be woken. Power on joins Wi-Fi and comes up awake; awake this
+# long with no session started, it goes back to sleep. An app showing the live
+# view (the stream here, or a Firebase "watch") keeps it awake; the timeout
+# counts from when it stops watching.
+AWAKE_TIMEOUT_S = 30.0
+CAMERA_WARMUP_S = 1.0        # after waking, let exposure settle before the first detection
+SLEEP_LED_LEVEL = 0.25       # sleep: a single ring pixel at this level, to show it is on
 
 # --- pan / tilt (Arducam PTZ controller, I2C 0x0C) ------------------------
 # Angles are degrees from centre. Raw servo values are 0-180; CENTER_RAW is
@@ -87,7 +98,7 @@ SEARCH_TILT_ROWS_DEG = (5.0, 22.0)   # tilt for each pass; lens is ~1.5 m up
 SEARCH_TILT_DPS = 40.0
 SEARCH_FOCUS_M = 5.0           # a room-sized hyperfocal guess while sweeping
 SEARCH_GIVE_UP_S = 180.0       # tracking (not recording) and sweeping this long
-                               # without finding anyone → back to idle. A
+                               # without finding anyone → back to awake. A
                                # recording is never abandoned: the user stops that.
 RESEARCH_AFTER_S = 6.0         # the person being recorded missing this long → sweep again
 LOST_HOLD_S = 2.0              # target missing → hold still and flash the ring
@@ -127,10 +138,10 @@ ACQUIRE_STALLED_S = 15.0       # searching this long → the app says "can't see
 # mover seen from a few metres; if yours is not, a MobileNet-SSD detector
 # (cv2.dnn) is the upgrade path — `Camera._detect` is the only place to change.
 DETECT_FPS_TRACKING = 3.0
-DETECT_FPS_IDLE = 0.5
-IDLE_PERSON_HOLD_S = 4.0       # idle: a person stays "in frame" this long after the
-                               # last detection (two idle detections), so one
-                               # missed frame does not flip the idle sub-state
+DETECT_FPS_AWAKE = 0.5
+AWAKE_PERSON_HOLD_S = 4.0       # awake: a person stays "in frame" this long after the
+                               # last detection (two awake detections), so one
+                               # missed frame does not flip the awake sub-state
 DETECT_HIT_THRESHOLD = 0.3     # HOG SVM margin: higher = fewer false people.
                                # Tune on your own room; coat stands and chairs
                                # are the usual false positives.
@@ -222,7 +233,7 @@ FOCUS_RATE_LIMIT_S = 0.5
 # makes every estimate roughly 10 % optimistic. For a 74 Wh bank, use 67.
 BATTERY_WH = 84.0
 BATTERY_LOW_FRAC = 0.20        # warn: LED ring flashes orange
-BATTERY_CRITICAL_FRAC = 0.07   # stop recording, park, drop to idle
+BATTERY_CRITICAL_FRAC = 0.07   # stop recording, park, go to sleep
 # Which current sensor is fitted. "ina260" has the shunt on the die and is
 # the easier part to buy and wire; "ina226" needs an external shunt; "none"
 # builds without a gauge, losing the low-battery warning and the auto-save.

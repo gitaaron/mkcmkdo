@@ -53,7 +53,7 @@ class LibraryScreen extends StatelessWidget {
                     ),
                     leading: const Icon(
                       Icons.play_arrow_rounded,
-                      color: SportColors.idle,
+                      color: SportColors.awake,
                     ),
                     title: Text(
                       _when(r.createdAt),

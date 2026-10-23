@@ -30,13 +30,15 @@ const go = (to: CamState | ((cur: CamState) => CamState | null)): Callable => (c
 export const callables: Record<string, Callable> = {
   setPower: (cam, data) => {
     if (typeof data?.on !== "boolean") throw new FnError("invalid-argument", "expected { on: boolean }");
-    // turning off is legal from every powered state and stops a recording with it
-    return requestState(cam, (cur) => (data.on ? (cur === "off" ? "idle" : null) : cur === "off" ? null : "off"));
+    // on wakes a sleeping camera; off puts it to sleep from any awake state,
+    // stopping a recording with it
+    return requestState(cam, (cur) =>
+      data.on ? (cur === "sleep" ? "awake" : null) : cur === "sleep" || cur === "off" ? null : "sleep");
   },
   startTracking: go("tracking"),
-  stopTracking: go("idle"),
+  stopTracking: go("awake"),
   startRecording: go("recording"),
-  stopRecording: go("idle"),      // saves the clip and ends the session
+  stopRecording: go("awake"),      // saves the clip and ends the session
   getState: (cam) => getState(cam),
   watch: (cam) => watch(cam),
   getPreview: (cam) => getPreview(cam),

@@ -20,7 +20,12 @@
 import { FieldValue, Timestamp, getFirestore, type DocumentReference } from "firebase-admin/firestore";
 import { FnError } from "./errors.js";
 
-export type CamState = "off" | "idle" | "tracking" | "recording";
+/**
+ * "off" is never asked for: it is how the camera reads while it boots (connecting,
+ * pairing). "sleep" is the camera powered but with its sensor off, saving the
+ * battery; it wakes on a command (or, with UWB, the tag).
+ */
+export type CamState = "off" | "sleep" | "awake" | "tracking" | "recording";
 
 /** Which hardware build the camera is. The camera reports it; the apps word their buttons to match. */
 export type TrackingMode = "with_uwb" | "without_uwb";
@@ -30,7 +35,7 @@ export interface Telemetry {
   tilt?: number;
   zoomMm?: number;
   dist?: number | null;  // with_uwb: from ranging; without_uwb: from the person's size in frame
-  /** idle: is a person in frame? tracking: search, then found; recording: track (without_uwb: search if lost) */
+  /** awake: is a person in frame? tracking: search, then found; recording: track (without_uwb: search if lost) */
   phase?: "person-in-frame" | "no-person-in-frame" | "search" | "found" | "track" | null;
   countdown?: number;        // tracking, found: whole seconds left before recording (3, 2, 1); else 0
   acquireStalled?: boolean;  // tracking a long time: nobody found / vision cannot see the subject
@@ -99,10 +104,11 @@ export function snapshot(d: CameraDoc): StateSnapshot {
 }
 
 const TRANSITIONS: Record<CamState, CamState[]> = {
-  off: ["idle"],
-  idle: ["off", "tracking"],
-  tracking: ["off", "idle", "recording"],
-  recording: ["off", "idle"],     // stopping a recording ends the session
+  off: [],                         // booting: nothing to ask yet
+  sleep: ["awake", "tracking"],    // record from sleep skips awake
+  awake: ["sleep", "tracking"],
+  tracking: ["sleep", "awake", "recording"],
+  recording: ["sleep", "awake"],   // stopping a recording ends the session
 };
 
 export function assertTransition(from: CamState, to: CamState): void {

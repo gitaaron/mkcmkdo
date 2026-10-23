@@ -41,7 +41,7 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 GONE = float("inf")
 
 
-def run_session(s: AutoSession, steps, state="idle", ready=False):
+def run_session(s: AutoSession, steps, state="awake", ready=False):
     """Feed (now, frame_age) pairs; return the states it asked for."""
     asked = []
     for now, age in steps:
@@ -72,10 +72,10 @@ def session_rules() -> None:
 
     # a body in the way for a few seconds changes nothing
     check("a short gap does not end or restart anything",
-          s.update(5.0, config.LOST_IDLE_S * 0.8, "recording", True) is None and s.active)
+          s.update(5.0, config.LOST_END_S * 0.8, "recording", True) is None and s.active)
 
-    # tag switched off: the control loop drops to idle after LOST_IDLE_S
-    s.update(40.0, config.LOST_IDLE_S + 1, "idle", False)
+    # tag switched off: the control loop drops to awake after LOST_END_S
+    s.update(40.0, config.LOST_END_S + 1, "awake", False)
     check("tag off → session over", not s.active and not s.tag_present)
     asked, _ = run_session(s, [(60 + t / 20, 0.05) for t in range(40)])
     check("tag back on → a new session", asked == ["tracking"], f"{asked}")
@@ -83,15 +83,15 @@ def session_rules() -> None:
     # stopped from the app with the tag still on: do not argue
     s = AutoSession()
     run_session(s, [(t / 20, 0.05) for t in range(40)])
-    asked, _ = run_session(s, [(2 + t / 20, 0.05) for t in range(100)], state="idle")
+    asked, _ = run_session(s, [(2 + t / 20, 0.05) for t in range(100)], state="awake")
     check("stopped from the app → stays stopped while the tag stays on", asked == [])
-    short = config.LOST_IDLE_S * 0.6
-    run_session(s, [(10 + t / 10, short * t / 5) for t in range(6)], state="idle")
+    short = config.LOST_END_S * 0.6
+    run_session(s, [(10 + t / 10, short * t / 5) for t in range(6)], state="awake")
     asked, _ = run_session(s, [(20 + t / 20, 0.05) for t in range(40)])
     check("…and a short off/on does not restart it", asked == [])
-    s.update(60.0, config.LOST_IDLE_S, "idle", False)
+    s.update(60.0, config.LOST_END_S, "awake", False)
     asked, _ = run_session(s, [(70 + t / 20, 0.05) for t in range(40)])
-    check("…but off for LOST_IDLE_S and on again does", asked == ["tracking"])
+    check("…but off for LOST_END_S and on again does", asked == ["tracking"])
 
     # manual sessions: the tag starts nothing, but found → record still applies
     s = AutoSession()
@@ -298,11 +298,11 @@ def tracker_found() -> None:
 
     cam6 = FakeCamera(centred)
     tr6 = Tracker(FakeUwb(theta_deg=0.0), cam6, FakePtz())
-    tr6.watch_idle()
-    check("idle: a person in frame is noticed", tr6.idle_person_in_frame)
+    tr6.watch_awake()
+    check("awake: a person in frame is noticed", tr6.awake_person_in_frame)
     tr6.reset_lock()
-    check("a session always starts in SEARCH, even with a person in frame in idle",
-          tr6.mode == "search" and not tr6.idle_person_in_frame, tr6.mode)
+    check("a session always starts in SEARCH, even with a person in frame in awake",
+          tr6.mode == "search" and not tr6.awake_person_in_frame, tr6.mode)
     took = run_tracker(tr6, 2.0, until=lambda: tr6.mode == "found")
     check("…and is found once settled, when the head already points at the tag",
           tr6.mode == "found" and took < config.ACQUIRE_SETTLE_S + 0.5, f"{took:.2f}s")
@@ -311,8 +311,8 @@ def tracker_found() -> None:
 
 class FakeRing:
     def __init__(self):
-        self.state, self.lost, self.warn = "idle", False, False
-        self.idle_person, self.searching, self.found = False, False, None
+        self.state, self.lost, self.warn = "awake", False, False
+        self.awake_person, self.searching, self.found = False, False, None
 
     def set_state(self, s):
         self.state = s
@@ -321,6 +321,7 @@ class FakeRing:
 class FakeLocal:
     def __init__(self):
         self.sent: list[dict] = []
+        self.viewers = 0
 
     async def broadcast(self, msg):
         self.sent.append(msg)
@@ -405,12 +406,12 @@ async def full_flow() -> None:
     config.TAG_PRESENT_S = 0.1
     config.ACQUIRE_SETTLE_S = 0.1
     config.LOST_HOLD_S = 0.2
-    config.LOST_IDLE_S = 0.6
-    config.IDLE_PERSON_HOLD_S = 1.0
+    config.LOST_END_S = 0.6
+    config.AWAKE_PERSON_HOLD_S = 1.0
 
     pw, ph = config.PREVIEW_SIZE
     head = Head.__new__(Head)
-    head.state = "idle"
+    head.state = "awake"
     head.camera = FakeRecCamera((pw // 2 - 50, ph // 2 - 150, 100, 300))
     head.ptz = FakePtz()
     head.ptz.park = lambda: None
@@ -427,6 +428,7 @@ async def full_flow() -> None:
     head._countdown_sent = 0
     head._near_focus = False
     head._boxes_sent_at = None
+    head._awake_since = time.monotonic()
     head.boxlog = BoxLog()
 
     countdown_sent: list[int] = []     # what the app hears, in order, to beep on
@@ -449,22 +451,22 @@ async def full_flow() -> None:
             await asyncio.sleep(0.01)
 
     await tick_for(0.3)
-    check("standby with the tag off", head.state == "idle")
-    check("idle sub-state: person in frame; the ring breathes",
-          head.phase == "person-in-frame" and head.led.idle_person, f"{head.phase}")
+    check("standby with the tag off", head.state == "awake")
+    check("awake sub-state: person in frame; the ring breathes",
+          head.phase == "person-in-frame" and head.led.awake_person, f"{head.phase}")
     bbox, head.camera._bbox = head.camera._bbox, None
-    await tick_for(config.IDLE_PERSON_HOLD_S + 0.5)
-    check("idle sub-state: no person in frame once they have gone for IDLE_PERSON_HOLD_S; ring solid",
-          head.phase == "no-person-in-frame" and not head.led.idle_person, f"{head.phase}")
+    await tick_for(config.AWAKE_PERSON_HOLD_S + 0.5)
+    check("awake sub-state: no person in frame once they have gone for AWAKE_PERSON_HOLD_S; ring solid",
+          head.phase == "no-person-in-frame" and not head.led.awake_person, f"{head.phase}")
     head.camera._bbox = bbox
     await tick_for(0.5)
     check("…and back to person in frame", head.phase == "person-in-frame", f"{head.phase}")
-    check("live view: idle boxes are all 'can't tell' (nobody picked yet)",
+    check("live view: awake boxes are all 'can't tell' (nobody picked yet)",
           head.live_boxes() and labels(head.live_boxes()) == {"unsure"}, f"{head.live_boxes()}")
 
     head.uwb.on_since, head.uwb.off_at = time.monotonic(), None
     await tick_for(0.15)
-    check("tag on with a person in frame → tracking, search (idle cannot say who they are)",
+    check("tag on with a person in frame → tracking, search (awake cannot say who they are)",
           head.state == "tracking" and head.phase == "search" and head.led.searching, f"{seen}")
     await tick_for(config.ACQUIRE_SETTLE_S + 0.4)
     check("…found once the head is on the tag and vision agrees; ring fills",
@@ -486,7 +488,7 @@ async def full_flow() -> None:
     head.tracker.last_fix_at = time.monotonic()
     await tick_for(1.0)
     check("tag off → back to standby, recording stopped",
-          head.state == "idle" and not head.camera.recording, f"{seen}")
+          head.state == "awake" and not head.camera.recording, f"{seen}")
     side = "/tmp/sportcam-test.boxes.json"
     frames = json.load(open(side))["frames"] if os.path.exists(side) else []
     check("the clip's person boxes are saved beside it, the climber labelled",
@@ -494,17 +496,17 @@ async def full_flow() -> None:
 
     order = [s for s, _ in seen]
     dedup = [s for i, s in enumerate(order) if i == 0 or order[i - 1] != s]
-    check("states ran idle → tracking → recording → idle",
-          dedup == ["idle", "tracking", "recording", "idle"], f"{dedup}")
-    check("idle reports its sub-state; tracking search/found; recording track",
-          all(p in ("person-in-frame", "no-person-in-frame") for s, p in seen if s == "idle")
+    check("states ran awake → tracking → recording → awake",
+          dedup == ["awake", "tracking", "recording", "awake"], f"{dedup}")
+    check("awake reports its sub-state; tracking search/found; recording track",
+          all(p in ("person-in-frame", "no-person-in-frame") for s, p in seen if s == "awake")
           and all(p in ("search", "found") for s, p in seen if s == "tracking")
           and all(p == "track" for s, p in seen if s == "recording"), f"{seen}")
 
     # --- nobody in frame when the tag goes on: SEARCH, turning to the tag ---------
     head.camera._bbox = None
-    await tick_for(max(config.IDLE_PERSON_HOLD_S, config.LOST_IDLE_S) + 0.3)
-    check("idle sub-state: no person in frame", head.phase == "no-person-in-frame", f"{head.phase}")
+    await tick_for(max(config.AWAKE_PERSON_HOLD_S, config.LOST_END_S) + 0.3)
+    check("awake sub-state: no person in frame", head.phase == "no-person-in-frame", f"{head.phase}")
     head.uwb.on_since, head.uwb.off_at = time.monotonic(), None
     await tick_for(0.25)
     check("tag on with nobody in frame → search; ring chases (the app pings)",
@@ -517,9 +519,40 @@ async def full_flow() -> None:
 
     # --- stop recording from the app: the session ends --------------------------
     await head.apply_state("tracking")          # what an older app sends
-    check("stop recording → idle", head.state == "idle" and not head.camera.recording)
+    check("stop recording → awake", head.state == "awake" and not head.camera.recording)
     await tick_for(0.5)
-    check("…and stays idle while the tag stays on", head.state == "idle")
+    check("…and stays awake while the tag stays on", head.state == "awake")
+
+    # --- sleep: awake AWAKE_TIMEOUT_S with no session ------------------------------
+    config.AWAKE_TIMEOUT_S = 0.5
+    head.local.viewers = 1
+    await tick_for(0.8)
+    check("live view open on the stream: stays awake past AWAKE_TIMEOUT_S", head.state == "awake")
+    head.local.viewers = 0
+    head.cloud.viewer_at = time.time()
+    await tick_for(0.8)
+    check("…and while the app watches through Firebase", head.state == "awake")
+    head.cloud.viewer_at = 0.0
+    await tick_for(0.8)
+    check("awake AWAKE_TIMEOUT_S with no session → sleep: camera off, no sub-state",
+          head.state == "sleep" and not head.camera.awake and head.phase is None
+          and head.led.state == "sleep", f"{head.state} {head.phase}")
+    check("…and no live view while asleep", head.live_boxes() == [])
+    head.uwb.on_since, head.uwb.off_at = None, time.monotonic()
+    await tick_for(config.LOST_END_S + 0.2)
+    check("tag off: still asleep", head.state == "sleep")
+    head.uwb.on_since, head.uwb.off_at = time.monotonic(), None
+    await tick_for(0.25)
+    check("tag on while asleep → straight into tracking, search; camera on",
+          head.state == "tracking" and head.phase == "search" and head.camera.awake,
+          f"{head.state} {head.phase}")
+    await head.apply_state("sleep")
+    check("the app's Sleep stops the session", head.state == "sleep" and not head.camera.awake)
+    await head.apply_state("tracking")
+    check("the app's Record from sleep → tracking, skipping awake",
+          head.state == "tracking" and head.camera.awake)
+    await head.apply_state("awake")
+    config.AWAKE_TIMEOUT_S = 30.0
 
 
 def ring_animation() -> None:

@@ -3,7 +3,7 @@
 There is no ranging radio in this build: the camera is the only sense. The
 tracker is a small state machine,
 
-    (idle, no person in frame)       (idle, person in frame)
+    (awake, no person in frame)       (awake, person in frame)
                │ session start                │ session start
                ▼                              ▼
     SEARCH ──person seen──► FOUND ──FOUND_CONFIRM_S──► TRACK (recording)
@@ -13,13 +13,15 @@ tracker is a small state machine,
        ▲                                                  │
        └────────────── missing RESEARCH_AFTER_S ◄─────────┘
 
-* **idle** — not a tracker mode: the session has not started. The head is
-  parked with the lens wide and `watch_idle()` runs the detector at
-  DETECT_FPS_IDLE, so the camera knows whether a person is in frame. A
+* **awake** — not a tracker mode: the session has not started. The head is
+  parked with the lens wide and `watch_awake()` runs the detector at
+  DETECT_FPS_AWAKE, so the camera knows whether a person is in frame. A
   session started with a person in frame skips SEARCH and begins in FOUND
   on that person.
 * **SEARCH** — lens wide, sweep pan end to end and step the tilt row at each
-  turn-around, until the detector sees a person. The first one wins.
+  turn-around, until the detector sees a person. The first one wins. A new
+  session holds still until the detector's first look, since the person may
+  already be in frame (a session started from sleep knows nothing yet).
 * **FOUND** — the sweep stops and the camera follows and frames that person
   exactly as it will while recording; they need not be centred. Seen
   throughout FOUND_CONFIRM_S (no gap longer than FOUND_LOST_S), the session
@@ -56,8 +58,8 @@ class Tracker:
         self.ptz = ptz
         self.dist_m: float | None = None   # estimated from the person's size
         self.confirmed = False             # recording: found people go straight to TRACK
-        self._idle_box: Box | None = None  # largest person seen while idle
-        self._idle_seen_at: float | None = None
+        self._awake_box: Box | None = None  # largest person seen while awake
+        self._awake_seen_at: float | None = None
         # every box of the last fresh detection, labelled for the recording's
         # overlay (boxlog): climber, other, or unsure
         self.labelled: list[tuple[Box, str]] = []
@@ -68,15 +70,21 @@ class Tracker:
     def reset_lock(self) -> None:
         """Forget any subject and start a new session.
 
-        Normally that is a fresh SEARCH. If idle had a person in frame, the
+        Normally that is a fresh SEARCH. If awake had a person in frame, the
         sweep is skipped and the session starts in FOUND on that person; if
         they have gone, FOUND_LOST_S later it falls back to SEARCH.
+
+        SEARCH holds still until the detector has taken a fresh look: the
+        person may already be in front of the camera — always so when it was
+        asleep a moment ago and saw nothing — and the sweep would turn away
+        from them.
         """
         now = time.monotonic()
-        box = self._idle_box if self.idle_person_in_frame else None
-        self._idle_box = self._idle_seen_at = None
+        box = self._awake_box if self.awake_person_in_frame else None
+        self._awake_box = self._awake_seen_at = None
         self.confirmed = False
         self._begin_search(now, direction=1 if self.ptz.pan_deg <= 0 else -1)
+        self._first_look = True
         if box is not None:
             self._first_sighting(now, box)
 
@@ -86,13 +94,13 @@ class Tracker:
         if self.mode == FOUND:
             self.mode = TRACK
 
-    # ---- idle --------------------------------------------------------------
-    def watch_idle(self) -> None:
-        """One idle tick: keep the lens wide and note whether anyone is in frame.
+    # ---- awake --------------------------------------------------------------
+    def watch_awake(self) -> None:
+        """One awake tick: keep the lens wide and note whether anyone is in frame.
 
-        Detection runs at DETECT_FPS_IDLE here. A person counts as in frame
-        until IDLE_PERSON_HOLD_S passes with no detection, so one missed frame
-        does not flip the idle sub-state.
+        Detection runs at DETECT_FPS_AWAKE here. A person counts as in frame
+        until AWAKE_PERSON_HOLD_S passes with no detection, so one missed frame
+        does not flip the awake sub-state.
 
         Every box is labelled UNSURE for the live view: with no session
         running, nobody has been picked as the climber yet.
@@ -103,17 +111,22 @@ class Tracker:
             self.labelled_at = time.monotonic()
             self.labelled = [(b, UNSURE) for b in boxes]
         if fresh and boxes and self.ptz.zoom_mm <= config.ZOOM_MIN_MM:
-            self._idle_box = max(boxes, key=lambda b: b[2] * b[3])
-            self._idle_seen_at = time.monotonic()
+            self._awake_box = max(boxes, key=lambda b: b[2] * b[3])
+            self._awake_seen_at = time.monotonic()
+
+    def forget_awake(self) -> None:
+        """Going to sleep: nobody is known to be in frame any more."""
+        self._awake_box = self._awake_seen_at = None
 
     @property
-    def idle_person_in_frame(self) -> bool:
-        """Idle sub-state: a person was detected within IDLE_PERSON_HOLD_S."""
-        return (self._idle_seen_at is not None
-                and time.monotonic() - self._idle_seen_at <= config.IDLE_PERSON_HOLD_S)
+    def awake_person_in_frame(self) -> bool:
+        """Awake sub-state: a person was detected within AWAKE_PERSON_HOLD_S."""
+        return (self._awake_seen_at is not None
+                and time.monotonic() - self._awake_seen_at <= config.AWAKE_PERSON_HOLD_S)
 
     def _begin_search(self, now: float, direction: int) -> None:
         self.mode = SEARCH
+        self._first_look = False             # re-searching: it has been looking all along
         self._dir = 1 if direction >= 0 else -1
         self._row = 0
         self._searching_since = now
@@ -181,7 +194,9 @@ class Tracker:
             else:
                 if fresh:
                     self._label(now, boxes, None)
-                self._sweep(dt)
+                    self._first_look = False     # looked, and nobody is here: sweep
+                if not self._first_look:
+                    self._sweep(dt)
             return
 
         matched = self._select(boxes) if boxes else None

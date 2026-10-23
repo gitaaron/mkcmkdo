@@ -58,7 +58,7 @@ latest result: [`cad/FIT_REPORT.md`](../../cad/FIT_REPORT.md).
 
 **Pan limit consequences.** No following through 360°, no short way round
 behind the head. A subject crossing a soft limit is lost; the camera holds,
-then<!--with_uwb--> (with UWB) drops to idle after 5 s<!--/--><!--both-->, or (without UWB)<!--/--><!--without_uwb--> sweeps again after a few
+then<!--with_uwb--> (with UWB) drops to awake after 5 s<!--/--><!--both-->, or (without UWB)<!--/--><!--without_uwb--> sweeps again after a few
 seconds; the search covers the same ±80°<!--/-->. Aim the tripod at the filming
 area; the limit matters only when people move around the tripod.
 

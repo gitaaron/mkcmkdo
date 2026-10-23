@@ -28,7 +28,8 @@ class SportCamApp extends StatefulWidget {
   State<SportCamApp> createState() => _SportCamAppState();
 }
 
-class _SportCamAppState extends State<SportCamApp> {
+class _SportCamAppState extends State<SportCamApp>
+    with WidgetsBindingObserver {
   final CameraClient _client = CameraClient(
     fallbackBase: kFallbackBase.isEmpty ? null : kFallbackBase,
     cameraKey: kCameraKey,
@@ -39,10 +40,20 @@ class _SportCamAppState extends State<SportCamApp> {
   void initState() {
     super.initState();
     _audio; // start listening for recording start/stop straight away
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Watching the live view keeps the camera awake, so stop watching while
+  /// the app is in the background ("inactive" is still on screen).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _client.foreground = state == AppLifecycleState.resumed ||
+        state == AppLifecycleState.inactive;
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _audio.dispose();
     _client.dispose();
     super.dispose();

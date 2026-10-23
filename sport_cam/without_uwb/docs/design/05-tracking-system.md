@@ -3,8 +3,8 @@
 ![Search and track](../images/search-and-track.png)
 
 Subject localisation by **vision only**: no tag, radio or anchors.
-**Track & record** starts a pan sweep (skipped if idle already has a person
-in frame); the person detector finds a person; the camera follows and frames
+**Track & record** (or **Record** from sleep) starts a pan sweep (skipped if
+the camera already has a person in frame); the person detector finds a person; the camera follows and frames
 them, and records once they have stayed in frame for 3 s. Pan, tilt, zoom and
 focus are register writes to one I2C controller on the Pi
 ([03](../../../docs/design/03-mechanical-design.md),
@@ -35,12 +35,15 @@ camera films the first person it finds ([limitations](#limitations)).
 ## The state machine
 
 ```
-   idle, no person in frame ──Track & record──►  SEARCH   sweep pan ±80° at 25°/s,
+   sleep ───────────────────────Record──────►  SEARCH   hold still until the first look
+                                                   │      (after CAMERA_WARMUP_S); a
+                                                   │      person in it → FOUND
+   awake, no person in frame ──Track & record──►  SEARCH   sweep pan ±80° at 25°/s,
                                                    │      step tilt row at each turn,
                                                    │      zoom wide, focus 5 m
                                                    │ person seen
                                                    ▼
-   idle, person in frame ───Track & record──────►  FOUND    follow and frame them, as when recording
+   awake, person in frame ───Track & record──────►  FOUND    follow and frame them, as when recording
              (skips the sweep)                     │        (nobody seen for 1 s → SEARCH)
                                                    │ still in frame 3 s later
                                                    ▼
@@ -53,13 +56,14 @@ camera films the first person it finds ([limitations](#limitations)).
 
 | Mode | Behaviour | Exit |
 | --- | --- | --- |
-| **idle**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_IDLE` (0.5 fps). Person in frame from a detection until `IDLE_PERSON_HOLD_S` (4 s) pass without one | **Track & record** → SEARCH (no person in frame) or FOUND on the last detected person (person in frame) |
-| **SEARCH** | zoom wide; focus at `SEARCH_FOCUS_M` (5 m); pan sweeps end to end at `SEARCH_PAN_DPS` (25°/s); steps to the next of `SEARCH_TILT_ROWS_DEG` (5°, 22°) at each end | person detected → FOUND (or straight back to TRACK while recording). In `tracking`, `SEARCH_GIVE_UP_S` (180 s) of sweeping → `idle` |
+| **awake**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_AWAKE` (0.5 fps). Person in frame from a detection until `AWAKE_PERSON_HOLD_S` (4 s) pass without one | **Track & record** → SEARCH (no person in frame) or FOUND on the last detected person (person in frame); `AWAKE_TIMEOUT_S` with no session and no live viewer → sleep |
+| **sleep** | sensor off, head parked; nothing is seen. `AWAKE_TIMEOUT_S` (30 s) in awake with no session and nobody watching the live view → sleep | **Wake up** → awake; **Record** → SEARCH |
+| **SEARCH** | zoom wide; focus at `SEARCH_FOCUS_M` (5 m). A new session holds still until the detector's first look, since the person may already be in front of the camera (always unknown when it was just asleep); a person in that look → FOUND, nobody → the sweep. Then pan sweeps end to end at `SEARCH_PAN_DPS` (25°/s); steps to the next of `SEARCH_TILT_ROWS_DEG` (5°, 22°) at each end | person detected → FOUND (or straight back to TRACK while recording). In `tracking`, `SEARCH_GIVE_UP_S` (180 s) of sweeping → `awake` |
 | **FOUND** | sweep stops (or never ran); follow the largest person with the same pan, tilt, zoom and focus routine as TRACK. They need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) → recording (TRACK); nobody seen for `FOUND_LOST_S` (1 s) → SEARCH |
 | **TRACK** | recording: follow and frame the person; estimate distance for focus | missing for `RESEARCH_AFTER_S` (6 s) → SEARCH |
 
-Mapping to app states (telemetry `phase`): idle = `idle`/`no-person-in-frame`
-or `idle`/`person-in-frame`; SEARCH = `tracking`/`search` (or
+Mapping to app states (telemetry `phase`): awake = `awake`/`no-person-in-frame`
+or `awake`/`person-in-frame`; SEARCH = `tracking`/`search` (or
 `recording`/`search` after a loss), and the app pings every 3 s; FOUND =
 `tracking`/`found`, with telemetry `countdown` (3, 2, 1) and a beep on each;
 TRACK = `recording`/`track`.
@@ -78,17 +82,17 @@ Sweep timing:
 | --- | --- |
 | **First person found wins** | at first sighting with several people in view, the largest detection is taken |
 | **3 s in frame to record** | a single-frame false positive (coat stand, chair) causes a ≈ 1 s pause, then the sweep resumes; it can't start a recording. Telemetry `countdown` carries the seconds left; the app beeps on each, then chimes when recording starts |
-| **Recording always follows found** | no manual record button. **Stop recording** saves the clip and ends the session (`idle`) |
+| **Recording always follows found** | no manual record button. **Stop recording** saves the clip and ends the session (`awake`) |
 | **Nearest, not largest, once found** | each detection is matched to the one nearest the last position, within `TRACK_GATE_FRACTION` (45 % of frame width). Detections outside the gate are ignored (bystanders) |
 | **Missing target** | `LOST_HOLD_S` (2 s): hold, ring flashes at 2 Hz (stays solid red while recording). `RESEARCH_AFTER_S` (6 s): sweep toward the last direction of travel. Recording continues; zoom relaxes wide meanwhile |
-| **Empty room** | `tracking`, nobody found for 180 s of sweeping → `idle`. Never applied to a recording |
+| **Empty room** | `tracking`, nobody found for 180 s of sweeping → `awake`. Never applied to a recording |
 
 ### Boxes in the recording
 
 Each detection while recording is saved with a label per box
 (`Tracker._label`), and the players draw them over the clip in colour
 ([08](../../../docs/design/08-recordings-and-cloud.md#person-boxes)). The
-live view shows the same labels as they are made; in idle, before anyone is
+live view shows the same labels as they are made; in awake, before anyone is
 picked, every box is `unsure`. With no
 tag, "the climber" can only mean the person being followed:
 
@@ -119,7 +123,7 @@ person boxes (3 fps, fresh only) ──► nearest-to-last (gate) ──► offs
 | **Fresh only** | loop 20 Hz, vision 3 Hz: goals move only on a new detection ([06](../../../docs/design/06-device-software.md#vision-and-why-it-runs-slowly)) |
 | **Zoom** | starts wide; vision frames to 65 % with an edge guard and a slow relax to wide when unseen ([06](../../../docs/design/06-device-software.md#framing-and-focus)) |
 | **Focus from size** | distance estimated by the thin-lens relation: body height H at distance d images at f·H/d. Inputs: focal length f, apparent body height on the sensor (`SENSOR_H_MM`), `SUBJECT_HEIGHT_M` = 1.7 m. Clamped to `DIST_MIN_M`–`DIST_MAX_M` (1–30 m), smoothed by `DIST_SMOOTHING` (0.3 per detection). Reported as `dist` in telemetry. Biased by children, crouching and reaches; the error matters mainly at full zoom. During SEARCH, focus is fixed at `SEARCH_FOCUS_M` (5 m). Focus position from distance and focal length via `FOCUS_GRID` ([06](../../../docs/design/06-device-software.md#framing-and-focus)) |
-| **Detector** | OpenCV HOG on the 720p preview, downscaled to `DETECT_DOWNSCALE_W` (480 px); `DETECT_FPS_TRACKING` 3 fps in a session, `DETECT_FPS_IDLE` 0.5 otherwise; record stream untouched 1080p. `DETECT_HIT_THRESHOLD` (0.3): SVM margin; higher = fewer false positives, more misses. Once found, searches a strip of `DETECT_STRIP_FRACTION` (60 %) of frame width around the person; whole frame while searching. 3 fps suffices for climbing (≈ 1.7°/s seen from 10 m), not for running |
+| **Detector** | OpenCV HOG on the 720p preview, downscaled to `DETECT_DOWNSCALE_W` (480 px); `DETECT_FPS_TRACKING` 3 fps in a session, `DETECT_FPS_AWAKE` 0.5 otherwise; record stream untouched 1080p. `DETECT_HIT_THRESHOLD` (0.3): SVM margin; higher = fewer false positives, more misses. Once found, searches a strip of `DETECT_STRIP_FRACTION` (60 %) of frame width around the person; whole frame while searching. 3 fps suffices for climbing (≈ 1.7°/s seen from 10 m), not for running |
 
 **Upgrade path:** MobileNet-SSD via `cv2.dnn` replaces HOG inside
 `Camera._detect()` only; the return type stays a list of `(x, y, w, h)`.
@@ -180,7 +184,7 @@ All in `src/without_uwb/device/sportcam/config.py`.
 | Parameter | Default | Meaning |
 | --- | --- | --- |
 | `CONTROL_RATE_HZ` | 20 | tracker / state-machine tick |
-| `DETECT_FPS_TRACKING` / `_IDLE` | 3.0 / 0.5 | detector rate |
+| `DETECT_FPS_TRACKING` / `_AWAKE` | 3.0 / 0.5 | detector rate |
 | `DETECT_HIT_THRESHOLD` | 0.3 | HOG margin; higher = fewer false people |
 | `DETECT_STRIP_FRACTION` | 0.6 | width searched around the person once found (0 = whole frame) |
 | `DETECT_DOWNSCALE_W` | 480 | detector input width, px |
@@ -191,7 +195,9 @@ All in `src/without_uwb/device/sportcam/config.py`.
 | `SEARCH_TILT_ROWS_DEG` | (5, 22) | tilt for each sweep pass |
 | `SEARCH_TILT_DPS` | 40 | speed of the step between rows |
 | `SEARCH_FOCUS_M` | 5 | focus distance while sweeping |
-| `SEARCH_GIVE_UP_S` | 180 | tracking, sweeping this long without finding anyone → idle |
+| `SEARCH_GIVE_UP_S` | 180 | tracking, sweeping this long without finding anyone → awake |
+| `AWAKE_TIMEOUT_S` | 30 | awake this long with no session → sleep (sensor off); an app showing the live view holds it off |
+| `CAMERA_WARMUP_S` | 1 | after waking, no detection until the exposure settles |
 | `FOUND_CONFIRM_S` | 3 | found and still in frame this long → record |
 | `FOUND_LOST_S` | 1 | found, nobody seen this long → resume sweep |
 | `ACQUIRE_STALLED_S` | 15 | searching this long → app says it can't see anyone |

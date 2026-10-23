@@ -127,9 +127,15 @@ Energy budget, 92 Wh bank:
 | --- | --- | --- | --- | --- |
 | Tracking **and** recording | 12.5 W | **6.2 h** | 9.2 W | **8.4 h** |
 | Tracking only | 12.0 W | 6.5 h | 8.7 W | 8.9 h |
-| Idle, streaming preview | 9.7 W | 8.0 h | 6.4 W | 12 h |
+| Awake, streaming preview | 9.7 W | 8.0 h | 6.4 W | 12 h |
+| Sleep (sensor off, head parked; UWB still ranging) | ≈ 6.8 W | ≈ 11 h | ≈ 3.6 W | ≈ 21 h |
 
 - Both builds exceed the 4 h requirement (C4).
+- **Sleep** figures are estimates: the Pi's ≈ 3 W baseline plus a parked
+  head, with no sensor, preview encode or detector. With UWB the anchors
+  keep ranging (≈ 3 W) so the tag can still start a session. The camera
+  sleeps after 30 s awake with no session and no one watching the live
+  view (`AWAKE_TIMEOUT_S`).
 - **With UWB**: the three anchors account for ≈ 3 W at 5 V (3.3 W at 12 V):
   about a third of the draw and ≈ 2 h of runtime.
 - **Without UWB**: figures are estimates from the load budget (5 V total ÷
@@ -163,7 +169,7 @@ Both sensors use I2C 0x40.
 | Threshold | Action |
 | --- | --- |
 | **20 %** (low) | ring dims and blinks orange at 1 Hz; app warning; estimate continues |
-| **7 %** (critical) | recording stopped and saved; both axes park; state `idle` |
+| **7 %** (critical) | recording stopped and saved; both axes park; state `sleep` |
 
 ### The SD card
 
@@ -199,7 +205,8 @@ leaves a truncated file; a controlled stop leaves a playable one.
 
 | Lever | Effect | Setting |
 | --- | --- | --- |
-| Detector idle rate | 0.5 fps when not tracking (automatic) | `DETECT_FPS_IDLE` |
+| Sleep | sensor, preview and detector off after 30 s awake with no session and no live viewer (automatic) | `AWAKE_TIMEOUT_S` |
+| Detector rate while awake | 0.5 fps when not tracking (automatic) | `DETECT_FPS_AWAKE` |
 | Ring dimming on low battery | automatic | — |
 | Preview frame rate, or stream only while a phone is connected | ≈ 1 W in every mode | `MJPEG_FPS` |
 | 720p recording | lower encode load | `RECORD_SIZE` |

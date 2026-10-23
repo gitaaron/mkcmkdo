@@ -74,7 +74,7 @@ class Advertiser:
         self._azc: AsyncZeroconf | None = None
         self._info: ServiceInfo | None = None
 
-    async def start(self, state: str = "idle") -> None:
+    async def start(self, state: str = "awake") -> None:
         self._azc = AsyncZeroconf(ip_version=IPVersion.V4Only)
         self._info = _service_info(state)
         await self._azc.async_register_service(self._info)

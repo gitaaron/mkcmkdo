@@ -5,7 +5,8 @@ import '../theme.dart';
 
 /// Top-right camera-state indicator — same colours and patterns as the LED
 /// ring on the base, per sub-state (telemetry `phase`):
-///   idle       blue: solid, or breathing slowly with a person in frame
+///   sleep      dim blue-grey, solid (the LED shows one dim pixel)
+///   awake       blue: solid, or breathing slowly with a person in frame
 ///   tracking   green: blinking in search (turning to the tag with UWB,
 ///              sweeping the room without); solid when found, counting down
 ///   recording  solid red
@@ -27,7 +28,7 @@ class StatusRing extends StatefulWidget {
 
   bool get searching => state == CamState.tracking && phase == 'search';
   bool get found => state == CamState.tracking && phase == 'found';
-  bool get idlePerson => state == CamState.idle && phase == 'person-in-frame';
+  bool get awakePerson => state == CamState.awake && phase == 'person-in-frame';
 
   @override
   State<StatusRing> createState() => _StatusRingState();
@@ -53,12 +54,12 @@ class _StatusRingState extends State<StatusRing>
   }
 
   void _syncAnimation() {
-    // Search blinks fast; idle with a person in frame
+    // Search blinks fast; awake with a person in frame
     // breathes slowly — like the LED ring.
     final period = Duration(
       milliseconds: widget.searching
           ? 500
-          : widget.idlePerson
+          : widget.awakePerson
           ? 2400
           : 1200,
     );
@@ -67,7 +68,7 @@ class _StatusRingState extends State<StatusRing>
         ..stop()
         ..duration = period;
     }
-    if (widget.searching || widget.idlePerson) {
+    if (widget.searching || widget.awakePerson) {
       if (!_pulse.isAnimating) _pulse.repeat(reverse: true);
     } else {
       _pulse
@@ -83,7 +84,7 @@ class _StatusRingState extends State<StatusRing>
   }
 
   String get _stateLabel {
-    if (widget.state == CamState.idle) return idleLabel(widget.phase);
+    if (widget.state == CamState.awake) return awakeLabel(widget.phase);
     if (widget.searching) return widget.searchingLabel;
     if (widget.found) {
       final n = widget.countdown > 0 ? widget.countdown : 1;

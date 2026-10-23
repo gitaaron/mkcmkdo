@@ -28,22 +28,28 @@ const buttons = computed<Btn[]>(() => {
   const text = modeText(props.cam.mode);
   switch (props.cam.state) {
     case "off":
-      return [{ label: "Turn on", kind: "primary", action: () => api.setPower(true) }];
-    case "idle":
+      return []; // still booting: nothing to ask yet
+    case "sleep":
+      // Record skips awake: the camera wakes straight into the search
       return [
-        { label: "Turn off", kind: "neutral", action: () => api.setPower(false) },
+        { label: "Wake up", kind: "neutral", action: () => api.setPower(true) },
+        { label: "Record", kind: "primary", action: () => api.startTracking() },
+      ];
+    case "awake":
+      return [
+        { label: "Sleep", kind: "neutral", action: () => api.setPower(false) },
         { label: text.startTracking, kind: "primary", action: () => api.startTracking() },
       ];
     case "tracking":
       // search → found → recording runs by itself; this only cancels it
       return [
-        { label: "Turn off", kind: "neutral", action: () => api.setPower(false) },
+        { label: "Sleep", kind: "neutral", action: () => api.setPower(false) },
         { label: "Stop tracking", kind: "primary", action: () => api.stopTracking() },
       ];
     case "recording":
-      // stopping saves the clip and ends the session (back to idle)
+      // stopping saves the clip and ends the session (back to awake)
       return [
-        { label: "Turn off", kind: "neutral", action: () => api.setPower(false) },
+        { label: "Sleep", kind: "neutral", action: () => api.setPower(false) },
         { label: "Stop recording", kind: "primary", action: () => api.stopRecording() },
       ];
   }
@@ -93,8 +99,8 @@ button:not(:disabled):active {
   color: var(--ink);
   border-color: #2a3850;
 }
-[data-state="idle"] .primary {
-  background: var(--idle);
+[data-state="awake"] .primary {
+  background: var(--awake);
   color: #fff;
 }
 [data-state="tracking"] .primary {
@@ -105,8 +111,8 @@ button:not(:disabled):active {
   background: var(--recording);
   color: #fff;
 }
-[data-state="off"] .primary {
-  background: var(--idle);
+[data-state="sleep"] .primary {
+  background: var(--recording);
   color: #fff;
 }
 </style>

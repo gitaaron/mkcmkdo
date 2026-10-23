@@ -47,13 +47,14 @@ view; camera-only for lower cost, size and power.
 | F1 | **Pan, tilt, zoom.** Pan 160° (±80°); tilt 130° (−45° to +85°); optical zoom 96° → 33° horizontal (≈ 3.5×). All three from the Arducam PTZ base | [03](../design/03-mechanical-design.md) |
 | F2 | **Follow a person** <!--both-->by UWB tag or by vision, per build<!--/--><!--with_uwb: by the UWB tag they wear--><!--without_uwb: by vision alone-->, and zoom to keep them framed | <!--both-->05 tracking ([with UWB](../../with_uwb/docs/design/05-tracking-system.md), [without UWB](../../without_uwb/docs/design/05-tracking-system.md))<!--/--><!--with_uwb:[05](../../with_uwb/docs/design/05-tracking-system.md)--><!--without_uwb:[05](../../without_uwb/docs/design/05-tracking-system.md)--> |
 | F3 | **Record unattended.** Recording starts once a found person has stayed in frame for 3 s, and stops at session end. A clip is saved even when the battery runs out | [Ideal path](#ideal-path) |
-| F4 | **LED status ring** showing each state and sub-state (connecting, pairing, idle with or without a person in frame, search, found, recording) and low battery | [State machine](#state-machine) |
+| F4 | **LED status ring** showing each state and sub-state (connecting, pairing, sleep, awake with or without a person in frame, search, found, recording) and low battery | [State machine](#state-machine) |
 | F5 | **Companion app**: opens into the live view; state-dependent bottom buttons; status ring top right in the LED colours | [07](../design/07-backend-and-app.md#web-app-srcweb) |
 | F6 | **Remote use.** State, live preview and control from any internet-connected phone or computer. One backend and one app serve both builds; the camera reports its build | [07](../design/07-backend-and-app.md#tracking-mode) |
 | F7 | **Recordings library.** Each stopped recording uploads to the backend and appears in the app's library | [08](../design/08-recordings-and-cloud.md) |
 | F8 | **Direct connection.** On the camera's Wi-Fi, a phone discovers and controls it with no server or internet | [09](../design/09-direct-connection-and-app.md) |
-| F9 | **Person boxes in recordings and the live view.** A box round every person the camera detects: **green** round the climber, **yellow** round anyone else, and **red** round everyone while it can't tell which is the climber (in `idle` nobody has been picked yet, so every box is red). Each recording keeps its boxes and both apps' players draw them over the video; both apps' live views draw them over the picture as the camera detects. The player and the live view each have a **Boxes on / off** button, remembered on that phone or browser | [08](../design/08-recordings-and-cloud.md#person-boxes) |
+| F9 | **Person boxes in recordings and the live view.** A box round every person the camera detects: **green** round the climber, **yellow** round anyone else, and **red** round everyone while it can't tell which is the climber (in `awake` nobody has been picked yet, so every box is red). Each recording keeps its boxes and both apps' players draw them over the video; both apps' live views draw them over the picture as the camera detects. The player and the live view each have a **Boxes on / off** button, remembered on that phone or browser | [08](../design/08-recordings-and-cloud.md#person-boxes) |
 | F10 | **Wi-Fi setup at a new gym.** With no saved network in range, the camera enters [pairing](#pairing) on its own; the phone shows its Wi-Fi share QR code to the lens, so the password is never retyped. The network is remembered for next time | [Pairing](#pairing); [08](../design/08-recordings-and-cloud.md#connecting-the-camera-to-gym-wi-fi-from-your-phone) |
+| F11 | **Sleep to save the battery.** Awake 30 s with no session started and nobody watching the live view, the camera sleeps: its sensor stops and the head parks, while the Pi stays reachable. From sleep the app offers **Wake up** and **Record**; Record goes straight to the search. No live view in sleep | [State machine](#state-machine) |
 
 ## Non-functional requirements
 
@@ -83,26 +84,36 @@ library. Deviations (dropouts, loss, manual control): <!--both-->[with UWB](#sta
 
 1. **Power on.** State `connecting` (white light chasing round the ring):
    the Pi joins a saved Wi-Fi network (at a new gym, [pairing](#pairing)
-   first), then connects to Firebase. State `idle`
+   first), then connects to Firebase. State `awake`
    (solid blue): head parked, lens wide. The app opens into the live view;
-   the status ring reads "On — no one in frame", then "On — person in frame"
+   the status ring reads "Awake — no one in frame", then "Awake — person in frame"
    once the climber walks into view, and the LED ring and the app's ring
-   start breathing slowly.
-2. **Start.** State `tracking` (initiate tracking).
+   start breathing slowly. Left awake 30 s without a session starting
+   and with nobody watching the live view (`AWAKE_TIMEOUT_S`), the camera
+   goes to `sleep` to save the battery
+   (one dim blue pixel on the ring): the sensor is off and there is no live
+   view, but the Pi stays reachable. The app then offers **Wake up** (back
+   to `awake`) and **Record** (step 2, skipping `awake`).
+2. **Start.** State `tracking` (initiate recording), from `awake` or `sleep`.
    - **With UWB**: the climber switches the tag on. The camera ranges
-     continuously, including in idle, and detects the tag within ≈ 1 s.
-   - **Without UWB**: the user taps **Track & record** (app or the camera's
-     local page).
+     continuously, in `awake` and `sleep` alike, and detects the tag within
+     ≈ 1 s.
+   - **Without UWB**: the user taps **Track & record** in `awake`, or
+     **Record** in `sleep` (app or the camera's local page).
 3. **Search.** Green light chasing round the ring; the app pings every 3 s.
    - **With UWB**: the location is known at once, so the head turns to the
      ranged position: "Turning to your tag…". Search ends when the head is
      on that position and the person there is detected — under a second
      here, with the climber already in view. It is never skipped: a person
-     in frame in idle could be anyone.
+     in frame in awake could be anyone.
    - **Without UWB**: skipped here. The climber is already in frame, so
      tracking starts at **found**. (With nobody in frame it sweeps ±80° at
      25°/s, zoomed wide, stepping between two tilt rows at each end:
-     "Looking for a person…", until a person is detected.)
+     "Looking for a person…", until a person is detected.) Started from
+     `sleep`, the camera knows nothing yet: it holds still until its first
+     detection (after ≈ 1 s for the exposure to settle,
+     `CAMERA_WARMUP_S`), and goes straight to found if the climber is in
+     that look; only an empty look starts the sweep.
 4. **Found.** The camera follows and frames the climber exactly as it will
    while recording (pan, tilt, zoom, focus); they don't have to be centred.
    The LED ring fills with green over 3 s and the app beeps each second
@@ -116,32 +127,38 @@ library. Deviations (dropouts, loss, manual control): <!--both-->[with UWB](#sta
    `recording` (solid red; the app chimes after the beeps). Pan and tilt
    keep the climber in frame; zoom holds them at ≈ 65 % of the frame. H.264
    is written on the Pi.
-6. **End.** The clip is saved, the app chimes, state `idle`.
+6. **End.** The clip is saved, the app chimes, state `awake` (and `sleep`
+   30 s later).
    - **With UWB**: the climber switches the tag off; the session ends 5 s
      later.
    - **Without UWB**: the user taps **Stop recording**.
 7. **Upload.** The clip uploads to Firebase and appears in the app's library
    ([08](../design/08-recordings-and-cloud.md)).
-8. **Turn off.** Both axes centre and the Pi shuts down. **Turn off** works
-   from any state and saves any recording first; the same sequence runs
-   automatically at 7 % battery.
+8. **Sleep.** **Sleep** in the app works from `awake`, `tracking` and
+   `recording` (saving any recording first): both axes centre and the
+   sensor stops. The same happens on its own after 30 s in `awake` with
+   nobody watching the live view, and at
+   7 % battery. To power off, unplug the bank.
 
 ## State machine
 
-States, colours, sounds and transitions are shared; the idle button and
-the search label differ by build. `idle` and `tracking` (initiate tracking)
-each have two sub-states, reported to the app as telemetry `phase`.
+States, colours, sounds and transitions are shared; the awake button and
+the search label differ by build. `awake` and `tracking` (initiate recording)
+each have two sub-states, reported to the app as telemetry `phase`. The live
+view works only in `awake`, `tracking` and `recording`: in `sleep` the
+camera's sensor is off.
 
 | State | LED | App status ring | App sound | Bottom buttons |
 | --- | --- | --- | --- | --- |
-| `off` | off | grey | — | *(app shows reconnect screen)* |
-| `connecting` | white, chasing round the ring | grey, as `off` | — | *(app shows reconnect screen)* |
-| `pairing` | white, blinking slowly (1 s on, 1 s off) | grey, as `off` | — | *(app shows reconnect screen)* |
-| `idle`, no person in frame | solid blue | blue, "On — no one in frame" | — | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
-| `idle`, person in frame | blue, breathing slowly | blue (slow breath), "On — person in frame" | — | **Turn off** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
-| `tracking`, search | green, chasing round the ring | green (fast blink), <!--with_uwb-->"Turning to your tag…"<!--/--><!--both--> / <!--/--><!--without_uwb-->"Looking for a person…"<!--/--> | sonar ping every 3 s | **Turn off** · **Stop tracking** |
-| `tracking`, found | green, filling round the ring over 3 s | solid green, "Found you — recording in 3…" | a beep each second (3, 2, 1) | **Turn off** · **Stop tracking** |
-| `recording` | solid red | red (solid) | rising chime on start, falling chime on stop<!--both-->; without UWB, pings again if it loses the person and searches<!--/--><!--without_uwb: ; pings again if it loses the person and searches--> | **Turn off** · **Stop recording** |
+| `off` *(app only)* | — | grey | — | *(app shows the camera starting up, or offline)* |
+| `connecting` | white, chasing round the ring | grey, as `off` | — | *(app shows the camera starting up)* |
+| `pairing` | white, blinking slowly (1 s on, 1 s off) | grey, as `off` | — | *(app shows the camera starting up)* |
+| `sleep` | one pixel, dim blue | dim blue-grey, "Asleep — camera off"; no live view | — | **Wake up** · **Record** |
+| `awake`, no person in frame | solid blue | blue, "Awake — no one in frame" | — | **Sleep** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
+| `awake`, person in frame | blue, breathing slowly | blue (slow breath), "Awake — person in frame" | — | **Sleep** · <!--with_uwb-->**Start tracking**<!--/--><!--both--> / <!--/--><!--without_uwb-->**Track & record**<!--/--> |
+| `tracking`, search | green, chasing round the ring | green (fast blink), <!--with_uwb-->"Turning to your tag…"<!--/--><!--both--> / <!--/--><!--without_uwb-->"Looking for a person…"<!--/--> | sonar ping every 3 s | **Sleep** · **Stop tracking** |
+| `tracking`, found | green, filling round the ring over 3 s | solid green, "Found you — recording in 3…" | a beep each second (3, 2, 1) | **Sleep** · **Stop tracking** |
+| `recording` | solid red | red (solid) | rising chime on start, falling chime on stop<!--both-->; without UWB, pings again if it loses the person and searches<!--/--><!--without_uwb: ; pings again if it loses the person and searches--> | **Sleep** · **Stop recording** |
 
 <!--both-->
 
@@ -151,13 +168,28 @@ Where two labels are given: with UWB / without UWB.
 
 Rules:
 
-- `idle` sub-state: the head is parked (centred, lens wide) and the person
-  detector runs at 0.5 fps (`DETECT_FPS_IDLE`). **Person in frame** from a
-  detection until 4 s (`IDLE_PERSON_HOLD_S`) pass without one; otherwise
+- `sleep`: the camera's sensor is stopped (no preview, detector or live
+  view), the head is parked, and the ring shows one dim pixel; the Pi keeps
+  its local API, Firebase link and mDNS up. **Wake up** → `awake`;
+  **Record** → `tracking`, skipping `awake`. With UWB the radios keep
+  ranging, so switching the tag on also starts a session from `sleep`.
+- `awake` for 30 s (`AWAKE_TIMEOUT_S`) without a session starting →
+  `sleep`. The clock restarts each time the camera becomes `awake` (at
+  power on, on **Wake up**, and when a session ends). An app showing the
+  live view keeps it awake: directly over the camera's stream, or through
+  Firebase (the app's `watch`, renewed every 30 s and good for a minute),
+  and the 30 s count starts when the viewer leaves. The phone app stops
+  watching while it is in the background. Through Firebase that
+  can take up to ≈ 1½ min after the app closes.
+- `awake` sub-state: the head is parked (centred, lens wide) and the person
+  detector runs at 0.5 fps (`DETECT_FPS_AWAKE`). **Person in frame** from a
+  detection until 4 s (`AWAKE_PERSON_HOLD_S`) pass without one; otherwise
   **no person in frame**. Telemetry `phase`: `person-in-frame` /
   `no-person-in-frame`.
-- `tracking` (initiate tracking) has two sub-states, the same in both
-  builds:
+- `tracking` (initiate recording) has two sub-states, the same in both
+  builds. A session started from `sleep` begins in search, and holds still
+  until the camera's first detection, since the person may already be in
+  front of it:
   1. **Search** (phase `search`) — get the subject into frame. With UWB the
      location is known at once, so the head turns to the ranged position;
      without UWB it sweeps the room. The app pings every 3 s.
@@ -172,16 +204,18 @@ Rules:
   Without UWB, tracking started from **person in frame** begins at found
   and skips search. With UWB it always begins at search, because only the
   tag says who the subject is.
-- Recording always follows found; there is no manual record button.
+- Recording always follows found; there is no manual record button. **Record**
+  in `sleep` starts a session (search), not a recording.
 - **Stop recording** saves the clip and ends the session: `recording` →
-  `idle`. **Stop tracking** cancels a session that hasn't started
+  `awake`. **Stop tracking** cancels a session that hasn't started
   recording.
 - Subject missing > 2 s in `recording`: hold position; the LED stays solid red.
   Next step is build-specific.
 - Battery < 20 %: ring dims and blinks orange at 1 Hz over the state colour.
-  Battery < 7 %: save, park, drop to `idle`.
-- `connecting` and `pairing` happen only at power on, before `idle`; no app
-  can reach the camera yet, so every app shows it as `off`. Wi-Fi lost
+  Battery < 7 %: save, park, `sleep`.
+- `connecting` and `pairing` happen only at power on, before `awake`; no app
+  can reach the camera yet, so every app shows it as `off`. `off` is never
+  asked for: the camera has no software off, only `sleep`. Wi-Fi lost
   after that changes nothing: the camera carries on, and NetworkManager
   rejoins when it can ([Pairing](#pairing)).
 - The camera is the single source of truth. App commands are requests; the
@@ -197,7 +231,7 @@ exposes it), so the password travels as the phone's own **Wi-Fi share QR
 code**, read through the lens.
 
 1. **Connecting.** At power on (state `connecting`) the Pi tries its saved
-   networks. One joins: `idle`. None in range at the first scan (≈ 10 s,
+   networks. One joins: `awake`. None in range at the first scan (≈ 10 s,
    `FIRST_SCAN_S`), or none joined within 60 s (`BOOT_GRACE_S`): `pairing`.
 2. **Pairing.** The camera raises its hotspot **`SportCam-Setup`**, parks
    facing forward with the lens wide and focused near, and the ring blinks
@@ -221,13 +255,13 @@ code**, read through the lens.
    Join fails (wrong password, out of range): back to `pairing`; the setup
    page says why, and the same QR code is tried again after 20 s
    (`QR_RETRY_S`).
-5. **Idle.** Joined: `idle`, and the camera connects to Firebase as in the
+5. **Awake.** Joined: `awake`, and the camera connects to Firebase as in the
    [ideal path](#ideal-path).
 
 Rules:
 
 - No network to join (C7): **Use without Wi-Fi** on the setup page sends
-  the camera to `idle` with the hotspot still up, and a phone on
+  the camera to `awake` with the hotspot still up, and a phone on
   `SportCam-Setup` controls it directly
   ([09](../design/09-direct-connection-and-app.md)). Recordings upload
   once it's on a network.
@@ -259,13 +293,13 @@ ranges the tag at 20 Hz through body and clothing and points at the result.
 Deviations from the [ideal path](#ideal-path):
 
 - Tag lost > 2 s in `tracking` or `recording`: hold, LED flashes (stays solid red
-  while recording). Lost > 5 s: `idle`
+  while recording). Lost > 5 s: `awake`
   (any recording saved first). A subject crossing a pan soft limit behaves
   the same way.
 - The 5 s delay rides over short dropouts. A switched-off tag and a
   body-shadowed tag are indistinguishable, so a dropout > 5 s also ends the
   session; the tag returning starts a new one (two clips). Raise
-  `LOST_IDLE_S` if this happens.
+  `LOST_END_S` if this happens.
 - Only the tag wearer is found: a detection counts only if its bearing and
   distance match the tag's. When two people both match, the one nearer the
   tag on average wins, once the averages are firm enough to be sure
@@ -276,7 +310,7 @@ Deviations from the [ideal path](#ideal-path):
 - Tracking for 15 s without recording (vision can't confirm the person, or
   someone is standing too close to the climber to tell apart): the app
   reports it.
-- **Start tracking** in the app starts a session without the tag; it
+- **Start tracking** in the app (or **Record** from `sleep`) starts a session without the tag; it
   records after found the same way. A session stopped from the app
   (**Stop tracking** or **Stop recording**) stays stopped until the tag has
   been off for 5 s and comes back on.
@@ -294,8 +328,9 @@ Implementation: [`src/with_uwb/device/sportcam/session.py`](../../src/with_uwb/d
 
 Nothing is worn. **Track & record** in the app starts a wide-angle pan
 sweep; the first person detected is followed and, still in frame 3 s later,
-recorded. If idle already has a person in frame, the sweep is skipped and
-that person is followed directly.
+recorded. If awake already has a person in frame, the sweep is skipped and
+that person is followed directly. **Record** from `sleep` does the same once
+the camera has woken and taken its first look.
 
 ### State machine, without UWB
 
@@ -308,9 +343,8 @@ Deviations from the [ideal path](#ideal-path):
   sweep again (phase `search`; the app pings), toward the last direction of
   travel; recording continues. The next person found is followed at once,
   with no countdown.
-- `tracking` with nobody found for 180 s of sweeping: `idle`. This is the
-  only automatic return to `idle`; a recording is never stopped
-  automatically.
+- `tracking` with nobody found for 180 s of sweeping: `awake` (and `sleep`
+  30 s later). A recording is never stopped automatically.
 
 Implementation: [`src/without_uwb/device/sportcam/session.py`](../../src/without_uwb/device/sportcam/session.py).
 

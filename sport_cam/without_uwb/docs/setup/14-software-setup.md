@@ -151,7 +151,7 @@ sudo systemctl enable --now sportcam-head sportcam-wifi
 journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
 ```
 
-**Done when** the LED ring chases white (connecting), then turns blue (idle): solid, or breathing slowly if the camera can see you. Blinking white instead: it has no Wi-Fi it knows; pair it as below.
+**Done when** the LED ring chases white (connecting), then turns blue (awake): solid, or breathing slowly if the camera can see you. Left alone for 30 s with no app showing the live view, it goes to sleep: one dim blue pixel, camera off (**Wake up** in the app brings it back). Blinking white instead: it has no Wi-Fi it knows; pair it as below.
 
 | Operation | Command / note |
 | --- | --- |
@@ -189,7 +189,7 @@ paste the password.
 
 ## 8. Live checks
 
-With the service running, the ring is blue (breathing slowly while it sees you). Do these in order: the
+With the service running, the ring is blue (breathing slowly while it sees you; one dim pixel once it has gone to sleep, and **Wake up** in the app brings it back). Do these in order: the
 tuning steps only mean something once the signs are right.
 
 1. **First run.** Stand 3–5 m from the camera, in the room you will film in,
@@ -205,7 +205,7 @@ tuning steps only mean something once the signs are right.
    *away* from you, flip `PAN_SIGN`; if it tilts away when you crouch or
    stand, flip `TILT_SIGN` (step 4b). Restart the service after each change.
 3. **Sweep coverage.** Stand still out of view and press **Track & record**
-   again from idle; watch one full sweep. The lens should pass over every
+   again from awake; watch one full sweep. The lens should pass over every
    part of the room you care about, without binding at either end of the pan.
    If the lens can't see your usual spot, adjust `SEARCH_TILT_ROWS_DEG`
    (tilt for each pass; the default rows are 5° and 22°) and, if something
@@ -217,7 +217,7 @@ tuning steps only mean something once the signs are right.
    your own room and light, since that is where false positives come from.
 5. **Re-sweep.** Walk out of view and wait. After about 6 s
    (`RESEARCH_AFTER_S`) the camera should start sweeping again and follow
-   the first person it finds. If nobody is ever found it gives up to idle after
+   the first person it finds. If nobody is ever found it gives up to awake after
    `SEARCH_GIVE_UP_S` (180 s) when not recording.
 6. **Battery gauge.** Counts energy used since the service started, assuming
    a full bank at that point. Start on a fully charged bank; compare

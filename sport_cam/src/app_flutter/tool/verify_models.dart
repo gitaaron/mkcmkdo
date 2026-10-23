@@ -33,6 +33,17 @@ void main() {
     camStateFrom('bogus') == CamState.off,
   );
   check('null state falls back to off', camStateFrom(null) == CamState.off);
+  check(
+    'sleep parses, and has no live view',
+    camStateFrom('sleep') == CamState.sleep && !CamState.sleep.isLive,
+  );
+  check(
+    'awake, tracking and recording have a live view',
+    CamState.awake.isLive &&
+        CamState.tracking.isLive &&
+        CamState.recording.isLive &&
+        !CamState.off.isLive,
+  );
 
   check(
     'mode defaults to with UWB when the backend omits it',

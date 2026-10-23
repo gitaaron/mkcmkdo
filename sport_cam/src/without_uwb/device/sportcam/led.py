@@ -32,7 +32,8 @@ COLOURS = {
     "off":       (0, 0, 0),
     "connecting": (0xC8, 0xC8, 0xC8),   # white chasing: trying the saved Wi-Fi networks
     "pairing":   (0xC8, 0xC8, 0xC8),    # white, slow blink: show me a Wi-Fi QR code
-    "idle":      (0x2F, 0x6F, 0xED),    # blue: solid, or breathing slowly with a person in frame
+    "sleep":     (0x2F, 0x6F, 0xED),    # one dim blue pixel: on, camera off
+    "awake":      (0x2F, 0x6F, 0xED),    # blue: solid, or breathing slowly with a person in frame
     "tracking":  (0x1F, 0x9D, 0x55),    # green: chasing (search), filling (found)
     "recording": (0xD6, 0x45, 0x41),    # solid red, never blinks
     "error":     (0xF2, 0xA9, 0x3B),    # flashing orange
@@ -42,10 +43,10 @@ COLOURS = {
 class StatusRing:
     def __init__(self) -> None:
         self._pixels = None
-        self.state = "idle"
+        self.state = "awake"
         self.lost = False          # tracking but no ranges → flash (not while recording)
         self.warn = False          # battery or storage low: dim + orange blink
-        self.idle_person = False   # idle, person in frame → slow blue breath
+        self.awake_person = False   # awake, person in frame → slow blue breath
         self.searching = False     # tracking, search → green chase
         self.found: float | None = None   # tracking, found: 0 → 1 over FOUND_CONFIRM_S → ring fills
         if neopixel_spi is not None:
@@ -68,7 +69,7 @@ class StatusRing:
     def _render(self) -> None:
         if not self._pixels:
             return
-        r, g, b = COLOURS.get(self.state, COLOURS["idle"])
+        r, g, b = COLOURS.get(self.state, COLOURS["awake"])
         t = time.monotonic()
         if self.warn:
             # A warning never hides the state: it dims the ring and slips a
@@ -83,7 +84,7 @@ class StatusRing:
             self._pixels.brightness = config.LED_BRIGHTNESS
         if self.state == "recording":
             k = 1.0                                                      # solid, even when lost
-        elif self.state == "idle" and self.idle_person:
+        elif self.state == "awake" and self.awake_person:
             k = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(math.pi * t))         # 0.5 Hz breath
         elif self.state == "pairing":
             k = 1.0 if (t % 2.0) < 1.0 else 0.08                         # 0.5 Hz blink
@@ -92,7 +93,12 @@ class StatusRing:
         else:
             k = 1.0
         colour = (int(r * k), int(g * k), int(b * k))
-        if self.state == "connecting" or (
+        if self.state == "sleep":
+            # One pixel, dim: shows the camera is on and listening while
+            # drawing next to nothing.
+            self._pixels.fill((0, 0, 0))
+            self._pixels[0] = tuple(int(c * config.SLEEP_LED_LEVEL) for c in colour)
+        elif self.state == "connecting" or (
                 self.state == "tracking" and self.searching and not self.lost):
             for i, c in enumerate(chase(colour, t, config.LED_COUNT)):
                 self._pixels[i] = c

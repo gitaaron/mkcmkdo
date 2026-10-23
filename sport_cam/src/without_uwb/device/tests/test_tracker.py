@@ -18,7 +18,7 @@ What is checked is what is easy to get wrong and impossible to eyeball:
   * following converges without overshoot, and follows someone who moves;
   * losing the person starts a new sweep;
   * zoom frames the person, and focus distance comes from their size;
-  * idle knows whether a person is in frame, and a session started then skips
+  * awake knows whether a person is in frame, and a session started then skips
     the sweep.
 
     python3 device/tests/test_tracker.py
@@ -108,6 +108,15 @@ class SimCamera:
         self.column: float | None = None
         self.detections = 0
         self.spurious: list[tuple[int, int, int, int]] = []   # one-shot false positives
+        self.awake = True
+        self._warm_until = 0.0
+
+    def set_awake(self, on: bool) -> None:
+        """As the real one: nothing seen asleep; the first look after CAMERA_WARMUP_S."""
+        if on and not self.awake:
+            self._boxes = []
+            self._warm_until = CLOCK.t + config.CAMERA_WARMUP_S
+        self.awake = on
 
     def set_detect_fps(self, fps: float) -> None:
         self._period = 1.0 / max(0.1, fps)
@@ -116,7 +125,9 @@ class SimCamera:
         self.column = cx
 
     def person_boxes(self):
-        if CLOCK.t - self._at < self._period:
+        if not self.awake:
+            return [], False
+        if CLOCK.t < self._warm_until or CLOCK.t - self._at < self._period:
             return self._boxes, False
         self._at = CLOCK.t
         self.detections += 1
@@ -350,22 +361,22 @@ def main() -> None:
     check("reset_lock forgets the subject",
           tr.mode == "search" and not tr.confirmed and tr.dist_m is None)
 
-    # ---- 9. idle: is anyone in frame? -----------------------------------------------
-    print("\nidle")
-    def idle_for(tr: Tracker, seconds: float) -> None:
+    # ---- 9. awake: is anyone in frame? -----------------------------------------------
+    print("\nawake")
+    def awake_for(tr: Tracker, seconds: float) -> None:
         end = CLOCK.t + seconds
         while CLOCK.t < end:
             CLOCK.t += 0.05
-            tr.watch_idle()
+            tr.watch_awake()
 
     person = Person(20.0, dist=6.0)
     tr, cam, ptz = world(person)
     ptz.zoom_mm = 6.0                                  # left zoomed in by the last session
-    cam.set_detect_fps(config.DETECT_FPS_IDLE)
-    idle_for(tr, 3.0)
-    check("idle widens the lens", ptz.zoom_mm == config.ZOOM_MIN_MM, f"{ptz.zoom_mm}")
-    check("idle sub-state: person in frame", tr.idle_person_in_frame)
-    check("idle does not move the head", ptz.pan_deg == 0.0 and ptz.tilt_deg == 0.0)
+    cam.set_detect_fps(config.DETECT_FPS_AWAKE)
+    awake_for(tr, 3.0)
+    check("awake widens the lens", ptz.zoom_mm == config.ZOOM_MIN_MM, f"{ptz.zoom_mm}")
+    check("awake sub-state: person in frame", tr.awake_person_in_frame)
+    check("awake does not move the head", ptz.pan_deg == 0.0 and ptz.tilt_deg == 0.0)
 
     cam.set_detect_fps(config.DETECT_FPS_TRACKING)
     tr.reset_lock()
@@ -381,26 +392,26 @@ def main() -> None:
           f"pan {ptz.pan_deg:.1f}, range {min(pans):.1f}..{max(pans):.1f}")
 
     person.visible = False
-    idle_for(tr, config.IDLE_PERSON_HOLD_S + 2.5)
-    check("idle sub-state: no person in frame once nobody is seen for IDLE_PERSON_HOLD_S",
-          not tr.idle_person_in_frame)
+    awake_for(tr, config.AWAKE_PERSON_HOLD_S + 2.5)
+    check("awake sub-state: no person in frame once nobody is seen for AWAKE_PERSON_HOLD_S",
+          not tr.awake_person_in_frame)
 
     tr, cam, ptz = world(Person(70.0))                 # outside the wide field of view
-    cam.set_detect_fps(config.DETECT_FPS_IDLE)
-    idle_for(tr, 5.0)
-    check("idle sub-state: nobody in frame", not tr.idle_person_in_frame)
+    cam.set_detect_fps(config.DETECT_FPS_AWAKE)
+    awake_for(tr, 5.0)
+    check("awake sub-state: nobody in frame", not tr.awake_person_in_frame)
     tr.reset_lock()
     check("session start with nobody in frame → SEARCH (sweep)", tr.mode == "search", tr.mode)
 
     gone = Person(-15.0)
     tr, cam, ptz = world(gone)
-    cam.set_detect_fps(config.DETECT_FPS_IDLE)
-    idle_for(tr, 3.0)
+    cam.set_detect_fps(config.DETECT_FPS_AWAKE)
+    awake_for(tr, 3.0)
     gone.visible = False                               # leaves just as the session starts
     cam.set_detect_fps(config.DETECT_FPS_TRACKING)
     tr.reset_lock()
     run(tr, config.FOUND_LOST_S + 0.5)
-    check("person in idle frame gone at session start → FOUND times out to SEARCH",
+    check("person in awake frame gone at session start → FOUND times out to SEARCH",
           tr.mode == "search", tr.mode)
 
     print()

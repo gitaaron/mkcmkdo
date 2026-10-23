@@ -102,8 +102,8 @@ class SessionAudio {
     }
     _pingWhile(
       connected &&
-          client.state != CamState.idle &&
-          client.state != CamState.off &&
+          (client.state == CamState.tracking ||
+              client.state == CamState.recording) &&
           client.telemetry.phase == 'search',
     );
     if (!connected) return;

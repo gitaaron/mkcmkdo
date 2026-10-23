@@ -62,7 +62,7 @@ No backend setting.
 - Apps select their wording from `mode` (`src/web/src/lib/modeText.ts`;
   `ModeText` in `src/app_flutter/lib/models.dart`).
 - No `mode` (camera never connected) → treated as `with_uwb`.
-- Build-specific automatic transitions (tag off → idle, found for 3 s → recording)
+- Automatic transitions (`awake` 30 s with no live viewer → `sleep`; tag off → awake, found for 3 s → recording)
   happen on the camera and arrive as ordinary state reports.
 - In dev, `TRACKING_MODE` sets the simulated camera's build.
 
@@ -98,8 +98,8 @@ client with two possible backends.
 | Call | Does |
 | --- | --- |
 | `getState` | the camera's snapshot: `mode`, `state`, `telemetry`, `deviceOnline`, `whepUrl`, `upload`, `updatedAt` |
-| `setPower({on})` | `off` ↔ `idle`; turning off from any state stops a recording with it |
-| `startTracking` / `stopTracking` | `idle` → `tracking`; `tracking`/`recording` → `idle` (stopping and saving a recording) |
+| `setPower({on})` | `sleep` ↔ `awake` (**Wake up** / **Sleep**); sleeping from any state stops a recording with it. Nothing while `off` (booting) |
+| `startTracking` / `stopTracking` | `awake` or `sleep` → `tracking` (**Record** from sleep skips `awake`); `tracking`/`recording` → `awake` (stopping and saving a recording) |
 | `startRecording` / `stopRecording` | `tracking` → `recording` → `tracking` |
 | `watch` | an app is showing the live view: keep previews coming for a minute |
 | `getPreview` | the latest preview frame, base64, with its person boxes (`size`, `boxes`) (for clients that poll) |
@@ -109,7 +109,7 @@ Errors:
 
 | Condition | Response |
 | --- | --- |
-| Illegal transition (e.g. `startRecording` from `idle`, or the current state) | `412 failed-precondition` (same as the camera's local API) |
+| Illegal transition (e.g. `startRecording` from `awake`, or the current state) | `412 failed-precondition` (same as the camera's local API) |
 | Any command while the camera is **offline** (no heartbeat for 20 s) | `412 failed-precondition`. `getState` still answers, with `deviceOnline: false` |
 
 ## Web app (`src/web/`)
@@ -142,6 +142,8 @@ src/web/src/
 Behaviour (requirement F5 in [01](../product/01-requirements.md#functional-requirements)):
 
 - **Live view on open:** `VideoView` mounts immediately; no play button.
+  Only in `awake`, `tracking` and `recording`: in `sleep` the camera's
+  sensor is off and the view says so, above **Wake up** and **Record**.
   The [person boxes](08-recordings-and-cloud.md#in-the-live-view) that come
   with each preview frame are drawn over it, with a **Boxes on / off** button
   under the recordings button (remembered in the browser, separately from

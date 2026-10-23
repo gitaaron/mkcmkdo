@@ -218,7 +218,7 @@ sudo systemctl enable --now sportcam-head sportcam-wifi
 journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
 ```
 
-**Done when** the LED ring chases white (connecting), then turns blue (idle): solid, or breathing slowly if the camera can see you. Blinking white instead: it has no Wi-Fi it knows; pair it as below.
+**Done when** the LED ring chases white (connecting), then turns blue (awake): solid, or breathing slowly if the camera can see you. Left alone for 30 s with no app showing the live view, it goes to sleep: one dim blue pixel, camera off (**Wake up** in the app brings it back). Blinking white instead: it has no Wi-Fi it knows; pair it as below.
 
 | Operation | Command / note |
 | --- | --- |
@@ -227,7 +227,7 @@ journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
 
 ## 8. Live checks
 
-With the service running and the tag **off**, the ring is blue (breathing slowly while it sees you). Do
+With the service running and the tag **off**, the ring is blue (breathing slowly while it sees you; one dim pixel once it has gone to sleep, and **Wake up** in the app brings it back). Do
 these in order: the session check only means something once the bearing and
 elevation are right.
 

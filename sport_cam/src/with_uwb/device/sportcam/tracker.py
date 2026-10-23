@@ -19,13 +19,13 @@ Acquisition runs the same state machine as the camera-only build. The
 difference is SEARCH: the tag gives the subject's location at once, so there
 is no sweep; the head turns straight to the bearing.
 
-    idle ──session start──► SEARCH ──on target, tag wearer seen──► FOUND ──FOUND_CONFIRM_S──► TRACK (recording)
+    awake ──session start──► SEARCH ──on target, tag wearer seen──► FOUND ──FOUND_CONFIRM_S──► TRACK (recording)
                                ▲                                      │
                                └───── tag wearer unseen FOUND_LOST_S ─┘
 
-* **idle** — not a tracker mode: the session has not started. The head is
-  parked with the lens wide and `watch_idle()` runs the detector at
-  DETECT_FPS_IDLE for the idle sub-state. That is anyone at all, so unlike
+* **awake** — not a tracker mode: the session has not started. The head is
+  parked with the lens wide and `watch_awake()` runs the detector at
+  DETECT_FPS_AWAKE for the awake sub-state. That is anyone at all, so unlike
   the camera-only build it never skips SEARCH.
 * **SEARCH** — turn to the tag's bearing, and hold there ACQUIRE_SETTLE_S
   until the detector sees the tag wearer (`_match_tag`).
@@ -70,7 +70,7 @@ class Tracker:
         self.last_fix_at = time.monotonic()
         self.dist_m: float | None = None
         self._last_step = time.monotonic()
-        self._idle_seen_at: float | None = None   # last person detection while idle
+        self._awake_seen_at: float | None = None   # last person detection while awake
         self._people: list[_Person] = []          # everyone in the tag's gate
         self._chosen: _Person | None = None       # the one taken for the tag wearer
         self._admitted: list[Box] = []            # boxes of people in the gate, last detection
@@ -90,12 +90,12 @@ class Tracker:
     def reset_lock(self) -> None:
         """Start a new session's acquisition, always in SEARCH.
 
-        Idle's person in frame is not used: it could be anyone, and only the
+        Awake's person in frame is not used: it could be anyone, and only the
         tag can say who.
         """
         now = time.monotonic()
         self.mode = SEARCH
-        self._idle_seen_at = None
+        self._awake_seen_at = None
         self._settled_since: float | None = None
         self._acquiring_since = now
         self._people, self._chosen = [], None
@@ -105,13 +105,13 @@ class Tracker:
         """Recording has started: hold the subject for the rest of the session."""
         self.mode = TRACK
 
-    # ---- idle --------------------------------------------------------------
-    def watch_idle(self) -> None:
-        """One idle tick: keep the lens wide and note whether anyone is in frame.
+    # ---- awake --------------------------------------------------------------
+    def watch_awake(self) -> None:
+        """One awake tick: keep the lens wide and note whether anyone is in frame.
 
-        Detection runs at DETECT_FPS_IDLE here. A person counts as in frame
-        until IDLE_PERSON_HOLD_S passes with no detection, so one missed frame
-        does not flip the idle sub-state.
+        Detection runs at DETECT_FPS_AWAKE here. A person counts as in frame
+        until AWAKE_PERSON_HOLD_S passes with no detection, so one missed frame
+        does not flip the awake sub-state.
 
         Every box is labelled UNSURE for the live view: with no session
         running, nobody has been picked as the climber yet.
@@ -122,13 +122,17 @@ class Tracker:
             self.labelled_at = time.monotonic()
             self.labelled = [(b, UNSURE) for b in boxes]
         if fresh and boxes and self.ptz.zoom_mm <= config.ZOOM_MIN_MM:
-            self._idle_seen_at = time.monotonic()
+            self._awake_seen_at = time.monotonic()
+
+    def forget_awake(self) -> None:
+        """Going to sleep: nobody is known to be in frame any more."""
+        self._awake_seen_at = None
 
     @property
-    def idle_person_in_frame(self) -> bool:
-        """Idle sub-state: a person was detected within IDLE_PERSON_HOLD_S."""
-        return (self._idle_seen_at is not None
-                and time.monotonic() - self._idle_seen_at <= config.IDLE_PERSON_HOLD_S)
+    def awake_person_in_frame(self) -> bool:
+        """Awake sub-state: a person was detected within AWAKE_PERSON_HOLD_S."""
+        return (self._awake_seen_at is not None
+                and time.monotonic() - self._awake_seen_at <= config.AWAKE_PERSON_HOLD_S)
 
     # ---- status the rest of the system reads -------------------------------
     def found_for(self) -> float:

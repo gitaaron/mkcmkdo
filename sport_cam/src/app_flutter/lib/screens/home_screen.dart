@@ -76,10 +76,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final upload = client.upload;
     final saved = client.justSaved;
     final text = ModeText.of(client.mode);
-    final picture = client.link == LinkMode.relay
-        ? client.preview != null
-        : client.isConnected && client.state != CamState.off;
-    final live = picture ? client.liveBoxes : null;
+    // No picture outside awake, initiate recording and recording: asleep the
+    // camera's sensor is off.
+    final live = client.isConnected && client.state.isLive;
+    final picture = live &&
+        (client.link != LinkMode.relay || client.preview != null);
+    final boxes = picture ? client.liveBoxes : null;
 
     return Scaffold(
       body: Stack(
@@ -90,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (client.link == LinkMode.relay)
             ColoredBox(
               color: Colors.black,
-              child: client.preview == null
+              child: client.preview == null || !live
                   ? const SizedBox.shrink()
                   : Image.memory(
                       client.preview!,
@@ -101,13 +103,26 @@ class _HomeScreenState extends State<HomeScreen> {
           else
             MjpegView(
               streamUrl: client.streamUrl,
-              active: client.isConnected && client.state != CamState.off,
+              // in the background: no stream, so the camera can sleep
+              active: live && client.foreground,
             ),
 
           // person boxes from the camera's last detection
-          if (live != null && _showBoxes)
+          if (boxes != null && _showBoxes)
             IgnorePointer(
-              child: CustomPaint(painter: LiveBoxesPainter(live)),
+              child: CustomPaint(painter: LiveBoxesPainter(boxes)),
+            ),
+
+          if (client.isConnected && client.state == CamState.sleep)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  'Camera is asleep — wake it up or record to see the picture',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: SportColors.muted, fontSize: 18),
+                ),
+              ),
             ),
 
           // top-left: connection status to the camera
@@ -222,7 +237,7 @@ class _LibraryButton extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: SportColors.idle,
+                  color: SportColors.awake,
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Text(

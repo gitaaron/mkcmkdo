@@ -250,7 +250,7 @@ const STEPS = [
       `Run the USB-C cable from the bank up to the inlet low on the ${where(LY.usbc.ang)} of the enclosure and plug it in. Dress it so it cannot snag a tripod leg.`,
       "Charge the bank fully before the first power-on. The fuel gauge counts what it measures from the moment the camera software starts and assumes a full pack then — it has no way to read the bank's own charge.",
     ],
-    note: "Expect about 8.4 hours tracking and recording, 8.9 tracking only, and 12 idle. Those allow for the bank's own conversion loss, which is why they are lower than its 92 Wh label suggests. Recording is nearly free on this board: the Pi 4 has a hardware H.264 encoder, which is the reason the design is not on a Pi 5.",
+    note: "Expect about 8.4 hours tracking and recording, 8.9 tracking only, 12 awake, and about 21 asleep. Those allow for the bank's own conversion loss, which is why they are lower than its 92 Wh label suggests. Recording is nearly free on this board: the Pi 4 has a hardware H.264 encoder, which is the reason the design is not on a Pi 5.",
     scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD], add: lift(BATT, -70),
              view: "iso-low", focus: "all", render: "battery",
              marks: [[0, 0, LY.tray_z + 15, "92 Wh bank, strapped low", 85, -40, -25]] },

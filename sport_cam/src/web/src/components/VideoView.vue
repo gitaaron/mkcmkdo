@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import type { StateSnapshot } from "../lib/api";
+import { LIVE_STATES, type StateSnapshot } from "../lib/api";
 import { drawBoxes, LIVE_HOLD_MS, prepareCanvas, type LiveBoxes } from "../lib/boxes";
 import { useShowBoxes } from "../lib/showBoxes";
 import BoxesToggle from "./BoxesToggle.vue";
@@ -51,8 +51,10 @@ watch(
 );
 onBeforeUnmount(stopWhep);
 
+// No picture outside awake, initiate recording and recording: asleep the
+// camera's sensor is off.
 const showPlaceholder = computed(
-  () => props.cam.state === "off" || !props.cam.deviceOnline,
+  () => !LIVE_STATES.includes(props.cam.state) || !props.cam.deviceOnline,
 );
 
 // ---- person boxes over the picture -------------------------------------------
@@ -62,7 +64,9 @@ const root = ref<HTMLDivElement | null>(null);
 const imgEl = ref<HTMLImageElement | null>(null);
 const canvas = ref<HTMLCanvasElement | null>(null);
 const { show, toggle } = useShowBoxes("sportcam.showLiveBoxes");
-const showingPicture = computed(() => whepActive.value || (!showPlaceholder.value && !!props.cam.previewUrl));
+const showingPicture = computed(
+  () => !showPlaceholder.value && (whepActive.value || !!props.cam.previewUrl),
+);
 
 function draw(): void {
   const c = canvas.value;
@@ -96,12 +100,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="root" class="video">
-    <video v-if="whepActive" ref="videoEl" autoplay playsinline muted @loadedmetadata="draw" />
+    <video v-if="whepActive && !showPlaceholder" ref="videoEl" autoplay playsinline muted @loadedmetadata="draw" />
     <img v-else-if="!showPlaceholder && cam.previewUrl" ref="imgEl" :src="cam.previewUrl" alt="live preview" @load="draw" />
     <div v-else class="placeholder">
       <p v-if="!cam.connected">Connecting…</p>
-      <p v-else-if="cam.state === 'off'">Camera is off</p>
       <p v-else-if="!cam.deviceOnline">Camera is offline</p>
+      <p v-else-if="cam.state === 'off'">Camera is starting up…</p>
+      <p v-else-if="cam.state === 'sleep'">Camera is asleep — wake it up or record to see the picture</p>
       <p v-else>Waiting for the picture…</p>
     </div>
     <canvas ref="canvas" class="boxes" aria-hidden="true" />

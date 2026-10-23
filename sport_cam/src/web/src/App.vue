@@ -76,7 +76,7 @@ function openFromToast(): void {
   position: absolute;
   top: -6px;
   right: -6px;
-  background: var(--idle);
+  background: var(--awake);
   color: #fff;
   border-radius: 9px;
   font-size: 10.5px;

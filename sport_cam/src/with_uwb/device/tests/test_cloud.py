@@ -88,7 +88,7 @@ class FakeClient:
 
 class FakeHead:
     def __init__(self) -> None:
-        self.state = "idle"
+        self.state = "awake"
         self.applied: list[str] = []
         self.link: cloud.CloudLink | None = None
         self.refuse_recording = False
@@ -121,7 +121,7 @@ async def main() -> None:
         await asyncio.sleep(0.02)
     check("connects", link.connected)
     check("writes mode, state and a heartbeat", doc().get("mode") == config.TRACKING_MODE
-          and doc().get("state") == "idle" and doc().get("stateBy") == "device"
+          and doc().get("state") == "awake" and doc().get("stateBy") == "device"
           and "deviceSeenAt" in doc(), str(doc()))
 
     print("commands from the app")
@@ -137,7 +137,7 @@ async def main() -> None:
     check("a refused request is corrected in the document", doc().get("state") == "tracking"
           and doc().get("stateBy") == "device", str(doc()))
     before = list(head.applied)
-    the_doc.update({"state": "idle", "stateBy": "device"})
+    the_doc.update({"state": "awake", "stateBy": "device"})
     await asyncio.sleep(0.1)
     check("ignores its own writes", head.applied == before, str(head.applied))
 

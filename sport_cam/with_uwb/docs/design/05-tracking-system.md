@@ -160,8 +160,8 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
 | **Tilt (no A3)** | `UWB_ANCHORS = 2`, or a frame without A3: box centre → PID → `OPT_MOTOR_Y` |
 | **Zoom** | initial setting from distance (1.8 m subject at 45 % of frame height); vision then frames to 65 % with an edge guard ([06](../../../docs/design/06-device-software.md#framing-and-focus)). Vision scale limited to 0.5–2.5× the distance zoom and to the lens range (no windup) |
 | **Focus** | ranged distance + focal length → `FOCUS_GRID` ([06](../../../docs/design/06-device-software.md#framing-and-focus)); no hunting |
-| **Detector** | OpenCV HOG on the 720p preview, 3 fps (0.5 idle); record stream untouched 1080p. Each detection used once; search strip ≈ 40 % of frame width around the ranged bearing ([06](../../../docs/design/06-device-software.md#vision-and-why-it-runs-slowly)). Sufficient: a climber at 0.3 m/s seen from 10 m moves 1.7°/s, and the 17 % framing margin gives several seconds of tolerance |
-| **Lost tag** | > 2 s without ranges: hold, LED flashes (solid red while recording). > 5 s: `idle` (recording saved first). Same path as a tag switched off |
+| **Detector** | OpenCV HOG on the 720p preview, 3 fps (0.5 awake); record stream untouched 1080p. Each detection used once; search strip ≈ 40 % of frame width around the ranged bearing ([06](../../../docs/design/06-device-software.md#vision-and-why-it-runs-slowly)). Sufficient: a climber at 0.3 m/s seen from 10 m moves 1.7°/s, and the 17 % framing margin gives several seconds of tolerance |
+| **Lost tag** | > 2 s without ranges: hold, LED flashes (solid red while recording). > 5 s: `awake` (recording saved first). Same path as a tag switched off |
 
 ### Search, found and recording
 
@@ -169,11 +169,13 @@ The same state machine as the camera-only build
 ([without UWB, 05](../../../without_uwb/docs/design/05-tracking-system.md#the-state-machine)).
 The difference is SEARCH: the tag gives the subject's location at once, so
 there is no sweep. The head still has to pan and tilt to bring the person
-into frame. Every session starts in SEARCH: idle's person in frame could be
+into frame. Every session starts in SEARCH: awake's person in frame could be
 anyone, so unlike the camera-only build it never skips straight to FOUND.
 
 ```
-   idle ──tag on / Start tracking──►  SEARCH   turn to the ranged position
+   awake ──tag on / Start tracking──►  SEARCH   turn to the ranged position
+   sleep ──tag on / Record─────────►    (the sensor starts; vision is ready
+                                         after CAMERA_WARMUP_S)
                                         │
                                         │ on target 0.5 s, tag wearer seen
                                         ▼
@@ -187,13 +189,14 @@ anyone, so unlike the camera-only build it never skips straight to FOUND.
 
 | Mode | Behaviour | Exit |
 | --- | --- | --- |
-| **idle**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_IDLE` (0.5 fps). Person in frame from a detection of anyone until `IDLE_PERSON_HOLD_S` (4 s) pass without one; it drives the LED and app only | session start (tag on, or **Start tracking**) → SEARCH |
+| **awake**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_AWAKE` (0.5 fps). Person in frame from a detection of anyone until `AWAKE_PERSON_HOLD_S` (4 s) pass without one; it drives the LED and app only | session start (tag on, or **Start tracking**) → SEARCH; `AWAKE_TIMEOUT_S` with no session and no live viewer → sleep |
+| **sleep** | sensor off, head parked; the radios keep ranging. `AWAKE_TIMEOUT_S` (30 s) in awake with no session and nobody watching the live view → sleep | **Wake up** → awake; tag on, or **Record** → SEARCH |
 | **SEARCH** | pan (and tilt, with A3) slews to the ranged position | within `ACQUIRE_POINT_TOL_DEG` (4°) for `ACQUIRE_SETTLE_S` (0.5 s) and the tag wearer detected (below) → FOUND |
 | **FOUND** | the full tracking loop, as in recording: ranged pan and tilt, vision trim, zoom and focus, all from the tag wearer's box. The person need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) and nobody else as near the tag → recording (TRACK); tag wearer unseen for `FOUND_LOST_S` (1 s) → SEARCH |
 | **TRACK** | recording, for the rest of the session; a hidden tag or a missed detection is ordinary tracking | session end |
 
-Mapping to app states (telemetry `phase`): idle = `idle`/`no-person-in-frame`
-or `idle`/`person-in-frame`; SEARCH = `tracking`/`search` (the app pings
+Mapping to app states (telemetry `phase`): awake = `awake`/`no-person-in-frame`
+or `awake`/`person-in-frame`; SEARCH = `tracking`/`search` (the app pings
 every 3 s); FOUND = `tracking`/`found`; TRACK = `recording`/`track`.
 Telemetry `countdown` carries the seconds left in FOUND (3, 2, 1); the app
 beeps on each, then chimes when recording starts. Not recording after
@@ -267,7 +270,7 @@ the gate is the wearer.
 Each detection while recording is saved with a label per box
 (`Tracker._label`), and the players draw them over the clip in colour
 ([08](../../../docs/design/08-recordings-and-cloud.md#person-boxes)). The
-live view shows the same labels as they are made; in idle, before anyone is
+live view shows the same labels as they are made; in awake, before anyone is
 picked, every box is `unsure`. While recording:
 
 | Label | Colour | When |

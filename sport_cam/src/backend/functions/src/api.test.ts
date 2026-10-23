@@ -33,7 +33,7 @@ let key = "";
 const cam = () => db.collection("cameras").doc(key);
 
 /** A camera that has just checked in, in `state`. */
-async function camera(state = "idle", seenAgoMs = 0) {
+async function camera(state = "awake", seenAgoMs = 0) {
   key = `test-${Math.random().toString(36).slice(2, 12)}`;
   await cam().set({
     mode: "with_uwb",
@@ -61,11 +61,11 @@ async function call(name: string, data?: unknown, k: string | null = key) {
 beforeEach(() => camera());
 
 describe("state machine", () => {
-  it("full happy path idle → tracking → recording → idle", async () => {
+  it("full happy path awake → tracking → recording → awake", async () => {
     for (const [fn, want] of [
       ["startTracking", "tracking"],
       ["startRecording", "recording"],
-      ["stopRecording", "idle"],
+      ["stopRecording", "awake"],
     ] as const) {
       const r = await call(fn);
       expect(r.status).toBe(200);
@@ -80,7 +80,7 @@ describe("state machine", () => {
     expect(d.stateBy).toBe("app");
   });
 
-  it("rejects recording from idle", async () => {
+  it("rejects recording from awake", async () => {
     const r = await call("startRecording");
     expect(r.status).toBe(412);
     expect(r.body.error.code).toBe("failed-precondition");
@@ -93,28 +93,45 @@ describe("state machine", () => {
 
   it("stopTracking while recording stops both", async () => {
     await camera("recording");
-    expect((await call("stopTracking")).body.result.state).toBe("idle");
+    expect((await call("stopTracking")).body.result.state).toBe("awake");
   });
 
   it("there is no way back from recording to tracking: stopping ends the session", async () => {
     await camera("recording");
-    expect((await call("stopRecording")).body.result.state).toBe("idle");
+    expect((await call("stopRecording")).body.result.state).toBe("awake");
   });
 
   it("setPower validates its input and is idempotent", async () => {
     expect((await call("setPower", {})).status).toBe(400);
-    expect((await call("setPower", { on: false })).body.result.state).toBe("off");
-    expect((await call("setPower", { on: false })).body.result.state).toBe("off");
-    expect((await call("setPower", { on: true })).body.result.state).toBe("idle");
+    expect((await call("setPower", { on: false })).body.result.state).toBe("sleep");
+    expect((await call("setPower", { on: false })).body.result.state).toBe("sleep");
+    expect((await call("setPower", { on: true })).body.result.state).toBe("awake");
+  });
+
+  it("record from sleep goes straight to tracking, skipping awake", async () => {
+    await camera("sleep");
+    expect((await call("startTracking")).body.result.state).toBe("tracking");
+  });
+
+  it("sleep only wakes or records", async () => {
+    await camera("sleep");
+    expect((await call("startRecording")).status).toBe(412);
+    expect((await call("stopTracking")).body.result.state).toBe("awake");   // = wake up
+  });
+
+  it("nothing can be asked of a camera still booting", async () => {
+    await camera("off");
+    expect((await call("startTracking")).status).toBe(412);
+    expect((await call("setPower", { on: true })).body.result.state).toBe("off");
   });
 
   it("refuses commands while the camera is offline, but still reports state", async () => {
-    await camera("idle", 60_000);
+    await camera("awake", 60_000);
     const r = await call("startTracking");
     expect(r.status).toBe(412);
     expect(r.body.error.message).toMatch(/offline/);
     const s = await call("getState");
-    expect(s.body.result).toMatchObject({ state: "idle", deviceOnline: false, mode: "with_uwb" });
+    expect(s.body.result).toMatchObject({ state: "awake", deviceOnline: false, mode: "with_uwb" });
   });
 });
 

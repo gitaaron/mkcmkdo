@@ -131,6 +131,8 @@ class CloudLink:
     async def _adopt(self, want: str) -> None:
         if want == self.head.state or self.head.state in BOOT_STATES:
             return                       # not up yet: nothing to adopt
+        if want not in ("sleep", "awake", "tracking", "recording"):
+            return                       # "off" is a boot state, never a request
         print(f"[cloud] app asked for {want}")
         await self.head.apply_state(want)
         await self.head.report_state()

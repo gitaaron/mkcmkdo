@@ -16,7 +16,11 @@ Runs at once:
     commands from it;
   * the **status ring** and the **battery gauge**;
   * the **Wi-Fi gate** (wifi_link.py): the camera boots into `connecting`,
-    and `pairing` if it has no network it knows, before `idle`.
+    and `pairing` if it has no network it knows, before `awake`;
+  * **sleep**: awake AWAKE_TIMEOUT_S with no session started and nobody
+    watching the live view, the camera sensor stops and the head parks to
+    save the battery. Everything above stays up, so a command wakes it, or
+    starts a session straight from sleep.
 
 State lives on the device. Whichever channel a command arrives on, it goes
 through `apply_state()` and is then broadcast to all of them — so the app, the
@@ -42,7 +46,7 @@ from .session import AutoSession
 from .storage import StorageMonitor
 from .tracker import Tracker
 from .uploader import drain_pending, upload_with_retry
-from .wifi_link import BOOT_STATES, public_state
+from .wifi_link import BOOT_STATES, LIVE_STATES, public_state
 
 
 def boot_state(status: dict | None, waited_s: float) -> str:
@@ -50,11 +54,11 @@ def boot_state(status: dict | None, waited_s: float) -> str:
 
     No status file yet: still connecting, unless the portal hasn't written
     one in WIFI_STATUS_WAIT_S — it isn't installed (bench Pi, dev machine),
-    so don't wait for it. Online, or told to work offline: idle.
+    so don't wait for it. Online, or told to work offline: awake.
     """
     if status is None:
-        return "connecting" if waited_s < config.WIFI_STATUS_WAIT_S else "idle"
-    return status["state"] if status["state"] in BOOT_STATES else "idle"
+        return "connecting" if waited_s < config.WIFI_STATUS_WAIT_S else "awake"
+    return status["state"] if status["state"] in BOOT_STATES else "awake"
 from .uwb import UwbArray
 
 
@@ -63,7 +67,7 @@ class Head:
         self.state = "connecting"     # until the Wi-Fi gate lets it go (wifi_loop)
         self._boot_at = time.monotonic()
         self._qr_sent: dict[str, float] = {}   # Wi-Fi QR code → when it was last sent
-        self._near_focus = False      # focus moved in for the QR code; home() before idle
+        self._near_focus = False      # focus moved in for the QR code; home() before awake
         self.camera = Camera()
         self.ptz = Ptz()
         self.uwb = UwbArray()
@@ -78,6 +82,7 @@ class Head:
         self._rec_path = ""
         self._rec_started = 0.0
         self.boxlog = BoxLog()     # person boxes beside the clip, for the players' overlay
+        self._awake_since = time.monotonic()   # awake this long untouched → sleep
         self._warned = ""          # which warning we last announced
         self._countdown_sent = 0   # tracker.countdown as last sent to the app
         self._boxes_sent_at: float | None = None   # tracker.labelled_at last sent live
@@ -95,11 +100,11 @@ class Head:
     def phase(self) -> str | None:
         """The sub-state.
 
-        idle: "person-in-frame" or "no-person-in-frame". Tracking: "search",
+        awake: "person-in-frame" or "no-person-in-frame". Tracking: "search",
         then "found" (FOUND_CONFIRM_S to recording). Recording: "track".
         """
-        if self.state == "idle":
-            return "person-in-frame" if self.tracker.idle_person_in_frame else "no-person-in-frame"
+        if self.state == "awake":
+            return "person-in-frame" if self.tracker.awake_person_in_frame else "no-person-in-frame"
         if self.state not in ("tracking", "recording"):
             return None
         return self.tracker.mode
@@ -140,11 +145,16 @@ class Head:
             print(f"[storage] refusing to record — {self.storage.minutes_left:.0f} min left")
             await self.local.broadcast({"type": "warning", "code": "storage-full",
                                         **self.storage.telemetry()})
-            new = "idle" if self.state == "tracking" else self.state
+            new = "awake" if self.state == "tracking" else self.state
         if self.state == "recording" and new == "tracking":
-            new = "idle"                  # stopping a recording ends the session
+            new = "awake"                  # stopping a recording ends the session
 
         old, self.state = self.state, new
+        self.camera.set_awake(new != "sleep")
+        if new == "awake":
+            self._awake_since = time.monotonic()
+        elif new == "sleep":
+            self.tracker.forget_awake()
         if old not in ("tracking", "recording") and new in ("tracking", "recording"):
             self.tracker.reset_lock()     # a new session acquires afresh
         if old != "recording" and new == "recording":
@@ -164,8 +174,8 @@ class Head:
         self.led.set_state(new)
         self.camera.set_detect_fps(
             config.DETECT_FPS_TRACKING if new in ("tracking", "recording")
-            else config.DETECT_FPS_IDLE)
-        if new in ("idle", "off", *BOOT_STATES):
+            else config.DETECT_FPS_AWAKE)
+        if new in ("awake", "sleep", *BOOT_STATES):
             self.ptz.park()
         if new == "pairing" and not self._near_focus:
             self.ptz.set_focus(config.QR_FOCUS_M)   # a phone held up to the lens
@@ -205,12 +215,12 @@ class Head:
                 self.boxlog.note(self.tracker.labelled_at, self.tracker.labelled)
             await self.announce_countdown()
             self.led.lost = self.tracker.lost_for() > config.LOST_HOLD_S
-            if self.tracker.lost_for() > config.LOST_IDLE_S:
-                await self.apply_state("idle")
+            if self.tracker.lost_for() > config.LOST_END_S:
+                await self.apply_state("awake")
                 await self.report_state()
         else:
-            if self.state == "idle":
-                self.tracker.watch_idle()     # person in frame? (LED and app only: sessions start in SEARCH)
+            if self.state == "awake":
+                self.tracker.watch_awake()     # person in frame? (LED and app only: sessions start in SEARCH)
             self.led.lost = False
         # The tag switching on (or the person found for FOUND_CONFIRM_S) can move the
         # state, through the same apply_state() as any other command.
@@ -220,8 +230,15 @@ class Head:
             print(f"[session] {self.state} → {want}")
             await self.apply_state(want)
             await self.report_state()
+        if self.state == "awake" and self.watched:
+            self._awake_since = time.monotonic()   # live view open: stay awake
+        if (self.state == "awake"
+                and time.monotonic() - self._awake_since > config.AWAKE_TIMEOUT_S):
+            print(f"[sleep] awake {config.AWAKE_TIMEOUT_S:.0f} s with no session → sleep")
+            await self.apply_state("sleep")
+            await self.report_state()
         await self.send_boxes()
-        self.led.idle_person = self.phase == "person-in-frame"
+        self.led.awake_person = self.phase == "person-in-frame"
         self.led.searching = self.state == "tracking" and self.phase == "search"
         self.led.found = (self.tracker.found_for() / config.FOUND_CONFIRM_S
                           if self.state == "tracking" and self.phase == "found" else None)
@@ -239,13 +256,13 @@ class Head:
             batt, store = self.power.level(), self.storage.level()
             self.led.warn = "low" in (batt, store)
 
-            if batt == "critical" and self.state not in ("off", *BOOT_STATES):
-                print("[power] critical — stopping and parking")
-                await self.apply_state("idle")
+            if batt == "critical" and self.state not in ("sleep", *BOOT_STATES):
+                print("[power] critical — stopping, parking and going to sleep")
+                await self.apply_state("sleep")
                 await self.report_state()
             elif store == "critical" and self.state == "recording":
                 print("[storage] critical — stopping recording while it is still valid")
-                await self.apply_state("idle")
+                await self.apply_state("awake")
                 await self.report_state()
 
             for code, level, tele in (("battery-low", batt, self.power.telemetry),
@@ -320,18 +337,23 @@ class Head:
         period = 1.0 / config.MJPEG_FPS
         while True:
             t0 = time.monotonic()
-            if self.state != "off":
+            if self.state in LIVE_STATES:         # sleep and boot: no live view
                 jpg = self.camera.preview_jpeg()
                 if jpg:
                     self.local.publish_frame(jpg)   # direct viewers
                     await self.cloud.preview(jpg, self.live_boxes())   # and, while watched, the app anywhere
             await asyncio.sleep(max(0.0, period - (time.monotonic() - t0)))
 
+    @property
+    def watched(self) -> bool:
+        """An app has the live view open: the stream here, or through Firebase."""
+        return self.local.viewers > 0 or self.cloud.watched
+
     def live_boxes(self) -> list[list]:
         """The last detection's labelled boxes for the live view, `[[x, y, w,
         h, label], …]` in PREVIEW_SIZE pixels; none once stale or not up."""
         at = self.tracker.labelled_at
-        if (at is None or self.state in ("off", *BOOT_STATES)
+        if (at is None or self.state not in LIVE_STATES
                 or time.monotonic() - at > config.LIVE_BOXES_MAX_AGE_S):
             return []
         return [[*map(int, box), label] for box, label in self.tracker.labelled]

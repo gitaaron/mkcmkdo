@@ -21,9 +21,9 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 
 | Module | Function |
 | --- | --- |
-| `main.py` | asyncio supervisor: state handling; control, frame and telemetry loops |
+| `main.py` | asyncio supervisor: state handling (including `awake` → `sleep` after `AWAKE_TIMEOUT_S`, held off while an app watches the live view); control, frame and telemetry loops |
 | `cloud.py` | Firebase link: Firestore document, app requests, previews ([below](#firebase-link)) |
-| `camera.py` | Picamera2: 720p preview (JPEG + person detection); 1080p **hardware** H.264 recording to `/home/pi/recordings` |
+| `camera.py` | Picamera2: 720p preview (JPEG + person detection); 1080p **hardware** H.264 recording to `/home/pi/recordings`; sensor stopped in `sleep`, with a `CAMERA_WARMUP_S` settle on waking before the first detection |
 | `ptz.py` | PTZ controller at I2C 0x0C: pan, tilt, zoom, focus, soft limits, homing |
 | `ptzcheck.py` | bench tool: sweeps both axes to their soft limits |
 | `led.py` | WS2812B ring over SPI (no root required) |
@@ -44,6 +44,7 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 | --- | --- |
 | Installation | 14 — Software setup, step 3 onward ([with UWB](../../with_uwb/docs/setup/14-software-setup.md), [without UWB](../../without_uwb/docs/setup/14-software-setup.md)). Runs from `/home/pi/sportcam/src/<build>/device` |
 | Privileges | `sportcam-head` runs as an ordinary user (hence SPI for the LED ring; the PWM/DMA driver needs root). `sportcam-wifi` (portal) runs as root and is the only thing that changes the network; the head reads its QR codes and asks it to join |
+| Sleep | `apply_state("sleep")` stops the sensor (`Camera.set_awake(False)`) and parks the head; the frame loop publishes nothing, so there is no live view on either path. The local API, Firebase link, mDNS<!--with_uwb--> and UWB ranging<!--/--><!--both--> (and, with UWB, ranging)<!--/--> stay up to be woken. Live frames go out only in `awake`, `tracking` and `recording` (`LIVE_STATES`) |
 | Recording upload | on stop, `main.py` hands the MP4 and its person boxes to `uploader.py` as a background task; tracking and streaming continue. The local copies are deleted after the backend confirms the byte count ([08](08-recordings-and-cloud.md)) |
 
 Live video:
@@ -78,7 +79,7 @@ its other roles are build-specific.
 
 | Property | Value | Rationale |
 | --- | --- | --- |
-| Rate | 3 fps (`DETECT_FPS_TRACKING`); 0.5 fps idle | subject motion seen from several metres is slow |
+| Rate | 3 fps (`DETECT_FPS_TRACKING`); 0.5 fps awake | subject motion seen from several metres is slow |
 | Search area | vertical strip around the expected column (`Camera.set_search_column()`) once the position is known | several-fold speed-up |
 | Freshness | the tracker acts only on a **new** detection | loop 20 Hz vs vision 3 Hz: reusing a cached detection applies it ≈ 7 times and causes hunting |
 
@@ -122,7 +123,8 @@ is already clipped. Relaxing wider is the safe failure direction.
 ### Status ring
 
 `led.py`, 16 × WS2812B on SPI0 MOSI. Colours per state:
-[01 — State machine](../product/01-requirements.md#state-machine). Overlays:
+[01 — State machine](../product/01-requirements.md#state-machine); in `sleep`
+only one pixel is lit, dimly (`SLEEP_LED_LEVEL`). Overlays:
 2 Hz flash for a lost subject while tracking (recording stays solid red); 1 Hz orange blink over the state colour for low
 battery or low card space.
 
@@ -135,11 +137,11 @@ builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
 ```jsonc
 // cameras/{CAMERA_KEY} — written by the camera
 { "mode": "with_uwb" | "without_uwb",       // config.TRACKING_MODE
-  "state": "off" | "idle" | "tracking" | "recording",
+  "state": "off" | "sleep" | "awake" | "tracking" | "recording",   // "off": booting
   "stateBy": "device",                       // "app" when the API wrote a request
   "telemetry": { "pan": -12.5, "tilt": 10.0, "zoomMm": 7.4, "dist": 4.2,
-                 "phase": "no-person-in-frame" | "person-in-frame"   // idle
-                        | "search" | "found" | "track" | null,      // tracking / recording; off
+                 "phase": "no-person-in-frame" | "person-in-frame"   // awake
+                        | "search" | "found" | "track" | null,      // tracking / recording; sleep, off
                  "countdown": 0,    // found: seconds left before recording (3, 2, 1); apps beep on each
                  "acquireStalled": false,
                  "battery": 0.82, "batteryWatts": 14.6, "batteryMinutes": 191,
@@ -175,8 +177,8 @@ Programs: camera service and wearable tag firmware.
 | Module | Function |
 | --- | --- |
 | `uwb.py` | range parsing (ULA1 frames, or the `dual-serial` sketch), bearing maths, Kalman → (θ, d) |
-| `tracker.py` | SEARCH → FOUND → TRACK state machine and control loops from [05](../../with_uwb/docs/design/05-tracking-system.md): idle person-in-frame watch (`watch_idle()`, for the LED and app only: a session always starts in SEARCH), turn to the ranged position, the tag-wearer match (`_match_tag()`: only the person where the tag is counts), pan/tilt from ranging, CV bias trims, framing, focus from distance |
-| `session.py` | tag-driven sessions: tag on → tracking (search → found) → recording after 3 s found; tag off → idle ([01](../product/01-requirements.md#state-machine-with-uwb)) |
+| `tracker.py` | SEARCH → FOUND → TRACK state machine and control loops from [05](../../with_uwb/docs/design/05-tracking-system.md): awake person-in-frame watch (`watch_awake()`, for the LED and app only: a session always starts in SEARCH), turn to the ranged position, the tag-wearer match (`_match_tag()`: only the person where the tag is counts), pan/tilt from ranging, CV bias trims, framing, focus from distance |
+| `session.py` | tag-driven sessions: tag on → tracking (search → found) → recording after 3 s found; tag off → awake ([01](../product/01-requirements.md#state-machine-with-uwb)) |
 | `rangecal.py` | `python3 -m sportcam.rangecal <metres>`: per-anchor range bias and noise with the tag on the boresight; prints `RANGE_BIAS_M` |
 | `bearingcal.py` | `python3 -m sportcam.bearingcal <metres>`: the filtered bearing's noise and correlation time with the wearer standing on the boresight; prints `TAG_BEARING_SIGMA_DEG` and `TAG_BEARING_CORR_S` |
 
@@ -203,7 +205,7 @@ fill target, edge guard, stale relax); `test_session.py` (SEARCH →
 FOUND → recording after 3 s, always SEARCH first, tag-driven sessions, the
 tag wearer picked out from bystanders, someone nearer the lens and a belayer
 beside them, each box labelled green, yellow or red, one telemetry push per
-countdown second, the boxes saved beside the clip, stop recording → idle).
+countdown second, the boxes saved beside the clip, stop recording → awake).
 
 ### Where ranges come from
 
@@ -239,7 +241,7 @@ example; checks the mask, hex scaling, bearing geometry and elevation solve
 
 - `tagPresent` (telemetry): tag on and ranging.
 - Camera-initiated state changes: tag on → session start; tag absent >
-  `LOST_IDLE_S` → idle (clip saved).
+  `LOST_END_S` → awake (clip saved).
 
 ---
 
@@ -251,7 +253,7 @@ Programs: camera service only.
 
 | Module | Function |
 | --- | --- |
-| `tracker.py` | SEARCH → FOUND → TRACK state machine and loops from [05](../../without_uwb/docs/design/05-tracking-system.md): idle person-in-frame watch (`watch_idle()`; a session starts in FOUND when someone is in frame), sweep, first person found, followed with a gate, pan/tilt goals and slew, vision-only framing, focus from apparent size |
+| `tracker.py` | SEARCH → FOUND → TRACK state machine and loops from [05](../../without_uwb/docs/design/05-tracking-system.md): awake person-in-frame watch (`watch_awake()`; a session starts in FOUND when someone is in frame), sweep, first person found, followed with a gate, pan/tilt goals and slew, vision-only framing, focus from apparent size |
 | `session.py` | `AutoSession`: found for 3 s starts recording; a tracking session sweeping 180 s without finding anyone gives up ([01](../product/01-requirements.md#state-machine-without-uwb)) |
 
 `config.py` additionally holds the search and tracking gains, detector
@@ -267,11 +269,11 @@ settings, and zoom and focus curves. `camera.py` adds `person_boxes()`.
 - Tracker use of the boxes (search, found, following, framing, focus from
   size): [05](../../without_uwb/docs/design/05-tracking-system.md#control-loops-all-run-on-the-pi-20-hz).
 
-Tests: `src/without_uwb/device/tests/test_tracker.py` (idle sub-state and
+Tests: `src/without_uwb/device/tests/test_tracker.py` (awake sub-state and
 sweep skip, sweep and turn-arounds, found → ready after 3 s, bystander gate, correction signs, slew
 limits, framing: fill target, edge guard, stale relax); `test_session.py`
-(recording after 3 s found, give-up rule, idle → FOUND with a person in frame,
-one telemetry push per countdown second, stop recording → idle).
+(recording after 3 s found, give-up rule, awake → FOUND with a person in frame,
+one telemetry push per countdown second, stop recording → awake).
 
 ### Firebase link, without UWB
 

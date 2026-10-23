@@ -48,10 +48,12 @@ python3 src/without_uwb/device/tests/test_tracker.py
 python3 src/without_uwb/device/tests/test_session.py
 ```
 
-`test_tracker.py` covers the idle sub-states, the search sweep (and skipping
+`test_tracker.py` covers the awake sub-states, the search sweep (and skipping
 it when a person is already in frame), found → ready to record, re-search and the control
 loops, and guards both of the tilt bugs below. `test_session.py` covers the
-Track & record session: recording 3 s after found, stop recording → idle,
+Track & record session: recording 3 s after found, stop recording → awake,
+awake 30 s → sleep (held off while the live view is open), Record from sleep (still for the first look, then found or
+the sweep),
 the give-up timeout, and a session started with a person in frame.
 
 ## On the bench, before the first session
@@ -77,13 +79,14 @@ checks above pass. Press **Track & record** in the app to start each one.
 | --- | --- | --- | --- |
 | 1 | **Sweep covers the range and reverses at the limits** | stand out of view, press Track & record, watch the pan for one full pass | it should go from about −80° to +80° and back, on both tilt rows (`SEARCH_TILT_ROWS_DEG`), without the servo binding or buzzing at either end. Binding: narrow the limits in `config.py`; wrong direction: flip `PAN_SIGN` / `TILT_SIGN` |
 | 2 | **First-person lock** | walk into view while it sweeps | the sweep stops and the camera centres on the first person the HOG detector sees, ignoring a second person who arrives later |
-| 2a | **Idle sub-state and sweep skip** | press Stop tracking, then stand in view of the parked camera for 5 s; check the app's status ring label; press Track & record | label "On — person in frame" (and "On — no one in frame" a few seconds after you leave). Track & record turns straight to you and locks within ≈ 2 s, with no sweep. Not detected while idle: same fixes as check 3, in reverse (`DETECT_HIT_THRESHOLD` lower) |
+| 2a | **Awake sub-state and sweep skip** | press Stop tracking, then stand in view of the parked camera for 5 s; check the app's status ring label; press Track & record | label "Awake — person in frame" (and "Awake — no one in frame" a few seconds after you leave). Track & record turns straight to you and locks within ≈ 2 s, with no sweep. Not detected while awake: same fixes as check 3, in reverse (`DETECT_HIT_THRESHOLD` lower) |
+| 2b | **Sleep, then Record with you in front** | with the app open on the live view, leave the camera awake for a minute; then close the app for 30 s (≈ 1½ min if the app reaches it through Firebase), reopen it, stand in view and press **Record** | it stays awake while you watch; after you close the app the ring drops to one dim blue pixel and the app says the camera is asleep (no live view), with **Wake up** · **Record**. Record: the camera holds still for about a second, then locks on you with no sweep. Sweeps away from you: its first look missed you — raise `CAMERA_WARMUP_S` (dark room) or lower `DETECT_HIT_THRESHOLD` |
 | 3 | **False-positive rate in your room** | leave the sweep running past a coat stand, hanging coats, a chair with clothes on it, a poster of a person | it should not record them. If it does, raise `DETECT_HIT_THRESHOLD` (0.3 → 0.4) or `FOUND_CONFIRM_S` (3 → 4), then repeat the sweep |
 | 4 | **Lock-and-follow a walking person** | walk across the room, turn and come back | the person stays inside the frame by vision alone; tilt follows as well as pan. Overshoot or oscillation means `TRACK_PAN_GAIN` / `TRACK_TILT_GAIN` are too high ([05 — Tuning](../design/05-tracking-system.md#tuning)) |
-| 5 | **Found, then record** | watch the ring and the app when it first finds you | the ring fills green over 3 s, then turns solid red, and the app shows recording with no extra tap. **Stop recording** saves the clip and the ring goes back to blue (idle) |
+| 5 | **Found, then record** | watch the ring and the app when it first finds you | the ring fills green over 3 s, then turns solid red, and the app shows recording with no extra tap. **Stop recording** saves the clip and the ring goes back to blue (awake) |
 | 6 | **Re-search after loss** | leave the frame, then stay out of view for more than `RESEARCH_AFTER_S` (6 s) | the camera holds still and flashes the ring for `LOST_HOLD_S`, then sweeps again; re-enter the view and it locks again |
 | 7 | **Zoom and focus estimate sanity** | walk from 2 m to 8 m and back, and check the focus is sharp at each distance | zoom keeps you at about two-thirds of the frame height (`ZOOM_FILL_TARGET`) across that range, without hunting. Until the focus grid has been run, focus follows the height-based distance estimate and may be soft at the tele end |
-| 8 | **Give-up to idle** | press Track & record with nobody in the room and do not record | after `SEARCH_GIVE_UP_S` (180 s) the camera stops sweeping and returns to idle (ring blue). If a recording is running it must **not** give up |
+| 8 | **Give-up to awake** | press Track & record with nobody in the room and do not record | after `SEARCH_GIVE_UP_S` (180 s) the camera stops sweeping and returns to awake (ring blue). If a recording is running it must **not** give up |
 | 9 | **Framing** | once recording, you fill roughly two-thirds of the frame height, with space all round | too loose or tight: `ZOOM_FILL_TARGET` |
 | 10 | **Pings, beeps and chimes** | the phone app pings every 3 s while the camera searches, beeps 3, 2, 1 while found, then chimes on record start, and chimes on stop — test once with the app in the background and the screen off | no chime in the background: the platform setup in `src/app_flutter/README.md` (notification permission on Android, `UIBackgroundModes` on iOS) |
 | 11 | **Battery estimate is honest** | compare minutes-left against a stopwatch over the first half hour | badly off usually means `BATTERY_WH` is still set to the bank's nameplate instead of the ~91 % that reaches the 12 V rail |

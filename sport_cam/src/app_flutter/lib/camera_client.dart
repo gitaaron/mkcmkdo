@@ -56,6 +56,7 @@ class CameraClient extends ChangeNotifier {
   LiveBoxes? _liveBoxes;
   Timer? _liveBoxesExpiry;
   bool _disposed = false;
+  bool _foreground = true;
 
   LinkMode get link => _link;
   CameraEndpoint? get endpoint => _endpoint;
@@ -66,6 +67,23 @@ class CameraClient extends ChangeNotifier {
   UploadProgress? get upload => _upload;
   Recording? get justSaved => _justSaved;
   String? get lastError => _lastError;
+
+  /// The app is on screen. In the background it stops asking for the live
+  /// view (no `watch`, no previews, no stream), so the camera can go to
+  /// sleep; state polling carries on for the record chimes.
+  bool get foreground => _foreground;
+  set foreground(bool on) {
+    if (on == _foreground) return;
+    _foreground = on;
+    if (!on) {
+      _preview = null;
+      _setLiveBoxes(null);
+    } else if (_link == LinkMode.relay) {
+      // previews resume without waiting for the next ping
+      unawaited(_call('watch'));
+    }
+    if (!_disposed) notifyListeners();
+  }
 
   bool get isConnected => _link == LinkMode.direct || _link == LinkMode.relay;
   String? get base => _endpoint?.base;
@@ -160,10 +178,11 @@ class CameraClient extends ChangeNotifier {
 
   Future<void> _pollOnce() async {
     final tick = _pollTick++;
-    // Keep the camera posting previews (it stops a minute after the last watch).
-    if (tick % 30 == 0) unawaited(_call('watch'));
+    // Keep the camera posting previews, and awake (it stops a minute after
+    // the last watch). Not from the background: let it sleep.
+    if (_foreground && tick % 30 == 0) unawaited(_call('watch'));
     if (tick % 10 == 9) unawaited(refreshRecordings(announce: true));
-    if (_state != CamState.off) {
+    if (_foreground && _state.isLive) {
       final p = await _call('getPreview', null, true);
       final jpeg = p?['jpeg'] as String?;
       if (jpeg != null) {

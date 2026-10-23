@@ -70,7 +70,7 @@ class StubTracker:
 class StubHead:
     """Minimal stand-in for Head: same attributes local_api touches."""
     def __init__(self):
-        self.state = "idle"
+        self.state = "awake"
         self.ptz = StubPtz()
         self.power = StubPower()
         self.storage = StubStorage()
@@ -114,7 +114,7 @@ async def main() -> None:
 
             # --- state machine over the direct connection ---------------
             st, body = await call(s, "getState")
-            check("getState", st == 200 and body["result"]["state"] == "idle", str(body))
+            check("getState", st == 200 and body["result"]["state"] == "awake", str(body))
             check("getState reports this build's mode",
                   body["result"].get("mode") == "with_uwb", str(body))
 
@@ -132,8 +132,22 @@ async def main() -> None:
                   st == 412 and body["error"]["code"] == "failed-precondition", str(body))
 
             st, body = await call(s, "stopRecording")
-            check("stopRecording → idle (the session ends)",
-                  st == 200 and body["result"]["state"] == "idle", str(body))
+            check("stopRecording → awake (the session ends)",
+                  st == 200 and body["result"]["state"] == "awake", str(body))
+
+            st, body = await call(s, "setPower", {"on": False})
+            check("setPower off → sleep", st == 200 and body["result"]["state"] == "sleep", str(body))
+            st, body = await call(s, "startRecording")
+            check("sleep: no recording without a session (412)", st == 412, str(body))
+            st, body = await call(s, "startTracking")
+            check("startTracking from sleep → tracking, skipping awake (Record)",
+                  st == 200 and body["result"]["state"] == "tracking", str(body))
+            await call(s, "setPower", {"on": False})
+            st, body = await call(s, "setPower", {"on": True})
+            check("setPower on wakes it → awake (Wake up)",
+                  st == 200 and body["result"]["state"] == "awake", str(body))
+            st, body = await call(s, "setPower", {"on": True})
+            check("…and again is a no-op", st == 200 and body["result"]["state"] == "awake", str(body))
 
             st, body = await call(s, "setPower", {"on": "yes"})
             check("setPower validates payload (400)",
@@ -187,7 +201,7 @@ async def main() -> None:
                       third["type"] == "state" and third["state"] == "tracking", str(third)[:80])
 
         # --- mDNS -------------------------------------------------------
-        await mdns.start("idle")
+        await mdns.start("awake")
         from zeroconf.asyncio import AsyncZeroconf
         azc = AsyncZeroconf()
         await asyncio.sleep(1.0)
@@ -198,7 +212,7 @@ async def main() -> None:
             check("mDNS advertises the API port", info.port == config.LOCAL_API_PORT, str(info.port))
             props = {k.decode(): v.decode() for k, v in info.properties.items()}
             check("mDNS TXT carries state + stream path",
-                  props.get("state") == "idle" and props.get("stream") == "/api/stream.mjpeg",
+                  props.get("state") == "awake" and props.get("stream") == "/api/stream.mjpeg",
                   str(props))
             await mdns.update_state("tracking")
             check("mDNS state update applied",

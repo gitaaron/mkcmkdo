@@ -97,7 +97,7 @@ ul { list-style: none; overflow-y: auto; }
   cursor: pointer;
   font-size: 15px;
 }
-.play { color: var(--idle); font-size: 13px; }
+.play { color: var(--awake); font-size: 13px; }
 .meta { display: flex; flex-direction: column; gap: 2px; }
 .sub { color: var(--muted); font-size: 12.5px; }
 </style>

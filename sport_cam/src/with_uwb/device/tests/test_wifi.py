@@ -1,4 +1,4 @@
-"""Wi-Fi setup: connecting → pairing → the phone's QR code → idle, without a Pi.
+"""Wi-Fi setup: connecting → pairing → the phone's QR code → awake, without a Pi.
 
   1. the Wi-Fi share-code parser, on the formats Android and iOS produce;
   2. a real QR code through Camera.qr_text (needs OpenCV);
@@ -91,7 +91,7 @@ def camera_reads_qr() -> None:
             return self.img
 
     cam = Camera.__new__(Camera)
-    cam._cam, cam._qr = FakeCam(frame), None
+    cam._cam, cam._qr, cam.awake = FakeCam(frame), None, True
     got = cam.qr_text()
     check("decodes a phone's code in the frame", got == text, f"{got!r}")
     cam._cam = FakeCam(np.full((h, w, 3), 90, np.uint8))
@@ -147,6 +147,9 @@ class FakeCamera:
     def set_detect_fps(self, _fps):
         pass
 
+    def set_awake(self, _on):
+        pass
+
 
 class FakeReporter:
     def __init__(self):
@@ -192,15 +195,15 @@ async def until(cond, timeout=2.0) -> bool:
 
 
 async def head_flow() -> None:
-    print("\nhead: connecting → pairing → QR code → idle")
+    print("\nhead: connecting → pairing → QR code → awake")
     from sportcam import main as main_mod
     check("boot_state: no file yet → connecting", main_mod.boot_state(None, 1.0) == "connecting")
-    check("boot_state: no portal at all → idle",
-          main_mod.boot_state(None, config.WIFI_STATUS_WAIT_S + 1) == "idle")
-    check("boot_state: offline → idle", main_mod.boot_state({"state": "offline"}, 0) == "idle")
+    check("boot_state: no portal at all → awake",
+          main_mod.boot_state(None, config.WIFI_STATUS_WAIT_S + 1) == "awake")
+    check("boot_state: offline → awake", main_mod.boot_state({"state": "offline"}, 0) == "awake")
     check("apps see connecting / pairing as off",
           public_state("connecting") == public_state("pairing") == "off"
-          and public_state("idle") == "idle")
+          and public_state("awake") == "awake")
     check("LED has both boot states", "connecting" in COLOURS and "pairing" in COLOURS)
 
     config.QR_SCAN_PERIOD_S = 0.01
@@ -246,19 +249,19 @@ async def head_flow() -> None:
 
     outcome["ok"] = True
     head.camera.qr = "WIFI:S:Hogtown Guest;T:WPA;P:climb0n;;"
-    check("right password: joins → idle", await until(lambda: head.state == "idle"))
+    check("right password: joins → awake", await until(lambda: head.state == "awake"))
     check("…with the credentials off the code",
           sent[-1] == {"ssid": "Hogtown Guest", "psk": "climb0n", "hidden": False}, f"{sent[-1]}")
-    check("…focus and zoom re-homed for idle", head.ptz.calls[-1] == "home", f"{head.ptz.calls}")
-    check("…and the apps see idle", head.cloud.states[-1] == "idle")
+    check("…focus and zoom re-homed for awake", head.ptz.calls[-1] == "home", f"{head.ptz.calls}")
+    check("…and the apps see awake", head.cloud.states[-1] == "awake")
     await asyncio.wait_for(task, 1.0)
     check("the gate ends once up", task.done())
 
     write_status("pairing")
     head = make_head()
-    head.state = "idle"
+    head.state = "awake"
     await asyncio.wait_for(head.wifi_loop(), 1.0)
-    check("Wi-Fi lost later never pulls the camera back", head.state == "idle")
+    check("Wi-Fi lost later never pulls the camera back", head.state == "awake")
 
 
 async def portal() -> None:

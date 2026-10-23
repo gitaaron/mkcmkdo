@@ -58,7 +58,30 @@ class Camera:
         self._detect_at = 0.0
         self._boxes: list[tuple[int, int, int, int]] = []
         self._fresh = False
+        self.awake = True                        # sensor running (stopped in sleep)
+        self._warm_until = 0.0
         self._strip_cx: float | None = None      # where UWB thinks the subject is
+
+    def set_awake(self, on: bool) -> None:
+        """Start or stop the sensor: stopped in sleep to save the battery.
+
+        Nothing is captured while it sleeps (no preview, detection or QR
+        reads). On waking the first CAMERA_WARMUP_S are skipped by the
+        detector so exposure can settle, and the cached boxes are dropped: a
+        session started from sleep must not act on what was seen before it.
+        """
+        if on == self.awake:
+            return
+        self.awake = on
+        self._boxes = []
+        self._detect_at = 0.0
+        self._warm_until = time.monotonic() + config.CAMERA_WARMUP_S if on else 0.0
+        if self._cam:
+            if on:
+                self._cam.start()
+            else:
+                self.stop_recording()
+                self._cam.stop()
 
     def set_detect_fps(self, fps: float) -> None:
         self._detect_period = 1.0 / max(0.1, fps)
@@ -75,7 +98,7 @@ class Camera:
         self._strip_cx = cx_px
 
     def preview_jpeg(self) -> bytes | None:
-        if not self._cam:
+        if not (self._cam and self.awake):
             return None
         rgb = self._cam.capture_array("lores")
         ok, jpg = cv2.imencode(".jpg", rgb[:, :, ::-1], [cv2.IMWRITE_JPEG_QUALITY, 80])
@@ -95,10 +118,10 @@ class Camera:
         boxes come back with ``fresh=False`` so the caller can tell a new
         measurement from a repeat of the last one.
         """
-        if not (self._cam and self._hog):
+        if not (self._cam and self._hog and self.awake):
             return [], False
         now = time.monotonic()
-        if now - self._detect_at < self._detect_period:
+        if now < self._warm_until or now - self._detect_at < self._detect_period:
             return self._boxes, False
         self._detect_at = now
         self._boxes = self._detect()
@@ -131,7 +154,7 @@ class Camera:
         (wifi_link.py). A full-frame decode costs ≈ 50–100 ms on a Pi 4, so
         the caller runs it off the event loop, a couple of times a second.
         """
-        if not (self._cam and cv2):
+        if not (self._cam and cv2 and self.awake):
             return None
         if self._qr is None:
             self._qr = cv2.QRCodeDetector()

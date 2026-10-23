@@ -66,7 +66,7 @@ class StubTracker:
 
 class StubHead:
     def __init__(self):
-        self.state = "idle"
+        self.state = "awake"
         self.ptz = StubPtz()
         self.power = StubPower()
         self.storage = StubStorage()
