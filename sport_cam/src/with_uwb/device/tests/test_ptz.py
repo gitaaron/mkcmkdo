@@ -93,6 +93,16 @@ def main() -> None:
     check("a zoom move refocuses for the last ranged distance",
           focus_after == focus_raw(10.6, 4.0, GRID), f"{focus_after}")
 
+    # ---- zooming out for a lost person skips the rate limit ----------------
+    config.ZOOM_RATE_LIMIT_S = 2.0                 # section 4 turned it off
+    p = Ptz()
+    p.focuser = RecordingFocuser()
+    p.set_zoom_mm(8.0)
+    p.set_zoom_mm(5.0)
+    check("a second zoom inside ZOOM_RATE_LIMIT_S is dropped", p.zoom_mm == 8.0, f"{p.zoom_mm}")
+    p.set_zoom_mm(config.ZOOM_MIN_MM, urgent=True)
+    check("…but an urgent one goes at once", p.zoom_mm == config.ZOOM_MIN_MM, f"{p.zoom_mm}")
+
     # ---- the app's joystick: speed grows with the square of the pull --------
     p = Ptz()
     p.focuser = RecordingFocuser()

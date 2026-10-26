@@ -24,16 +24,20 @@ import numpy as np
 from stl import mesh as stlmesh
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-STL_DIR = os.path.join(HERE, "..", "..", "..", "cad", "stl")
+STL_DIR = os.path.join(HERE, "..", "..", "..", "..", "with_uwb", "cad", "stl")
 OUT = os.path.join(HERE, "models.js")
 
-# name -> stl file. The enclosure is a single body, so nothing here needs
-# splitting before it is packed.
+# name -> stl file. Unlike the old continuous-pan build, the enclosure is a
+# single body: the anchor-arm bosses bridge the LED window, so nothing here
+# needs splitting before it is packed.
 PARTS: dict[str, str] = {
     "base_housing":      "base_housing.stl",
     "lid":               "lid.stl",
     "led_diffuser_ring": "led_diffuser_ring.stl",
     "shelf":             "shelf.stl",
+    "anchor_arm":        "anchor_arm.stl",
+    "mast_foot":         "mast_foot.stl",
+    "mast_cradle":       "mast_cradle.stl",
     "battery_tray":      "battery_tray.stl",
 }
 

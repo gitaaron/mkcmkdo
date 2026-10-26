@@ -181,7 +181,7 @@ Behaviour (requirement F5 in [01](../product/01-requirements.md#functional-requi
 | --- | --- | --- |
 | `src/backend/.firebaserc` | project id | written by `scripts/firebase-setup.sh` |
 | function environment | `RECORDINGS_BUCKET` | defaults to `<project>-recordings` |
-| camera `config.py` | `FIREBASE_PROJECT`, `CAMERA_KEY`, `UPLOAD_API_BASE`, `FIREBASE_CREDENTIALS` | the camera's link ([14 — Software setup](../../with_uwb/docs/setup/14-software-setup.md)) |
+| camera `config.py` | `FIREBASE_PROJECT`, `CAMERA_KEY`, `UPLOAD_API_BASE`, `FIREBASE_CREDENTIALS` | the camera's link ([14 — Software setup](../with_uwb/setup/14-software-setup.md)) |
 | `npm run dev` | `TRACKING_MODE` | which build the simulated camera is |
 | web, dev only | `VITE_CAMERA_KEY` | the camera key in dev (default `dev-camera-key`, the simulator's) |
 

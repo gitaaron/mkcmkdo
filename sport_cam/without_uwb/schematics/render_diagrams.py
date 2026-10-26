@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render system-design illustrations for SportCam to docs/images/*.png.
+"""Render system-design illustrations for SportCam to docs/without_uwb/images/*.png.
 
 Usage:  python3 schematics/render_diagrams.py
 """
@@ -12,7 +12,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch, FancyArrowPatch, Circle, Rectangle, Wedge, Polygon
 
-OUT = os.path.join(os.path.dirname(__file__), "..", "docs", "images")
+OUT = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "without_uwb", "images")
 os.makedirs(OUT, exist_ok=True)
 
 INK = "#1a2233"

@@ -47,8 +47,8 @@ by `npm run docs` at <!--with_uwb-->http://localhost:8090/with_uwb/schematics/in
 ## Head unit
 
 Pin-by-pin wiring with checks: 12 — Wiring guide
-([with UWB](../../with_uwb/docs/setup/12-wiring.md),
-[without UWB](../../without_uwb/docs/setup/12-wiring.md)). This section
+([with UWB](../with_uwb/setup/12-wiring.md),
+[without UWB](../without_uwb/setup/12-wiring.md)). This section
 gives the design rationale. Head schematic: <!--both-->each build's section below<!--/--><!--with_uwb: [With UWB](#with-uwb)--><!--without_uwb: [Without UWB](#without-uwb)-->.
 
 Common connections:
@@ -142,11 +142,11 @@ Why this way:
 Parts: IRF4905 (−55 V, 0.02 Ω; ≈ 0.06 W at 1.7 A, no heatsink), two 2N3904,
 eight resistors on perfboard (BOM 13a). The rocker only carries under 1 mA.
 Circuit, values and checks: 12 — Wiring
-([with UWB](../../with_uwb/docs/setup/12-wiring.md#power-latch),
-[without UWB](../../without_uwb/docs/setup/12-wiring.md#power-latch)). Pi
+([with UWB](../with_uwb/setup/12-wiring.md#power-latch),
+[without UWB](../without_uwb/setup/12-wiring.md#power-latch)). Pi
 settings: 14 — Software setup
-([with UWB](../../with_uwb/docs/setup/14-software-setup.md#power-switch),
-[without UWB](../../without_uwb/docs/setup/14-software-setup.md#power-switch)).
+([with UWB](../with_uwb/setup/14-software-setup.md#power-switch),
+[without UWB](../without_uwb/setup/14-software-setup.md#power-switch)).
 
 ### Load budget
 
@@ -210,7 +210,7 @@ A PD bank doesn't report its charge, so the camera meters consumption:
 | --- | --- | --- |
 | `"ina260"` (default) | INA260 | integrated shunt; nothing to calibrate |
 | `"ina226"` | INA226 + external shunt | set `INA226_SHUNT_OHMS` |
-| `"none"` | — | no low-battery warning or automatic save-and-park; see the BOM ([with UWB](../../with_uwb/docs/setup/10-bill-of-materials.md#parts-that-are-hard-to-source-in-canada), [without UWB](../../without_uwb/docs/setup/10-bill-of-materials.md#parts-that-are-hard-to-source-in-canada)) |
+| `"none"` | — | no low-battery warning or automatic save-and-park; see the BOM ([with UWB](../with_uwb/setup/10-bill-of-materials.md#parts-that-are-hard-to-source-in-canada), [without UWB](../without_uwb/setup/10-bill-of-materials.md#parts-that-are-hard-to-source-in-canada)) |
 
 Both sensors use I2C 0x40.
 
@@ -275,15 +275,15 @@ Stage-by-stage, verifying each before the next:
 7. **With UWB**: anchors.
 
 Procedure and checks: 12 — Wiring guide
-([with UWB](../../with_uwb/docs/setup/12-wiring.md#wiring-order-with-checks),
-[without UWB](../../without_uwb/docs/setup/12-wiring.md#wiring-order-with-checks));
+([with UWB](../with_uwb/setup/12-wiring.md#wiring-order-with-checks),
+[without UWB](../without_uwb/setup/12-wiring.md#wiring-order-with-checks));
 then the bench checks in 15 — Verification.
 
 ---
 
 ## With UWB
 
-![Head schematic, with UWB](../../with_uwb/docs/images/schematic-head.png)
+![Head schematic, with UWB](../with_uwb/images/schematic-head.png)
 
 Additional connection:
 
@@ -293,13 +293,13 @@ Additional connection:
 
 **Detector role:** with A3 fitted, trims angles already set by ranging. With
 two anchors, it drives tilt (subject motion ≈ 1.7°/s). 3 fps is sufficient
-for both ([05](../../with_uwb/docs/design/05-tracking-system.md)).
+for both ([05](../with_uwb/design/05-tracking-system.md)).
 
-![Power tree, with UWB](../../with_uwb/docs/images/power-tree.png)
+![Power tree, with UWB](../with_uwb/images/power-tree.png)
 
 ### Wearable
 
-![Wearable schematic](../../with_uwb/docs/images/schematic-wearable.png)
+![Wearable schematic](../with_uwb/images/schematic-wearable.png)
 
 | Item | Value |
 | --- | --- |
@@ -312,7 +312,7 @@ for both ([05](../../with_uwb/docs/design/05-tracking-system.md)).
 
 ## Without UWB
 
-![Head schematic, without UWB](../../without_uwb/docs/images/schematic-head.png)
+![Head schematic, without UWB](../without_uwb/images/schematic-head.png)
 
 No radios, anchors or wearable. The common connections are the complete
 head; the Pi's USB ports are unused.
@@ -320,7 +320,7 @@ head; the Pi's USB ports are unused.
 **Detector role:** sole sensor for the tracker. HOG on a Pi 4 at ≈ 3 fps.
 Sufficient for walking or climbing at several metres; the few hundred ms of
 latency is handled by gains below 1
-([05](../../without_uwb/docs/design/05-tracking-system.md)). For faster
+([05](../without_uwb/design/05-tracking-system.md)). For faster
 subjects: a faster board or a MobileNet-SSD detector.
 
-![Power tree, without UWB](../../without_uwb/docs/images/power-tree.png)
+![Power tree, without UWB](../without_uwb/images/power-tree.png)

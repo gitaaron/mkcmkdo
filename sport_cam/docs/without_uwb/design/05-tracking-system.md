@@ -7,13 +7,13 @@ Subject localisation by **vision only**: no tag, radio or anchors.
 the camera already has a person in frame); the person detector finds a person; the camera follows and frames
 them, and records once they have stayed in frame for 3 s. Pan, tilt, zoom and
 focus are register writes to one I2C controller on the Pi
-([03](../../../docs/design/03-mechanical-design.md),
-[04](../../../docs/design/04-electronics.md)); the loop runs on the device at
+([03](../../design/03-mechanical-design.md),
+[04](../../design/04-electronics.md)); the loop runs on the device at
 20 Hz.
 
 ## Why camera-only
 
-Comparison with the [UWB build](../../../with_uwb/docs/design/05-tracking-system.md)
+Comparison with the [UWB build](../../with_uwb/design/05-tracking-system.md)
 (wearable tag ranged by three anchors on the head):
 
 <!--compare-->
@@ -49,7 +49,8 @@ camera films the first person it finds ([limitations](#limitations)).
                                                    ▼
                                                  TRACK ── recording
                                                    │
-                          missing 2 s: hold, ring flashes
+                          missing 2 s: ring flashes; hold the aim, zoom out to wide,
+                                       look everywhere
                           missing 6 s: ─────────────► SEARCH (toward the side they left;
                                                       still recording, next person found → TRACK)
 ```
@@ -60,7 +61,7 @@ camera films the first person it finds ([limitations](#limitations)).
 | **sleep** | sensor off, head parked; nothing is seen. `AWAKE_TIMEOUT_S` (30 s) in awake with no session and nobody watching the live view → sleep | **Wake up** → awake; **Record** → SEARCH |
 | **SEARCH** | zoom wide; focus at `SEARCH_FOCUS_M` (5 m). A new session holds still until the detector's first look, since the person may already be in front of the camera (always unknown when it was just asleep); a person in that look → FOUND, nobody → the sweep. Then pan sweeps end to end at `SEARCH_PAN_DPS` (25°/s); steps to the next of `SEARCH_TILT_ROWS_DEG` (5°, 22°) at each end | person detected → FOUND (or straight back to TRACK while recording). In `tracking`, `SEARCH_GIVE_UP_S` (180 s) of sweeping → `awake` |
 | **FOUND** | sweep stops (or never ran); follow the largest person with the same pan, tilt, zoom and focus routine as TRACK. They need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) → recording (TRACK); nobody seen for `FOUND_LOST_S` (1 s) → SEARCH |
-| **TRACK** | recording: follow and frame the person; estimate distance for focus | missing for `RESEARCH_AFTER_S` (6 s) → SEARCH |
+| **TRACK** | recording: follow and frame the person; estimate distance for focus. Missing `LOST_ZOOM_OUT_S` (2 s): zoom out to wide, holding the aim | missing for `RESEARCH_AFTER_S` (6 s) → SEARCH |
 
 Mapping to app states (telemetry `phase`): awake = `awake`/`no-person-in-frame`
 or `awake`/`person-in-frame`; SEARCH = `tracking`/`search` (or
@@ -84,14 +85,14 @@ Sweep timing:
 | **3 s in frame to record** | a single-frame false positive (coat stand, chair) causes a ≈ 1 s pause, then the sweep resumes; it can't start a recording. Telemetry `countdown` carries the seconds left; the app beeps on each, then chimes when recording starts |
 | **Recording always follows found** | no manual record button. **Stop recording** saves the clip and ends the session (`awake`) |
 | **Nearest, not largest, once found** | each detection is matched to the one nearest the last position, within `TRACK_GATE_FRACTION` (45 % of frame width). Detections outside the gate are ignored (bystanders) |
-| **Missing target** | `LOST_HOLD_S` (2 s): hold, ring flashes at 2 Hz (stays solid red while recording). `RESEARCH_AFTER_S` (6 s): sweep toward the last direction of travel. Recording continues; zoom relaxes wide meanwhile |
+| **Missing target** | `LOST_ZOOM_OUT_S` (2 s), recording: zoom straight out to wide (past the zoom rate limit), still pointing where they were, and search the whole frame rather than their strip. Most losses are a step or a reach out of a tight shot, and the wide shot still has them; the follow gate is scaled to the new zoom, so the same person is picked up, and the fill loop closes back in. `LOST_HOLD_S` (2 s), at the same moment: ring flashes at 2 Hz (stays solid red while recording). `RESEARCH_AFTER_S` (6 s): sweep toward the last direction of travel, still wide. Recording continues throughout |
 | **Empty room** | `tracking`, nobody found for 180 s of sweeping → `awake`. Never applied to a recording |
 
 ### Boxes in the recording
 
 Each detection while recording is saved with a label per box
 (`Tracker._label`), and the players draw them over the clip in colour
-([08](../../../docs/design/08-recordings-and-cloud.md#person-boxes)). The
+([08](../../design/08-recordings-and-cloud.md#person-boxes)). The
 live view shows the same labels as they are made; in awake, before anyone is
 picked, every box is `unsure`. With no
 tag, "the climber" can only mean the person being followed:
@@ -120,9 +121,9 @@ person boxes (3 fps, fresh only) ──► nearest-to-last (gate) ──► offs
 | --- | --- |
 | **Pan / tilt** | on each fresh detection: pan goal += `TRACK_PAN_GAIN` (0.6) × offset (converted to degrees via the current FOV); tilt goal += `TRACK_TILT_GAIN` (0.5) × offset (pixel y grows downward: a low person tilts the camera down). Offsets < `TRACK_DEADBAND_FRACTION` (4 %) ignored. Servos slew toward the goals at ≤ `PAN_MAX_DPS` / `TILT_MAX_DPS`. Goals clamped to the soft limits |
 | **Gains < 1** | detections are ≈ 3 fps and a few hundred ms old on arrival; full correction overshoots. Under-correction settles in a few detections, with some lag on fast movers |
-| **Fresh only** | loop 20 Hz, vision 3 Hz: goals move only on a new detection ([06](../../../docs/design/06-device-software.md#vision-and-why-it-runs-slowly)) |
-| **Zoom** | starts wide; vision frames to 65 % with an edge guard and a slow relax to wide when unseen ([06](../../../docs/design/06-device-software.md#framing-and-focus)) |
-| **Focus from size** | distance estimated by the thin-lens relation: body height H at distance d images at f·H/d. Inputs: focal length f, apparent body height on the sensor (`SENSOR_H_MM`), `SUBJECT_HEIGHT_M` = 1.7 m. Clamped to `DIST_MIN_M`–`DIST_MAX_M` (1–30 m), smoothed by `DIST_SMOOTHING` (0.3 per detection). Reported as `dist` in telemetry. Biased by children, crouching and reaches; the error matters mainly at full zoom. During SEARCH, focus is fixed at `SEARCH_FOCUS_M` (5 m). Focus position from distance and focal length via `FOCUS_GRID` ([06](../../../docs/design/06-device-software.md#framing-and-focus)) |
+| **Fresh only** | loop 20 Hz, vision 3 Hz: goals move only on a new detection ([06](../../design/06-device-software.md#vision-and-why-it-runs-slowly)) |
+| **Zoom** | starts wide; vision frames to 65 % with an edge guard, and zooms straight out when the person is lost ([06](../../design/06-device-software.md#framing-and-focus)) |
+| **Focus from size** | distance estimated by the thin-lens relation: body height H at distance d images at f·H/d. Inputs: focal length f, apparent body height on the sensor (`SENSOR_H_MM`), `SUBJECT_HEIGHT_M` = 1.7 m. Clamped to `DIST_MIN_M`–`DIST_MAX_M` (1–30 m), smoothed by `DIST_SMOOTHING` (0.3 per detection). Reported as `dist` in telemetry. Biased by children, crouching and reaches; the error matters mainly at full zoom. During SEARCH, focus is fixed at `SEARCH_FOCUS_M` (5 m). Focus position from distance and focal length via `FOCUS_GRID` ([06](../../design/06-device-software.md#framing-and-focus)) |
 | **Detector** | OpenCV HOG on the 720p preview, downscaled to `DETECT_DOWNSCALE_W` (480 px); `DETECT_FPS_TRACKING` 3 fps in a session, `DETECT_FPS_AWAKE` 0.5 otherwise; record stream untouched 1080p. `DETECT_HIT_THRESHOLD` (0.3): SVM margin; higher = fewer false positives, more misses. Once found, searches a strip of `DETECT_STRIP_FRACTION` (60 %) of frame width around the person; whole frame while searching. 3 fps suffices for climbing (≈ 1.7°/s seen from 10 m), not for running |
 
 **Upgrade path:** MobileNet-SSD via `cv2.dnn` replaces HOG inside
@@ -143,7 +144,7 @@ person boxes (3 fps, fresh only) ──► nearest-to-last (gate) ──► offs
 
 | # | Constraint | Limit |
 | --- | --- | --- |
-| 1 | **Resolution (zoom)** | 1.8 m subject at full zoom: 65 % of frame to ≈ 8.3 m, 40 % at 13.5 m, 18 % at 30 m; full body from ≈ 1.5 m ([03](../../../docs/design/03-mechanical-design.md#how-far-the-zoom-reaches)) |
+| 1 | **Resolution (zoom)** | 1.8 m subject at full zoom: 65 % of frame to ≈ 8.3 m, 40 % at 13.5 m, 18 % at 30 m; full body from ≈ 1.5 m ([03](../../design/03-mechanical-design.md#how-far-the-zoom-reaches)) |
 | 2 | **Geometry** | < 5 m from a tall wall: steep tilt (foreshortening) and high angular rates. At 8–12 m a 15 m route spans ≈ 50–60° of tilt |
 | 3 | **Search range** — binding for acquisition | the search runs at full wide. At 10 m the frame is ≈ 12.5 m tall, so a 1.7 m person is ≈ 14 % of it, at HOG's detection limit. **Reliable search to ≈ 8–10 m**; beyond that, start the subject closer (or entering from the side) and let the zoom follow them out. Pan ±80°: ≈ 22 m wide at 8 m |
 
@@ -204,12 +205,12 @@ All in `src/without_uwb/device/sportcam/config.py`.
 | `TRACK_PAN_GAIN` / `TRACK_TILT_GAIN` | 0.6 / 0.5 | share of the pixel offset corrected per detection |
 | `TRACK_DEADBAND_FRACTION` | 0.04 | offsets below this share of the frame are ignored |
 | `TRACK_GATE_FRACTION` | 0.45 | max jump (share of frame width) still "the same person" |
+| `LOST_ZOOM_OUT_S` | 2 | recording, target missing → zoom out to wide, holding the aim |
 | `LOST_HOLD_S` | 2 | target missing → hold and flash the ring |
 | `RESEARCH_AFTER_S` | 6 | target missing → sweep again |
 | `ZOOM_FILL_TARGET` | 0.65 | fraction of the frame the person should fill |
 | `ZOOM_VISION_GAIN` | 0.35 | share of the log error corrected per detection |
 | `ZOOM_GUARD_FILL` / `_EDGE` / `_STEP` | 0.85 / 0.03 / 0.8 | fast zoom-out guard |
-| `ZOOM_STALE_S` / `_RELAX` | 2 / 0.3 | ease back to wide with no detection |
 | `SUBJECT_HEIGHT_M` | 1.7 | body height assumed for the distance estimate |
 | `DIST_SMOOTHING` | 0.3 | share of each new distance estimate taken |
 | `DIST_MIN_M` / `DIST_MAX_M` | 1 / 30 | clamp on the estimate |

@@ -86,7 +86,7 @@ Each of these really happened, and each is now caught by a check above or a
 test:
 
 - **The anchor arm floated 8 mm above the bed.** Caught while measuring print
-  times for [the printing spec](../../../docs/setup/11-3d-printing.md); it would have
+  times for [the printing spec](../../setup/11-3d-printing.md); it would have
   needed support along its whole length.
 - **The battery gauge was told the wrong capacity.** `BATTERY_WH` was set to
   the number on the bank, but the gauge sits downstream of the bank's own

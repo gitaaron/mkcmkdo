@@ -14,4 +14,4 @@ python3 cad/fit.py           # from sport_cam/ — or ./render_all.sh here, whic
 ```
 
 Per-part previews with STL download links:
-[BOM printed-parts table](../docs/setup/10-bill-of-materials.md#printed-parts).
+[BOM printed-parts table](../../docs/without_uwb/setup/10-bill-of-materials.md#printed-parts).

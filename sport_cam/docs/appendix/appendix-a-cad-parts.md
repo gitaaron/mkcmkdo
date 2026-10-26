@@ -11,8 +11,8 @@ Parametric OpenSCAD sources for every printed part live in <!--both-->each build
 
 Compiled STLs: `<build>/cad/stl/` (committed). Previews and download links:
 BOM printed-parts table
-([with UWB](../../with_uwb/docs/setup/10-bill-of-materials.md#printed-parts),
-[without UWB](../../without_uwb/docs/setup/10-bill-of-materials.md#printed-parts)).
+([with UWB](../with_uwb/setup/10-bill-of-materials.md#printed-parts),
+[without UWB](../without_uwb/setup/10-bill-of-materials.md#printed-parts)).
 
 All motion comes from the bought PTZ assembly; every printed part is an
 enclosure, shelf or bracket.
@@ -101,8 +101,8 @@ Measure every part as it arrives, put the numbers in
 [`cad/ordered_parts.toml`](../../cad/ordered_parts.toml) with `measured = true`
 on each, and re-run `fit.py`. Which sizes matter, and what each one changes,
 is the first table of your build's 15 — Verification checklist
-([with UWB](../../with_uwb/docs/setup/15-verification.md#before-you-print),
-[without UWB](../../without_uwb/docs/setup/15-verification.md#before-you-print)).
+([with UWB](../with_uwb/setup/15-verification.md#before-you-print),
+[without UWB](../without_uwb/setup/15-verification.md#before-you-print)).
 
 Prefer remixing community designs instead? See
 [Appendix B — Open-source printed-part alternatives](appendix-b-open-source-parts.md).
@@ -127,7 +127,7 @@ set to 190 mm, which puts the antennas 400 mm apart (each sits 10 mm
 further out than the board's centre) — see
 [constraints C1–C2](../product/01-requirements.md#non-functional-requirements). Bearing noise
 scales as 1/baseline
-([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)), so if you have the
+([05](../with_uwb/design/05-tracking-system.md#geometry)), so if you have the
 room, widening it buys accuracy as long as the tripod stays stable and the
 arms stay stiff; `fit.py` sets `UWB_BASELINE_M` to match. `uwb_v_base` does
 the same for elevation; if you change it, cut the dowel to the length

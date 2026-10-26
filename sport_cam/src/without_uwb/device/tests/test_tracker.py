@@ -93,7 +93,7 @@ class FakePtz:
         self.set_pan(self.pan_deg + x * config.JOG_PAN_MAX_DPS * dt)
         self.set_tilt(self.tilt_deg + y * config.JOG_TILT_MAX_DPS * dt)
 
-    def set_zoom_mm(self, mm: float) -> None:
+    def set_zoom_mm(self, mm: float, urgent: bool = False) -> None:
         self.zoom_mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, mm))
 
     def set_focus(self, dist: float) -> None:
@@ -330,6 +330,30 @@ def main() -> None:
     check("re-finds them somewhere else, straight back to TRACK", locked(tr) and abs(ptz.pan_deg + 50.0) < 4.0,
           f"pan {ptz.pan_deg:.1f}")
 
+    # ---- 6b. lost from a tight shot: zoom out to find them --------------------------
+    print("\nlost, zoomed in")
+    far = Person(10.0, dist=7.0)
+    tr, cam, ptz = world(far)
+    run(tr, 20, until=lambda: locked(tr))
+    run(tr, 25)
+    tight, aim = ptz.zoom_mm, ptz.pan_deg
+    far.bearing = aim + ptz.hfov_deg / 2 + 6.0          # a step out of the tight shot
+    run(tr, config.LOST_ZOOM_OUT_S - 0.2)
+    check("out of sight under LOST_ZOOM_OUT_S: zoom held",
+          ptz.zoom_mm == tight and tr.lost_for() > 0, f"{tight:.1f} → {ptz.zoom_mm:.1f} mm")
+    run(tr, 0.3, until=lambda: ptz.zoom_mm == config.ZOOM_MIN_MM)
+    check("…then straight out to wide, still pointing where they were",
+          ptz.zoom_mm == config.ZOOM_MIN_MM and abs(ptz.pan_deg - aim) < 0.5,
+          f"{ptz.zoom_mm:.1f} mm, pan {aim:.1f} → {ptz.pan_deg:.1f}")
+    check("…searching the whole frame", cam.column is None, f"{cam.column}")
+    run(tr, 3, until=lambda: tr.lost_for() == 0.0)
+    check("…and finds them in the wide shot, still recording them",
+          tr.lost_for() == 0.0 and locked(tr), f"lost {tr.lost_for():.1f} s")
+    run(tr, 15)
+    check("…then turns to them and zooms back in",
+          abs(ptz.pan_deg - far.bearing) < 3.0 and ptz.zoom_mm > config.ZOOM_MIN_MM + 2.0,
+          f"pan {ptz.pan_deg:.1f} (them {far.bearing:.1f}), {ptz.zoom_mm:.1f} mm")
+
     # ---- 7. framing ---------------------------------------------------------------
     print("\nframing")
     far = Person(10.0, dist=7.0)
@@ -348,11 +372,6 @@ def main() -> None:
     check("zoom stays inside the lens range",
           config.ZOOM_MIN_MM <= ptz.zoom_mm <= config.ZOOM_MAX_MM)
 
-    zoomed = ptz.zoom_mm
-    far.visible = False
-    run(tr, 5)                                                  # before RESEARCH_AFTER_S
-    check("no detections → zoom eases back toward wide", ptz.zoom_mm < zoomed - 0.5,
-          f"{zoomed:.1f} → {ptz.zoom_mm:.1f} mm")
 
     near = Person(10.0, dist=1.6)
     tr, cam, ptz = world(near)

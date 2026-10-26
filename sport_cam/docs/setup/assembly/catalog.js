@@ -11,7 +11,7 @@
  *                                   → PNG data URL of those PARTS models
  *
  * Pictures come from one of three places, in this order:
- *   printed  the part previews in <build>/docs/images/parts/ (rendered by
+ *   printed  the part previews in docs/<build>/images/parts/ (rendered by
  *            <build>/cad/render_previews.py)
  *   model    a snapshot of the same model the guide's 3D viewer draws
  *   svg      a drawing defined in this file (also the offline fallback)

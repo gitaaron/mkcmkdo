@@ -34,7 +34,10 @@ is no sweep; the head turns straight to the bearing.
   longer than FOUND_LOST_S), and clearly the tag wearer rather than someone
   beside them, the session starts recording and calls `confirm()`.
 * **TRACK** — recording, for the rest of the session: a hidden tag or a
-  missed detection afterwards is ordinary tracking.
+  missed detection afterwards is ordinary tracking. With the wearer out of
+  sight LOST_ZOOM_OUT_S, the lens zooms straight out to wide (still turning
+  with the tag) so vision can find them again, and closes back in once it
+  does.
 
 Every mode runs the same control loop in `step()`; the modes only decide
 when the session moves on.
@@ -66,6 +69,7 @@ class Tracker:
         self._pan_bias = 0.0           # CV-learned correction to the UWB bearing
         self._tilt_bias = 0.0          # same, for the UWB elevation
         self._zoom_scale = 1.0         # vision framing: multiplies the distance zoom
+        self._looking_wide = False     # recording, wearer out of sight: lens wide
         self._last_seen_at: float | None = None   # last fresh person detection
         self.last_fix_at = time.monotonic()
         self.dist_m: float | None = None
@@ -317,6 +321,8 @@ class Tracker:
         tilt_target: float | None = None
         fix = self.uwb.fix()
         have_fix = bool(fix and fix.age_s < 0.5)
+        self._looking_wide = self.mode == TRACK and (
+            self._last_seen_at is None or now - self._last_seen_at > config.LOST_ZOOM_OUT_S)
         if have_fix:
             self.last_fix_at = now
             self.dist_m = fix.dist_m
@@ -325,6 +331,10 @@ class Tracker:
                 tilt_target = self._aim_tilt(fix.elev_rad, fix.dist_m) + self._tilt_bias
             self._update_zoom(fix.dist_m)
             self._hint_search_column(target)
+        elif self._looking_wide:
+            # no tag either: widen anyway, and look at the whole frame
+            self.ptz.set_zoom_mm(config.ZOOM_MIN_MM, urgent=True)
+            self.camera.set_search_column(None)
 
         # Vision runs at a few frames per second, far slower than this loop.
         # Acting only on a *fresh* detection is what stops one measurement
@@ -370,8 +380,8 @@ class Tracker:
                     self._tilt_pid(cy_err) * config.TILT_STEP_GAIN,
                     -config.TILT_MAX_DPS * dt * 4, config.TILT_MAX_DPS * dt * 4))
             self._frame_zoom(x, y, w, h)
-        elif (self._last_seen_at is None
-              or now - self._last_seen_at > config.ZOOM_STALE_S):
+        elif not self._looking_wide and (
+                self._last_seen_at is None or now - self._last_seen_at > config.ZOOM_STALE_S):
             # Vision has gone quiet: ease back toward the looser distance
             # framing, in log space so zooming out and in relax alike.
             k = max(0.0, 1.0 - config.ZOOM_STALE_RELAX * dt)
@@ -456,12 +466,15 @@ class Tracker:
         # frame height.
         base_mm = (config.TARGET_FRAME_FRACTION * config.SENSOR_H_MM
                    * dist_m / config.SUBJECT_HEIGHT_M)
-        efl_mm = _clamp(base_mm * self._zoom_scale, config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
+        if self._looking_wide:
+            efl_mm = config.ZOOM_MIN_MM       # lost from sight while recording: find them
+        else:
+            efl_mm = _clamp(base_mm * self._zoom_scale, config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
         # Anti-windup: at the end of the lens's range, keep the vision scale
         # at what the lens can actually do, so it responds at once on the way back.
         self._zoom_scale = _clamp(efl_mm / base_mm, config.ZOOM_SCALE_MIN, config.ZOOM_SCALE_MAX)
         self.ptz.set_focus(dist_m)        # first, so a zoom move refocuses for this distance
-        self.ptz.set_zoom_mm(efl_mm)
+        self.ptz.set_zoom_mm(efl_mm, urgent=self._looking_wide)
 
 
 class _Person:

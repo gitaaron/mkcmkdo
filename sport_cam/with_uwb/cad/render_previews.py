@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a preview PNG for every STL in cad/stl/ → docs/images/parts/.
+"""Render a preview PNG for every STL in cad/stl/ → docs/with_uwb/images/parts/.
 
 Usage:  python3 cad/render_previews.py     (run cad/render_all.sh first)
 Requires: pip install numpy-stl matplotlib
@@ -16,7 +16,7 @@ from stl import mesh
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STL_DIR = os.path.join(HERE, "stl")
-OUT = os.path.join(HERE, "..", "docs", "images", "parts")
+OUT = os.path.join(HERE, "..", "..", "docs", "with_uwb", "images", "parts")
 os.makedirs(OUT, exist_ok=True)
 
 for f in sorted(os.listdir(STL_DIR)):

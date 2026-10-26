@@ -32,7 +32,7 @@ both angles, frames the shot, and confirms the person before recording.
 
 - All anchors are **static**: they don't move with the lens.
 - Spacing is a compromise between head size
-  ([C1, C2](../../../docs/product/01-requirements.md#non-functional-requirements))
+  ([C1, C2](../../product/01-requirements.md#non-functional-requirements))
   and angle noise, which grows as spacing shrinks.
 - The tag ranges each anchor in turn and broadcasts one frame with r₁, r₂, r₃.
   A single frame means one timestamp: the formulas below assume simultaneous
@@ -158,15 +158,16 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
 | **Pan** | absolute position = UWB bearing + CV bias; slew-limited to `PAN_MAX_DPS` |
 | **Tilt (with A3)** | absolute position. φ is measured at the anchor plane; the lens is 98 mm higher, so `Tracker._aim_tilt` recomputes the angle from the lens (≈ 1° at 5 m). `TAG_AIM_OFFSET_M` raises the aim point above a low-worn tag. Vision bias clamped ±10° |
 | **Tilt (no A3)** | `UWB_ANCHORS = 2`, or a frame without A3: box centre → PID → `OPT_MOTOR_Y` |
-| **Zoom** | initial setting from distance (1.8 m subject at 45 % of frame height); vision then frames to 65 % with an edge guard ([06](../../../docs/design/06-device-software.md#framing-and-focus)). Vision scale limited to 0.5–2.5× the distance zoom and to the lens range (no windup) |
-| **Focus** | ranged distance + focal length → `FOCUS_GRID` ([06](../../../docs/design/06-device-software.md#framing-and-focus)); no hunting |
-| **Detector** | OpenCV HOG on the 720p preview, 3 fps (0.5 awake); record stream untouched 1080p. Each detection used once; search strip ≈ 40 % of frame width around the ranged bearing ([06](../../../docs/design/06-device-software.md#vision-and-why-it-runs-slowly)). Sufficient: a climber at 0.3 m/s seen from 10 m moves 1.7°/s, and the 17 % framing margin gives several seconds of tolerance |
+| **Zoom** | initial setting from distance (1.8 m subject at 45 % of frame height); vision then frames to 65 % with an edge guard ([06](../../design/06-device-software.md#framing-and-focus)). Vision scale limited to 0.5–2.5× the distance zoom and to the lens range (no windup) |
+| **Focus** | ranged distance + focal length → `FOCUS_GRID` ([06](../../design/06-device-software.md#framing-and-focus)); no hunting |
+| **Detector** | OpenCV HOG on the 720p preview, 3 fps (0.5 awake); record stream untouched 1080p. Each detection used once; search strip ≈ 40 % of frame width around the ranged bearing ([06](../../design/06-device-software.md#vision-and-why-it-runs-slowly)). Sufficient: a climber at 0.3 m/s seen from 10 m moves 1.7°/s, and the 17 % framing margin gives several seconds of tolerance |
+| **Wearer out of sight** | recording, tag still ranging, no detection of the wearer for `LOST_ZOOM_OUT_S` (2 s): zoom straight out to wide (past the zoom rate limit), still turning with the tag, and search the whole frame. Vision sees them again: the framing closes back in from wide. Mostly a climber above or beside a tight shot, which is also when tilt without A3 needs vision most |
 | **Lost tag** | > 2 s without ranges: hold, LED flashes (solid red while recording). > 5 s: `awake` (recording saved first). Same path as a tag switched off |
 
 ### Search, found and recording
 
 The same state machine as the camera-only build
-([without UWB, 05](../../../without_uwb/docs/design/05-tracking-system.md#the-state-machine)).
+([without UWB, 05](../../without_uwb/design/05-tracking-system.md#the-state-machine)).
 The difference is SEARCH: the tag gives the subject's location at once, so
 there is no sweep. The head still has to pan and tilt to bring the person
 into frame. Every session starts in SEARCH: awake's person in frame could be
@@ -193,7 +194,7 @@ anyone, so unlike the camera-only build it never skips straight to FOUND.
 | **sleep** | sensor off, head parked; the radios keep ranging. `AWAKE_TIMEOUT_S` (30 s) in awake with no session and nobody watching the live view → sleep | **Wake up** → awake; tag on, or **Record** → SEARCH |
 | **SEARCH** | pan (and tilt, with A3) slews to the ranged position | within `ACQUIRE_POINT_TOL_DEG` (4°) for `ACQUIRE_SETTLE_S` (0.5 s) and the tag wearer detected (below) → FOUND |
 | **FOUND** | the full tracking loop, as in recording: ranged pan and tilt, vision trim, zoom and focus, all from the tag wearer's box. The person need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) and nobody else as near the tag → recording (TRACK); tag wearer unseen for `FOUND_LOST_S` (1 s) → SEARCH |
-| **TRACK** | recording, for the rest of the session; a hidden tag or a missed detection is ordinary tracking | session end |
+| **TRACK** | recording, for the rest of the session; a hidden tag or a missed detection is ordinary tracking. Wearer unseen 2 s: zoom out to wide until seen again | session end |
 
 Mapping to app states (telemetry `phase`): awake = `awake`/`no-person-in-frame`
 or `awake`/`person-in-frame`; SEARCH = `tracking`/`search` (the app pings
@@ -212,7 +213,7 @@ into view, away from anyone else".
   stop the clip.
 - A subject beyond a soft limit is found from the limit.
 - Every session records after found, whether the tag or **Start tracking**
-  started it ([01](../../../docs/product/01-requirements.md#state-machine-with-uwb)).
+  started it ([01](../../product/01-requirements.md#state-machine-with-uwb)).
   **Stop recording** ends the session.
 
 ### Telling the tag wearer from everyone else
@@ -251,7 +252,7 @@ never resolved.
 Too close to tell apart, the camera never records. After
 `ACQUIRE_STALLED_S` (15 s) the app asks the climber to step away from
 others. The anchor baseline is the hardware lever: the bearing noise
-falls with spacing ([C2](../../../docs/product/01-requirements.md#non-functional-requirements)).
+falls with spacing ([C2](../../product/01-requirements.md#non-functional-requirements)).
 
 While more than one person is being compared, the vision pan bias stands
 still until recording. Otherwise it would lean toward whoever was picked
@@ -269,7 +270,7 @@ the gate is the wearer.
 
 Each detection while recording is saved with a label per box
 (`Tracker._label`), and the players draw them over the clip in colour
-([08](../../../docs/design/08-recordings-and-cloud.md#person-boxes)). The
+([08](../../design/08-recordings-and-cloud.md#person-boxes)). The
 live view shows the same labels as they are made; in awake, before anyone is
 picked, every box is `unsure`. While recording:
 
@@ -287,7 +288,7 @@ means the wearer went out of view beside someone else.
 | # | Constraint | Limit |
 | --- | --- | --- |
 | 1 | **UWB link** | bearing error is independent of distance (σ_θ ≈ √2·σ_r / b; ≈ 7° filtered at 5 m or 30 m). Reliable 20 Hz DS-TWR to **≈ 25–35 m** in a gym (steel, concrete); 50 m+ outdoors line-of-sight |
-| 2 | **Resolution (zoom)** — binding | 1.8 m subject at full zoom: 65 % of frame to ≈ 8.3 m, 40 % at 13.5 m, 18 % at 30 m; full body from ≈ 1.5 m ([03](../../../docs/design/03-mechanical-design.md#how-far-the-zoom-reaches)) |
+| 2 | **Resolution (zoom)** — binding | 1.8 m subject at full zoom: 65 % of frame to ≈ 8.3 m, 40 % at 13.5 m, 18 % at 30 m; full body from ≈ 1.5 m ([03](../../design/03-mechanical-design.md#how-far-the-zoom-reaches)) |
 | 3 | **Geometry** | < 5 m from a tall wall: steep tilt (foreshortening) and high angular rates. At 8–12 m a 15 m route spans ≈ 50–60° of tilt |
 | 4 | **Pan range ±80°** | at 8 m the sweep is ≈ 22 m wide (any bouldering wall, most routes). Aim at the centre of the area; check both ends before starting |
 
@@ -341,5 +342,5 @@ the camera for most of the climb. A back-mounted tag is rarely body-shadowed.
 | --- | --- |
 | Role | ranging **initiator**: polls each anchor, broadcasts the collected ranges |
 | Power | independent USB bank; 2 500 mAh lasts > 1 day |
-| Control | power switch only. On starts a session, off ends it; the camera detects ranging start and stop ([01](../../../docs/product/01-requirements.md#state-machine-with-uwb), `src/with_uwb/device/sportcam/session.py`) |
+| Control | power switch only. On starts a session, off ends it; the camera detects ranging start and stop ([01](../../product/01-requirements.md#state-machine-with-uwb), `src/with_uwb/device/sportcam/session.py`) |
 | LED | blinks green while ranging. Battery level: the bank's own indicator |

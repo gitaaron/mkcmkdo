@@ -45,7 +45,7 @@ view; camera-only for lower cost, size and power.
 | ID | Requirement | Reference |
 | --- | --- | --- |
 | F1 | **Pan, tilt, zoom.** Pan 160° (±80°); tilt 130° (−45° to +85°); optical zoom 96° → 33° horizontal (≈ 3.5×). All three from the Arducam PTZ base | [03](../design/03-mechanical-design.md) |
-| F2 | **Follow a person** <!--both-->by UWB tag or by vision, per build<!--/--><!--with_uwb: by the UWB tag they wear--><!--without_uwb: by vision alone-->, and zoom to keep them framed | <!--both-->05 tracking ([with UWB](../../with_uwb/docs/design/05-tracking-system.md), [without UWB](../../without_uwb/docs/design/05-tracking-system.md))<!--/--><!--with_uwb:[05](../../with_uwb/docs/design/05-tracking-system.md)--><!--without_uwb:[05](../../without_uwb/docs/design/05-tracking-system.md)--> |
+| F2 | **Follow a person** <!--both-->by UWB tag or by vision, per build<!--/--><!--with_uwb: by the UWB tag they wear--><!--without_uwb: by vision alone-->, and zoom to keep them framed | <!--both-->05 tracking ([with UWB](../with_uwb/design/05-tracking-system.md), [without UWB](../without_uwb/design/05-tracking-system.md))<!--/--><!--with_uwb:[05](../with_uwb/design/05-tracking-system.md)--><!--without_uwb:[05](../without_uwb/design/05-tracking-system.md)--> |
 | F3 | **Record unattended.** Recording starts once a found person has stayed in frame for 3 s, and stops at session end. A clip is saved even when the battery runs out | [Ideal path](#ideal-path) |
 | F4 | **LED status ring** showing each state and sub-state (connecting, pairing, sleep, awake with or without a person in frame, search, found, recording) and low battery | [State machine](#state-machine) |
 | F5 | **Companion app**: opens into the live view; state-dependent bottom buttons; status ring top right in the LED colours | [07](../design/07-backend-and-app.md#web-app-srcweb) |
@@ -57,6 +57,7 @@ view; camera-only for lower cost, size and power.
 | F11 | **Sleep to save the battery.** Awake 30 s with no session started and nobody watching the live view, the camera sleeps: its sensor stops and the head parks, while the Pi stays reachable. From sleep the app offers **Wake up** and **Record**; Record goes straight to the search. No live view in sleep | [State machine](#state-machine) |
 | F12 | **On/off switch.** A rocker switch in the enclosure wall turns the camera on and off; no unplugging. Off is a clean shutdown from any state: a recording in progress is saved (and uploads at the next boot), the head parks and the ring goes dark, then the camera cuts its own power. Nothing draws from the bank while it is off | [04 — Power switch](../design/04-electronics.md#power-switch) |
 | F13 | **Aim by hand.** In `awake`, the phone app shows a joystick over the live view: a knob in a ring. Pull it left and the camera pans left, right pans right, up tilts up, down tilts down; the further from the centre, the faster (up to 60°/s pan, 45°/s tilt at the rim). Let go and it stops. Only over the direct connection, where it responds at once; not in `tracking` or `recording`, where the tracker drives the head, and not in the web app (Firebase lag) | [09](../design/09-direct-connection-and-app.md#aiming-by-hand) |
+| F14 | **Zoom out to find a lost person.** Recording, and the person out of sight for 2 s (they climbed or stepped out of a tight shot): the lens zooms straight out to its widest, still pointing where they were<!--with_uwb--> and still turning with the tag<!--/-->, and the detector searches the whole frame. Seen again, tracking carries on and the zoom closes back in<!--without_uwb-->. Still not found at 6 s: the camera sweeps the room, still wide<!--/--> | [State machine](#state-machine) |
 
 ## Non-functional requirements
 
@@ -67,7 +68,7 @@ in the doc that makes it. C1 and C2 differ by build.
 | --- | --- | --- | --- | --- |
 | C1 | **Compact head**, with UWB | ≤ 45 cm across, ≤ 30 cm tall to the top of the A3 mast (enclosure floor up), excluding the tripod | must fit small rooms; the width follows the anchor spacing (C2) | `uwb_half_base`, `uwb_v_base` in `with_uwb/cad/config.scad` |
 | C1 | **Compact head**, without UWB | Ø 135 mm enclosure (assumed part sizes), camera on top, no side protrusions, excluding the tripod | must fit small rooms | `base_d_min` in `without_uwb/cad/config.scad`; `cad/fit.py` widens it only if parts require |
-| C2 | **Anchor spacing**, with UWB | A1–A2 **400 mm** horizontal; A3 **250 mm** above them, ≈ 89 mm behind the pan axis | angle noise ∝ 1/spacing: 400 mm gives ≈ 7° RMS filtered (≈ 9° at 250 mm) ([05](../../with_uwb/docs/design/05-tracking-system.md#geometry)). Telling the climber from a belayer beside them waits on that noise: at 400 mm someone 1.5 m away is resolved in ≈ 8 s rather than ≈ 17 s, and 1 m away in ≈ 12 s rather than never. Measure it with `bearingcal`. Below 250 mm, error and A3's blind corner grow quickly | `with_uwb/cad/config.scad`; `UWB_BASELINE_M`, `UWB_A3_UP_M`, `UWB_A3_BACK_M` in `src/with_uwb/device/sportcam/config.py` |
+| C2 | **Anchor spacing**, with UWB | A1–A2 **400 mm** horizontal; A3 **250 mm** above them, ≈ 89 mm behind the pan axis | angle noise ∝ 1/spacing: 400 mm gives ≈ 7° RMS filtered (≈ 9° at 250 mm) ([05](../with_uwb/design/05-tracking-system.md#geometry)). Telling the climber from a belayer beside them waits on that noise: at 400 mm someone 1.5 m away is resolved in ≈ 8 s rather than ≈ 17 s, and 1 m away in ≈ 12 s rather than never. Measure it with `bearingcal`. Below 250 mm, error and A3's blind corner grow quickly | `with_uwb/cad/config.scad`; `UWB_BASELINE_M`, `UWB_A3_UP_M`, `UWB_A3_BACK_M` in `src/with_uwb/device/sportcam/config.py` |
 | C2 | **Pan range ±80°**, without UWB | soft limits `PAN_MIN_DEG` / `PAN_MAX_DEG` = ∓80°; no continuous rotation | the base fouls before 180° and can't turn 360°; the search covers this range only | `src/without_uwb/device/sportcam/config.py` |
 | C3 | **Standard tripod mount** | 3/8-16 brass insert in the floor; removable 3/8-16 → 1/4-20 reducer bushing | photo tripods use 1/4-20, video heads 3/8-16; one socket takes both without an adapter plate | `tripod_boss_d`, `tripod_hole_d` in `<build>/cad/config.scad`; BOM |
 | C4 | **Battery operation** | ≥ 4 h tracking + recording from a USB-C PD bank; remaining-time gauge; clean save and stop at 7 % | no wall socket; no lost clip at end of charge | [04 — Runtime](../design/04-electronics.md#runtime) |
@@ -213,8 +214,10 @@ Rules:
 - **Stop recording** saves the clip and ends the session: `recording` →
   `awake`. **Stop tracking** cancels a session that hasn't started
   recording.
-- Subject missing > 2 s in `recording`: hold position; the LED stays solid red.
-  Next step is build-specific.
+- Subject missing > 2 s in `recording`: the LED stays solid red, and the
+  lens zooms straight out to wide, still pointing where they were, and looks
+  for them in the whole frame ([F14](#functional-requirements)); seen again,
+  the zoom closes back in. Next step is build-specific.
 - Battery < 20 %: ring dims and blinks orange at 1 Hz over the state colour.
   Battery < 7 %: save, park, `sleep`.
 - `connecting` and `pairing` happen only at power on, before `awake`; no app
@@ -284,20 +287,23 @@ Rules:
 
 ## With UWB
 
-![SportCam tracking a climber with a UWB tag](../../with_uwb/docs/images/intro-scene.png)
+![SportCam tracking a climber with a UWB tag](../with_uwb/images/intro-scene.png)
 
 The climber wears a UWB tag on the rear of the harness, off-spine
-([wearing the tag](../../with_uwb/docs/design/05-tracking-system.md#wearing-the-tag)).
+([wearing the tag](../with_uwb/design/05-tracking-system.md#wearing-the-tag)).
 The camera, 6–12 m back
-([placement envelope](../../with_uwb/docs/design/05-tracking-system.md#camera-placement-envelope)),
+([placement envelope](../with_uwb/design/05-tracking-system.md#camera-placement-envelope)),
 ranges the tag at 20 Hz through body and clothing and points at the result.
 
 ### State machine, with UWB
 
-![State machine, with UWB](../../with_uwb/docs/images/state-machine.png)
+![State machine, with UWB](../with_uwb/images/state-machine.png)
 
 Deviations from the [ideal path](#ideal-path):
 
+- Tag wearer out of sight > 2 s in `recording`, with the tag still ranging:
+  the camera keeps turning with the tag, zoomed out to wide until vision sees
+  them again.
 - Tag lost > 2 s in `tracking` or `recording`: hold, LED flashes (stays solid red
   while recording). Lost > 5 s: `awake`
   (any recording saved first). A subject crossing a pan soft limit behaves
@@ -309,7 +315,7 @@ Deviations from the [ideal path](#ideal-path):
 - Only the tag wearer is found: a detection counts only if its bearing and
   distance match the tag's. When two people both match, the one nearer the
   tag on average wins, once the averages are firm enough to be sure
-  ([05](../../with_uwb/docs/design/05-tracking-system.md#telling-the-tag-wearer-from-everyone-else)).
+  ([05](../with_uwb/design/05-tracking-system.md#telling-the-tag-wearer-from-everyone-else)).
   The countdown holds at 1 until then: a few extra seconds with a belayer
   2.5 m away, ≈ 8 s at 1.5 m, ≈ 12 s at 1 m. Within ≈ 0.5 m the two can't be
   told apart and it doesn't record.
@@ -324,13 +330,13 @@ Deviations from the [ideal path](#ideal-path):
 
 Implementation: [`src/with_uwb/device/sportcam/session.py`](../../src/with_uwb/device/sportcam/session.py).
 
-![App UI, with UWB](../../with_uwb/docs/images/app-ui.png)
+![App UI, with UWB](../with_uwb/images/app-ui.png)
 
 ---
 
 ## Without UWB
 
-![SportCam finding and tracking a climber by vision](../../without_uwb/docs/images/intro-scene.png)
+![SportCam finding and tracking a climber by vision](../without_uwb/images/intro-scene.png)
 
 Nothing is worn. **Track & record** in the app starts a wide-angle pan
 sweep; the first person detected is followed and, still in frame 3 s later,
@@ -340,13 +346,14 @@ the camera has woken and taken its first look.
 
 ### State machine, without UWB
 
-![State machine, without UWB](../../without_uwb/docs/images/state-machine.png)
+![State machine, without UWB](../without_uwb/images/state-machine.png)
 
 Deviations from the [ideal path](#ideal-path):
 
 - Nobody found in 15 s: the app reports it.
-- Person missing 2 s in `recording`: hold; the LED stays solid red. Missing 6 s:
-  sweep again (phase `search`; the app pings), toward the last direction of
+- Person missing 2 s in `recording`: the LED stays solid red; hold the aim
+  and zoom out to wide. Missing 6 s:
+  sweep again, still wide (phase `search`; the app pings), toward the last direction of
   travel; recording continues. The next person found is followed at once,
   with no countdown.
 - `tracking` with nobody found for 180 s of sweeping: `awake` (and `sleep`
@@ -354,4 +361,4 @@ Deviations from the [ideal path](#ideal-path):
 
 Implementation: [`src/without_uwb/device/sportcam/session.py`](../../src/without_uwb/device/sportcam/session.py).
 
-![App UI, without UWB](../../without_uwb/docs/images/app-ui.png)
+![App UI, without UWB](../without_uwb/images/app-ui.png)

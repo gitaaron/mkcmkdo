@@ -161,8 +161,8 @@ Before printing (lid ≈ 4 h, enclosure ≈ 18 h): measure the bought parts,
 enter the values in [`cad/ordered_parts.toml`](../../cad/ordered_parts.toml),
 run `python3 cad/fit.py` (re-solves the layout, re-renders, checks fit). What
 to measure: first table of **15 — Verification checklist**
-([with UWB](../../with_uwb/docs/setup/15-verification.md#before-you-print),
-[without UWB](../../without_uwb/docs/setup/15-verification.md#before-you-print)).
+([with UWB](../with_uwb/setup/15-verification.md#before-you-print),
+[without UWB](../without_uwb/setup/15-verification.md#before-you-print)).
 
 ## Print order
 

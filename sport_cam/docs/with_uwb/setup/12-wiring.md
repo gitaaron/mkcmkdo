@@ -1,6 +1,6 @@
 # 12 — Wiring guide
 
-Every electrical connection in the camera, in the order you make
+Every electrical connection in the camera and the tag, in the order you make
 them. The [assembly guide](assembly/index.html) tells you *when* in the build
 each one happens, and links back here.
 
@@ -8,12 +8,13 @@ each one happens, and links back here.
 
 | Diagram | Shows |
 | --- | --- |
-| [Interactive wiring schematic](../../schematics/interactive/index.html) | the whole system as one clickable graph. Open it in a browser or from `npm run docs` |
+| [Interactive wiring schematic](../../../with_uwb/schematics/interactive/index.html) | the whole system as one clickable graph. Open it in a browser or from `npm run docs` |
 | [Head schematic](../images/schematic-head.png) | every signal into and out of the Pi |
 | [Power tree](../images/power-tree.png) | the bank → 12 V → 5 V chain and what hangs off it |
+| [Wearable schematic](../images/schematic-wearable.png) | the tag, which has no wiring of its own |
 
 The design reasons behind each connection are in
-[04 — Electronics](../../../docs/design/04-electronics.md).
+[04 — Electronics](../../design/04-electronics.md).
 
 ## Before you start
 
@@ -53,7 +54,7 @@ away from the USB ports, and its pad is square.
 The rocker doesn't switch the power itself. It tells a small latch board to,
 so switching off is a clean shutdown and not a power cut: the Pi saves the
 recording, parks the head and halts, and only then does the latch let go.
-Design reasons: [04 — Electronics](../../../docs/design/04-electronics.md#power-switch).
+Design reasons: [04 — Electronics](../../design/04-electronics.md#power-switch).
 
 Build it on a scrap of perfboard (BOM 13a), ≈ 30 × 24 mm, with the IRF4905
 bent over flat so it stays below the LED window.
@@ -154,12 +155,26 @@ No gauge? Leave out I1–I4 at the gauge end, wire the 12 V straight through
 Use the ring's **DIN** pad, not DOUT. The arrows printed on the ring point
 away from DIN.
 
-### Camera and PTZ — plug-in connections
+### Camera, PTZ and anchors — plug-in connections
 
 | # | From | To | Notes |
 | --- | --- | --- | --- |
 | C1 | camera ribbon (15-pin, from the Arducam kit) | Pi **CSI** connector | silver contacts **toward the HDMI ports**; lift the latch, insert fully, press the latch down. Leave ≈ 80 mm of slack coiled under the lid |
 | C2 | PTZ controller's servo and lens leads | as fitted in the Arducam kit | factory-wired; only R3, I1 and I2 are yours |
+| U1 | anchor **A1** (arm, +Y) | Pi USB-A, via a 50 cm extension | the **data** anchor: shows up as `/dev/ttyUSB0` |
+| U2 | anchor **A2** (arm, −Y) | Pi USB-A, via a 50 cm extension | power only |
+| U3 | anchor **A3** (mast) | Pi USB-A, via a 50 cm extension | power only. Tie it down the dowel with slack at the foot so the mast can be pulled |
+
+A1 is the data anchor by convention; not A3, whose cable is the longest. Any
+anchor works: the tag broadcasts each RangeData frame to all of them, and the
+one on USB prints it (ULA1 manual §5–6, "monitoring mode"). Confirm it streams
+`mc 07 …` frames ([software setup, step 5b](14-software-setup.md#5-bench-checks-motion-and-radios)).
+
+### Wearable tag
+
+| # | From | To | Notes |
+| --- | --- | --- | --- |
+| W1 | tag ULA1 USB-A plug | small USB bank (2 500 mAh) | that is the whole circuit ([schematic](../images/schematic-wearable.png)) |
 
 ## Pi header, pins used
 
@@ -211,7 +226,11 @@ Each step points at the assembly-guide step it belongs to.
    ([assembly: lid on](assembly/index.html#lid-on)). **Check:**
    `i2cdetect -y 1` shows **0c** and **40**; `rpicam-hello -t 2000` shows a
    picture.
-8. **Dress the cables** ([assembly: cabling](assembly/index.html#cabling)).
+8. **Anchors** (U1–U3)
+   ([assembly: arms](assembly/index.html#arms),
+   [mast](assembly/index.html#mast)). **Check:**
+   `ls /dev/ttyUSB*` shows `/dev/ttyUSB0`.
+9. **Dress the cables** ([assembly: cabling](assembly/index.html#cabling)).
    Sweep both axes by hand to their limits and watch the ribbon and leads.
    Nothing may hang where a tripod leg folds or reach the pan axis.
 
@@ -227,6 +246,7 @@ Then carry on with the [software setup](14-software-setup.md).
 | `40` missing | I1–I4 | gauge VCC or GND, or swapped SDA/SCL. Or run without it: `POWER_MONITOR = "none"` |
 | Ring dark | L1–L4, R4, R5 | data on DOUT, 1OE not grounded, or the shifter unpowered |
 | Ring flickers random colours | L2, L4 | long data lead, or unused shifter inputs left floating |
+| No `/dev/ttyUSB0` | U1 | the data anchor is not plugged into the Pi, or its extension is not seated |
 | Camera dies the instant you switch off | S3, or the Pi setup | HOLD isn't reaching Q2: check S3 is on pin 11, and that `gpio=17=op,dh` is in `config.txt` |
 | Camera never turns off after switching off | S4, or the Pi setup | SENSE isn't reaching the Pi (pin 13, `gpio-shutdown` overlay), or `POWER_OFF_ON_HALT` isn't set, so the halted Pi keeps HOLD high |
 | Switched back on during a shutdown and it stays dark | — | expected: the Pi has halted. Switch off, wait 5 s, switch on |

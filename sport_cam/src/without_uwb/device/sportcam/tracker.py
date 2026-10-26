@@ -11,7 +11,9 @@ tracker is a small state machine,
        └─ nobody seen ◄────────┘                          │
           FOUND_LOST_S                                    │
        ▲                                                  │
-       └────────────── missing RESEARCH_AFTER_S ◄─────────┘
+       └────────────── missing RESEARCH_AFTER_S ◄─────────┤
+                                                 missing  │ zoom out
+                                          LOST_ZOOM_OUT_S ▼ to wide
 
 * **awake** — not a tracker mode: the session has not started. The head is
   parked with the lens wide and `watch_awake()` runs the detector at
@@ -30,9 +32,13 @@ tracker is a small state machine,
 * **TRACK** — recording. Pan and tilt follow the person, zoom frames them,
   and among several detections the one nearest the last position is
   followed, so a bystander walking through does not steal the shot. If the
-  person is gone for RESEARCH_AFTER_S the camera goes back to SEARCH (the
-  sweep starts toward the side they were last heading for), still recording;
-  the next person found goes straight back to TRACK.
+  person is gone for LOST_ZOOM_OUT_S the lens zooms straight out to wide,
+  still pointing where they were, and the detector looks at the whole frame:
+  someone who stepped or climbed just out of a tight shot is usually still
+  in a wide one, and seen again the zoom closes back in. Gone for
+  RESEARCH_AFTER_S the camera goes back to SEARCH (the sweep starts toward
+  the side they were last heading for), still recording; the next person
+  found goes straight back to TRACK.
 
 The detector runs at a few frames per second, far slower than the 20 Hz loop
 that calls `step()`. Corrections are therefore applied only on a *fresh*
@@ -204,11 +210,13 @@ class Tracker:
             self._label(now, boxes, matched)
         if matched:
             self._seen(now, matched)
-        self._relax_zoom_if_stale(now, dt)
-        self.ptz.set_zoom_mm(self._efl)          # retry anything the rate limit dropped
+        gone = now - (self._last_seen_at or now)
+        if self.mode == TRACK and gone > config.LOST_ZOOM_OUT_S:
+            self._look_wide()
+        else:
+            self.ptz.set_zoom_mm(self._efl)      # retry anything the rate limit dropped
         self._slew(dt)
 
-        gone = now - (self._last_seen_at or now)
         if self.mode == FOUND and gone > config.FOUND_LOST_S:
             self._begin_search(now, direction=self._last_side or self._dir)
         elif self.mode == TRACK and gone > config.RESEARCH_AFTER_S:
@@ -349,15 +357,23 @@ class Tracker:
         self._efl = _clamp(self._efl, config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
         self.ptz.set_zoom_mm(self._efl)
 
-    def _relax_zoom_if_stale(self, now: float, dt: float) -> None:
-        """No detection for a while: ease back toward wide, in log space."""
-        if self.mode == SEARCH or self._efl <= config.ZOOM_MIN_MM:
-            return
-        if self._last_seen_at is not None and now - self._last_seen_at > config.ZOOM_STALE_S:
-            k = max(0.0, 1.0 - config.ZOOM_STALE_RELAX * dt)
-            ratio = self._efl / config.ZOOM_MIN_MM
-            self._efl = config.ZOOM_MIN_MM * math.exp(math.log(ratio) * k)
-            self.ptz.set_zoom_mm(self._efl)
+    def _look_wide(self) -> None:
+        """Recording, and the person out of sight LOST_ZOOM_OUT_S: zoom out.
+
+        Straight to the wide end, past the rate limit, still pointing where
+        they were last seen, and the detector searches the whole frame rather
+        than the strip they were in. Where they were last seen moves toward
+        the centre by the zoom ratio, so the follow gate still finds them
+        there. Seen again, the fill loop zooms back in from wide.
+        """
+        if self.ptz.zoom_mm > config.ZOOM_MIN_MM and self._last_centre is not None:
+            k = config.ZOOM_MIN_MM / self.ptz.zoom_mm
+            pw, ph = config.PREVIEW_SIZE
+            lx, ly = self._last_centre
+            self._last_centre = (pw / 2 + (lx - pw / 2) * k, ph / 2 + (ly - ph / 2) * k)
+        self._efl = config.ZOOM_MIN_MM
+        self.ptz.set_zoom_mm(self._efl, urgent=True)
+        self.camera.set_search_column(None)
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:

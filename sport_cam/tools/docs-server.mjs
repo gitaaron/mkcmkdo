@@ -124,12 +124,12 @@ async function listDocs() {
   for (const [folder, title] of [["product", "Product"], ["design", "Design"], ["setup", "Setup"]]) {
     entries.push({ section: title });
     if (folder === "setup")
-      for (const b of BUILDS) entries.push({ path: `${b}/docs/setup/README.md`, title: "Setup — start here", build: b });
+      for (const b of BUILDS) entries.push({ path: `docs/${b}/setup/README.md`, title: "Setup — start here", build: b });
     const list = [...(await mdEntries(`docs/${folder}`))];
     for (const b of BUILDS) {
-      list.push(...(await mdEntries(`${b}/docs/${folder}`, b)));
+      list.push(...(await mdEntries(`docs/${b}/${folder}`, b)));
       if (folder === "setup")
-        list.push({ path: `${b}/docs/setup/13-assembly.html`, href: `${b}/docs/setup/assembly/index.html`, title: "13 — Assembly guide, interactive 3D", build: b });
+        list.push({ path: `docs/${b}/setup/13-assembly.html`, href: `docs/${b}/setup/assembly/index.html`, title: "13 — Assembly guide, interactive 3D", build: b });
     }
     list.sort(byNumber);
     entries.push(...list.map(({ href, ...e }) => (href ? { ...e, path: href } : e)));

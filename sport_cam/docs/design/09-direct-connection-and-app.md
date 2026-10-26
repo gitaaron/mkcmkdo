@@ -74,13 +74,13 @@ device with nothing installed. Both clients use the same protocol.
 
 <!--both-->
 
-![App UI (with UWB wording; the camera-only build shows "Track & record")](../../with_uwb/docs/images/app-ui.png)
+![App UI (with UWB wording; the camera-only build shows "Track & record")](../with_uwb/images/app-ui.png)
 
 <!--/-->
 
-<!--with_uwb: ![App UI](../../with_uwb/docs/images/app-ui.png)-->
+<!--with_uwb: ![App UI](../with_uwb/images/app-ui.png)-->
 
-<!--without_uwb: ![App UI (with UWB wording; this build shows "Track & record")](../../with_uwb/docs/images/app-ui.png)-->
+<!--without_uwb: ![App UI (with UWB wording; this build shows "Track & record")](../with_uwb/images/app-ui.png)-->
 
 Same layout as the web app, plus a connection badge:
 

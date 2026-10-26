@@ -57,6 +57,6 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | **Range bias** | how far an anchor's ranges read long or short; measured once with `rangecal` and subtracted |
 | **RTLS firmware** | the vendor's `RTLS_Anchor` / `RTLS_Tag` sketches, which range to every anchor and send all the distances in one frame. The other pair, `RangingAnchor` / `RangingTag`, doesn't work with SportCam |
 | **Tag** | the UWB radio the subject wears, plugged into a small USB bank. Switching it on starts a session |
-| **Tag wearer match** | how the camera tells the person wearing the tag from anyone else in frame: their bearing and distance must agree with the tag's, and beside someone else they must be the nearer to the tag on average ([05](../../with_uwb/docs/design/05-tracking-system.md#telling-the-tag-wearer-from-everyone-else)) |
+| **Tag wearer match** | how the camera tells the person wearing the tag from anyone else in frame: their bearing and distance must agree with the tag's, and beside someone else they must be the nearer to the tag on average ([05](../with_uwb/design/05-tracking-system.md#telling-the-tag-wearer-from-everyone-else)) |
 | **ULA1** | Haorutech's UWB module (an ESP32 plus a DWM1000), used for the three anchors and the tag |
 | **UWB** | ultra-wideband radio. It measures distance to about 10 cm, through clothing and bodies |

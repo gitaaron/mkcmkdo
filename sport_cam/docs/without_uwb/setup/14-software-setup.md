@@ -56,10 +56,10 @@ for t in tests/test_*.py; do python3 $t | tail -1; done
 Firebase provides remote access and the recordings library. Skipping this
 step gives **stand-alone** operation: direct phone connection only;
 recordings stay on the card
-([09](../../../docs/design/09-direct-connection-and-app.md)).
+([09](../../design/09-direct-connection-and-app.md)).
 
 Once, on a computer: `./scripts/firebase-setup.sh <project-id>`, then
-`npm run deploy` ([08](../../../docs/design/08-recordings-and-cloud.md#deploying-the-firebase-backend)).
+`npm run deploy` ([08](../../design/08-recordings-and-cloud.md#deploying-the-firebase-backend)).
 Setup prints three values and writes the camera's key file. Copy the key
 file to the Pi:
 
@@ -136,7 +136,7 @@ the distance estimated from their size in the frame.
 
 Give the camera's setup hotspot its own password, and write it on the
 head's label: you need it only for the setup page, the fallback to the QR
-code ([Pairing](../../../docs/product/01-requirements.md#pairing)).
+code ([Pairing](../../product/01-requirements.md#pairing)).
 
 ```bash
 sudo mkdir -p /etc/sportcam
@@ -204,7 +204,7 @@ bank's cable always works too.
   it, and plays the recording library. Needs step 3.
 - **The native app, on the camera's Wi-Fi** — full-rate video with no internet:
   `cd src/app_flutter && flutter pub get && flutter run`. It finds the camera by
-  mDNS ([09](../../../docs/design/09-direct-connection-and-app.md)). Add
+  mDNS ([09](../../design/09-direct-connection-and-app.md)). Add
   `--dart-define=SPORTCAM_FALLBACK=https://<project>.web.app --dart-define=SPORTCAM_CAMERA_KEY=<key>`
   and it reaches the camera through Firebase when it's not on the same
   network. For the record start/stop chimes to play with the phone in your
@@ -213,7 +213,7 @@ bank's cable always works too.
   allow notifications on Android when asked.
 
 Both word their buttons for this build: the camera reports
-`TRACKING_MODE = "without_uwb"` itself ([07 — Tracking mode](../../../docs/design/07-backend-and-app.md#tracking-mode)).
+`TRACKING_MODE = "without_uwb"` itself ([07 — Tracking mode](../../design/07-backend-and-app.md#tracking-mode)).
 
 **At a new gym:** power on. The ring chases white while the camera looks
 for a network it knows, then blinks white: it's pairing. On your phone
@@ -253,8 +253,11 @@ tuning steps only mean something once the signs are right.
    a bag, raise `DETECT_HIT_THRESHOLD` a little (0.3 by default; higher means
    fewer false people). If it sweeps past real people, lower it. Tune it in
    your own room and light, since that is where false positives come from.
-5. **Re-sweep.** Walk out of view and wait. After about 6 s
-   (`RESEARCH_AFTER_S`) the camera should start sweeping again and follow
+5. **Zoom out, then re-sweep.** While it records you zoomed in, step a
+   little to one side, just out of the shot: after about 2 s
+   (`LOST_ZOOM_OUT_S`) it should zoom straight out, find you in the wide
+   shot and close back in. Then walk right out of view and wait. After
+   about 6 s (`RESEARCH_AFTER_S`) the camera should start sweeping again and follow
    the first person it finds. If nobody is ever found it gives up to awake after
    `SEARCH_GIVE_UP_S` (180 s) when not recording.
 6. **Battery gauge.** Counts energy used since the service started, assuming

@@ -1,12 +1,12 @@
 # 13 — Assembly guide (interactive 3D)
 
 **Open [`index.html`](index.html)** — straight from disk, or via `npm run docs`
-at http://localhost:8090/with_uwb/docs/setup/assembly/index.html (it is also linked from the
+at http://localhost:8090/docs/without_uwb/setup/assembly/index.html (it is also linked from the
 docs viewer's sidebar).
 
 | Feature | Detail |
 | --- | --- |
-| Structure | fourteen steps in five phases (prepare → enclosure → camera → tracking → finish) |
+| Structure | twelve steps in five phases (prepare → enclosure → camera → power & cables → finish) |
 | Per-step view | live 3D render: fitted parts grey; current part blue, animated along its insertion path; green arrows and callouts for direction and wiring; parts, tools and checks lists |
 | Catalogue | click a part or tool for a picture and description |
 | Navigation | drag to orbit, scroll to zoom, right-drag to pan |
@@ -41,7 +41,7 @@ re-runs `build_models.py` (cad/stl → `models.js`) and `render_steps.py`
 Geometry sources:
 
 - Printed parts: the real STL meshes.
-- Bought parts (the Raspberry Pi, the power boards, the Arducam PTZ base and camera, the UWB boards, the power bank and the tripod): primitives in the `PARTS`
+- Bought parts (the Raspberry Pi, the power boards, the Arducam PTZ base and camera, the power bank and the tripod): primitives in the `PARTS`
   table in `index.html`, placed at the positions `cad/fit.py` writes to
   **`layout.js`** (generated; `window.SPORTCAM_LAYOUT`).
 - No hand positioning: after a CAD or part-size change, re-run `fit.py`;
@@ -51,6 +51,4 @@ Geometry sources:
 Constants at the top of `index.html`, all from the layout: `LID_Z`
 (where the lid's ring meets the enclosure), `TILT_Z` (the Arducam base's tilt
 axis), `SHELF_Z` (the underside of the Pi shelf) and `BAND_Z` (the diffuser
-band); `ARM_R` (the wall boss the anchor arms and the mast foot bolt
-to), `UWB_HALF`, `BOARD_Z`, and for the A3 mast `MAST_R`, `MAST_TOP` and
-`A3_Z`. `render_steps.py` reads the same layout from `cad/layout.json`.
+band). `render_steps.py` reads the same layout from `cad/layout.json`.

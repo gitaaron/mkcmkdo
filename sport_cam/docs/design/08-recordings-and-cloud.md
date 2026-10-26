@@ -66,13 +66,13 @@ from the card with it. Both apps' players draw them over the video and have a
 
 With UWB the climber is the tag wearer, and red means two people
 are still being told apart, or someone near the tag is in view while the
-wearer is out of sight ([05](../../with_uwb/docs/design/05-tracking-system.md#boxes-in-the-recording)). Without UWB the climber is the person being
+wearer is out of sight ([05](../with_uwb/design/05-tracking-system.md#boxes-in-the-recording)). Without UWB the climber is the person being
 followed, and red means they are out of sight while someone else is in
-view ([05](../../without_uwb/docs/design/05-tracking-system.md#boxes-in-the-recording)).<!--/--><!--with_uwb: The climber is the tag wearer. Red means
+view ([05](../without_uwb/design/05-tracking-system.md#boxes-in-the-recording)).<!--/--><!--with_uwb: The climber is the tag wearer. Red means
 two people are still being told apart, or someone near the tag is in view
-while the wearer is out of sight ([05](../../with_uwb/docs/design/05-tracking-system.md#boxes-in-the-recording)).--><!--without_uwb: The climber is
+while the wearer is out of sight ([05](../with_uwb/design/05-tracking-system.md#boxes-in-the-recording)).--><!--without_uwb: The climber is
 the person being followed. Red means they are out of sight while someone
-else is in view ([05](../../without_uwb/docs/design/05-tracking-system.md#boxes-in-the-recording)).-->
+else is in view ([05](../without_uwb/design/05-tracking-system.md#boxes-in-the-recording)).-->
 
 ```json
 {"v": 1, "size": [1280, 720],

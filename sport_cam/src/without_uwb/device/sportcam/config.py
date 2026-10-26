@@ -109,7 +109,9 @@ SEARCH_FOCUS_M = 5.0           # a room-sized hyperfocal guess while sweeping
 SEARCH_GIVE_UP_S = 180.0       # tracking (not recording) and sweeping this long
                                # without finding anyone → back to awake. A
                                # recording is never abandoned: the user stops that.
-RESEARCH_AFTER_S = 6.0         # the person being recorded missing this long → sweep again
+LOST_ZOOM_OUT_S = 2.0          # the person being recorded missing this long → zoom
+                               # straight out to wide, still pointing where they were
+RESEARCH_AFTER_S = 6.0         # missing this long → sweep again (still wide)
 LOST_HOLD_S = 2.0              # target missing → hold still and flash the ring
 
 # --- following the person ---------------------------------------------------
@@ -189,11 +191,6 @@ ZOOM_FILL_TARGET = 0.65        # person fills 65 %: ≈ 17 % margin each side
 ZOOM_VISION_GAIN = 0.35        # share of the log-error corrected per detection
 PERSON_IN_BOX_H = 0.75
 PERSON_IN_BOX_W = 0.55
-# With no detection for this long (a turned back, a pose HOG misses), vision
-# has nothing to say, so the zoom eases back toward the wide end at
-# ZOOM_STALE_RELAX of the way per second — wider is the safe direction.
-ZOOM_STALE_S = 2.0
-ZOOM_STALE_RELAX = 0.3
 # Guard: a fast zoom-out when the body nears the edge of the frame or
 # outgrows ZOOM_GUARD_FILL. HOG cannot see a body that is already clipped,
 # so this has to act on the approach, and it wins over the fill loop.

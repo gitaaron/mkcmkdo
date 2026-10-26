@@ -6,7 +6,7 @@
 <title>13 — SportCam assembly guide</title>
 <meta name="description" content="Interactive step-by-step guide for building the SportCam subject-tracking camera tripod, with 3D renderings of every assembly step." />
 <link rel="stylesheet" href="guide.css" />
-<link rel="stylesheet" href="../../../../docs/setup/assembly/catalog.css" />
+<link rel="stylesheet" href="../../../setup/assembly/catalog.css" />
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
@@ -15,7 +15,7 @@
 </script>
 <script src="layout.js"></script>
 <script src="models.js"></script>
-<script src="../../../../docs/setup/assembly/catalog.js"></script>
+<script src="../../../setup/assembly/catalog.js"></script>
 </head>
 <body>
 
@@ -126,7 +126,7 @@ const lift = (ids, dz) => ids.map((id) => [id, 0, 0, dz]);
 const STEPS = [
   {
     id: "prep", phase: 0, title: "Print, measure and prepare the parts", time: "≈ 33 h print · 60 min prep",
-    parts: ["All 9 printed bodies (≈ 400 g PETG) — settings and filament in <a href='../../../../docs/setup/11-3d-printing.md' target='_blank'>printer specifications</a>", "M2.5 / M3 screw kit + brass heat-set inserts", "Calipers"],
+    parts: ["All 9 printed bodies (≈ 400 g PETG) — settings and filament in <a href='../../../setup/11-3d-printing.md' target='_blank'>printer specifications</a>", "M2.5 / M3 screw kit + brass heat-set inserts", "Calipers"],
     tools: ["3D printer", "Calipers", "Soldering iron (for inserts)", "3.2 mm drill bit, flush cutters"],
     steps: [
       "<b>Measure before printing.</b> Measure what you've bought and put the numbers in <code>cad/ordered_parts.toml</code> — above all the Arducam base's <b>bolt spacing</b> (the lid's slots take 30–72 mm), the power bank, the buck converter, and your ULA1 boards. Then run <code>python3 cad/fit.py</code> from <code>sport_cam/</code>: it works out where everything goes, re-renders the parts and checks that they all fit together and print on an A1 Mini. This guide follows its layout. The full list is in the <a href='../15-verification.md' target='_blank'>verification checklist</a>.",
@@ -368,7 +368,7 @@ const STEPS = [
       "<b>Card:</b> the app should show free space as minutes of recording. A 64 GB card reads roughly 10 hours when empty. Fill it deliberately once if you want to see the camera decline to record and say why.",
     ],
     warn: "If the mask reads <code>03</code>, A3 is not being ranged — check the tag is configured for three anchors. Tracking still works on <code>03</code>, but tilt falls back to vision alone.",
-    note: "Full bring-up order is in <a href='../../../../docs/design/04-electronics.md' target='_blank'>doc 04</a>; the tracking maths and calibration are in <a href='../../design/05-tracking-system.md' target='_blank'>doc 05</a>.",
+    note: "Full bring-up order is in <a href='../../../design/04-electronics.md' target='_blank'>doc 04</a>; the tracking maths and calibration are in <a href='../../design/05-tracking-system.md' target='_blank'>doc 05</a>.",
     scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST, ...BATT, ...CABLES, "tripod"], add: [],
              view: "iso", focus: "all", demo: true, render: "complete" },
   },

@@ -177,8 +177,11 @@ class Ptz:
         self._zoom_mm = config.ZOOM_MIN_MM
         self._focus_raw = None
 
-    def set_zoom_mm(self, efl_mm: float) -> None:
+    def set_zoom_mm(self, efl_mm: float, urgent: bool = False) -> None:
         """Set the zoom motor from a wanted focal length.
+
+        `urgent` skips ZOOM_RATE_LIMIT_S: zooming out to look for a person
+        lost while recording can't wait for the lens's next turn.
 
         The motor is open-loop with a non-linear relationship between step
         count and focal length; `config.ZOOM_CURVE` holds the measured
@@ -190,7 +193,7 @@ class Ptz:
         efl_mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, efl_mm))
         now = time.monotonic()
         if (abs(efl_mm - self._zoom_mm) < config.ZOOM_MIN_STEP_MM
-                or now - self._last_zoom_at < config.ZOOM_RATE_LIMIT_S):
+                or (not urgent and now - self._last_zoom_at < config.ZOOM_RATE_LIMIT_S)):
             return
         self._zoom_mm = efl_mm
         self._last_zoom_at = now

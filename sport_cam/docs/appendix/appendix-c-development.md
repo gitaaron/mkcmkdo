@@ -104,7 +104,7 @@ npm run deploy                             # build + deploy functions, hosting, 
 ```
 
 Then enter the printed values in the camera's `config.py`
-([14 — Software setup](../../with_uwb/docs/setup/14-software-setup.md)).
+([14 — Software setup](../with_uwb/setup/14-software-setup.md)).
 Deployed resources, camera key, cost:
 [08](../design/08-recordings-and-cloud.md#deploying-the-firebase-backend).
 
@@ -137,7 +137,7 @@ npm run docs       # → http://localhost:8090
 | Implementation | `tools/docs-server.mjs` + `tools/docs-viewer.js`; Node only (no npm install); `marked` vendored in `tools/vendor/` (offline) |
 | Sidebar | reading order: README, Product, Design, Setup, appendices |
 | Links | doc-to-doc links stay in the viewer; code/STL links open raw in a new tab |
-| Deep links | e.g. `http://localhost:8090/#with_uwb/docs/setup/10-bill-of-materials.md` |
+| Deep links | e.g. `http://localhost:8090/#docs/with_uwb/setup/10-bill-of-materials.md` |
 | Port | 8090; override with `DOCS_PORT`. Coexists with `npm run dev` |
 | Code changes | restart `npm run docs` after editing `tools/docs-server.mjs` (sidebar is built by the server) |
 
@@ -199,9 +199,9 @@ same-origin, which is why a CDN-only version can't work
 
 ```bash
 pip install schemdraw matplotlib pillow
-python3 with_uwb/schematics/render_diagrams.py       # → with_uwb/docs/images/
+python3 with_uwb/schematics/render_diagrams.py       # → docs/with_uwb/images/
 python3 with_uwb/schematics/render_schematics.py
-python3 without_uwb/schematics/render_diagrams.py    # → without_uwb/docs/images/
+python3 without_uwb/schematics/render_diagrams.py    # → docs/without_uwb/images/
 python3 without_uwb/schematics/render_schematics.py
 ```
 
@@ -209,6 +209,6 @@ CAD, part previews and the assembly guide's meshes, per build:
 
 ```bash
 python3 cad/fit.py                                   # fit both builds to cad/ordered_parts.toml, render the STLs
-python3 <build>/cad/render_previews.py               # part previews → <build>/docs/images/parts/
-python3 <build>/docs/setup/assembly/build_models.py  # assembly guide meshes
+python3 <build>/cad/render_previews.py               # part previews → docs/<build>/images/parts/
+python3 docs/<build>/setup/assembly/build_models.py  # assembly guide meshes
 ```

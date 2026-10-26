@@ -12,9 +12,9 @@
 #   npm run docs                       # docs viewer :8090
 #   (BUILD = with_uwb or without_uwb)
 #   ./BUILD/cad/render_all.sh                    # OpenSCAD → BUILD/cad/stl/*.stl
-#   python3 BUILD/cad/render_previews.py         # STL previews → BUILD/docs/images/parts/
-#   python3 BUILD/schematics/render_diagrams.py  # design diagrams → BUILD/docs/images/
-#   python3 BUILD/schematics/render_schematics.py  # schematics → BUILD/docs/images/
+#   python3 BUILD/cad/render_previews.py         # STL previews → docs/BUILD/images/parts/
+#   python3 BUILD/schematics/render_diagrams.py  # design diagrams → docs/BUILD/images/
+#   python3 BUILD/schematics/render_schematics.py  # schematics → docs/BUILD/images/
 
 services:
   workspace:

@@ -60,7 +60,7 @@ function currentDoc() {
 
 // The build a repo path belongs to, or null for a shared one.
 function buildOfPath(path) {
-  const m = /^(?:src\/)?(with_uwb|without_uwb)\//.exec(path);
+  const m = /^(?:src\/|docs\/)?(with_uwb|without_uwb)\//.exec(path);
   return m ? m[1] : null;
 }
 

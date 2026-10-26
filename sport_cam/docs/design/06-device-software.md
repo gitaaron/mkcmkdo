@@ -42,7 +42,7 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 
 | Aspect | Detail |
 | --- | --- |
-| Installation | 14 — Software setup, step 3 onward ([with UWB](../../with_uwb/docs/setup/14-software-setup.md), [without UWB](../../without_uwb/docs/setup/14-software-setup.md)). Runs from `/home/pi/sportcam/src/<build>/device` |
+| Installation | 14 — Software setup, step 3 onward ([with UWB](../with_uwb/setup/14-software-setup.md), [without UWB](../without_uwb/setup/14-software-setup.md)). Runs from `/home/pi/sportcam/src/<build>/device` |
 | Privileges | `sportcam-head` runs as an ordinary user (hence SPI for the LED ring; the PWM/DMA driver needs root). `sportcam-wifi` (portal) runs as root and is the only thing that changes the network; the head reads its QR codes and asks it to join |
 | Sleep | `apply_state("sleep")` stops the sensor (`Camera.set_awake(False)`) and parks the head; the frame loop publishes nothing, so there is no live view on either path. The local API, Firebase link, mDNS<!--with_uwb--> and UWB ranging<!--/--><!--both--> (and, with UWB, ranging)<!--/--> stay up to be woken. Live frames go out only in `awake`, `tracking` and `recording` (`LIVE_STATES`) |
 | Recording upload | on stop, `main.py` hands the MP4 and its person boxes to `uploader.py` as a background task; tracking and streaming continue. The local copies are deleted after the backend confirms the byte count ([08](08-recordings-and-cloud.md)) |
@@ -100,12 +100,16 @@ Shared by both builds; only the initial zoom guess differs (your build's 05).
 | **Guard:** body within this of an edge… | `ZOOM_GUARD_EDGE` | 3 % |
 | …or filling more than | `ZOOM_GUARD_FILL` | 85 % |
 | …zooms out at once by | `ZOOM_GUARD_STEP` | 0.8× |
-| **Stale relax:** no detection for | `ZOOM_STALE_S` | 2 s |
-| …zoom widens at | `ZOOM_STALE_RELAX` | 30 %/s |
+| **Lost while recording:** no detection for | `LOST_ZOOM_OUT_S` | 2 s |
+| …zooms straight out to | `ZOOM_MIN_MM` (wide), past the rate limit | — |
+| **Stale relax** (with UWB, before recording): no detection for | `ZOOM_STALE_S` | 2 s |
+| …zoom eases back to the distance framing at | `ZOOM_STALE_RELAX` | 30 %/s |
 | Rate limit / minimum step (no "breathing") | `ZOOM_RATE_LIMIT_S`, `ZOOM_MIN_STEP_MM` | — |
 
 The guard acts before clipping because the detector can't see a body that
-is already clipped. Relaxing wider is the safe failure direction.
+is already clipped. Wider is the safe failure direction: a person lost from
+a tight shot is usually still in a wide one, so losing them while recording
+zooms straight out to look.
 
 **Focus** from subject distance *and* focal length:
 
@@ -177,7 +181,7 @@ Programs: camera service and wearable tag firmware.
 | Module | Function |
 | --- | --- |
 | `uwb.py` | range parsing (ULA1 frames, or the `dual-serial` sketch), bearing maths, Kalman → (θ, d) |
-| `tracker.py` | SEARCH → FOUND → TRACK state machine and control loops from [05](../../with_uwb/docs/design/05-tracking-system.md): awake person-in-frame watch (`watch_awake()`, for the LED and app only: a session always starts in SEARCH), turn to the ranged position, the tag-wearer match (`_match_tag()`: only the person where the tag is counts), pan/tilt from ranging, CV bias trims, framing, focus from distance |
+| `tracker.py` | SEARCH → FOUND → TRACK state machine and control loops from [05](../with_uwb/design/05-tracking-system.md): awake person-in-frame watch (`watch_awake()`, for the LED and app only: a session always starts in SEARCH), turn to the ranged position, the tag-wearer match (`_match_tag()`: only the person where the tag is counts), pan/tilt from ranging, CV bias trims, framing, focus from distance |
 | `session.py` | tag-driven sessions: tag on → tracking (search → found) → recording after 3 s found; tag off → awake ([01](../product/01-requirements.md#state-machine-with-uwb)) |
 | `rangecal.py` | `python3 -m sportcam.rangecal <metres>`: per-anchor range bias and noise with the tag on the boresight; prints `RANGE_BIAS_M` |
 | `bearingcal.py` | `python3 -m sportcam.bearingcal <metres>`: the filtered bearing's noise and correlation time with the wearer standing on the boresight; prints `TAG_BEARING_SIGMA_DEG` and `TAG_BEARING_CORR_S` |
@@ -197,7 +201,7 @@ cd ~/sportcam/src/with_uwb/device && python3 -m sportcam.rangecal 5
 - The tracker converts the ranged bearing into the pixel column the detector
   searches around.
 - Vision's roles (angle trim, framing, confirming the person before recording) and hold-on-dropout
-  behaviour: [05](../../with_uwb/docs/design/05-tracking-system.md#control-loops-all-run-on-the-pi-20-hz).
+  behaviour: [05](../with_uwb/design/05-tracking-system.md#control-loops-all-run-on-the-pi-20-hz).
 
 Tests: `src/with_uwb/device/tests/test_tracker.py` (fresh-only rule, strip
 hint, slew limits, tilt from A3, sign of every vertical correction, framing:
@@ -219,7 +223,7 @@ countdown second, the boxes saved beside the clip, stop recording → awake).
 `ula1` requires the vendor's **`RTLS_Tag` / `RTLS_Anchor`** sketches; the
 `Ranging` pair reports one distance at a time. One range where three are
 expected = wrong pair loaded: reflash
-([14, step 1](../../with_uwb/docs/setup/14-software-setup.md#1-flash-the-radios-on-your-computer))
+([14, step 1](../with_uwb/setup/14-software-setup.md#1-flash-the-radios-on-your-computer))
 or use `dual-serial`.
 
 Tests: `src/with_uwb/device/tests/test_uwb.py` parses the manual's worked
@@ -253,7 +257,7 @@ Programs: camera service only.
 
 | Module | Function |
 | --- | --- |
-| `tracker.py` | SEARCH → FOUND → TRACK state machine and loops from [05](../../without_uwb/docs/design/05-tracking-system.md): awake person-in-frame watch (`watch_awake()`; a session starts in FOUND when someone is in frame), sweep, first person found, followed with a gate, pan/tilt goals and slew, vision-only framing, focus from apparent size |
+| `tracker.py` | SEARCH → FOUND → TRACK state machine and loops from [05](../without_uwb/design/05-tracking-system.md): awake person-in-frame watch (`watch_awake()`; a session starts in FOUND when someone is in frame), sweep, first person found, followed with a gate, pan/tilt goals and slew, vision-only framing, focus from apparent size |
 | `session.py` | `AutoSession`: found for 3 s starts recording; a tracking session sweeping 180 s without finding anyone gives up ([01](../product/01-requirements.md#state-machine-without-uwb)) |
 
 `config.py` additionally holds the search and tracking gains, detector
@@ -267,7 +271,7 @@ settings, and zoom and focus curves. `camera.py` adds `person_boxes()`.
 - Detector isolated in `Camera._detect()`; replacing HOG with MobileNet-SSD
   (`cv2.dnn`) changes only that method.
 - Tracker use of the boxes (search, found, following, framing, focus from
-  size): [05](../../without_uwb/docs/design/05-tracking-system.md#control-loops-all-run-on-the-pi-20-hz).
+  size): [05](../without_uwb/design/05-tracking-system.md#control-loops-all-run-on-the-pi-20-hz).
 
 Tests: `src/without_uwb/device/tests/test_tracker.py` (awake sub-state and
 sweep skip, sweep and turn-arounds, found → ready after 3 s, bystander gate, correction signs, slew

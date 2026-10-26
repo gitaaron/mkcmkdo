@@ -281,6 +281,10 @@ PERSON_IN_BOX_W = 0.55
 # ZOOM_STALE_RELAX of the way per second — wider is the safe direction.
 ZOOM_STALE_S = 2.0
 ZOOM_STALE_RELAX = 0.3
+# Recording, and the tag wearer out of sight this long (climbed or stepped
+# out of a tight shot): zoom straight out to wide, still following the tag,
+# until vision sees them again. Then the framing closes back in.
+LOST_ZOOM_OUT_S = 2.0
 # Guard: a fast zoom-out when the body nears the edge of the frame or
 # outgrows ZOOM_GUARD_FILL. HOG cannot see a body that is already clipped,
 # so this has to act on the approach, and it wins over the fill loop.

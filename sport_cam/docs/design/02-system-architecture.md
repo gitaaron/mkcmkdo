@@ -9,8 +9,8 @@ to hardware and software. Shared architecture first, then <!--both-->each build'
 Subsystem docs:
 [03 — Mechanical design](03-mechanical-design.md),
 [04 — Electronics](04-electronics.md),
-05 — Tracking system ([with UWB](../../with_uwb/docs/design/05-tracking-system.md) ·
-[without UWB](../../without_uwb/docs/design/05-tracking-system.md)),
+05 — Tracking system ([with UWB](../with_uwb/design/05-tracking-system.md) ·
+[without UWB](../without_uwb/design/05-tracking-system.md)),
 [06 — Device software](06-device-software.md),
 [07 — Backend & app](07-backend-and-app.md),
 [08 — Recordings & cloud](08-recordings-and-cloud.md),
@@ -42,7 +42,7 @@ The UWB build adds a fourth subsystem, the **wearable tag**.
 
 ## With UWB
 
-![System architecture, with UWB](../../with_uwb/docs/images/system-architecture.png)
+![System architecture, with UWB](../with_uwb/images/system-architecture.png)
 
 | Subsystem | Compute | Role |
 | --- | --- | --- |
@@ -54,7 +54,7 @@ Anchors on the camera unit: A1 and A2 on arms, A3 on a mast (elevation).
 
 ## Without UWB
 
-![System architecture, without UWB](../../without_uwb/docs/images/system-architecture.png)
+![System architecture, without UWB](../without_uwb/images/system-architecture.png)
 
 No wearable and no radio; the camera is the only sensor. The Pi's USB ports
 are unused.

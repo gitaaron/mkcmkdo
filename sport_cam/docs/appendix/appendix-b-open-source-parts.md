@@ -36,9 +36,9 @@ build adds two arms, a mast and a pod ([With UWB](#with-uwb))<!--/-->.
 Starting points for a continuous-rotation pan stage. Required changes: add a
 stepper, driver, slip ring and second microcontroller; rewrite `ptz.py` and
 `tracker.py` for velocity rather than position control. <!--with_uwb-->With UWB, the geometry in
-[05](../../with_uwb/docs/design/05-tracking-system.md#static-anchors-change-the-loop)
+[05](../with_uwb/design/05-tracking-system.md#static-anchors-change-the-loop)
 changes to anchors that rotate with the lens<!--/--><!--both-->; <!--/--><!--without_uwb: Without UWB,--><!--both-->without UWB,<!--/--><!--without_uwb--> the search sweep
-in [05](../../without_uwb/docs/design/05-tracking-system.md) would no longer be limited
+in [05](../without_uwb/design/05-tracking-system.md) would no longer be limited
 to ±80°, which is the point of doing it<!--/-->.
 
 | Model | Why it's interesting | What you give up |
@@ -57,7 +57,7 @@ the repository's git history.
 ### UWB anchor arms and mast
 
 No substitute. The arms set the 400 mm baseline used by the bearing maths
-([05](../../with_uwb/docs/design/05-tracking-system.md)) and carry a specific board
+([05](../with_uwb/design/05-tracking-system.md)) and carry a specific board
 at a specific height. Custom designs must keep the antenna spacing (400 mm)
 and the mast height (250 mm).
 

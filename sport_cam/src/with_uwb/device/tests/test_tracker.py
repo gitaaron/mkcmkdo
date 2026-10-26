@@ -112,7 +112,7 @@ class FakePtz:
         self.tilt_calls += 1
         self.set_tilt(self.tilt_deg + d)
 
-    def set_zoom_mm(self, mm):
+    def set_zoom_mm(self, mm, urgent=False):
         self.zoom_mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, mm))
 
     def set_focus(self, dist):
@@ -314,6 +314,32 @@ def main() -> None:
           1.0 <= tr12._zoom_scale < zoomed - 0.1, f"{zoomed:.2f} → {tr12._zoom_scale:.2f}")
     check("focus follows the ranged distance", ptz12.focus_dist == 8.0,
           f"{ptz12.focus_dist}")
+
+    # ---- 10. recording, and the wearer out of sight: zoom out to find them ----
+    ptz16 = FakePtz()
+    cam16 = FramedCamera(ptz16, dist=8.0)
+    tr16 = Tracker(FakeUwb(theta_deg=10.0, dist=8.0), cam16, ptz16)
+    tr16.confirm()                                        # recording
+    run(tr16, 400, 0.01)
+    tight = ptz16.zoom_mm
+    seen = cam16.person_bbox
+    cam16.person_bbox = lambda: (None, FakeCamera.person_bbox(cam16)[1])   # out of shot
+    run(tr16, 50, 0.01)                                   # ≈ 0.5 s
+    check("recording, wearer out of sight under LOST_ZOOM_OUT_S: zoom held",
+          abs(ptz16.zoom_mm - tight) < 0.5, f"{tight:.1f} → {ptz16.zoom_mm:.1f} mm")
+    run(tr16, 80, 0.01)                                   # past 1 s
+    check("…then straight out to wide, still turned to the tag",
+          ptz16.zoom_mm == config.ZOOM_MIN_MM and abs(ptz16.pan_deg - 10.0) < 1.0,
+          f"{ptz16.zoom_mm:.1f} mm, pan {ptz16.pan_deg:.1f}")
+    tr16.uwb.fix_value = None                             # and the tag drops out too
+    run(tr16, 20, 0.01)
+    check("…still wide with no tag, searching the whole frame",
+          ptz16.zoom_mm == config.ZOOM_MIN_MM and cam16.column is None, f"{cam16.column}")
+    tr16.uwb = FakeUwb(theta_deg=10.0, dist=8.0)
+    cam16.person_bbox = seen                              # back in the wide shot
+    run(tr16, 400, 0.01)
+    check("…seen again: the framing closes back in",
+          ptz16.zoom_mm > config.ZOOM_MIN_MM + 1.0, f"{ptz16.zoom_mm:.1f} mm")
 
     print()
     if failures:

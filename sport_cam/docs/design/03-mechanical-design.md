@@ -111,15 +111,15 @@ checked by `cad/fit.py`.
 
 | Topic | Doc |
 | --- | --- |
-| Part list, previews, STL links | BOM: [with UWB](../../with_uwb/docs/setup/10-bill-of-materials.md#printed-parts), [without UWB](../../without_uwb/docs/setup/10-bill-of-materials.md#printed-parts) |
+| Part list, previews, STL links | BOM: [with UWB](../with_uwb/setup/10-bill-of-materials.md#printed-parts), [without UWB](../without_uwb/setup/10-bill-of-materials.md#printed-parts) |
 | Print settings, orientation, supports, times | [11 — 3D printing](../setup/11-3d-printing.md) |
 | OpenSCAD sources and `cad/fit.py` | [Appendix A](../appendix/appendix-a-cad-parts.md) |
 
 ## Assembly
 
 Interactive 3D assembly guide per build
-([with UWB](../../with_uwb/docs/setup/assembly/index.html),
-[without UWB](../../without_uwb/docs/setup/assembly/index.html); open the
+([with UWB](../with_uwb/setup/assembly/index.html),
+[without UWB](../without_uwb/setup/assembly/index.html); open the
 file directly or from the docs viewer). Steps: enclosure electronics, lid and
 camera, battery, cabling, bring-up<!--with_uwb-->; with UWB also the anchor arms and A3
 mast<!--/-->. Each step highlights and animates the part being fitted.
@@ -128,13 +128,13 @@ mast<!--/-->. Each step highlights and animates the part being fitted.
 
 ## With UWB
 
-![Mechanical layout, with UWB](../../with_uwb/docs/images/mechanical-layout.png)
+![Mechanical layout, with UWB](../with_uwb/images/mechanical-layout.png)
 
 Additions to the stack:
 
 | # | Item | Description |
 | --- | --- | --- |
-| 7 | **UWB anchor arms** | two printed arms on the ±Y wall bosses, each carrying a ULA1 on a USB extension. Extensions enter through a slot high in the wall, behind the Pi's USB ports. **Static:** they don't rotate with the camera ([05](../../with_uwb/docs/design/05-tracking-system.md)) |
+| 7 | **UWB anchor arms** | two printed arms on the ±Y wall bosses, each carrying a ULA1 on a USB extension. Extensions enter through a slot high in the wall, behind the Pi's USB ports. **Static:** they don't rotate with the camera ([05](../with_uwb/design/05-tracking-system.md)) |
 | 8 | **A3 mast** | ½-inch hardwood dowel, 246 mm, in a printed foot on the −X boss behind the lens. A printed cradle holds the third ULA1 **250 mm above A1/A2** (elevation). Out of shot at every tilt angle |
 
 Head envelope: ≈ **42 cm across the arms, 28 cm tall** to the mast top
@@ -149,13 +149,13 @@ shot. A taller mast enters the shot; lower `TILT_MAX_DEG` to compensate.
 - **Anchor placement:** at the arm ends, antennas level with each other and
   clear of the enclosure. Horizontal baseline sets bearing resolution
   (400 mm: ≈ 7° RMS filtered; 250 mm: ≈ 9°;
-  [05](../../with_uwb/docs/design/05-tracking-system.md#geometry)). A3 height sets
+  [05](../with_uwb/design/05-tracking-system.md#geometry)). A3 height sets
   elevation resolution the same way. The arms give 400 mm, so the camera can
   tell the climber from a belayer standing close
-  ([05](../../with_uwb/docs/design/05-tracking-system.md#telling-the-tag-wearer-from-everyone-else)).
+  ([05](../with_uwb/design/05-tracking-system.md#telling-the-tag-wearer-from-everyone-else)).
   Minimum 250 mm for both; below that the
   noise and the
-  [blind corner](../../with_uwb/docs/design/05-tracking-system.md#elevation-from-the-third-anchor)
+  [blind corner](../with_uwb/design/05-tracking-system.md#elevation-from-the-third-anchor)
   grow quickly. Widening: [Appendix A](../appendix/appendix-a-cad-parts.md#with-uwb).
 - **No metal near an antenna** (hence a wooden mast). Metal under A3 detunes
   it and biases its range; 1 cm of r₃ bias ≈ 2° of elevation error at 10 m.
@@ -164,7 +164,7 @@ shot. A taller mast enters the shot; lower `TILT_MAX_DEG` to compensate.
 
 ## Without UWB
 
-![Mechanical layout, without UWB](../../without_uwb/docs/images/mechanical-layout.png)
+![Mechanical layout, without UWB](../without_uwb/images/mechanical-layout.png)
 
 The common stack is the whole head. Enclosure wall plain all round; no side
 protrusions

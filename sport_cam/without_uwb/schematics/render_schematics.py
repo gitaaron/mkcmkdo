@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render electrical schematics for SportCam with schemdraw → docs/images/*.png.
+"""Render electrical schematics for SportCam with schemdraw → docs/without_uwb/images/*.png.
 
 Usage:  python3 schematics/render_schematics.py
 """
@@ -8,7 +8,7 @@ import os
 import schemdraw
 import schemdraw.elements as elm
 
-OUT = os.path.join(os.path.dirname(__file__), "..", "docs", "images")
+OUT = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "without_uwb", "images")
 os.makedirs(OUT, exist_ok=True)
 
 
@@ -25,7 +25,7 @@ def save(d, name):
 # Camera unit schematic — everything lives on the Pi now
 # ----------------------------------------------------------------------------
 def head_schematic():
-    """Signals only — the power tree (docs/images/power-tree.png) covers rails."""
+    """Signals only — the power tree (docs/without_uwb/images/power-tree.png) covers rails."""
     with schemdraw.Drawing(show=False) as d:
         d.config(fontsize=11)
         pi = d.add(elm.Ic(
