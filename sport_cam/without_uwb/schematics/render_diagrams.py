@@ -147,8 +147,8 @@ def system_architecture():
         ["Flutter (iOS / Android)", "live video",
          "link badge + status ring"])
     box(ax, 0.4, 2.2, 3.6, 2.6, "Camera unit (one board)",
-        ["Raspberry Pi 4 (HW H.264)", "Arducam PTZ ctrl (I2C 0x0C)",
-         "pan + tilt + zoom + focus", "HOG person detector (vision)",
+        ["Raspberry Pi 4 (HW H.264)", "pan + tilt: hardware PWM (pigpio)",
+         "zoom + focus: PTZ ctrl (I2C 0x0C)", "HOG person detector (vision)",
          "LED ring (SPI) · INA260 gauge"])
     box(ax, 4.6, 0.3, 3.2, 1.8, "Battery", ["USB-C PD bank 92 Wh",
                                             "PD trigger 12 V → buck 5 V",

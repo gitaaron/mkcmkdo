@@ -96,6 +96,7 @@ class RecCamera(SimCamera):
     def __init__(self, ptz, people):
         super().__init__(ptz, people)
         self.recording = False
+        self.no_detector = None
 
     def start_recording(self):
         self.recording = True
@@ -144,6 +145,7 @@ async def full_flow() -> None:
     head._rec_path, head._rec_started = "", 0.0
     head._countdown_sent = 0
     head._near_focus = False
+    head._tasks = set()
     head._boxes_sent_at = None
     head._jog, head._jog_at = (0.0, 0.0), float("-inf")
     head._awake_since = CLOCK.t
@@ -174,6 +176,17 @@ async def full_flow() -> None:
     check("awake: camera does not move", head.ptz.pan_deg == 0.0 and head.state == "awake")
     check("awake sub-state: no person in frame (they are outside the wide view)",
           head.phase == "no-person-in-frame", f"{head.phase}")
+
+    # --- no person detector on this install (an OpenCV without HOG) ---------------
+    head.camera.no_detector = "OpenCV 5.0.0 has no person detector (HOG)"
+    head.local.sent.clear()
+    await head.apply_state("tracking")
+    check("no person detector: a session is refused, the camera stays awake",
+          head.state == "awake", head.state)
+    check("…and the apps are told why",
+          any(m.get("type") == "warning" and m.get("code") == "no-detector"
+              and "HOG" in m.get("reason", "") for m in head.local.sent), f"{head.local.sent}")
+    head.camera.no_detector = None
 
     # --- the app's track / record button -----------------------------------------
     await head.apply_state("tracking")
@@ -392,6 +405,7 @@ async def switched_off() -> None:
     head.cloud, head.mdns = Stub("report_state"), Stub("update_state", "stop")
     head._rec_path, head._rec_started = "/tmp/sportcam-test.mp4", main_mod.time.monotonic()
     head._near_focus = False
+    head._tasks = set()
 
     async def run_forever():
         await asyncio.sleep(3600)

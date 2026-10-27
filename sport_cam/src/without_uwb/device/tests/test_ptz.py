@@ -14,7 +14,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sportcam import config
-from sportcam.ptz import OPT_FOCUS, Ptz, focus_raw
+from sportcam import ptz as ptz_mod
+from sportcam.ptz import (OPT_FOCUS, OPT_MOTOR_X, OPT_MOTOR_Y, ArducamServos,
+                          PigpioServos, Ptz, focus_raw)
 
 failures: list[str] = []
 
@@ -106,6 +108,7 @@ def main() -> None:
     # ---- the app's joystick: speed grows with the square of the pull --------
     p = Ptz()
     p.focuser = RecordingFocuser()
+    p.servos = ArducamServos(p.focuser)       # so servo writes are recorded
 
     def jogged(x, y, dt=1.0):
         p.park()
@@ -127,6 +130,57 @@ def main() -> None:
     p.focuser.writes.clear()
     p.jog(0.0, 0.0, 1.0)
     check("knob at the centre: no servo writes", p.focuser.writes == [])
+
+    # ---- servo drivers: pigpio hardware PWM, or the controller's registers --
+    class FakePi:
+        def __init__(self):
+            self.pwm: dict[int, tuple[int, int]] = {}
+
+        def hardware_PWM(self, gpio, hz, duty):
+            self.pwm[gpio] = (hz, duty)
+
+    def us(pi, gpio):
+        hz, duty = pi.pwm[gpio]
+        return duty / hz                          # millionths of the period → µs
+
+    p = Ptz()
+    pi = FakePi()
+    p.servos = PigpioServos(pi)
+    p.set_pan(0.0)
+    p.set_tilt(0.0)
+    centre = config.SERVO_US_AT_0 + config.PAN_CENTER_RAW / 180 * (
+        config.SERVO_US_AT_180 - config.SERVO_US_AT_0)
+    check("pigpio: centre is the centre pulse, at SERVO_PWM_HZ, on PAN_GPIO",
+          pi.pwm[config.PAN_GPIO][0] == config.SERVO_PWM_HZ
+          and abs(us(pi, config.PAN_GPIO) - centre) < 0.05, f"{pi.pwm}")
+    check("…and tilt on TILT_GPIO", config.TILT_GPIO in pi.pwm)
+    per_deg = (config.SERVO_US_AT_180 - config.SERVO_US_AT_0) / 180
+    p.set_pan(0.1)
+    check("pigpio: a tenth of a degree moves the pulse a tenth of a degree's width",
+          abs(us(pi, config.PAN_GPIO) - (centre + 0.1 * per_deg * config.PAN_SIGN)) < 0.05,
+          f"{us(pi, config.PAN_GPIO):.2f} µs")
+    p.set_tilt(30.0)
+    check("pigpio: tilt follows TILT_SIGN",
+          abs(us(pi, config.TILT_GPIO) - (centre + 30 * per_deg * config.TILT_SIGN)) < 0.05)
+    p.set_pan(500.0)
+    check("pigpio: the soft limit still holds",
+          abs(us(pi, config.PAN_GPIO)
+              - (centre + config.PAN_MAX_DEG * per_deg * config.PAN_SIGN)) < 0.05)
+    saved, ptz_mod.pigpio = ptz_mod.pigpio, None
+    idle = PigpioServos()
+    idle.write(OPT_MOTOR_X, 90.0)
+    check("pigpio: no pigpio installed (dev machine) is a no-op, not a crash", not idle.available)
+    ptz_mod.pigpio = saved
+
+    p = Ptz()
+    p.servos = ArducamServos(RecordingFocuser())
+    p.set_pan(10.4)
+    p.set_tilt(-5.6)
+    writes = dict(p.servos.focuser.writes)
+    check("arducam: pan and tilt go to the registers in whole degrees",
+          writes.get(OPT_MOTOR_X) == round(config.PAN_CENTER_RAW + 10.4 * config.PAN_SIGN)
+          and writes.get(OPT_MOTOR_Y) == round(config.TILT_CENTER_RAW - 5.6 * config.TILT_SIGN),
+          f"{writes}")
 
     print()
     if failures:

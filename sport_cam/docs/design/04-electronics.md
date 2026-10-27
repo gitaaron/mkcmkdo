@@ -54,26 +54,49 @@ Common connections:
 | Signal | From → To | Notes |
 | --- | --- | --- |
 | CSI | Pi CSI → Arducam 15-pin FFC | kit cable fits a Pi 4; service loop under the lid |
-| PTZ I2C | Pi GPIO2/3 → PTZ controller | one device at **0x0C** for pan, tilt, zoom and focus |
+| PTZ I2C | Pi GPIO2/3 → PTZ controller | one device at **0x0C** for zoom and focus (and pan/tilt with `SERVO_DRIVER = "arducam"`) |
+| Servo PWM | Pi GPIO12 / GPIO13 (hardware PWM0 / PWM1) → 74AHCT125 gates 2, 3 → pan / tilt servo | [below](#servo-drive) |
 | LED data | Pi GPIO10 (SPI0 MOSI) → 74AHCT125 → WS2812B DIN | [below](#driving-the-ws2812b-ring) |
 | Battery gauge | INA260 (or INA226) on I2C **0x40** | 12 V side, between trigger and buck; optional ([below](#knowing-what-is-left)) |
 | Power switch | rocker → latch; latch HOLD ← Pi GPIO17; SENSE → Pi GPIO27 | off is a clean shutdown ([below](#power-switch)) |
 
 ### The PTZ controller
 
-All motion is register writes to one I2C device:
+Zoom and focus are register writes to one I2C device. So are pan and tilt
+as the kit comes, but this build moves those to the Pi ([below](#servo-drive)):
 
 | Channel | Register | Range | Axis |
 | --- | --- | --- | --- |
 | `OPT_ZOOM` | 0x00 | 3000–20000 | zoom motor, wide → tele |
 | `OPT_FOCUS` | 0x01 | 0–20000 | focus motor |
-| `OPT_MOTOR_X` | 0x05 | 0–180 | pan servo, degrees |
-| `OPT_MOTOR_Y` | 0x06 | 0–180 | tilt servo, degrees |
+| `OPT_MOTOR_X` | 0x05 | 0–180 | pan servo, **whole** degrees (`SERVO_DRIVER = "arducam"` only) |
+| `OPT_MOTOR_Y` | 0x06 | 0–180 | tilt servo, whole degrees (likewise) |
 | `OPT_IRCUT` | 0x0C | 0/1 | IR-cut filter |
 
 - Driver: `src/<build>/device/sportcam/ptz.py`.
-- Power the controller from the 5 V rail, not the Pi's GPIO 5 V pin: two
-  stalled servos draw ≈ 0.7 A. Common ground.
+- Power the controller from the 5 V rail, not the Pi's GPIO 5 V pin. Common
+  ground.
+
+### Servo drive
+
+The controller's pan and tilt registers take whole degrees. At full zoom the
+frame is ≈ 33° across, so one degree is ≈ 3 % of the frame and a slow pan
+moves in visible ticks, however smoothly the tracker eases. The Pi drives the
+two servos itself instead:
+
+| Choice | Why |
+| --- | --- |
+| **GPIO12 / GPIO13, hardware PWM** (PWM0 / PWM1) | the Pi 4's two independent hardware PWM channels; pulses come from the PWM block, with no CPU or DMA jitter. GPIO18/19 are the same two channels, and GPIO18 is better left free |
+| **pigpio** (`pigpiod` + `hardware_PWM`) | pulse width set to a fraction of a microsecond at 50 Hz, ≈ 0.01° of command. The servo's own deadband (≈ 0.3–0.5°) becomes the limit, 2–3× finer than whole degrees. The service reaches the daemon over a local socket and does not run as root |
+| **Through the 74AHCT125's spare gates** (2, 3) | most servos accept 3.3 V pulses, not all reliably; the chip is already there for the ring and had three idle gates |
+| **Servos on the 5 V rail directly** | they draw ≈ 0.7 A when both stall; not the Pi's 5 V pin |
+| **Analog audio off** (`dtparam=audio=off`) | it uses the same PWM block. The camera has no use for it |
+| **`SERVO_DRIVER = "arducam"` kept** | a head wired as the kit came still works, in whole degrees |
+
+Pulse width is linear in the raw angle: `SERVO_US_AT_0` (500 µs) at 0°,
+`SERVO_US_AT_180` (2500 µs) at 180°, the standard servo range and what the
+controller's registers map to. So the centre and sign calibration carries
+over between drivers.
 
 ### Driving the WS2812B ring
 
@@ -87,7 +110,7 @@ All motion is register writes to one I2C device:
 
 ```
 power bank ──PD trigger (12 V)──► latch ──► INA260 ──► buck 12→5 V 8 A ──┬─► Pi 4 (USB-C)
-                                    ▲                                     ├─► PTZ controller + servos
+                                    ▲                                     ├─► PTZ controller (lens) + servos
                               rocker switch                               ├─► (with UWB) 3 × UWB anchors (Pi USB)
                                                                           └─► WS2812B ring
 ```

@@ -18,7 +18,7 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | **HOG** | OpenCV's person detector ("histogram of oriented gradients"). It runs about 3 times a second on the Pi |
 | **I2C** | the two-wire bus the Pi uses to talk to the PTZ controller and the gauge |
 | **Kalman filter** | a smoothing filter that averages noisy measurements while still following real movement |
-| **Level shifter** | the 74AHCT125 chip that lifts the Pi's 3.3 V data signal to the 5 V the LED ring needs |
+| **Level shifter** | the 74AHCT125 chip that lifts the Pi's 3.3 V signals to 5 V: data for the LED ring, and the servos' PWM |
 | **Found** | the second sub-state of `tracking`: a person is in frame (with UWB, the person where the tag is) and the camera follows and frames them as it will while recording. The ring fills with green over 3 s and the app beeps each second; still in frame at the end, recording starts |
 | **mDNS / Bonjour** | how a phone finds the camera on the local Wi-Fi by name (`sportcam.local`) without knowing its IP address |
 | **MJPEG** | video sent as a stream of JPEG pictures; the camera's direct live view to phones on its Wi-Fi |
@@ -28,10 +28,12 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | **Person in frame / no person in frame** | the two sub-states of `awake`: whether the person detector has seen someone in the last 4 s. Without UWB, starting a session with a person in frame skips search and goes straight to found; with UWB it never does, as only the tag can say who they are. With a person in frame the ring breathes slowly ([01](../product/01-requirements.md#state-machine)) |
 | **PETG** | the filament every structural part is printed in |
 | **Power latch** | the small board that switches the camera's 12 V. The rocker switch tells it on or off, and the Pi holds it on after switch-off until it has saved the recording and shut down ([04](../design/04-electronics.md#power-switch)) |
-| **PTZ** | pan, tilt and zoom. The **PTZ base** is the bought Arducam camera assembly; the **PTZ controller** is its board that drives the servos and lens motors |
+| **pigpio** | the library and daemon (`pigpiod`) the camera uses to drive the servos from the Pi's hardware PWM, in steps finer than a degree |
+| **PTZ** | pan, tilt and zoom. The **PTZ base** is the bought Arducam camera assembly; the **PTZ controller** is its board that drives the lens motors (and, as the kit comes, the servos) |
 | **Search** | the first sub-state of `tracking`: getting the subject into frame. <!--both-->With UWB the camera turns to the tag; without UWB it sweeps the room<!--/--><!--with_uwb: The camera turns to where the tag is--><!--without_uwb: The camera sweeps the room-->. The ring shows a green light chasing round and the app pings every 3 s |
 | **Sleep** | the camera's battery-saving state: sensor off, head parked, no live view, one dim pixel on the ring; the Pi still answers the apps. Entered after 30 s awake with no session; left by **Wake up** or **Record** |
 | **Slew limit** | a cap on how fast the camera may turn, so it glides between measurements instead of snapping |
+| **Easing** | turning at a speed proportional to the distance left, with limited acceleration, so each move starts and ends gently: smooth pans in the video |
 | **Soft limits** | the pan and tilt angles the software won't go past, set short of where the bracket hits anything |
 | **SPI** | the Pi's serial bus used to send colour data to the LED ring |
 | **State** | what the camera is doing: `connecting`, `pairing`, `sleep`, `awake`, `tracking` (initiate recording) or `recording` ([01](../product/01-requirements.md#state-machine)). Apps see `connecting` and `pairing` as `off` |

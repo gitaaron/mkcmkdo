@@ -39,9 +39,9 @@ they present ranges completely differently:
 """
 from __future__ import annotations
 
-import asyncio
 import math
 import re
+import threading
 import time
 from dataclasses import dataclass
 
@@ -155,12 +155,17 @@ class UwbArray:
         self._kalman_elev = _KalmanAngle(config.UWB_A3_UP_M)
 
     def start(self) -> None:
-        loop = asyncio.get_event_loop()
+        # Daemon threads of their own, not the event loop's default executor:
+        # the readers never return, and asyncio.run() waits for that
+        # executor's threads on exit, so shutdown (the power switch) would
+        # hang. They would also hold workers asyncio.to_thread() needs.
         if config.UWB_PROTOCOL == "ula1":
-            loop.run_in_executor(None, self._reader_ula1, config.UWB_PORT)
+            readers = [(self._reader_ula1, (config.UWB_PORT,))]
         else:
-            for idx, port in enumerate(config.UWB_PORTS[:config.UWB_ANCHORS]):
-                loop.run_in_executor(None, self._reader_pair, idx, port)
+            readers = [(self._reader_pair, (idx, port))
+                       for idx, port in enumerate(config.UWB_PORTS[:config.UWB_ANCHORS])]
+        for fn, args in readers:
+            threading.Thread(target=fn, args=args, name="uwb-reader", daemon=True).start()
 
     # ---- readers ----------------------------------------------------------
     def _reader_ula1(self, port: str) -> None:

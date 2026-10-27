@@ -172,6 +172,7 @@ async def index(_req: web.Request) -> web.Response:
 
 
 _joining = asyncio.Lock()     # one join at a time, from the page or the lens
+_tasks: set[asyncio.Task] = set()
 
 
 async def connect(req: web.Request) -> web.Response:
@@ -209,7 +210,10 @@ async def api_join(req: web.Request) -> web.Response:
     async def run() -> None:
         async with _joining:
             await asyncio.to_thread(join, ssid, psk, hidden)
-    asyncio.create_task(run())
+    # The loop holds tasks only weakly: keep this one until the join is done.
+    task = asyncio.create_task(run())
+    _tasks.add(task)
+    task.add_done_callback(_tasks.discard)
     return web.json_response({"joining": ssid}, status=202)
 
 

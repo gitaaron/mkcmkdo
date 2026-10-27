@@ -256,7 +256,7 @@ def tracker_found() -> None:
     centred = (pw // 2 - 50, ph // 2 - 150, 100, 300)   # a 1.8 m body at 10 m
 
     ptz = FakePtz()
-    tr = Tracker(FakeUwb(theta_deg=40.0), FakeCamera(centred), ptz)
+    tr = Tracker(FakeUwb(theta_deg=40.0), People(ptz, [(40.0, 10.0)]), ptz)
     tr.step()
     check("still SEARCH while turning toward the tag", tr.mode == "search", tr.mode)
     took = run_tracker(tr, 3.0, until=lambda: tr.mode == "found")
@@ -277,7 +277,7 @@ def tracker_found() -> None:
 
     ptz3 = FakePtz()           # the person stands 6° off where the tag reads: off-centre
     tr3 = Tracker(FakeUwb(theta_deg=10.0), People(ptz3, [(16.0, 10.0)]), ptz3)
-    run_tracker(tr3, 1.5, until=lambda: tr3.ready_to_record)
+    run_tracker(tr3, 3.0, until=lambda: tr3.ready_to_record)
     check("a person off-centre is still found and recorded (no centring needed)",
           tr3.ready_to_record)
 
@@ -371,6 +371,7 @@ class FakeRecCamera(FakeCamera):
     def __init__(self, bbox):
         super().__init__(bbox)
         self.recording = False
+        self.no_detector = None
 
     def start_recording(self):
         self.recording = True
@@ -427,6 +428,7 @@ async def full_flow() -> None:
     head._rec_path, head._rec_started = "", 0.0
     head._countdown_sent = 0
     head._near_focus = False
+    head._tasks = set()
     head._boxes_sent_at = None
     head._jog, head._jog_at = (0.0, 0.0), float("-inf")
     head._awake_since = time.monotonic()
@@ -453,6 +455,17 @@ async def full_flow() -> None:
 
     await tick_for(0.3)
     check("standby with the tag off", head.state == "awake")
+
+    # --- no person detector on this install (an OpenCV without HOG) ---------------
+    head.camera.no_detector = "OpenCV 5.0.0 has no person detector (HOG)"
+    head.local.sent.clear()
+    await head.apply_state("tracking")
+    check("no person detector: a session is refused, the camera stays awake",
+          head.state == "awake", head.state)
+    check("…and the apps are told why",
+          any(m.get("type") == "warning" and m.get("code") == "no-detector"
+              and "HOG" in m.get("reason", "") for m in head.local.sent), f"{head.local.sent}")
+    head.camera.no_detector = None
 
     # the app's joystick turns the head in awake, and stops when the app stops sending
     head.jog(-1.0, 0.5)
@@ -483,7 +496,7 @@ async def full_flow() -> None:
     await tick_for(0.15)
     check("tag on with a person in frame → tracking, search (awake cannot say who they are)",
           head.state == "tracking" and head.phase == "search" and head.led.searching, f"{seen}")
-    await tick_for(config.ACQUIRE_SETTLE_S + 0.4)
+    await tick_for(config.ACQUIRE_SETTLE_S + 1.5)   # the eased turn to the tag, then settle
     check("…found once the head is on the tag and vision agrees; ring fills",
           head.state == "tracking" and head.phase == "found" and head.led.found is not None
           and not head.led.searching, f"{seen}")
@@ -616,6 +629,7 @@ async def switched_off() -> None:
     head.cloud, head.mdns = Stub("report_state"), Stub("update_state", "stop")
     head._rec_path, head._rec_started = "/tmp/sportcam-test.mp4", main_mod.time.monotonic()
     head._near_focus = False
+    head._tasks = set()
 
     async def run_forever():
         await asyncio.sleep(3600)

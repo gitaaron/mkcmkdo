@@ -121,7 +121,7 @@ The anchors are fixed to the enclosure, so θ is an angle in the bar's frame
 and is commanded directly as an absolute position:
 
 ```
-pan_target = θ + bias          # absolute position, commanded to OPT_MOTOR_X
+pan_target = θ + bias          # absolute position, commanded as the pan servo's pulse
 ```
 
 - No velocity integration, windup or dead-reckoned heading.
@@ -138,13 +138,13 @@ pan_target = θ + bias          # absolute position, commanded to OPT_MOTOR_X
 
 ```
 uwb θ ──► Kalman ──┐
-                   ├──► pan target (°) ──► slew limit ──► OPT_MOTOR_X (0x05)
+                   ├──► pan target (°) ──► ease ──► pan PWM (GPIO12)
 person bbox ──► CV bias (slow integrator, ±12°) ──┘
 
 uwb φ ──► Kalman ──► lens-height correction ──┐
-                                              ├──► tilt target ──► slew limit ──► OPT_MOTOR_Y (0x06)
+                                              ├──► tilt target ──► ease ──► tilt PWM (GPIO13)
 person bbox ──► CV bias (slow integrator, ±10°) ──┘
-   (no A3: person bbox ──► tilt PID ──► OPT_MOTOR_Y)
+   (no A3: person bbox ──► tilt PID ──► tilt PWM)
 
 d ─────► zoom setpoint: EFL = frac · sensor_h · d / subject_h × vision scale
                        └─► OPT_ZOOM (0x00), rate-limited
@@ -155,9 +155,9 @@ d, EFL ──► FOCUS_GRID lookup (in 1/d) ──► OPT_FOCUS (0x01)
 
 | Loop | Behaviour |
 | --- | --- |
-| **Pan** | absolute position = UWB bearing + CV bias; slew-limited to `PAN_MAX_DPS` |
+| **Pan** | absolute position = UWB bearing + CV bias, eased toward it: speed = distance left / `TRACK_EASE_S` (0.4 s), capped at `PAN_MAX_DPS` and at the speed that can still stop there, changed by at most `PAN_MAX_ACCEL_DPS2` (60 °/s²) per second. Ranging noise and each vision bias update bend the motion rather than jerking it; the turn to the tag at session start takes ≈ 1.5 s for 40° |
 | **Tilt (with A3)** | absolute position. φ is measured at the anchor plane; the lens is 98 mm higher, so `Tracker._aim_tilt` recomputes the angle from the lens (≈ 1° at 5 m). `TAG_AIM_OFFSET_M` raises the aim point above a low-worn tag. Vision bias clamped ±10° |
-| **Tilt (no A3)** | `UWB_ANCHORS = 2`, or a frame without A3: box centre → PID → `OPT_MOTOR_Y` |
+| **Tilt (no A3)** | `UWB_ANCHORS = 2`, or a frame without A3: box centre → PID → tilt servo |
 | **Zoom** | initial setting from distance (1.8 m subject at 45 % of frame height); vision then frames to 65 % with an edge guard ([06](../../design/06-device-software.md#framing-and-focus)). Vision scale limited to 0.5–2.5× the distance zoom and to the lens range (no windup) |
 | **Focus** | ranged distance + focal length → `FOCUS_GRID` ([06](../../design/06-device-software.md#framing-and-focus)); no hunting |
 | **Detector** | OpenCV HOG on the 720p preview, 3 fps (0.5 awake); record stream untouched 1080p. Each detection used once; search strip ≈ 40 % of frame width around the ranged bearing ([06](../../design/06-device-software.md#vision-and-why-it-runs-slowly)). Sufficient: a climber at 0.3 m/s seen from 10 m moves 1.7°/s, and the 17 % framing margin gives several seconds of tolerance |
@@ -192,7 +192,7 @@ anyone, so unlike the camera-only build it never skips straight to FOUND.
 | --- | --- | --- |
 | **awake**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_AWAKE` (0.5 fps). Person in frame from a detection of anyone until `AWAKE_PERSON_HOLD_S` (4 s) pass without one; it drives the LED and app only | session start (tag on, or **Start tracking**) → SEARCH; `AWAKE_TIMEOUT_S` with no session and no live viewer → sleep |
 | **sleep** | sensor off, head parked; the radios keep ranging. `AWAKE_TIMEOUT_S` (30 s) in awake with no session and nobody watching the live view → sleep | **Wake up** → awake; tag on, or **Record** → SEARCH |
-| **SEARCH** | pan (and tilt, with A3) slews to the ranged position | within `ACQUIRE_POINT_TOL_DEG` (4°) for `ACQUIRE_SETTLE_S` (0.5 s) and the tag wearer detected (below) → FOUND |
+| **SEARCH** | pan (and tilt, with A3) eases to the ranged position | within `ACQUIRE_POINT_TOL_DEG` (4°) for `ACQUIRE_SETTLE_S` (0.5 s) and the tag wearer detected (below) → FOUND |
 | **FOUND** | the full tracking loop, as in recording: ranged pan and tilt, vision trim, zoom and focus, all from the tag wearer's box. The person need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) and nobody else as near the tag → recording (TRACK); tag wearer unseen for `FOUND_LOST_S` (1 s) → SEARCH |
 | **TRACK** | recording, for the rest of the session; a hidden tag or a missed detection is ordinary tracking. Wearer unseen 2 s: zoom out to wide until seen again | session end |
 

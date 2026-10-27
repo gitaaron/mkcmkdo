@@ -112,7 +112,9 @@ class LocalApi:
     async def broadcast(self, msg: dict) -> None:
         """Push a message to every connected app client."""
         dead = []
-        for ws in self._ws_clients:
+        # A copy: clients connect and disconnect during the awaits below, and
+        # changing the set mid-iteration raises out of here into the caller.
+        for ws in list(self._ws_clients):
             try:
                 await ws.send_json(msg)
             except (ConnectionResetError, RuntimeError):

@@ -5,10 +5,10 @@
 Subject localisation by **vision only**: no tag, radio or anchors.
 **Track & record** (or **Record** from sleep) starts a pan sweep (skipped if
 the camera already has a person in frame); the person detector finds a person; the camera follows and frames
-them, and records once they have stayed in frame for 3 s. Pan, tilt, zoom and
-focus are register writes to one I2C controller on the Pi
-([03](../../design/03-mechanical-design.md),
-[04](../../design/04-electronics.md)); the loop runs on the device at
+them, and records once they have stayed in frame for 3 s. Pan and tilt are
+the Pi's own hardware PWM, zoom and focus register writes to one I2C
+controller ([03](../../design/03-mechanical-design.md),
+[04](../../design/04-electronics.md#servo-drive)); the loop runs on the device at
 20 Hz.
 
 ## Why camera-only
@@ -111,7 +111,7 @@ person boxes (3 fps, fresh only) ──► nearest-to-last (gate) ──► offs
       │                                                            ▼
       │                                         goal += gain × offset   (pan 0.6, tilt 0.5, deadband 4 %)
       │                                                            ▼
-      │                                         slew limit (PAN_MAX_DPS 120, TILT_MAX_DPS 90) ──► OPT_MOTOR_X / _Y
+      │                                         ease (TRACK_EASE_S 0.4, accel 60 / 45 °/s², ≤ 120 / 90 °/s) ──► pan / tilt PWM (GPIO12 / 13)
       │
       ├──► fill = person size / frame ──► zoom loop (target 65 %, guard, stale relax) ──► OPT_ZOOM
       └──► apparent height, thin lens ──► distance (smoothed) ──► FOCUS_GRID lookup ──► OPT_FOCUS
@@ -119,7 +119,8 @@ person boxes (3 fps, fresh only) ──► nearest-to-last (gate) ──► offs
 
 | Loop | Behaviour |
 | --- | --- |
-| **Pan / tilt** | on each fresh detection: pan goal += `TRACK_PAN_GAIN` (0.6) × offset (converted to degrees via the current FOV); tilt goal += `TRACK_TILT_GAIN` (0.5) × offset (pixel y grows downward: a low person tilts the camera down). Offsets < `TRACK_DEADBAND_FRACTION` (4 %) ignored. Servos slew toward the goals at ≤ `PAN_MAX_DPS` / `TILT_MAX_DPS`. Goals clamped to the soft limits |
+| **Pan / tilt** | on each fresh detection: pan goal += `TRACK_PAN_GAIN` (0.6) × offset (converted to degrees via the current FOV); tilt goal += `TRACK_TILT_GAIN` (0.5) × offset (pixel y grows downward: a low person tilts the camera down). Offsets < `TRACK_DEADBAND_FRACTION` (4 %) ignored. Servos ease toward the goals (next row). Goals clamped to the soft limits |
+| **Easing** | the goals jump about 3 times a second. Racing to each one at the slew limit and stopping dead would show in the video as a lurch every detection (simulated, a 5°/s walker: camera still on 86 % of ticks, bursts to 35°/s). Instead speed = distance left / `TRACK_EASE_S` (0.4 s, about one detection gap), capped at `PAN_MAX_DPS` / `TILT_MAX_DPS` and at the speed that can still stop at the goal, and changed by at most `PAN_MAX_ACCEL_DPS2` / `TILT_MAX_ACCEL_DPS2` (60 / 45 °/s²) per second. Each move starts and ends gently and a new goal bends the motion instead of jerking it (same walker: 3–7°/s, never still). Found mid-sweep, the camera eases out of the sweep's speed rather than stopping |
 | **Gains < 1** | detections are ≈ 3 fps and a few hundred ms old on arrival; full correction overshoots. Under-correction settles in a few detections, with some lag on fast movers |
 | **Fresh only** | loop 20 Hz, vision 3 Hz: goals move only on a new detection ([06](../../design/06-device-software.md#vision-and-why-it-runs-slowly)) |
 | **Zoom** | starts wide; vision frames to 65 % with an edge guard, and zooms straight out when the person is lost ([06](../../design/06-device-software.md#framing-and-focus)) |
@@ -177,6 +178,8 @@ All in `src/without_uwb/device/sportcam/config.py`.
 | `PAN_MIN_DEG` / `PAN_MAX_DEG` | −80 / 80 | pan soft limits |
 | `TILT_MIN_DEG` / `TILT_MAX_DEG` | −45 / 85 | tilt soft limits |
 | `PAN_MAX_DPS` / `TILT_MAX_DPS` | 120 / 90 | servo slew limits |
+| `TRACK_EASE_S` | 0.4 | easing: time to cover the distance to the goal; longer is smoother, lags more |
+| `PAN_MAX_ACCEL_DPS2` / `TILT_MAX_ACCEL_DPS2` | 60 / 45 | easing: how fast the turning speed may change |
 | `SEARCH_PAN_DPS` | 25 | sweep speed |
 | `SEARCH_TILT_ROWS_DEG` | (5, 22) | tilt for each sweep pass |
 | `SEARCH_TILT_DPS` | 40 | speed of the step between rows |

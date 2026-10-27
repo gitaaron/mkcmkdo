@@ -42,13 +42,14 @@ tracker is a small state machine,
 
 The detector runs at a few frames per second, far slower than the 20 Hz loop
 that calls `step()`. Corrections are therefore applied only on a *fresh*
-detection and then held as a goal that the servos slew toward; acting on the
+detection and then held as a goal that the servos ease toward; acting on the
 cached box every tick would integrate one measurement many times over.
 """
 from __future__ import annotations
 
 import math
 import time
+from collections import deque
 
 from . import config
 from .boxlog import CLIMBER, OTHER, UNSURE, Box
@@ -70,6 +71,7 @@ class Tracker:
         # overlay (boxlog): climber, other, or unsure
         self.labelled: list[tuple[Box, str]] = []
         self.labelled_at: float | None = None
+        self._poses: deque[tuple[float, float, float]] = deque(maxlen=40)   # (t, pan, tilt), 2 s
         self.reset_lock()
 
     # ---- session ----------------------------------------------------------
@@ -143,6 +145,7 @@ class Tracker:
         self._last_side = 0                  # which way the subject was drifting
         self._pan_goal = self.ptz.pan_deg
         self._tilt_goal = self.ptz.tilt_deg
+        self._pan_vel = self._tilt_vel = 0.0   # deg/s, for easing (_slew)
         self._efl = config.ZOOM_MIN_MM
         self.dist_m = None
         self.camera.set_search_column(None)
@@ -188,6 +191,7 @@ class Tracker:
         now = time.monotonic()
         dt = min(now - self._last_step, 0.25)
         self._last_step = now
+        self._poses.append((now, self.ptz.pan_deg, self.ptz.tilt_deg))
 
         boxes, fresh = self.camera.person_boxes()
         boxes = boxes if fresh else []
@@ -251,6 +255,8 @@ class Tracker:
         step = config.SEARCH_TILT_DPS * dt
         self.ptz.set_tilt(self.ptz.tilt_deg + _clamp(row - self.ptz.tilt_deg, -step, step))
         self._pan_goal, self._tilt_goal = pan, self.ptz.tilt_deg
+        # Moving at sweep speed: a person found now is eased to, not stopped dead for.
+        self._pan_vel, self._tilt_vel = self._dir * config.SEARCH_PAN_DPS, 0.0
 
     def _first_sighting(self, now: float, box: Box) -> None:
         """Stop the sweep and start following the first person seen."""
@@ -281,28 +287,50 @@ class Tracker:
         self._last_seen_at = now
         self._last_centre = (cx, cy)
         cx_err, cy_err = cx - pw / 2, cy - ph / 2
+        # Offsets are from where the head pointed when the frame was taken.
+        pan, tilt = self._pose_at(getattr(self.camera, "captured_at", None))
         if abs(cx_err) > config.TRACK_DEADBAND_FRACTION * pw:
             self._last_side = 1 if cx_err > 0 else -1
             self._pan_goal = _clamp(
-                self.ptz.pan_deg + config.TRACK_PAN_GAIN * self._px_to_hdeg(cx_err),
+                pan + config.TRACK_PAN_GAIN * self._px_to_hdeg(cx_err),
                 config.PAN_MIN_DEG, config.PAN_MAX_DEG)
         if abs(cy_err) > config.TRACK_DEADBAND_FRACTION * ph:
             # Pixel y grows downward: a person below centre means aim lower.
             self._tilt_goal = _clamp(
-                self.ptz.tilt_deg - config.TRACK_TILT_GAIN * self._px_to_vdeg(cy_err),
+                tilt - config.TRACK_TILT_GAIN * self._px_to_vdeg(cy_err),
                 config.TILT_MIN_DEG, config.TILT_MAX_DEG)
         self.camera.set_search_column(cx)
         self._estimate_distance(h)
         self._frame_zoom(x, y, w, h)
 
+    def _pose_at(self, t: float | None) -> tuple[float, float]:
+        """Pan and tilt when the frame captured at `t` was taken.
+
+        Detection runs on its own thread, so by the time boxes arrive the
+        head has moved on; offsets in them are from where it pointed then.
+        Falls back to the current pose when `t` is unknown (test cameras) or
+        older than the log.
+        """
+        if t is not None:
+            for at, pan, tilt in reversed(self._poses):
+                if at <= t:
+                    if t - at <= 0.2:
+                        return pan, tilt
+                    break
+        return self.ptz.pan_deg, self.ptz.tilt_deg
+
     def _slew(self, dt: float) -> None:
-        """Glide the servos toward the goals instead of snapping between frames."""
-        max_pan = config.PAN_MAX_DPS * dt
-        self.ptz.set_pan(self.ptz.pan_deg + _clamp(self._pan_goal - self.ptz.pan_deg,
-                                                   -max_pan, max_pan))
-        max_tilt = config.TILT_MAX_DPS * dt
-        self.ptz.set_tilt(self.ptz.tilt_deg + _clamp(self._tilt_goal - self.ptz.tilt_deg,
-                                                     -max_tilt, max_tilt))
+        """Ease the servos toward the goals instead of snapping between frames.
+
+        The goals jump a few times a second, on each fresh detection; easing
+        spreads each jump over the gap until the next one (see _ease).
+        """
+        pan, self._pan_vel = _ease(self.ptz.pan_deg, self._pan_vel, self._pan_goal, dt,
+                                   config.PAN_MAX_DPS, config.PAN_MAX_ACCEL_DPS2)
+        self.ptz.set_pan(pan)
+        tilt, self._tilt_vel = _ease(self.ptz.tilt_deg, self._tilt_vel, self._tilt_goal, dt,
+                                     config.TILT_MAX_DPS, config.TILT_MAX_ACCEL_DPS2)
+        self.ptz.set_tilt(tilt)
 
     # ---- geometry ----------------------------------------------------------
     def _px_to_hdeg(self, dx_px: float) -> float:
@@ -378,3 +406,21 @@ class Tracker:
 
 def _clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
+
+
+def _ease(pos: float, vel: float, goal: float, dt: float,
+          max_dps: float, max_accel: float) -> tuple[float, float]:
+    """One tick of easing toward `goal` → (new position, new velocity).
+
+    The wanted speed is the distance left over TRACK_EASE_S, capped at
+    `max_dps` and at the speed from which `max_accel` can still stop at the
+    goal. The velocity moves toward it by at most `max_accel`·dt per tick.
+    """
+    err = goal - pos
+    want = math.copysign(min(abs(err) / config.TRACK_EASE_S,
+                             math.sqrt(2.0 * max_accel * abs(err)), max_dps), err)
+    vel += _clamp(want - vel, -max_accel * dt, max_accel * dt)
+    step = vel * dt
+    if err * step > 0 and abs(step) >= abs(err):
+        return goal, 0.0                       # arriving: land on it, not past it
+    return pos + step, vel

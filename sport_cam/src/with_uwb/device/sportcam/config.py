@@ -1,7 +1,8 @@
 """Camera-unit configuration.
 
 This is the **PTZ-base build on a Raspberry Pi 4**: an Arducam IMX477 PTZ
-camera on a metal pan-tilt base, all four axes behind one I2C controller.
+camera on a metal pan-tilt base: zoom and focus on its I2C controller, pan
+and tilt on the Pi's hardware PWM (or the controller, `SERVO_DRIVER`).
 There is no pan stepper, no slip ring and no base ESP32, so everything below
 runs on the single Pi.
 
@@ -67,12 +68,29 @@ AWAKE_TIMEOUT_S = 30.0
 CAMERA_WARMUP_S = 1.0        # after waking, let exposure settle before the first detection
 SLEEP_LED_LEVEL = 0.25       # sleep: a single ring pixel at this level, to show it is on
 
-# --- pan / tilt (Arducam PTZ controller, I2C 0x0C) ------------------------
+# --- pan / tilt -------------------------------------------------------------
+# Who drives the two servos (docs/04, "Servo drive"):
+#   "pigpio"  — the Pi, via the pigpio daemon's hardware PWM on PAN_GPIO /
+#               TILT_GPIO, through the 74AHCT125. Sub-degree steps, so slow
+#               pans stay smooth zoomed in. Needs the servo signal leads
+#               moved off the PTZ controller (docs 12, "Servos") and pigpiod
+#               running (docs 14).
+#   "arducam" — the PTZ controller's registers 0x05 / 0x06, whole degrees
+#               only. For a head still wired as the kit came.
+SERVO_DRIVER = "pigpio"
+PAN_GPIO, TILT_GPIO = 12, 13   # the Pi 4's two hardware PWM channels (pins 32, 33)
+SERVO_PWM_HZ = 50
+# Pulse width at raw 0° and 180°: the standard servo range, and what the
+# controller's registers map to. If a commanded ±45° measures short or long
+# on the bench, widen or narrow these about 1500 µs.
+SERVO_US_AT_0, SERVO_US_AT_180 = 500, 2500
+
 # Angles are degrees from centre. Raw servo values are 0-180; CENTER_RAW is
 # the raw value that aims the lens along the anchor bar's normal, and SIGN
-# flips if your base is assembled mirrored. Verify both on the bench with
+# flips if your base is assembled mirrored. CENTER_RAW may be fractional with
+# the pigpio driver. Verify both on the bench with
 # `python -m sportcam.ptzcheck` before the first tracking run.
-I2C_BUS = 1
+I2C_BUS = 1                     # PTZ controller (zoom, focus; and pan/tilt on "arducam")
 PAN_CENTER_RAW, PAN_SIGN = 90, 1
 TILT_CENTER_RAW, TILT_SIGN = 90, 1
 
@@ -84,6 +102,15 @@ TILT_MIN_DEG, TILT_MAX_DEG = -45.0, 85.0
 
 PAN_MAX_DPS = 120.0            # slew limit on the pan servo (deg/s)
 TILT_MAX_DPS = 90.0
+# Easing. Racing to each new aim point at the slew limit and stopping dead
+# shows in the video as a lurch every detection. Instead the servos move at
+# a speed proportional to the distance left, covering it in about
+# TRACK_EASE_S, and change speed no faster than the acceleration limits, so
+# every move starts and ends gently and a new aim point bends the motion
+# rather than jerking it. Longer is smoother but lags a fast mover more.
+TRACK_EASE_S = 0.4
+PAN_MAX_ACCEL_DPS2 = 60.0
+TILT_MAX_ACCEL_DPS2 = 45.0
 
 # --- manual aim: the phone app's joystick (awake only) ---------------------
 # The knob's pull, as a fraction of the ring's radius, sets the speed: it

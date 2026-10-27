@@ -238,6 +238,31 @@ async def main() -> None:
             os.remove(os.path.join(config.RECORD_DIR, f))
         os.rmdir(config.RECORD_DIR)
 
+    # A client connecting or dropping while a broadcast is mid-send changes
+    # the set being sent to; that must not escape into the caller (the
+    # control loop).
+    api = LocalApi(head=None)
+
+    class Client:
+        def __init__(self, on_send=None):
+            self.got, self.on_send = [], on_send
+
+        async def send_json(self, msg):
+            await asyncio.sleep(0)
+            self.got.append(msg)
+            if self.on_send:
+                self.on_send()
+
+    late = Client()
+    first = Client(on_send=lambda: api._ws_clients.add(late))
+    api._ws_clients.update({first, Client(on_send=lambda: api._ws_clients.discard(first))})
+    try:
+        await api.broadcast({"type": "state"})
+        ok, err = True, ""
+    except RuntimeError as e:
+        ok, err = False, str(e)
+    check("a client joining or leaving mid-broadcast doesn't break it", ok, err)
+
     print()
     if failures:
         print(f"{len(failures)} FAILED: {', '.join(failures)}")

@@ -133,6 +133,16 @@ describe("state machine", () => {
     const s = await call("getState");
     expect(s.body.result).toMatchObject({ state: "awake", deviceOnline: false, mode: "with_uwb" });
   });
+
+  it("passes the camera's latest warning through, for the app to toast", async () => {
+    await camera("awake");
+    expect((await call("getState")).body.result.warning).toBeNull();
+    const at = Timestamp.fromMillis(Date.UTC(2026, 9, 27, 12));
+    await cam().update({ warning: { code: "no-detector", at } });
+    expect((await call("getState")).body.result.warning).toEqual({
+      code: "no-detector", at: "2026-10-27T12:00:00.000Z",
+    });
+  });
 });
 
 describe("camera key", () => {

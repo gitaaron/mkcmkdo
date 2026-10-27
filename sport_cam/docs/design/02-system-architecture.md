@@ -34,7 +34,7 @@ The UWB build adds a fourth subsystem, the **wearable tag**.
 
 | Decision | Rationale | Cost |
 | --- | --- | --- |
-| **Control loop closes on one board.** Pan, tilt, zoom and focus are register writes to the Arducam PTZ controller on the Pi's I2C bus | no network hop or second microcontroller in the loop | pan limited to ±80°, no continuous rotation ([03](03-mechanical-design.md#ranges-of-motion)) |
+| **Control loop closes on one board.** Pan and tilt are the Pi's own hardware PWM ([04 — Servo drive](04-electronics.md#servo-drive)); zoom and focus are register writes to the Arducam PTZ controller on the Pi's I2C bus | no network hop or second microcontroller in the loop; sub-degree pan and tilt | pan limited to ±80°, no continuous rotation ([03](03-mechanical-design.md#ranges-of-motion)) |
 | **Backend and network are optional.** Without Wi-Fi the camera tracks, records and shows state; a phone on the same Wi-Fi controls it directly ([09](09-direct-connection-and-app.md)) | gym Wi-Fi is unreliable (C7) | the camera hosts its own copy of the API |
 | **Firebase only** ([07](07-backend-and-app.md)). The camera writes its own Firestore document and listens on it for app requests | no server to run or hold connections (C8) | remote live view is a ≈ 1 frame/s preview; Cloud Functions can't stream |
 

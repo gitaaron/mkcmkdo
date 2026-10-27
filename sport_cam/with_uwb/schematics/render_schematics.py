@@ -30,13 +30,15 @@ def head_schematic():
         d.config(fontsize=11)
         pi = d.add(elm.Ic(
             pins=[
-                pin("USB A1", "left", "7/7", "USBA1"),
-                pin("USB A2", "left", "6/7", "USBA2"),
-                pin("USB A3", "left", "5/7", "USBA3"),
-                pin("SPI MOSI G10", "left", "4/7", "MOSI"),
-                pin("HOLD G17", "left", "3/7", "HOLD"),
-                pin("SENSE G27", "left", "2/7", "SENSE"),
-                pin("USB-C 5V", "left", "1/7", "USBC"),
+                pin("USB A1", "left", "9/9", "USBA1"),
+                pin("USB A2", "left", "8/9", "USBA2"),
+                pin("USB A3", "left", "7/9", "USBA3"),
+                pin("PWM0 G12", "left", "6/9", "PWMPAN"),
+                pin("PWM1 G13", "left", "5/9", "PWMTILT"),
+                pin("SPI MOSI G10", "left", "4/9", "MOSI"),
+                pin("HOLD G17", "left", "3/9", "HOLD"),
+                pin("SENSE G27", "left", "2/9", "SENSE"),
+                pin("USB-C 5V", "left", "1/9", "USBC"),
                 pin("CSI", "right", "4/4"),
                 pin("SDA G2", "right", "3/4", "SDA"),
                 pin("SCL G3", "right", "2/4", "SCL"),
@@ -48,23 +50,20 @@ def head_schematic():
         cam = d.add(elm.Ic(
             pins=[pin("CSI", "left", "2/2"), pin("GND", "left", "1/2", "GND")],
             edgepadW=1.4, edgepadH=0.9, pinspacing=1.3,
-            at=(11.0, 3.6),
-        ).label("Arducam IMX477\n+ motorized zoom lens", "top", ofst=(0, 0.35), fontsize=10))
+        ).at((11.0, pi.CSI[1])).anchor("CSI").label("Arducam IMX477\n+ motorized zoom lens", "top", ofst=(0, 0.35), fontsize=10))
         d.add(elm.Wire("-").at(pi.CSI).to(cam.CSI).label("15-pin FFC", "top", fontsize=9))
         d.add(elm.Wire("|-").at(pi.GND2).to(cam.GND))
 
         ptz = d.add(elm.Ic(
             pins=[
-                pin("SDA", "left", "4/4"),
-                pin("SCL", "left", "3/4"),
-                pin("pan servo  0x05", "right", "4/4", "PAN"),
-                pin("tilt servo  0x06", "right", "3/4", "TILT"),
-                pin("zoom motor  0x00", "right", "2/4", "ZOOM"),
-                pin("focus motor  0x01", "right", "1/4", "FOCUS"),
+                pin("SDA", "left", "2/2"),
+                pin("SCL", "left", "1/2"),
+                pin("zoom motor  0x00", "right", "2/2", "ZOOM"),
+                pin("focus motor  0x01", "right", "1/2", "FOCUS"),
             ],
-            edgepadW=1.5, edgepadH=1.0, pinspacing=1.3,
+            edgepadW=4.0, edgepadH=1.0, pinspacing=1.3,
             at=(11.0, -4.2),
-        ).label("Arducam PTZ controller — I2C 0x0C\n(5 V from the rail, not the GPIO header)",
+        ).label("Arducam PTZ controller — I2C 0x0C, lens only\n(5 V from the rail, not the GPIO header)",
                 "bottom", ofst=(0, -0.5), fontsize=10))
         d.add(elm.Wire("-|").at(pi.SDA).to(ptz.SDA))
         d.add(elm.Wire("-|").at(pi.SCL).to(ptz.SCL).label("I2C", "top", fontsize=9))
@@ -91,6 +90,15 @@ def head_schematic():
         d.add(elm.Dot(open=True).label("power latch\n(12 V, docs/04)", "left", fontsize=9))
 
         d.add(elm.Vdd().at(pi.USBC).label("+5 V rail (see power tree)", fontsize=9))
+
+        # Pan and tilt: the Pi's hardware PWM, through the shifter's spare
+        # gates, straight to the servos (docs/04, "Servo drive").
+        d.add(elm.Line().at(pi.PWMPAN).left(5)
+              .label("hardware PWM → 74AHCT125 gate 2", "top", fontsize=8.5))
+        d.add(elm.Dot(open=True).label("pan servo\n(5 V from the rail)", "left", fontsize=9))
+        d.add(elm.Line().at(pi.PWMTILT).left(5)
+              .label("hardware PWM → 74AHCT125 gate 3", "top", fontsize=8.5))
+        d.add(elm.Dot(open=True).label("tilt servo\n(5 V from the rail)", "left", fontsize=9))
     save(d, "schematic-head.png")
 
 

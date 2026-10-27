@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import math
 import time
+from collections import deque
 
 from simple_pid import PID
 
@@ -69,6 +70,8 @@ class Tracker:
         self._pan_bias = 0.0           # CV-learned correction to the UWB bearing
         self._tilt_bias = 0.0          # same, for the UWB elevation
         self._zoom_scale = 1.0         # vision framing: multiplies the distance zoom
+        self._pan_vel = 0.0            # deg/s, for easing toward the target
+        self._tilt_vel = 0.0
         self._looking_wide = False     # recording, wearer out of sight: lens wide
         self._last_seen_at: float | None = None   # last fresh person detection
         self.last_fix_at = time.monotonic()
@@ -82,6 +85,8 @@ class Tracker:
         # overlay (boxlog): climber, other, or unsure
         self.labelled: list[tuple[Box, str]] = []
         self.labelled_at: float | None = None
+        self._poses: deque[tuple[float, float, float]] = deque(maxlen=40)   # (t, pan, tilt), 2 s
+        self._view_pan = 0.0           # pan when the latest detection's frame was taken
         self.reset_lock()
 
     def lost_for(self) -> float:
@@ -205,13 +210,29 @@ class Tracker:
         elif now - self._found_seen_at > config.FOUND_LOST_S:
             self.mode = SEARCH                # gone: the countdown starts again
 
+    def _pose_at(self, t: float | None) -> tuple[float, float]:
+        """Pan and tilt when the frame captured at `t` was taken.
+
+        Detection runs on its own thread, so by the time boxes arrive the
+        head has moved on; offsets in them are from where it pointed then.
+        Falls back to the current pose when `t` is unknown (test cameras) or
+        older than the log.
+        """
+        if t is not None:
+            for at, pan, tilt in reversed(self._poses):
+                if at <= t:
+                    if t - at <= 0.2:
+                        return pan, tilt
+                    break
+        return self.ptz.pan_deg, self.ptz.tilt_deg
+
     def _box_deg(self, box: tuple[int, int, int, int]) -> float:
         """A box's centre as a pan bearing, in the same frame as the tag's."""
         x, _, w, _ = box
         half_w = config.PREVIEW_SIZE[0] / 2
         half_fov = math.radians(max(1.0, self.ptz.hfov_deg) / 2)
         off = math.atan((x + w / 2 - half_w) / half_w * math.tan(half_fov))
-        return self.ptz.pan_deg + math.degrees(off)
+        return self._view_pan + math.degrees(off)
 
     def _range_agrees(self, box: tuple[int, int, int, int], dist_m: float) -> bool:
         """Does the box's height put the person roughly at the tag's distance?
@@ -316,6 +337,7 @@ class Tracker:
         now = time.monotonic()
         dt = min(now - self._last_step, 0.25)
         self._last_step = now
+        self._poses.append((now, self.ptz.pan_deg, self.ptz.tilt_deg))
 
         target = self.ptz.pan_deg
         tilt_target: float | None = None
@@ -344,6 +366,7 @@ class Tracker:
         boxes, fresh = self.camera.person_boxes()
         bbox = None
         if fresh:
+            self._view_pan = self._pose_at(getattr(self.camera, "captured_at", None))[0]
             bbox = self._match_tag(boxes, target if have_fix else None,
                                    fix.dist_m if have_fix else (self.dist_m or 0.0))
         if fresh:
@@ -391,14 +414,17 @@ class Tracker:
         # whoever happens to be in frame. Vision cannot tell your subject from
         # a bystander; the tag can, and that is the whole reason it is there.
 
-        # Slew-limit so the servos glide instead of snapping between frames.
-        max_step = config.PAN_MAX_DPS * dt
-        self.ptz.set_pan(self.ptz.pan_deg + _clamp(target - self.ptz.pan_deg,
-                                                   -max_step, max_step))
+        # Ease rather than slew at full rate, so ranging noise and each
+        # vision bias update bend the motion instead of jerking it (_ease).
+        pan, self._pan_vel = _ease(self.ptz.pan_deg, self._pan_vel, target, dt,
+                                   config.PAN_MAX_DPS, config.PAN_MAX_ACCEL_DPS2)
+        self.ptz.set_pan(pan)
         if tilt_target is not None:
-            max_tilt = config.TILT_MAX_DPS * dt
-            self.ptz.set_tilt(self.ptz.tilt_deg + _clamp(tilt_target - self.ptz.tilt_deg,
-                                                         -max_tilt, max_tilt))
+            tilt, self._tilt_vel = _ease(self.ptz.tilt_deg, self._tilt_vel, tilt_target, dt,
+                                         config.TILT_MAX_DPS, config.TILT_MAX_ACCEL_DPS2)
+            self.ptz.set_tilt(tilt)
+        else:
+            self._tilt_vel = 0.0               # tilt is vision's PID's (nudge_tilt)
         self._advance(now, have_fix, target, tilt_target, saw_wearer)
 
     @staticmethod
@@ -508,3 +534,21 @@ def _lead_needed(a: _Person, b: _Person) -> float:
 
 def _clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
+
+
+def _ease(pos: float, vel: float, goal: float, dt: float,
+          max_dps: float, max_accel: float) -> tuple[float, float]:
+    """One tick of easing toward `goal` → (new position, new velocity).
+
+    The wanted speed is the distance left over TRACK_EASE_S, capped at
+    `max_dps` and at the speed from which `max_accel` can still stop at the
+    goal. The velocity moves toward it by at most `max_accel`·dt per tick.
+    """
+    err = goal - pos
+    want = math.copysign(min(abs(err) / config.TRACK_EASE_S,
+                             math.sqrt(2.0 * max_accel * abs(err)), max_dps), err)
+    vel += _clamp(want - vel, -max_accel * dt, max_accel * dt)
+    step = vel * dt
+    if err * step > 0 and abs(step) >= abs(err):
+        return goal, 0.0                       # arriving: land on it, not past it
+    return pos + step, vel

@@ -162,6 +162,28 @@ class SimCamera:
         return out
 
 
+class LaggedCamera(SimCamera):
+    """As the real threaded detector: a frame is taken, and its boxes arrive
+    DETECT_LAG_S later, while the head has kept moving. `captured_at` is when
+    the frame was taken."""
+    DETECT_LAG_S = 0.25
+
+    def __init__(self, ptz: FakePtz, people: list[Person]) -> None:
+        super().__init__(ptz, people)
+        self._pending = None                 # (taken at, boxes)
+        self.captured_at: float | None = None
+
+    def person_boxes(self):
+        if self._pending is None and CLOCK.t - self._at >= self._period:
+            self._at = CLOCK.t
+            self._pending = (CLOCK.t, self.project())
+        if self._pending and CLOCK.t - self._pending[0] >= self.DETECT_LAG_S:
+            self.captured_at, self._boxes = self._pending
+            self._pending = None
+            return self._boxes, True
+        return self._boxes, False
+
+
 def world(*people: Person):
     ptz = FakePtz()
     cam = SimCamera(ptz, list(people))
@@ -312,6 +334,23 @@ def main() -> None:
     check("subject past the limit: pan stops at the limit",
           ptz.pan_deg <= config.PAN_MAX_DEG + 1e-9)
 
+
+    # detections that arrive late, as from the real detector thread
+    b = Person(0.0)
+    ptz = FakePtz()
+    cam = LaggedCamera(ptz, [b])
+    tr = Tracker(cam, ptz)
+    run(tr, 20, until=lambda: locked(tr))
+    run(tr, 4)
+    b.bearing = 30.0                                            # moves well aside
+    peak = 0.0
+    for _ in range(int(5 / 0.05)):
+        run(tr, 0.05)
+        peak = max(peak, ptz.pan_deg - 30.0)
+    # Taken from the current pose instead, the turn made during the detection
+    # is counted twice: ≈ 1.8° past them here.
+    check("late detections: offsets taken from the pose at capture, no overshoot",
+          peak < 0.5 and abs(ptz.pan_deg - 30.0) < 1.5, f"peak +{peak:.1f}°, pan {ptz.pan_deg:.1f}")
     # ---- 6. losing the person ----------------------------------------------------
     print("\nlost")
     a = Person(25.0)

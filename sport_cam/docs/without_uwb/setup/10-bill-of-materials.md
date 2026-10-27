@@ -46,7 +46,7 @@ ordered. Printed-parts table: tick **Acquired** ☐ when printed.
 | 3   | A      | Pi 4 heatsink + fan case, or an aluminium heatsink set | 1   | $12    | [Amazon.ca](https://www.amazon.ca/s?k=raspberry+pi+4+heatsink+fan)                                                                                                                              | the Pi 5 Active Cooler does **not** fit a Pi 4. Passive heatsinks are enough at this load; a fan is cheap insurance in a sealed enclosure                                                                                                                                                               |
 | 4   | A      | microSD 64 GB A2 (SanDisk Extreme)                     | 1   | $14    | [Amazon.ca](https://www.amazon.ca/s?k=sandisk+extreme+64gb+microsd+a2)                                                                                                                          | recordings land here at 5.4 GB/h, so 64 GB holds ≈ 10 h — more than one battery charge can produce. 128 or 256 GB only helps if you carry spare banks and stay offline; see [04](../../design/04-electronics.md#the-sd-card). **Buy a known brand**: counterfeit cards are the commonest cause of Pi corruption      |
 | 7   | A      | WS2812B LED ring, 16 px                                | 1   | $14    | [Amazon.ca](https://www.amazon.ca/s?k=ws2812b+ring+16+led)                                                                                                                                      | status indicator; `LED_COUNT = 16`. A 16-px ring is 44 mm across — to light the 120 mm window evenly, ~380 mm of 60/m WS2812B **strip** (≈ 23 px) lining the window works better; change `LED_COUNT` if you do                                                                                          |
-| 8   | A      | 74AHCT125 level shifter                                | 1   | $6     | [Amazon.ca](https://www.amazon.ca/s?k=74ahct125) · [Digi-Key.ca](https://www.digikey.ca/)                                                                                                       | lifts the Pi's 3.3 V SPI data to 5 V for the ring. SPI is used instead of the classic PWM/DMA driver so the service need not run as root — see [04](../../design/04-electronics.md#driving-the-ws2812b-ring)                                                                                                         |
+| 8   | A      | 74AHCT125 level shifter                                | 1   | $6     | [Amazon.ca](https://www.amazon.ca/s?k=74ahct125) · [Digi-Key.ca](https://www.digikey.ca/)                                                                                                       | lifts the Pi's 3.3 V signals to 5 V: SPI data for the ring, and the two servo PWM lines (gates 2 and 3). SPI is used instead of the classic PWM/DMA driver so the service need not run as root — see [04](../../design/04-electronics.md#driving-the-ws2812b-ring)                                                                                                         |
 
 ## Power
 
@@ -100,7 +100,7 @@ charger exceeds that, by a few minutes.
 
 | #   | Status | Part                                                                    | Qty | ≈ CAD | Source                                                                            | Notes                                                                                                                                                                                                                                             |
 | --- | ------ | ----------------------------------------------------------------------- | --- | ----- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 18  |        | Barrel jack, JST kit, 18/22 AWG silicone wire, heatshrink, Dupont leads | —   | $20   | [Amazon.ca](https://www.amazon.ca/s?k=jst+connector+kit+22awg+silicone+wire)      | 18 AWG on the 5 V rail — it carries 4 A                                                                                                                                                                                                           |
+| 18  |        | Barrel jack, JST kit, 18/22 AWG silicone wire, heatshrink, Dupont leads, 2 × 30 cm servo extension leads, male header strip | —   | $25   | [Amazon.ca](https://www.amazon.ca/s?k=jst+connector+kit+22awg+silicone+wire)      | 18 AWG on the 5 V rail — it carries 4 A. The extension leads and two 3-pin headers move the servos onto the Pi's PWM ([12, Servos](12-wiring.md#servos))                                                                                                                                                                                                           |
 | 19  |        | 470 µF electrolytic capacitor, 10 V or higher (small pack)              | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=470uf+16v+electrolytic+capacitor)           | across the buck output, stripe (−) to OUT− — connection R1 in the [wiring guide](12-wiring.md).                                                                       |
 | 21  |        | Nylon standoff kit, M2.5 + M3                                           | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=m2.5+m3+nylon+standoff+kit)                 | Pi on four 6 mm M2.5 standoffs on the shelf. The power boards are foam-taped down, so no M3 standoffs are needed |
 | 22  |        | M2.5/M3 screw + nut + brass heat-set insert kit | 1   | $20   | [Amazon.ca](https://www.amazon.ca/s?k=m3+m2.5+screw+nut+assortment) | ≈ 11 × M3: PTZ base 4 + nuts, lid 4 × M3 × 8 countersunk (in sideways through the wall), shelf 3 × M3 × 8. 8 × M2.5. Inserts: 7 × M3 — 1 in each shelf post, 4 in the lid's ring. Kit price kept at the UWB build's figure |
@@ -138,20 +138,20 @@ STLs, previews and the images below are regenerated by `python3 cad/fit.py`
 
 | Configuration | Total |
 | --- | --- |
-| **Full build** (12 MP PTZ + 92 Wh battery, camera-only), own tripod | **≈ C$731** |
-| Full build + tripod (item 26) | ≈ C$766 |
+| **Full build** (12 MP PTZ + 92 Wh battery, camera-only), own tripod | **≈ C$736** |
+| Full build + tripod (item 26) | ≈ C$771 |
 | With a 74 Wh bank instead (6.7 h) | subtract ≈ C$25 |
 | Without the battery gauge (`POWER_MONITOR = "none"`) | subtract ≈ C$22 |
 | Optional charging kit (items 28–29), if your own chargers are too slow | add ≈ C$52 |
 
-(≈ US$526 / US$551 at typical exchange + Canadian markup.)
+(≈ US$530 / US$555 at typical exchange + Canadian markup.)
 
 | Group | Items | ≈ CAD |
 | --- | --- | --- |
 | Camera and power | 1, 9–14 (293 + 80 + 10 + 16 + 22 + 8 + 15 + 10) | 454 |
 | Compute and status | 2–4, 7, 8 (95 + 12 + 14 + 14 + 6) | 141 |
-| Wiring, fasteners, filament | 18, 19, 21–25b, 27 (20 + 10 + 10 + 20 + 12 + 8 + 25 + 12 + 4 + 15) | 136 |
-| **Total** | | **731** |
+| Wiring, fasteners, filament | 18, 19, 21–25b, 27 (25 + 10 + 10 + 20 + 12 + 8 + 25 + 12 + 4 + 15) | 141 |
+| **Total** | | **736** |
 
 Optional charging items 28–29 excluded.
 
@@ -168,7 +168,7 @@ One item: the battery gauge (item 12).
 
 ## Compared with the UWB build
 
-[UWB build](../../with_uwb/setup/10-bill-of-materials.md): ≈ C$1094
+[UWB build](../../with_uwb/setup/10-bill-of-materials.md): ≈ C$1099
 excluding tripod. Omitted here:
 
 | Removed | ≈ CAD |
@@ -180,7 +180,7 @@ excluding tripod. Omitted here:
 | ½-inch hardwood dowel (item 27a) | $5 |
 | **Total saved** | **$363** |
 
-C$1094 − C$363 = **C$731**.
+C$1099 − C$363 = **C$736**.
 
 Also omitted, not itemised (kit prices unchanged): heat-set inserts, M3
 hardware for the arms and mast, the radios' M2.5 standoffs. Printed parts: 5

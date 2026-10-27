@@ -192,6 +192,9 @@ reconnects automatically afterwards.
 | Wi-Fi drops mid-upload | `upload_with_retry`: exponential backoff 5 s → 5 min, 8 attempts; file kept until confirmed |
 | Backend unreachable for the whole session | retry ladder ends after ≈ 15 min; file kept. `upload_loop` retries everything on the card at start-up and every 15 min, oldest first |
 | Card nearly full | < 20 min of space: ring blinks orange, app warns. < 5 min: new recordings refused, a running one stopped cleanly ([01 — State machine](../product/01-requirements.md#state-machine), [04](04-electronics.md#the-sd-card)) |
+| No person detector on the camera | an OpenCV without HOG (5.x; the setup installs apt's 4.x): the head boots and pairs, but refuses every session, and the app toasts *"Can't track: the camera's OpenCV has no person detector"* |
+| Warnings to the app | the head sends `{"type": "warning", "code": …}` on the WebSocket and writes `warning: {code, at}` to Firestore (passed through by `getState`); the app shows each new one as a toast for 6 s. Codes: `no-detector`, `storage-full`, `storage-low`, `battery-low` |
+| One upload per clip | a clip still in its retry ladder is skipped by `upload_loop`'s drain, so it is never sent twice at once (the first to finish would delete it under the other) |
 | Backend unreachable at record time | no effect on recording (local); only upload needs the network |
 | Internet down at the gym | tracking and recording continue; direct phone connection works on the same Wi-Fi; remote apps show the camera offline |
 | Partial upload | Cloud Storage creates the object only on PUT completion, and `finalizeRecording` checks size: no partial files in the library |

@@ -178,6 +178,15 @@ class _HomeScreenState extends State<HomeScreen> {
               alignment: Alignment(0, -0.78),
             ),
 
+          // the camera refused something or is running low: says why
+          if (client.warning case final warning?)
+            _Pill(
+              text: warning.text,
+              accent: SportColors.recording,
+              onTap: client.dismissWarning,
+              alignment: const Alignment(0, 0.56),
+            ),
+
           if (upload != null)
             _Pill(text: 'Uploading… ${(upload.fraction * 100).round()}%')
           else if (saved != null)
@@ -318,6 +327,7 @@ class _Pill extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 24),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
           decoration: BoxDecoration(
             color: SportColors.panel,
@@ -326,6 +336,7 @@ class _Pill extends StatelessWidget {
           ),
           child: Text(
             text,
+            textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13.5, color: accent ?? SportColors.ink),
           ),
         ),

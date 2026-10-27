@@ -26,6 +26,11 @@ from .storage import pending_files
 
 ProgressFn = Callable[[dict], Awaitable[None]]
 
+# Clips being uploaded right now. A clip still in its retry ladder is also on
+# the card, so drain_pending would otherwise send it a second time alongside
+# — and the first to finish deletes the file under the other.
+_uploading: set[str] = set()
+
 CHUNK = 256 * 1024
 
 
@@ -103,16 +108,22 @@ async def upload_recording(path: str, duration_s: float | None, progress: Progre
 
 async def upload_with_retry(path: str, duration_s: float | None, progress: ProgressFn) -> None:
     """Retry with backoff — gym Wi-Fi drops, uploads must survive it."""
-    delay = 5.0
-    for attempt in range(8):
-        try:
-            await upload_recording(path, duration_s, progress)
-            return
-        except Exception as err:  # noqa: BLE001 — any failure → retry
-            print(f"[upload] attempt {attempt + 1} failed: {err}; retry in {delay:.0f}s")
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, 300)
-    print(f"[upload] giving up on {path} — kept locally, will retry later")
+    if path in _uploading:
+        return
+    _uploading.add(path)
+    try:
+        delay = 5.0
+        for attempt in range(8):
+            try:
+                await upload_recording(path, duration_s, progress)
+                return
+            except Exception as err:  # noqa: BLE001 — any failure → retry
+                print(f"[upload] attempt {attempt + 1} failed: {err}; retry in {delay:.0f}s")
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 300)
+        print(f"[upload] giving up on {path} — kept locally, will retry later")
+    finally:
+        _uploading.discard(path)
 
 
 async def drain_pending(progress: ProgressFn, exclude: str | None = None) -> int:
@@ -125,18 +136,21 @@ async def drain_pending(progress: ProgressFn, exclude: str | None = None) -> int
     Oldest first matters: if space is tight, clearing the oldest clip frees
     the card soonest for whatever is being filmed now.
     """
-    files = [p for p in pending_files() if p != exclude]
+    files = [p for p in pending_files() if p != exclude and p not in _uploading]
     if not files:
         return 0
     print(f"[upload] {len(files)} recording(s) pending")
     done = 0
     for path in files:
-        if not os.path.exists(path):          # uploaded by another pass
+        if path in _uploading or not os.path.exists(path):   # another upload has it
             continue
+        _uploading.add(path)
         try:
             await upload_recording(path, None, progress)
             done += 1
         except Exception as err:              # noqa: BLE001 — try the rest
             print(f"[upload] still cannot send {os.path.basename(path)}: {err}")
             break                             # backend is down; stop hammering
+        finally:
+            _uploading.discard(path)
     return done

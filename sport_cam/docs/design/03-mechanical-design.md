@@ -24,7 +24,7 @@ enclosure or a bracket.
 | 3 | **Enclosure** | printed, <!--with_uwb-->Ø 141 × 84 mm<!--/--><!--both--> with UWB, <!--/--><!--without_uwb-->Ø 135 × 73 mm<!--/--><!--both--> without<!--/--> with the assumed part sizes ([layout](#layout-inside-the-enclosure)). No moving parts inside. <!--both-->Wall: three bosses and an anchor-cable slot with UWB; plain without<!--/--><!--with_uwb: Wall: three bosses for the arms and mast, and an anchor-cable slot--><!--without_uwb: Wall: plain all round--> |
 | 4 | **Lid** | printed, 5 mm, structural: carries the whole camera. The Arducam base bolts through four radial slots; ribbon and servo lead pass through the central opening |
 | 5 | **Arducam pan-tilt base** | aluminium bracket, two digital servos, both axes 0–180°. Supplied assembled with the camera |
-| 6 | **Camera and lens** | IMX477 12 MP sensor, motorized zoom lens. Zoom and focus steppers driven over the same I2C bus as the servos |
+| 6 | **Camera and lens** | IMX477 12 MP sensor, motorized zoom lens. Zoom and focus steppers on the kit's I2C controller; the servos are driven by the Pi's PWM ([04](04-electronics.md#servo-drive)) |
 
 <!--with_uwb-->
 

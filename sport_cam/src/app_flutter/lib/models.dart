@@ -314,6 +314,36 @@ class LiveBoxes {
   }
 }
 
+/// Something the camera raised for the user: a session it refused, a card
+/// filling up, a low battery. Shown as a toast for [hold].
+class CamWarning {
+  const CamWarning(this.code, this.text);
+
+  final String code;
+  final String text;
+
+  static const hold = Duration(seconds: 6);
+
+  /// Null for codes this app doesn't know (a newer camera): no toast.
+  static CamWarning? of(Object? code) => switch (code) {
+    'no-detector' => const CamWarning(
+      'no-detector',
+      "Can't track: the camera's OpenCV has no person detector — "
+          'reinstall python3-opencv (4.x) on the camera',
+    ),
+    'storage-full' => const CamWarning(
+      'storage-full',
+      "Can't record: the camera's card is full",
+    ),
+    'storage-low' => const CamWarning(
+      'storage-low',
+      "The camera's card is nearly full",
+    ),
+    'battery-low' => const CamWarning('battery-low', 'Camera battery low'),
+    _ => null,
+  };
+}
+
 class UploadProgress {
   const UploadProgress(this.name, this.sent, this.total);
 

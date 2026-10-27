@@ -45,6 +45,12 @@ class CameraClient extends ChangeNotifier {
   UploadProgress? _upload;
   Recording? _justSaved;
   String? _lastError;
+  CamWarning? _warning;
+  Timer? _warningExpiry;
+  // Relay: the `at` of the warning last seen in getState. The first poll
+  // only sets it, so connecting doesn't replay an old warning.
+  String? _relayWarningAt;
+  bool _relayWarningSeen = false;
 
   WebSocketChannel? _ws;
   StreamSubscription<dynamic>? _wsSub;
@@ -57,6 +63,13 @@ class CameraClient extends ChangeNotifier {
   Timer? _liveBoxesExpiry;
   bool _disposed = false;
   bool _foreground = true;
+  // Bumped by every connect / attach. Async work started under an older
+  // value (a slow discovery, a poll still waiting on the last endpoint)
+  // checks it after each await and drops its result: otherwise a retry and
+  // a tap racing each other open two sockets, and a late reply from the old
+  // endpoint overwrites the new one's state.
+  int _gen = 0;
+  int? _pollingGen; // the connection a poll is in flight for
 
   LinkMode get link => _link;
   CameraEndpoint? get endpoint => _endpoint;
@@ -67,6 +80,25 @@ class CameraClient extends ChangeNotifier {
   UploadProgress? get upload => _upload;
   Recording? get justSaved => _justSaved;
   String? get lastError => _lastError;
+
+  /// The camera's latest warning, for [CamWarning.hold]; null otherwise.
+  CamWarning? get warning => _warning;
+
+  void _raiseWarning(Object? code) {
+    final w = CamWarning.of(code);
+    if (w == null) return;
+    _warning = w;
+    _warningExpiry?.cancel();
+    _warningExpiry = Timer(CamWarning.hold, dismissWarning);
+    if (!_disposed) notifyListeners();
+  }
+
+  void dismissWarning() {
+    _warningExpiry?.cancel();
+    if (_warning == null) return;
+    _warning = null;
+    if (!_disposed) notifyListeners();
+  }
 
   /// The app is on screen. In the background it stops asking for the live
   /// view (no `watch`, no previews, no stream), so the camera can go to
@@ -111,22 +143,26 @@ class CameraClient extends ChangeNotifier {
 
   /// Discover and connect. Safe to call again to re-scan.
   Future<void> connect() async {
+    final gen = ++_gen;
     _setLink(LinkMode.searching);
 
     final cameras = await CameraDiscovery.discover();
+    if (gen != _gen) return;
     if (cameras.isNotEmpty) {
-      await _attach(cameras.first, LinkMode.direct);
+      await _attach(cameras.first, LinkMode.direct, gen);
       return;
     }
 
     final remembered = await _rememberedEndpoint();
     if (remembered != null && await _reachable(remembered.base)) {
-      await _attach(remembered, LinkMode.direct);
+      if (gen != _gen) return;
+      await _attach(remembered, LinkMode.direct, gen);
       return;
     }
 
     final fb = fallbackBase;
     if (fb != null && cameraKey.isNotEmpty && await _reachable(fb)) {
+      if (gen != _gen) return;
       final uri = Uri.parse(fb);
       await _attach(
         CameraEndpoint(
@@ -137,27 +173,36 @@ class CameraClient extends ChangeNotifier {
           baseUrl: fb,
         ),
         LinkMode.relay,
+        gen,
       );
       return;
     }
 
+    if (gen != _gen) return;
     _setLink(LinkMode.offline);
     _scheduleRetry();
   }
 
   /// Connect to a camera the user picked from the discovery list.
-  Future<void> connectTo(CameraEndpoint endpoint) =>
-      _attach(endpoint, endpoint.direct ? LinkMode.direct : LinkMode.relay);
+  Future<void> connectTo(CameraEndpoint endpoint) => _attach(
+    endpoint,
+    endpoint.direct ? LinkMode.direct : LinkMode.relay,
+    ++_gen,
+  );
 
-  Future<void> _attach(CameraEndpoint endpoint, LinkMode mode) async {
+  Future<void> _attach(CameraEndpoint endpoint, LinkMode mode, int gen) async {
     _retry?.cancel();
     await _closeSocket();
+    if (gen != _gen || _disposed) return;
     _endpoint = endpoint;
+    _relayWarningAt = null;
+    _relayWarningSeen = false;
     _setLink(mode);
     if (endpoint.direct) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefsHostKey, endpoint.host);
       await prefs.setInt(_prefsPortKey, endpoint.port);
+      if (gen != _gen || _disposed) return;
     }
     if (endpoint.direct) {
       _openSocket();
@@ -176,7 +221,19 @@ class CameraClient extends ChangeNotifier {
     unawaited(_pollOnce());
   }
 
+  /// One poll. Skipped while the last is still waiting (a slow link takes
+  /// longer than the 1 s tick), so replies can't arrive out of order.
   Future<void> _pollOnce() async {
+    if (_pollingGen == _gen) return;
+    final gen = _pollingGen = _gen;
+    try {
+      await _pollStep(gen);
+    } finally {
+      if (_pollingGen == gen) _pollingGen = null;
+    }
+  }
+
+  Future<void> _pollStep(int gen) async {
     final tick = _pollTick++;
     // Keep the camera posting previews, and awake (it stops a minute after
     // the last watch). Not from the background: let it sleep.
@@ -184,6 +241,7 @@ class CameraClient extends ChangeNotifier {
     if (tick % 10 == 9) unawaited(refreshRecordings(announce: true));
     if (_foreground && _state.isLive) {
       final p = await _call('getPreview', null, true);
+      if (gen != _gen) return;
       final jpeg = p?['jpeg'] as String?;
       if (jpeg != null) {
         _preview = base64Decode(jpeg);
@@ -193,12 +251,20 @@ class CameraClient extends ChangeNotifier {
     }
     if (tick.isEven) {
       final s = await _call('getState', null, true);
+      if (gen != _gen) return;
       if (s == null) {
         if (++_pollFailures >= 5) _onDisconnected();
         return;
       }
       _pollFailures = 0;
       _applyState(s);
+      final w = s['warning'] as Map<String, dynamic>?;
+      final at = w?['at'] as String?;
+      if (_relayWarningSeen && at != null && at != _relayWarningAt) {
+        _raiseWarning(w?['code']);
+      }
+      _relayWarningAt = at;
+      _relayWarningSeen = true;
       final up = s['upload'] as Map<String, dynamic>?;
       _upload = up == null
           ? null
@@ -263,6 +329,8 @@ class CameraClient extends ChangeNotifier {
         }
         _upload = null;
         notifyListeners();
+      case 'warning':
+        _raiseWarning(msg['code']);
       case 'uploadProgress':
         _upload = UploadProgress(
           msg['name'] as String? ?? '',
@@ -414,6 +482,7 @@ class CameraClient extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _retry?.cancel();
+    _warningExpiry?.cancel();
     unawaited(_closeSocket());
     super.dispose();
   }

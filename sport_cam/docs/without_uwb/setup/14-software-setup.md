@@ -41,6 +41,27 @@ cd ~/sportcam/src/without_uwb/device
 sudo pip3 install --break-system-packages -r requirements.txt
 ```
 
+**Pan and tilt driver.** The servos are driven by the Pi's hardware PWM
+through the pigpio daemon (`SERVO_DRIVER = "pigpio"`,
+[04 — Servo drive](../../design/04-electronics.md#servo-drive)). The service
+talks to the daemon over a local socket, so it still doesn't run as root.
+Analog audio uses the same PWM block, so turn it off:
+
+```bash
+sudo apt install -y pigpio python3-pigpio
+sudo systemctl enable --now pigpiod
+echo 'dtparam=audio=off' | sudo tee -a /boot/firmware/config.txt
+sudo reboot
+```
+
+If apt has no `pigpio` package, build it from
+[source](https://github.com/joan2937/pigpio) (`make && sudo make install`)
+and install its `pigpiod` unit. A head still wired as the Arducam kit came,
+with the servo leads on the PTZ controller, needs none of this: set
+`SERVO_DRIVER = "arducam"` instead (whole-degree steps).
+
+**Done when:** `pigs hwver` prints a number (pigpiod is up).
+
 System-wide install rationale: both services use the system `python3`; the
 Wi-Fi portal runs as root; Picamera2 is apt-only (a virtualenv would need
 `--system-site-packages` and edited unit files).
@@ -119,7 +140,13 @@ step 1.
 python3 -m sportcam.ptzcheck
 ```
 
-Sweeps each axis to its soft limits and back. Adjust in `config.py`:
+Sweeps each axis to its soft limits and back, then creeps the pan 0° → 3°
+in tenths of a degree. Adjust in `config.py`:
+
+- the creep should be smooth. Ticks of about a degree mean the pan servo is
+  still on the PTZ controller, not GPIO12 ([wiring, M1–M6](12-wiring.md#servos));
+- if a commanded ±45° measures short or long (phone level on the camera),
+  widen or narrow `SERVO_US_AT_0` / `SERVO_US_AT_180` evenly about 1500 µs;
 
 - narrow `PAN_MIN/MAX_DEG` or `TILT_MIN/MAX_DEG` if anything binds. The
   search sweeps the whole pan range, so the ends of it matter more than they
@@ -325,7 +352,8 @@ All in `src/without_uwb/device/sportcam/config.py`:
 
 | Setting | From |
 | --- | --- |
-| `PAN_SIGN`, `TILT_SIGN`, soft limits (`PAN_MIN/MAX_DEG`, `TILT_MIN/MAX_DEG`) | step 4b, `ptzcheck`, then step 8 |
+| `SERVO_DRIVER` | step 2: `"pigpio"` once the servo leads are on GPIO12/13, `"arducam"` if not |
+| `PAN_SIGN`, `TILT_SIGN`, soft limits (`PAN_MIN/MAX_DEG`, `TILT_MIN/MAX_DEG`), `SERVO_US_AT_0/180` | step 4b, `ptzcheck`, then step 8 |
 | `ZOOM_CURVE` | step 5a, by hand |
 | `FOCUS_GRID` | step 5b, `focuscal` |
 | `SEARCH_PAN_DPS`, `SEARCH_TILT_ROWS_DEG` | step 8.3: how fast and where the sweep looks |

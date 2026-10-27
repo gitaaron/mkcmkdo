@@ -8,7 +8,9 @@ to confirm three things in `config.py`:
 
   * ``PAN_CENTER_RAW`` / ``TILT_CENTER_RAW`` really do centre the axes,
   * ``PAN_SIGN`` / ``TILT_SIGN`` match the direction you expect,
-  * the soft limits stop short of anything mechanical.
+  * the soft limits stop short of anything mechanical,
+  * with ``SERVO_DRIVER = "pigpio"``, the pan creeps in tenths of a degree
+    (the last step): smooth, not in visible one-degree ticks.
 
 Nothing here is destructive; it moves slowly and stops on Ctrl-C.
 """
@@ -30,10 +32,27 @@ def sweep(name: str, setter, lo: float, hi: float) -> None:
     print(f"  {name} centred      ")
 
 
+def creep(ptz: Ptz) -> None:
+    """Pan 0° → 3° in 0.1° steps over 6 s: what a slow pan zoomed in asks for."""
+    print(f"\nfine steps ({config.SERVO_DRIVER}): pan 0° → 3° in 0.1° steps, slowly")
+    for i in range(31):
+        ptz.set_pan(i / 10)
+        time.sleep(0.2)
+    if config.SERVO_DRIVER == "pigpio":
+        print("  it should creep smoothly. Ticks of about a degree: the servo is still on"
+              " the PTZ controller, not GPIO12/13")
+    else:
+        print("  the registers take whole degrees, so expect three ticks")
+    ptz.set_pan(0.0)
+
+
 def main() -> None:
     ptz = Ptz()
     if not ptz.focuser.available:
         print("No I2C bus — is this running on the Pi, with I2C enabled?")
+        return
+    if not ptz.servos.available:
+        print("pigpiod is not running: sudo systemctl enable --now pigpiod")
         return
     print("Centring both axes.")
     ptz.park()
@@ -41,6 +60,7 @@ def main() -> None:
     try:
         sweep("pan", ptz.set_pan, config.PAN_MIN_DEG, config.PAN_MAX_DEG)
         sweep("tilt", ptz.set_tilt, config.TILT_MIN_DEG, config.TILT_MAX_DEG)
+        creep(ptz)
         print("\nHoming zoom and focus.")
         ptz.home()
         for mm in (config.ZOOM_MIN_MM, config.ZOOM_MAX_MM, config.ZOOM_MIN_MM):

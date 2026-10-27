@@ -58,8 +58,11 @@ Live video:
 ### Motion, in one place
 
 `ptz.py` is the only module that drives hardware motion. API in degrees from
-centre; hides raw 0–180 servo units, soft limits and the open-loop zoom
-calibration:
+centre; hides raw 0–180 servo units, soft limits, the servo driver and the
+open-loop zoom calibration. Pan and tilt go out as pigpio hardware PWM on
+GPIO12 / GPIO13 (`SERVO_DRIVER = "pigpio"`, fractional degrees) or as the PTZ
+controller's whole-degree registers (`"arducam"`, a head wired as the kit
+came) — [04 — Servo drive](04-electronics.md#servo-drive):
 
 ```python
 ptz.set_pan(-12.5)      # degrees from centre (the anchor bar's normal / the enclosure's forward axis)
@@ -70,7 +73,9 @@ ptz.park()              # centre both axes
 ```
 
 The tracker commands absolute `set_pan` / `set_tilt` targets every tick,
-slew-limited to `PAN_MAX_DPS`.
+eased toward its goal: speed proportional to the distance left
+(`TRACK_EASE_S`), acceleration-limited, and at most `PAN_MAX_DPS`, so the
+video pans smoothly between the detector's few updates a second.
 
 ### Vision, and why it runs slowly
 
@@ -82,8 +87,13 @@ its other roles are build-specific.
 | Rate | 3 fps (`DETECT_FPS_TRACKING`); 0.5 fps awake | subject motion seen from several metres is slow |
 | Search area | vertical strip around the expected column (`Camera.set_search_column()`) once the position is known | several-fold speed-up |
 | Freshness | the tracker acts only on a **new** detection | loop 20 Hz vs vision 3 Hz: reusing a cached detection applies it ≈ 7 times and causes hunting |
+| Thread | HOG runs on its own thread (`Camera._detect_loop`); `person_boxes()` returns at once with the latest result | run inside the 20 Hz tick, a detection froze the servos for a few hundred ms and the motion then lurched to catch up |
+| Capture time | each result carries `captured_at`; the tracker logs its pan/tilt every tick and reads offsets against the pose then (`Tracker._pose_at`) | the head keeps easing during a detection; measured against the current pose, that turn is counted twice and the camera overshoots (≈ 1.8° on a 30° move) |
 
-Tests: `src/<build>/device/tests/test_ptz.py` covers the focus lookup. All
+Tests: `src/<build>/device/tests/test_ptz.py` covers the focus lookup and both
+servo drivers (pulse widths, fractional degrees, signs, limits);
+`test_camera.py` the detector thread (never blocks the loop, each result
+handed over once, an in-flight result dropped on sleep). All
 device tests run on any machine (`python3 tests/test_<name>.py`).
 
 ### Framing and focus

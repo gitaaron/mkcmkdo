@@ -194,8 +194,8 @@ const STEPS = [
       "Data comes out of <b>SPI0 MOSI, GPIO10</b>, not the classic <code>rpi_ws281x</code> PWM/DMA pin. A Pi 4 can do it either way, but the PWM driver needs the whole camera service to run as root and SPI does not.",
       "<b>Ring:</b> foam-tape it to the <b>underside</b> of the shelf, <b>LEDs facing down</b>, centred on the shelf's small centre hole. It then sits in the band of the LED window, between the power boards and the shelf, and lights the window all the way round. Take its leads round the edge of the shelf through the cut-away side.",
       LY.shifter_on === "shelf"
-        ? "<b>Shifter:</b> foam-tape it to the top of the shelf where the model shows, beside the Pi's place. Wire GPIO10 → 74AHCT125 input, its output → ring DIN. Tie the shifter's unused inputs to ground and power it from 5 V. Ring 5 V and ground come from the buck, not the Pi."
-        : "<b>Shifter:</b> foam-tape it to the floor where the model shows. Wire GPIO10 → 74AHCT125 input, its output → ring DIN. Tie the shifter's unused inputs to ground and power it from 5 V. Ring 5 V and ground come from the buck, not the Pi.",
+        ? "<b>Shifter:</b> foam-tape it to the top of the shelf where the model shows, beside the Pi's place. Wire GPIO10 → 74AHCT125 input, its output → ring DIN. Leave room beside it for two 3-pin servo headers (gates 2 and 3 drive the servos, wired in the cabling step); tie the last gate's input and enable to ground and power it from 5 V. Ring 5 V and ground come from the buck, not the Pi."
+        : "<b>Shifter:</b> foam-tape it to the floor where the model shows. Wire GPIO10 → 74AHCT125 input, its output → ring DIN. Leave room beside it for two 3-pin servo headers (gates 2 and 3 drive the servos, wired in the cabling step); tie the last gate's input and enable to ground and power it from 5 V. Ring 5 V and ground come from the buck, not the Pi.",
       "<b>Diffuser band:</b> slide it down over the outside of the enclosure until it rests on the small ledge below the window, then fix it with four dabs of glue.",
       "Power up and run the three state colours with the shelf held in place. The band should glow evenly all the way round; the three posts behind the window cast faint shadows.",
     ],
@@ -313,7 +313,8 @@ const STEPS = [
     steps: [
       "<b>Wiring:</b> the full connection list and a symptom table are in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>.",
       "<b>Camera ribbon:</b> about 80 mm of slack coiled under the lid, loose enough that neither axis pulls it at full travel. Sweep both by hand and watch the coil before you tie anything.",
-      "<b>PTZ I2C and power:</b> 5 V and ground from the buck, SDA and SCL to GPIO 2/3. Power the controller from the rail, <i>not</i> the Pi's GPIO 5 V pin — two servos stalling is about 0.7 A and the header is not the place for it.",
+      "<b>PTZ I2C and power:</b> 5 V and ground from the buck, SDA and SCL to GPIO 2/3. Power the controller from the rail, <i>not</i> the Pi's GPIO 5 V pin.",
+      "<b>Servos:</b> unplug both servo leads from the PTZ controller and bring them down through the lid to the two 3-pin headers by the shifter (extension leads if short): GPIO12 → gate 2 → pan, GPIO13 → gate 3 → tilt, headers powered from the 5 V rail. Brown/black is ground. Connections R7 and M1–M7 in the <a href='../12-wiring.md#servos' target='_blank'>wiring guide</a>.",
       "<b>Anchors:</b> a USB-A extension each, routed along the arms and tied to the rib, down the dowel for A3, and in through the slot high in the wall to the Pi's USB ports. Only one carries data; the others just need 5 V. Leave A3's lead a little slack at the foot so the mast can be pulled for transport.",
       "Tie everything off. Nothing may hang where a tripod leg folds, and nothing may reach the pan axis.",
     ],

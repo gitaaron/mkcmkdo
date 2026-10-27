@@ -1,4 +1,4 @@
-"""Arducam PTZ controller — pan, tilt, zoom and focus on one I2C device.
+"""Pan, tilt, zoom and focus: the Arducam PTZ base.
 
 The B0167B12 kit puts all four axes behind a single controller board at
 I2C 0x0C (Arducam's `Focuser` register map):
@@ -10,9 +10,13 @@ I2C 0x0C (Arducam's `Focuser` register map):
     OPT_MOTOR_Y  0x06       0-180        tilt servo, degrees
     OPT_IRCUT    0x0C       0/1          IR-cut filter
 
-This replaces the old `tilt.py` (pigpio PWM) and `lens.py` (bespoke register
-writes). There is no pan stepper and no base controller any more — pan is a
-**position** command on this bus, not a velocity relayed over the network.
+The pan and tilt registers take **whole degrees**. Zoomed in (≈ 33° across
+the frame at full zoom) one degree is ≈ 3 % of the frame, so a slow pan
+visibly steps. With `SERVO_DRIVER = "pigpio"` the two servo signal leads come
+off the controller and the Pi drives them itself, through the pigpio daemon's
+hardware PWM on GPIO12 / GPIO13 (docs/04, "Servo drive"): pulse widths to a
+fraction of a microsecond, so the servo's own deadband (≈ 0.3–0.5°) is the
+limit. Zoom and focus stay on the controller either way.
 
 Servos are open-loop: what we command is what we believe. `pan_deg` and
 `tilt_deg` therefore report the commanded angle, which is good to a couple of
@@ -28,6 +32,11 @@ try:
     from smbus2 import SMBus
 except ImportError:          # dev machine / CI — run headless
     SMBus = None
+
+try:
+    import pigpio
+except ImportError:          # dev machine / CI, or the Arducam servo driver
+    pigpio = None
 
 from . import config
 
@@ -87,6 +96,57 @@ class Focuser:
             time.sleep(0.01)
 
 
+class ArducamServos:
+    """Pan and tilt through the controller's registers: whole degrees only."""
+
+    def __init__(self, focuser: Focuser) -> None:
+        self.focuser = focuser
+
+    @property
+    def available(self) -> bool:
+        return self.focuser.available
+
+    def write(self, channel: str, raw_deg: float) -> None:
+        self.focuser.set(channel, round(raw_deg))
+
+
+class PigpioServos:
+    """Pan and tilt driven by the Pi: pigpio hardware PWM, sub-degree steps.
+
+    GPIO12 and GPIO13 are the Pi 4's two hardware PWM channels (PWM0, PWM1),
+    so the pulses come from the PWM block itself, without CPU or DMA jitter.
+    Both run at SERVO_PWM_HZ. A raw angle maps linearly onto the pulse width
+    between SERVO_US_AT_0 and SERVO_US_AT_180, as the controller's registers
+    did, so the centre and sign calibration carries over unchanged.
+
+    Needs the pigpio daemon (`sudo systemctl enable --now pigpiod`); the
+    service talks to it over a local socket and does not run as root.
+    """
+
+    def __init__(self, pi=None) -> None:
+        self._pi = pi
+        if self._pi is None and pigpio is not None:
+            self._pi = pigpio.pi()
+            if not self._pi.connected:
+                print("[ptz] pigpiod is not running — pan and tilt will not move "
+                      "(sudo systemctl enable --now pigpiod)")
+                self._pi = None
+        self._gpio = {OPT_MOTOR_X: config.PAN_GPIO, OPT_MOTOR_Y: config.TILT_GPIO}
+
+    @property
+    def available(self) -> bool:
+        return self._pi is not None
+
+    def write(self, channel: str, raw_deg: float) -> None:
+        if self._pi is None:
+            return
+        raw_deg = max(0.0, min(180.0, raw_deg))
+        us = config.SERVO_US_AT_0 + raw_deg / 180.0 * (config.SERVO_US_AT_180 - config.SERVO_US_AT_0)
+        # duty is in millionths of the period: us / (1e6 / hz) × 1e6
+        self._pi.hardware_PWM(self._gpio[channel], config.SERVO_PWM_HZ,
+                              round(us * config.SERVO_PWM_HZ))
+
+
 class Ptz:
     """Pan, tilt and zoom in engineering units.
 
@@ -98,6 +158,8 @@ class Ptz:
 
     def __init__(self, bus: int = 1) -> None:
         self.focuser = Focuser(bus)
+        self.servos = (PigpioServos() if config.SERVO_DRIVER == "pigpio"
+                       else ArducamServos(self.focuser))
         self._pan = 0.0
         self._tilt = 0.0
         self._zoom_mm = config.ZOOM_MIN_MM
@@ -119,13 +181,13 @@ class Ptz:
     def set_pan(self, deg: float) -> float:
         deg = max(config.PAN_MIN_DEG, min(config.PAN_MAX_DEG, deg))
         self._pan = deg
-        self.focuser.set(OPT_MOTOR_X, round(config.PAN_CENTER_RAW + deg * config.PAN_SIGN))
+        self.servos.write(OPT_MOTOR_X, config.PAN_CENTER_RAW + deg * config.PAN_SIGN)
         return deg
 
     def set_tilt(self, deg: float) -> float:
         deg = max(config.TILT_MIN_DEG, min(config.TILT_MAX_DEG, deg))
         self._tilt = deg
-        self.focuser.set(OPT_MOTOR_Y, round(config.TILT_CENTER_RAW + deg * config.TILT_SIGN))
+        self.servos.write(OPT_MOTOR_Y, config.TILT_CENTER_RAW + deg * config.TILT_SIGN)
         return deg
 
     def nudge_tilt(self, delta_deg: float) -> float:

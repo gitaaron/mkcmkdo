@@ -213,6 +213,12 @@ void main() {
     const UploadProgress('x', 0, 0).fraction == 0,
   );
 
+  check(
+    'a refused session explains itself',
+    CamWarning.of('no-detector')?.text.contains('person detector') == true,
+  );
+  check('an unknown warning code raises no toast', CamWarning.of('x') == null);
+
   // ignore: avoid_print
   print(_failures == 0 ? '\nall model checks passed' : '\n$_failures FAILED');
   if (_failures > 0) throw StateError('model verification failed');

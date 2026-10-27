@@ -186,9 +186,7 @@ def main() -> None:
     first = ptz6.pan_deg
     check("pan is slew-limited, not snapped",
           0 < first < 20, f"moved {first:.1f} deg in one tick")
-    for _ in range(200):
-        tr6.step()
-        time.sleep(0.002)
+    run(tr6, 200, 0.02)                                   # ≈ 4 s: eased, not raced
     check("pan converges on the bearing", abs(ptz6.pan_deg - 60.0) < 3.0,
           f"{ptz6.pan_deg:.1f} deg")
 
@@ -220,7 +218,7 @@ def main() -> None:
     tr10.step()
     check("A3 tilt is slew-limited, not snapped",
           0 < ptz10.tilt_deg < 15, f"{ptz10.tilt_deg:.1f} deg in one tick")
-    run(tr10, 200, 0.002)
+    run(tr10, 200, 0.02)
     expect = Tracker._aim_tilt(math.radians(30.0), 10.0)
     check("A3 tilt converges on the elevation", abs(ptz10.tilt_deg - expect) < 0.5,
           f"{ptz10.tilt_deg:.1f} vs {expect:.1f}")
@@ -327,7 +325,7 @@ def main() -> None:
     run(tr16, 50, 0.01)                                   # ≈ 0.5 s
     check("recording, wearer out of sight under LOST_ZOOM_OUT_S: zoom held",
           abs(ptz16.zoom_mm - tight) < 0.5, f"{tight:.1f} → {ptz16.zoom_mm:.1f} mm")
-    run(tr16, 80, 0.01)                                   # past 1 s
+    run(tr16, int(config.LOST_ZOOM_OUT_S / 0.01), 0.01)   # past LOST_ZOOM_OUT_S
     check("…then straight out to wide, still turned to the tag",
           ptz16.zoom_mm == config.ZOOM_MIN_MM and abs(ptz16.pan_deg - 10.0) < 1.0,
           f"{ptz16.zoom_mm:.1f} mm, pan {ptz16.pan_deg:.1f}")

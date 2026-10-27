@@ -14,6 +14,7 @@ import asyncio
 import os
 import sys
 import tempfile
+import threading
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -92,6 +93,7 @@ def camera_reads_qr() -> None:
 
     cam = Camera.__new__(Camera)
     cam._cam, cam._qr, cam.awake = FakeCam(frame), None, True
+    cam._cam_lock = threading.Lock()
     got = cam.qr_text()
     check("decodes a phone's code in the frame", got == text, f"{got!r}")
     cam._cam = FakeCam(np.full((h, w, 3), 90, np.uint8))
@@ -140,6 +142,7 @@ class FakeRing:
 
 class FakeCamera:
     qr = None
+    no_detector = None
 
     def qr_text(self):
         return self.qr

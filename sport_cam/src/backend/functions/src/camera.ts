@@ -72,6 +72,7 @@ export interface StateSnapshot {
   deviceOnline: boolean;
   whepUrl: string | null;
   upload: { name: string; sent: number; total: number } | null;  // a clip on its way to the library
+  warning: { code: string; at: string } | null;  // the latest one the camera raised; the app toasts new ones
   updatedAt: string;
 }
 
@@ -99,6 +100,7 @@ export function snapshot(d: CameraDoc): StateSnapshot {
     deviceOnline: isOnline(d),
     whepUrl: d.whepUrl ?? null,
     upload: d.upload ?? null,
+    warning: d.warning ? { code: d.warning.code, at: d.warning.at.toDate().toISOString() } : null,
     updatedAt: d.updatedAt.toDate().toISOString(),
   };
 }

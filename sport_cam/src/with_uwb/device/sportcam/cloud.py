@@ -25,6 +25,7 @@ CAMERA_KEY set, it tracks, records and serves the phone directly as before.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import os
 import time
 from typing import Any, Callable
@@ -126,7 +127,8 @@ class CloudLink:
                 self.viewer_at = seen.timestamp() if hasattr(seen, "timestamp") else float(seen)
             want = d.get("state")
             if d.get("stateBy") == "app" and want and want != self.head.state and self._loop:
-                asyncio.run_coroutine_threadsafe(self._adopt(want), self._loop)
+                fut = asyncio.run_coroutine_threadsafe(self._adopt(want), self._loop)
+                fut.add_done_callback(_log_failure)
 
     async def _adopt(self, want: str) -> None:
         if want == self.head.state or self.head.state in BOOT_STATES:
@@ -155,6 +157,10 @@ class CloudLink:
     # ---- what the head reports ------------------------------------------
     async def report_state(self, state: str) -> None:
         await self._write(self._doc, {"state": public_state(state), "stateBy": "device", "updatedAt": server_time()})
+
+    async def warning(self, code: str) -> None:
+        """The latest warning, for apps on the relay: getState carries it."""
+        await self._write(self._doc, {"warning": {"code": code, "at": server_time()}})
 
     async def telemetry(self, payload: dict) -> None:
         """Keep the latest; send it now only if the phase or the countdown
@@ -196,3 +202,9 @@ class CloudLink:
         # finalizeRecording clears this once the clip is in the library
         await self._write(self._doc, {"upload": {"name": msg.get("name"), "sent": msg.get("sent"),
                                                  "total": msg.get("total")}})
+
+
+def _log_failure(fut: concurrent.futures.Future) -> None:
+    """Nothing awaits an adopted request: say if it failed, rather than nothing."""
+    if not fut.cancelled() and fut.exception() is not None:
+        print(f"[cloud] applying the app's request failed: {fut.exception()!r}")

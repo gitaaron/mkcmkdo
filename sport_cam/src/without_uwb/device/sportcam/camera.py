@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import os
+import threading
 import time
 
 try:
@@ -48,9 +49,21 @@ class Camera:
             )
             self._cam.configure(cfg)
             self._cam.start()
-        if cv2:
+        # Why sessions cannot run on this install, or None. The head refuses
+        # to start one and the app says why, rather than tracking blind.
+        self.no_detector: str | None = None
+        if cv2 and hasattr(cv2, "HOGDescriptor"):
             self._hog = cv2.HOGDescriptor()
             self._hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+        elif cv2:
+            # OpenCV 5 moved HOG out of the main module. apt's python3-opencv
+            # (4.x) has it; without it, boot (pairing still reads QR codes)
+            # but run no sessions.
+            self.no_detector = f"OpenCV {cv2.__version__} has no person detector (HOG)"
+        elif self._cam:
+            self.no_detector = "OpenCV is not installed"
+        if self.no_detector:
+            print(f"[camera] {self.no_detector} — tracking sessions disabled")
         # Detection is the biggest CPU cost on this board, so it is
         # rate-limited and throttled further when nothing is being tracked
         # (docs/03, "Running on a battery"). Between runs the cached box is
@@ -63,6 +76,45 @@ class Camera:
         self.awake = True                        # sensor running (stopped in sleep)
         self._warm_until = 0.0
         self._strip_cx: float | None = None      # column to search, once locked on
+        # Detection runs on its own thread (_detect_loop): HOG takes a few
+        # hundred ms on a Pi 4, and run inside the 20 Hz control tick it froze
+        # the servos for that long every detection. OpenCV releases the GIL
+        # while it works, so the control loop keeps easing meanwhile.
+        self._lock = threading.Lock()
+        # Held for every capture and for starting/stopping the sensor: a
+        # capture waiting on a frame from a sensor stopped under it (sleep)
+        # would wait for good. Captures are one frame, so it is held briefly.
+        self._cam_lock = threading.Lock()
+        self._seq = 0                            # results published
+        self._seq_read = 0                       # results handed to the tracker
+        self._gen = 0                            # bumped on sleep/wake: drops in-flight results
+        self.captured_at: float | None = None    # when the latest boxes' frame was taken
+        self._wake = threading.Event()
+        if self._cam and self._hog:
+            self._start_detector()
+
+    def _start_detector(self) -> None:
+        threading.Thread(target=self._detect_loop, name="detector", daemon=True).start()
+
+    def _detect_loop(self) -> None:
+        """Detect at `set_detect_fps` while awake, publishing each result once."""
+        while True:
+            now = time.monotonic()
+            wait = max(self._warm_until, self._detect_at + self._detect_period) - now
+            if not self.awake or wait > 0:
+                self._wake.wait(0.05 if not self.awake else min(wait, 0.05))
+                self._wake.clear()
+                continue
+            gen, strip = self._gen, self._strip_cx
+            self._detect_at = now
+            try:
+                boxes = self._detect(strip)
+            except Exception:                    # asleep now, or a bad frame
+                continue
+            with self._lock:
+                if gen == self._gen:
+                    self._boxes, self.captured_at = boxes, now
+                    self._seq += 1
 
     def set_awake(self, on: bool) -> None:
         """Start or stop the sensor: stopped in sleep to save the battery.
@@ -75,18 +127,23 @@ class Camera:
         if on == self.awake:
             return
         self.awake = on
-        self._boxes = []
+        with self._lock:
+            self._gen += 1
+            self._boxes = []
+            self._seq_read = self._seq
         self._detect_at = 0.0
         self._warm_until = time.monotonic() + config.CAMERA_WARMUP_S if on else 0.0
         if self._cam:
-            if on:
-                self._cam.start()
-            else:
-                self.stop_recording()
-                self._cam.stop()
+            with self._cam_lock:
+                if on:
+                    self._cam.start()
+                else:
+                    self.stop_recording()
+                    self._cam.stop()
 
     def set_detect_fps(self, fps: float) -> None:
         self._detect_period = 1.0 / max(0.1, fps)
+        self._wake.set()
 
     def set_search_column(self, cx_px: float | None) -> None:
         """Hint the detector which column of the frame to search.
@@ -98,10 +155,17 @@ class Camera:
         """
         self._strip_cx = cx_px
 
+    def _capture(self):
+        """One preview frame (RGB), or None while the sensor sleeps. Any thread."""
+        with self._cam_lock:
+            if not (self._cam and self.awake):
+                return None
+            return self._cam.capture_array("lores")
+
     def preview_jpeg(self) -> bytes | None:
-        if not (self._cam and self.awake):
+        rgb = self._capture()
+        if rgb is None:
             return None
-        rgb = self._cam.capture_array("lores")
         ok, jpg = cv2.imencode(".jpg", rgb[:, :, ::-1], [cv2.IMWRITE_JPEG_QUALITY, 80])
         return jpg.tobytes() if ok else None
 
@@ -110,26 +174,27 @@ class Camera:
 
         Rate-limited to `set_detect_fps`. Between detections the previous list
         comes back with ``fresh=False`` so the caller can tell a new
-        measurement from a repeat of the last one.
+        measurement from a repeat of the last one. `captured_at` says when
+        the frame behind them was taken: the head has moved since.
         """
         if not (self._cam and self._hog and self.awake):
             return [], False
-        now = time.monotonic()
-        if now < self._warm_until or now - self._detect_at < self._detect_period:
-            return self._boxes, False
-        self._detect_at = now
-        self._boxes = self._detect()
-        return self._boxes, True
+        with self._lock:
+            fresh = self._seq != self._seq_read
+            self._seq_read = self._seq
+            return self._boxes, fresh
 
-    def _detect(self) -> list[Box]:
-        rgb = self._cam.capture_array("lores")
+    def _detect(self, strip_cx: float | None) -> list[Box]:
+        rgb = self._capture()
+        if rgb is None:
+            raise RuntimeError("asleep")         # set_awake(False) since the loop looked
         pw, ph = config.PREVIEW_SIZE
 
         # Crop to a vertical strip around the followed person, when locked on.
         x0 = 0
-        if self._strip_cx is not None and config.DETECT_STRIP_FRACTION:
+        if strip_cx is not None and config.DETECT_STRIP_FRACTION:
             half = pw * config.DETECT_STRIP_FRACTION / 2
-            x0 = int(max(0, min(pw - 2 * half, self._strip_cx - half)))
+            x0 = int(max(0, min(pw - 2 * half, strip_cx - half)))
             rgb = rgb[:, x0:x0 + int(2 * half)]
 
         sw = config.DETECT_DOWNSCALE_W
@@ -153,7 +218,10 @@ class Camera:
             return None
         if self._qr is None:
             self._qr = cv2.QRCodeDetector()
-        grey = cv2.cvtColor(self._cam.capture_array("lores"), cv2.COLOR_RGB2GRAY)
+        rgb = self._capture()
+        if rgb is None:
+            return None
+        grey = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
         text, _pts, _ = self._qr.detectAndDecode(grey)
         return text or None
 

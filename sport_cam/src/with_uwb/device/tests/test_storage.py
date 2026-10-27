@@ -116,6 +116,36 @@ def main() -> None:
     check("nothing is reported as sent", n == 0, f"{n}")
     check("files survive a failed drain", len(storage.pending_files(tmp)) == 3)
 
+    # ---- 6b. a clip still in its retry ladder is not sent twice -----------
+    for f in storage.pending_files(tmp):
+        os.remove(f)
+    clip = make_clip(tmp, "rec_retrying.mp4", age_s=100)
+    calls = {"n": 0}
+
+    async def slow_upload(path, duration_s, progress):
+        calls["n"] += 1
+        await asyncio.sleep(0.05)
+        raise RuntimeError("wifi dropped")
+
+    async def retry_and_drain():
+        uploader.upload_recording = slow_upload
+        sleep, uploader.asyncio.sleep = uploader.asyncio.sleep, lambda _s: sleep(0.01)
+        try:
+            retrying = asyncio.create_task(uploader.upload_with_retry(clip, 1.0, noop))
+            await sleep(0.02)                       # mid-attempt
+            drained = await uploader.drain_pending(noop)
+            retrying.cancel()
+        finally:
+            uploader.asyncio.sleep = sleep
+        return drained
+
+    before = calls["n"]
+    drained = asyncio.run(retry_and_drain())
+    check("a clip being retried is left to its own retry, not sent again by the drain",
+          drained == 0 and calls["n"] == before + 1, f"drained {drained}, attempts {calls['n'] - before}")
+    check("…and once its retry is over, the drain may send it", not uploader._uploading)
+    os.remove(clip)
+
     # ---- 7. an empty card is a no-op --------------------------------------
     uploader.upload_recording = fake_upload
     for f in storage.pending_files(tmp):

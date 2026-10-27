@@ -85,6 +85,7 @@ class Head:
         self.boxlog = BoxLog()     # person boxes beside the clip, for the players' overlay
         self._awake_since = time.monotonic()   # awake this long untouched → sleep
         self._warned = ""          # which warning we last announced
+        self._tasks: set[asyncio.Task] = set()   # background uploads, kept alive
         self._countdown_sent = 0   # tracker.countdown as last sent to the app
         self._boxes_sent_at: float | None = None   # tracker.labelled_at last sent live
         self._jog = (0.0, 0.0)              # the app's joystick: pan, tilt in −1…1
@@ -171,13 +172,19 @@ class Head:
     # ---- state ------------------------------------------------------------
     async def apply_state(self, new: str) -> None:
         """Single place state changes happen, whatever asked for it."""
+        # No person detector (an OpenCV without HOG): a session could never
+        # find anyone, nor record. Decline and say why.
+        if (new in ("tracking", "recording") and self.state not in ("tracking", "recording")
+                and self.camera.no_detector):
+            print(f"[camera] refusing to start a session — {self.camera.no_detector}")
+            await self.warn("no-detector", reason=self.camera.no_detector)
+            return
         # Refuse to start filming onto a card that cannot hold the clip. The
         # encoder has no graceful failure: it writes until ENOSPC and leaves a
         # truncated file. Better to decline and say why.
         if new == "recording" and not self.storage.can_record():
             print(f"[storage] refusing to record — {self.storage.minutes_left:.0f} min left")
-            await self.local.broadcast({"type": "warning", "code": "storage-full",
-                                        **self.storage.telemetry()})
+            await self.warn("storage-full", **self.storage.telemetry())
             new = "awake" if self.state == "tracking" else self.state
         if self.state == "recording" and new == "tracking":
             new = "awake"                  # stopping a recording ends the session
@@ -201,9 +208,12 @@ class Head:
             self.boxlog.stop()
             duration = time.monotonic() - self._rec_started
             print(f"[rec] stopped ({duration:.0f}s) — uploading in background")
-            asyncio.create_task(
-                upload_with_retry(self._rec_path, round(duration, 1), self.on_upload_progress)
-            )
+            task = asyncio.create_task(
+                upload_with_retry(self._rec_path, round(duration, 1), self.on_upload_progress))
+            # The loop holds tasks only weakly: without a reference one can be
+            # garbage-collected mid-upload.
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
         self.led.set_state(new)
         self.camera.set_detect_fps(
             config.DETECT_FPS_TRACKING if new in ("tracking", "recording")
@@ -222,6 +232,12 @@ class Head:
         await self.local.broadcast(self.local.state_payload())
         await self.cloud.report_state(self.state)
         await self.mdns.update_state(public_state(self.state))
+
+    async def warn(self, code: str, **detail) -> None:
+        """Something the apps should show the user: direct clients now, and
+        Firestore for apps connected through the relay."""
+        await self.local.broadcast({"type": "warning", "code": code, **detail})
+        await self.cloud.warning(code)
 
     async def on_upload_progress(self, msg: dict) -> None:
         await self.cloud.upload_progress(msg)
@@ -324,7 +340,7 @@ class Head:
                 if level == "low" and self._warned != code:
                     self._warned = code
                     print(f"[health] {code}")
-                    await self.local.broadcast({"type": "warning", "code": code, **tele()})
+                    await self.warn(code, **tele())
             if batt == "ok" and store == "ok":
                 self._warned = ""
             await asyncio.sleep(10.0)
@@ -392,7 +408,9 @@ class Head:
         while True:
             t0 = time.monotonic()
             if self.state in LIVE_STATES:         # sleep and boot: no live view
-                jpg = self.camera.preview_jpeg()
+                # Off the loop: the capture waits up to a frame and the JPEG
+                # encode takes a few ms more, and the control tick shares it.
+                jpg = await asyncio.to_thread(self.camera.preview_jpeg)
                 if jpg:
                     self.local.publish_frame(jpg)   # direct viewers
                     await self.cloud.preview(jpg, self.live_boxes())   # and, while watched, the app anywhere
