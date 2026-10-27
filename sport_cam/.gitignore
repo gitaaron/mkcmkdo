@@ -16,3 +16,6 @@ src/app_flutter/.packages
 *.swp
 .obsidian
 sportcam-firebase.json
+
+# MobileNet-SSD weights: fetched by `python3 -m sportcam.getmodel`, not committed
+src/*/device/models/*.pb

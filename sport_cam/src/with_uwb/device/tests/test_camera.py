@@ -36,14 +36,14 @@ class FakeSensor:
         pass
 
 
-DETECT_S = 0.25          # about what HOG takes on a Pi 4
+DETECT_S = 0.25          # about what a detection takes on a Pi 4
 BOX = (100, 50, 80, 200)
 
 
 def slow_camera() -> Camera:
     """A Camera whose detection takes DETECT_S and finds one person."""
     cam = Camera()
-    cam._cam, cam._hog = FakeSensor(), object()
+    cam._cam, cam._detector = FakeSensor(), object()
     cam.starts = 0
 
     def detect(strip_cx):

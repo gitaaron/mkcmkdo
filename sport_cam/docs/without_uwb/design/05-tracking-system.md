@@ -125,17 +125,19 @@ person boxes (3 fps, fresh only) ──► nearest-to-last (gate) ──► offs
 | **Fresh only** | loop 20 Hz, vision 3 Hz: goals move only on a new detection ([06](../../design/06-device-software.md#vision-and-why-it-runs-slowly)) |
 | **Zoom** | starts wide; vision frames to 65 % with an edge guard, and zooms straight out when the person is lost ([06](../../design/06-device-software.md#framing-and-focus)) |
 | **Focus from size** | distance estimated by the thin-lens relation: body height H at distance d images at f·H/d. Inputs: focal length f, apparent body height on the sensor (`SENSOR_H_MM`), `SUBJECT_HEIGHT_M` = 1.7 m. Clamped to `DIST_MIN_M`–`DIST_MAX_M` (1–30 m), smoothed by `DIST_SMOOTHING` (0.3 per detection). Reported as `dist` in telemetry. Biased by children, crouching and reaches; the error matters mainly at full zoom. During SEARCH, focus is fixed at `SEARCH_FOCUS_M` (5 m). Focus position from distance and focal length via `FOCUS_GRID` ([06](../../design/06-device-software.md#framing-and-focus)) |
-| **Detector** | OpenCV HOG on the 720p preview, downscaled to `DETECT_DOWNSCALE_W` (480 px); `DETECT_FPS_TRACKING` 3 fps in a session, `DETECT_FPS_AWAKE` 0.5 otherwise; record stream untouched 1080p. `DETECT_HIT_THRESHOLD` (0.3): SVM margin; higher = fewer false positives, more misses. Once found, searches a strip of `DETECT_STRIP_FRACTION` (60 %) of frame width around the person; whole frame while searching. 3 fps suffices for climbing (≈ 1.7°/s seen from 10 m), not for running |
+| **Detector** | `DETECTOR`: OpenCV HOG (default) or MobileNet-SSD ([06 — The two detectors](../../design/06-device-software.md#the-two-detectors)), on the 720p preview. HOG is downscaled to `DETECT_DOWNSCALE_W` (480 px); `DETECT_FPS_TRACKING` 3 fps in a session, `DETECT_FPS_AWAKE` 0.5 otherwise; record stream untouched 1080p. `DETECT_HIT_THRESHOLD` (0.3, HOG): SVM margin; higher = fewer false positives, more misses. Once found, searches a strip of `DETECT_STRIP_FRACTION` (60 %) of frame width around the person; whole frame while searching. 3 fps suffices for climbing (≈ 1.7°/s seen from 10 m), not for running |
 
-**Upgrade path:** MobileNet-SSD via `cv2.dnn` replaces HOG inside
-`Camera._detect()` only; the return type stays a list of `(x, y, w, h)`.
+**MobileNet-SSD** (`DETECTOR = "ssd"`, after `python3 -m sportcam.getmodel`)
+is the answer to HOG's blind spots below. It matters most in this build,
+where vision is the only sensor. Measure it on your wall with `detectbench`
+before switching.
 
 ## Limitations
 
 | Limitation | Effect | Mitigation |
 | --- | --- | --- |
 | **No identity** | follows the first person found (largest detection at first sighting). After a loss and re-search the same rule applies; someone passing between camera and subject can take over | clear the view when starting; subject stands in front |
-| **HOG blind spots** | best on upright, side- or front-on people in good light. Weak on unusual poses (overhangs, horizontal body, crouching), back views in bulky clothing, partial occlusion, poor or high-contrast light. False positives on coat stands and similar | the 3 s found wait turns false positives into a pause; `DETECT_HIT_THRESHOLD` trades misses against false positives |
+| **HOG blind spots** | best on upright, side- or front-on people in good light. Weak on unusual poses (overhangs, horizontal body, crouching), back views in bulky clothing, partial occlusion, poor or high-contrast light. False positives on coat stands and similar | `DETECTOR = "ssd"`; the 3 s found wait turns false positives into a pause; `DETECT_HIT_THRESHOLD` trades misses against false positives |
 | **Pan ±80°** | can't look behind; the sweep covers the front 160° only | aim the tripod at the area of interest |
 | **Distance is estimated** | zoom from apparent size; focus from an assumed 1.7 m body. Biased by children, crouching, long reaches | — |
 | **Recording starts 3 s after found** | the wrong person may be recorded | **Stop tracking** during the countdown, or stop and restart |

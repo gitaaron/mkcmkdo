@@ -31,13 +31,14 @@ except ImportError:
     cv2 = None
 
 from . import config
+from .detector import make_detector
 
 
 class Camera:
     def __init__(self) -> None:
         self._cam = None
         self._encoder = None
-        self._hog = None
+        self._detector = None
         self._qr = None
         if Picamera2:
             self._cam = Picamera2()
@@ -47,21 +48,13 @@ class Camera:
             )
             self._cam.configure(cfg)
             self._cam.start()
-        # Why sessions cannot run on this install, or None. The head refuses
-        # to start one and the app says why, rather than tracking blind.
-        self.no_detector: str | None = None
-        if cv2 and hasattr(cv2, "HOGDescriptor"):
-            self._hog = cv2.HOGDescriptor()
-            self._hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
-        elif cv2:
-            # OpenCV 5 moved HOG out of the main module. apt's python3-opencv
-            # (4.x) has it; without it, boot (pairing still reads QR codes)
-            # but run no sessions.
-            self.no_detector = f"OpenCV {cv2.__version__} has no person detector (HOG)"
-        elif self._cam:
-            self.no_detector = "OpenCV is not installed"
+        # The person detector (detector.py: HOG or MobileNet-SSD, falling back
+        # to the other), and why sessions cannot run without one, or None.
+        # The head refuses to start a session and the app says why, rather
+        # than tracking blind.
+        self._detector, self.no_detector = make_detector()
         if self.no_detector:
-            print(f"[camera] {self.no_detector} — tracking sessions disabled")
+            print(f"[camera] no person detector: {self.no_detector} — tracking sessions disabled")
         # Detection is the biggest CPU cost on this board, so it is
         # rate-limited and throttled further when nothing is being tracked
         # (docs/03, "Running on a battery"). Between runs the cached box is
@@ -88,7 +81,7 @@ class Camera:
         self._gen = 0                            # bumped on sleep/wake: drops in-flight results
         self.captured_at: float | None = None    # when the latest boxes' frame was taken
         self._wake = threading.Event()
-        if self._cam and self._hog:
+        if self._cam and self._detector:
             self._start_detector()
 
     def _start_detector(self) -> None:
@@ -183,7 +176,7 @@ class Camera:
         measurement from a repeat of the last one. `captured_at` says when
         the frame behind them was taken: the head has moved since.
         """
-        if not (self._cam and self._hog and self.awake):
+        if not (self._cam and self._detector and self.awake):
             return [], False
         with self._lock:
             fresh = self._seq != self._seq_read
@@ -194,7 +187,7 @@ class Camera:
         rgb = self._capture()
         if rgb is None:
             raise RuntimeError("asleep")         # set_awake(False) since the loop looked
-        pw, ph = config.PREVIEW_SIZE
+        pw = config.PREVIEW_SIZE[0]
 
         # Crop to a vertical strip around the known bearing, when we have one.
         x0 = 0
@@ -203,14 +196,7 @@ class Camera:
             x0 = int(max(0, min(pw - 2 * half, strip_cx - half)))
             rgb = rgb[:, x0:x0 + int(2 * half)]
 
-        sw = config.DETECT_DOWNSCALE_W
-        sh = max(1, int(round(rgb.shape[0] * sw / rgb.shape[1])))
-        small = cv2.resize(rgb, (sw, sh))
-        rects, _ = self._hog.detectMultiScale(small, winStride=(8, 8))
-        sx = rgb.shape[1] / sw
-        sy = ph / sh
-        return [(int(x * sx) + x0, int(y * sy), int(w * sx), int(h * sy))
-                for x, y, w, h in rects]
+        return [(x + x0, y, w, h) for x, y, w, h in self._detector.detect(rgb)]
 
     def qr_text(self) -> str | None:
         """Whatever QR code is in front of the lens, or None.

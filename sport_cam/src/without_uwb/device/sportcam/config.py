@@ -171,16 +171,26 @@ ACQUIRE_STALLED_S = 15.0       # searching this long → the app says "can't see
 
 # --- vision ---------------------------------------------------------------
 # Vision is the only sensor, so the detector runs at the full rate whenever a
-# session is active. HOG on a Pi 4 takes a few hundred ms, which is why the
-# loops above are written for ~3 detections a second. A person is a slow
-# mover seen from a few metres; if yours is not, a MobileNet-SSD detector
-# (cv2.dnn) is the upgrade path — `Camera._detect` is the only place to change.
+# session is active. Either detector takes a few hundred ms on a Pi 4, which
+# is why the loops above are written for ~3 detections a second.
+# Which person detector (detector.py). "hog" needs nothing else; "ssd" is
+# MobileNet-SSD on cv2.dnn — much better on climbing poses and back views,
+# weaker on people small in a wide frame — and needs its weights:
+# `python3 -m sportcam.getmodel`. If the chosen one cannot load, the other is
+# used; with neither, sessions are refused and the app says why. Compare the
+# two on your own wall with `python3 -m sportcam.detectbench` (docs 15).
+DETECTOR = "hog"
+SSD_CONFIDENCE = 0.5           # higher = fewer false people, more misses
+SSD_INPUT = 300                # the network's input size; it was trained at 300
+SSD_SWAP_RB = False            # the preview is handed over as RGB, which the model wants
+SSD_WIDE_TILES = True          # whole-frame searches run as two overlapping halves:
+                               # twice the time, but a far person stays big enough
 DETECT_FPS_TRACKING = 3.0
 DETECT_FPS_AWAKE = 0.5
 AWAKE_PERSON_HOLD_S = 4.0       # awake: a person stays "in frame" this long after the
                                # last detection (two awake detections), so one
                                # missed frame does not flip the awake sub-state
-DETECT_HIT_THRESHOLD = 0.3     # HOG SVM margin: higher = fewer false people.
+DETECT_HIT_THRESHOLD = 0.3     # HOG only. SVM margin: higher = fewer false people.
                                # Tune on your own room; coat stands and chairs
                                # are the usual false positives.
 
@@ -189,7 +199,7 @@ DETECT_HIT_THRESHOLD = 0.3     # HOG SVM margin: higher = fewer false people.
 # a fraction of the frame width; 0 disables the crop. Searching (no lock)
 # always uses the whole frame.
 DETECT_STRIP_FRACTION = 0.6
-DETECT_DOWNSCALE_W = 480       # detector input width; smaller is faster
+DETECT_DOWNSCALE_W = 480       # HOG input width; smaller is faster
 
 # Horizontal field of view at the two ends of the zoom range, used to turn a
 # bearing into a pixel column. From the lens's published 96-33 deg spec.
@@ -212,8 +222,9 @@ DIST_MIN_M, DIST_MAX_M = 1.0, 30.0
 # (1 − target)/2 of the frame as margin on each side for error and sudden
 # moves. "Fill" is the larger of the person's height and width fractions, so
 # a person stretched sideways is framed by their span.
-# HOG boxes are padded: the body is about PERSON_IN_BOX_H of the box height
-# and PERSON_IN_BOX_W of its width, and fill is measured on the body.
+# Boxes are padded (HOG's own, and SSD's padded to match in detector.py): the
+# body is about PERSON_IN_BOX_H of the box height and PERSON_IN_BOX_W of its
+# width, and fill is measured on the body.
 ZOOM_FILL_TARGET = 0.65        # person fills 65 %: ≈ 17 % margin each side
 ZOOM_VISION_GAIN = 0.35        # share of the log-error corrected per detection
 PERSON_IN_BOX_H = 0.75

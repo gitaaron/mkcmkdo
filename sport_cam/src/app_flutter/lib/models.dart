@@ -328,8 +328,8 @@ class CamWarning {
   static CamWarning? of(Object? code) => switch (code) {
     'no-detector' => const CamWarning(
       'no-detector',
-      "Can't track: the camera's OpenCV has no person detector — "
-          'reinstall python3-opencv (4.x) on the camera',
+      "Can't track: the camera has no person detector — install "
+          'python3-opencv (4.x), or run sportcam.getmodel, on the camera',
     ),
     'storage-full' => const CamWarning(
       'storage-full',

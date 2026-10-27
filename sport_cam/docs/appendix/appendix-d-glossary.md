@@ -15,12 +15,13 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | **Focal length (EFL)** | how far the zoom lens is zoomed in, in mm: about 2.8 mm at the wide end, 10.6 mm at full zoom |
 | **FOV** | field of view: how wide an angle the camera sees, 96° across at the wide end |
 | **Gauge** | the INA260 current sensor between the bank and the buck, which works out how much battery is left |
-| **HOG** | OpenCV's person detector ("histogram of oriented gradients"). It runs about 3 times a second on the Pi |
+| **HOG** | OpenCV's classic person detector ("histogram of oriented gradients"), the default (`DETECTOR = "hog"`). It runs about 3 times a second on the Pi |
 | **I2C** | the two-wire bus the Pi uses to talk to the PTZ controller and the gauge |
 | **Kalman filter** | a smoothing filter that averages noisy measurements while still following real movement |
 | **Level shifter** | the 74AHCT125 chip that lifts the Pi's 3.3 V signals to 5 V: data for the LED ring, and the servos' PWM |
 | **Found** | the second sub-state of `tracking`: a person is in frame (with UWB, the person where the tag is) and the camera follows and frames them as it will while recording. The ring fills with green over 3 s and the app beeps each second; still in frame at the end, recording starts |
 | **mDNS / Bonjour** | how a phone finds the camera on the local Wi-Fi by name (`sportcam.local`) without knowing its IP address |
+| **MobileNet-SSD** | a small neural-network person detector (`DETECTOR = "ssd"`), better than HOG on climbing poses; its weights come from `python3 -m sportcam.getmodel` |
 | **MJPEG** | video sent as a stream of JPEG pictures; the camera's direct live view to phones on its Wi-Fi |
 | **Person boxes** | the boxes the apps draw round each person the camera detected, over a recording and over the live view: green the climber, yellow anyone else, red while it can't tell which is the climber (every box in awake). Saved beside the clip as `<clip>.boxes.json` ([08](../design/08-recordings-and-cloud.md#person-boxes)). Each view has a Boxes on / off button |
 | **PD (USB Power Delivery)** | the part of USB-C that lets a bank supply more than 5 V. The **PD trigger** board asks the bank for 12 V |

@@ -267,6 +267,18 @@ TAG_BEARING_CORR_S = 0.35      # its correlation time: the Kalman filter's ≈ 7
 # Rates are deliberately modest: HOG on a Pi 4 takes a few hundred ms, and
 # tilt only needs to keep up with ~1.7 deg/s of subject motion.
 DETECT_FPS_TRACKING = 3.0
+# Which person detector (detector.py). "hog" needs nothing else; "ssd" is
+# MobileNet-SSD on cv2.dnn — much better on climbing poses and back views,
+# weaker on people small in a wide frame — and needs its weights:
+# `python3 -m sportcam.getmodel`. If the chosen one cannot load, the other is
+# used; with neither, sessions are refused and the app says why. Compare the
+# two on your own wall with `python3 -m sportcam.detectbench` (docs 15).
+DETECTOR = "hog"
+SSD_CONFIDENCE = 0.5           # higher = fewer false people, more misses
+SSD_INPUT = 300                # the network's input size; it was trained at 300
+SSD_SWAP_RB = False            # the preview is handed over as RGB, which the model wants
+SSD_WIDE_TILES = True          # whole-frame searches run as two overlapping halves:
+                               # twice the time, but a far person stays big enough
 DETECT_FPS_AWAKE = 0.5
 AWAKE_PERSON_HOLD_S = 4.0       # awake: a person stays "in frame" this long after the
                                # last detection (two awake detections), so one
@@ -277,7 +289,7 @@ AWAKE_PERSON_HOLD_S = 4.0       # awake: a person stays "in frame" this long aft
 # on the known bearing instead of the whole frame cuts the work several times
 # over. Width is a fraction of frame width; 0 disables the crop.
 DETECT_STRIP_FRACTION = 0.42
-DETECT_DOWNSCALE_W = 480       # detector input width; smaller is faster
+DETECT_DOWNSCALE_W = 480       # HOG input width; smaller is faster
 
 # Horizontal field of view at the two ends of the zoom range, used to turn a
 # bearing into a pixel column. From the lens's published 96-33 deg spec.
@@ -296,8 +308,9 @@ ZOOM_DEADBAND_M = 0.3
 # (1 − target)/2 of the frame as margin on each side for error and sudden
 # moves. "Fill" is the larger of the person's height and width fractions, so
 # a climber stretched sideways on an overhang is framed by their span.
-# HOG boxes are padded: the body is about PERSON_IN_BOX_H of the box height
-# and PERSON_IN_BOX_W of its width, and fill is measured on the body.
+# Boxes are padded (HOG's own, and SSD's padded to match in detector.py): the
+# body is about PERSON_IN_BOX_H of the box height and PERSON_IN_BOX_W of its
+# width, and fill is measured on the body.
 ZOOM_FILL_TARGET = 0.65        # person fills 65 %: ≈ 17 % margin each side
 ZOOM_VISION_GAIN = 0.35        # share of the log-error corrected per detection
 ZOOM_SCALE_MIN, ZOOM_SCALE_MAX = 0.5, 2.5   # vision may move zoom this far off distance

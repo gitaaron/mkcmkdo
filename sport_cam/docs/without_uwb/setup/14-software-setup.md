@@ -62,6 +62,16 @@ with the servo leads on the PTZ controller, needs none of this: set
 
 **Done when:** `pigs hwver` prints a number (pigpiod is up).
 
+**Person detector (optional now, worth it later).** HOG works out of the
+box. MobileNet-SSD finds climbers in poses HOG misses
+([06 — The two detectors](../../design/06-device-software.md#the-two-detectors));
+fetch its weights now so the comparison in
+[verification](15-verification.md) can run:
+
+```bash
+python3 -m sportcam.getmodel      # ≈ 48 MB download, keeps 19 MB in models/
+```
+
 System-wide install rationale: both services use the system `python3`; the
 Wi-Fi portal runs as root; Picamera2 is apt-only (a virtualenv would need
 `--system-site-packages` and edited unit files).
@@ -352,6 +362,7 @@ All in `src/without_uwb/device/sportcam/config.py`:
 
 | Setting | From |
 | --- | --- |
+| `DETECTOR` | `"hog"` until `detectbench` ([15](15-verification.md)) shows `"ssd"` finding the climber more often at 3 fps or better |
 | `SERVO_DRIVER` | step 2: `"pigpio"` once the servo leads are on GPIO12/13, `"arducam"` if not |
 | `PAN_SIGN`, `TILT_SIGN`, soft limits (`PAN_MIN/MAX_DEG`, `TILT_MIN/MAX_DEG`), `SERVO_US_AT_0/180` | step 4b, `ptzcheck`, then step 8 |
 | `ZOOM_CURVE` | step 5a, by hand |

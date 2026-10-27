@@ -24,6 +24,9 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 | `main.py` | asyncio supervisor: state handling (including `awake` → `sleep` after `AWAKE_TIMEOUT_S`, held off while an app watches the live view); control, frame and telemetry loops. On SIGTERM (the power switch going off, through systemd) `power_off()` closes any recording, parks the head and darkens the ring before the Pi halts ([04](04-electronics.md#power-switch)) |
 | `cloud.py` | Firebase link: Firestore document, app requests, previews ([below](#firebase-link)) |
 | `camera.py` | Picamera2: 720p preview (JPEG + person detection); 1080p **hardware** H.264 recording to `/home/pi/recordings`; sensor stopped in `sleep`, with a `CAMERA_WARMUP_S` settle on waking before the first detection |
+| `detector.py` | person detectors: HOG, or MobileNet-SSD on `cv2.dnn` (`DETECTOR`), each falling back to the other; boxes always in HOG's padded convention ([below](#vision-and-why-it-runs-slowly)) |
+| `getmodel.py` | `python3 -m sportcam.getmodel`: fetches the MobileNet-SSD weights (checksummed) into `models/` |
+| `detectbench.py` | bench tool: runs both detectors on the live picture and prints time per frame and hit rate |
 | `ptz.py` | PTZ controller at I2C 0x0C: pan, tilt, zoom, focus, soft limits, homing; `jog()` for the app's joystick ([09](09-direct-connection-and-app.md#aiming-by-hand)) |
 | `ptzcheck.py` | bench tool: sweeps both axes to their soft limits |
 | `led.py` | WS2812B ring over SPI (no root required) |
@@ -84,14 +87,31 @@ its other roles are build-specific.
 
 | Property | Value | Rationale |
 | --- | --- | --- |
+| Detector | `DETECTOR = "hog"` (default) or `"ssd"`; if the chosen one can't load, the other is used ([detectors](#the-two-detectors)) | HOG needs no model; SSD finds climbing poses HOG misses |
 | Rate | 3 fps (`DETECT_FPS_TRACKING`); 0.5 fps awake | subject motion seen from several metres is slow |
 | Search area | vertical strip around the expected column (`Camera.set_search_column()`) once the position is known | several-fold speed-up |
 | Freshness | the tracker acts only on a **new** detection | loop 20 Hz vs vision 3 Hz: reusing a cached detection applies it ≈ 7 times and causes hunting |
-| Thread | HOG runs on its own thread (`Camera._detect_loop`); `person_boxes()` returns at once with the latest result | run inside the 20 Hz tick, a detection froze the servos for a few hundred ms and the motion then lurched to catch up |
+| Thread | detection runs on its own thread (`Camera._detect_loop`); `person_boxes()` returns at once with the latest result | run inside the 20 Hz tick, a detection froze the servos for a few hundred ms and the motion then lurched to catch up |
 | Capture time | each result carries `captured_at`; the tracker logs its pan/tilt every tick and reads offsets against the pose then (`Tracker._pose_at`) | the head keeps easing during a detection; measured against the current pose, that turn is counted twice and the camera overshoots (≈ 1.8° on a 30° move) |
+
+#### The two detectors
+
+| | HOG | MobileNet-SSD (SSDLite-MobileNetV2, COCO) |
+| --- | --- | --- |
+| Poses | trained on upright pedestrians: misses overhangs, reaches, crouches, back views | trained on everyday photos: handles them |
+| People small in the frame | multi-scale over a 480 px image | the input is squeezed to 300×300, so a whole-frame search runs as two overlapping halves (`SSD_WIDE_TILES`); a person across the seam is joined back into one box |
+| Speed, Pi 4 | ≈ 3 fps | to be measured with `detectbench` (≈ 150–250 ms a pass expected; the tiled search is two passes) |
+| Boxes | padded around the body | hug the body; padded about their centre to HOG's convention (`PERSON_IN_BOX_W/H`), so zoom, focus, the gate and the overlays need no second set of constants |
+| Needs | OpenCV 4 (gone from OpenCV 5's main module) | OpenCV 4 or 5 (`cv2.dnn`), and `models/ssdlite_mobilenet_v2_coco.pb` from `getmodel` (19 MB, not in the repo; its `.pbtxt` is) |
+| Knobs | `DETECT_DOWNSCALE_W`, `DETECT_HIT_THRESHOLD` (camera-only build) | `SSD_CONFIDENCE`, `SSD_WIDE_TILES` |
+
+HOG stays the default until `detectbench` on the real wall shows SSD at 3 fps
+or better with more frames finding the climber ([15 — Verification](../without_uwb/setup/15-verification.md)).
 
 Tests: `src/<build>/device/tests/test_ptz.py` covers the focus lookup and both
 servo drivers (pulse widths, fractional degrees, signs, limits);
+`test_detector.py` the detectors (which SSD detections count, tiles, the seam
+join, box padding, fallback; the real model too once fetched);
 `test_camera.py` the detector thread (never blocks the loop, each result
 handed over once, an in-flight result dropped on sleep). All
 device tests run on any machine (`python3 tests/test_<name>.py`).
