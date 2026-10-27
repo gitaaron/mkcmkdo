@@ -142,9 +142,9 @@ def system_architecture():
 
     box(ax, 4.5, 5.4, 3.2, 1.9, "Firebase (cloud)",
         ["api function  /api/call/*", "Firestore: state + preview",
-         "Storage: recordings", "Hosting: Vue web app"])
-    box(ax, 9.2, 5.4, 2.5, 1.9, "Phone / laptop app",
-        ["Flutter (phone) · Vue (web)", "live video",
+         "Storage: recordings", "Hosting: /api → function"])
+    box(ax, 9.2, 5.4, 2.5, 1.9, "Phone app",
+        ["Flutter (iOS / Android)", "live video",
          "link badge + status ring"])
     box(ax, 0.4, 2.2, 3.6, 2.6, "Camera unit (one board)",
         ["Raspberry Pi 4 (HW H.264)", "Arducam PTZ ctrl (I2C 0x0C)",
@@ -154,7 +154,7 @@ def system_architecture():
                                             "PD trigger 12 V → buck 5 V",
                                             "8.4 h tracking + recording"], fc="#fdf6e8")
     arrow(ax, (4.0, 4.3), (4.5, 5.6), "internet: state,\npreview, clips", color=BLUE, lofs=(1.05, -0.35))
-    arrow(ax, (7.7, 6.4), (9.2, 6.4), "HTTPS + Firestore", color=BLUE)
+    arrow(ax, (7.7, 6.4), (9.2, 6.4), "HTTPS", color=BLUE)
     ax.annotate("", xy=(4.05, 4.5), xytext=(10.4, 5.35),
                 arrowprops=dict(arrowstyle="<|-|>", color=GREEN, lw=2.2,
                                 connectionstyle="arc3,rad=-0.38"))

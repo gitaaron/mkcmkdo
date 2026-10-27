@@ -80,7 +80,7 @@ if touches '^cad/|^[^/]+/cad/|^src/[^/]+/device/sportcam/config\.py$'; then
     fi
 fi
 
-if touches '^src/backend/|^src/web/|^package(-lock)?\.json$'; then
+if touches '^src/backend/|^package(-lock)?\.json$'; then
     [ -d node_modules ] || npm install --no-audit --no-fund >"$log/npm-install.out" 2>&1
     run typecheck npm run --silent typecheck
 fi

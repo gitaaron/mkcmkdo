@@ -6,8 +6,8 @@ import 'models.dart';
 
 /// Finds SportCam cameras on the local network via mDNS/Bonjour.
 ///
-/// This is the capability a web app cannot have: browsers expose no service
-/// discovery API at all. The camera publishes `_sportcam._tcp.local` (see
+/// This is why the app is native: browsers expose no service discovery API
+/// at all. The camera publishes `_sportcam._tcp.local` (see
 /// device/sportcam/discovery.py); we resolve SRV → A and read the TXT record
 /// so the picker can show each camera's name and current state before the
 /// app connects to anything.

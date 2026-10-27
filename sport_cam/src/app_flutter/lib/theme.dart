@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'models.dart';
 
-/// Same palette as the LED ring on the camera base and the Vue web app.
+/// Same palette as the LED ring on the camera base.
 class SportColors {
   static const bg = Color(0xFF0D1420);
   static const panel = Color(0xFF131C2C);

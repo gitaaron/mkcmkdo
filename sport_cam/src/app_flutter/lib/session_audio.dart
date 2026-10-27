@@ -14,8 +14,7 @@ import 'models.dart';
 /// the wall while you climb.
 ///
 /// Sounds: `assets/sounds/ping.wav`, `beep.wav`, `rec_start.wav` (rising) and
-/// `rec_stop.wav` (falling), rendered by `tool/make_chimes.py` from the same
-/// notes as the web app's sounds. Beeps and chimes queue rather than cut each
+/// `rec_stop.wav` (falling), rendered by `tool/make_chimes.py`. Beeps and chimes queue rather than cut each
 /// other off, so the start chime plays after the last beep; the ping has its
 /// own player and never holds them up.
 ///

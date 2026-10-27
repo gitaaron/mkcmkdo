@@ -31,7 +31,7 @@ lib/
   models.dart                  CamState, LinkMode, CameraEndpoint, Recording…
   discovery.dart               mDNS sweep for _sportcam._tcp
   camera_client.dart           connection strategy + callable API + WS state
-  theme.dart                   palette shared with the LED ring / web app
+  theme.dart                   palette shared with the LED ring
   session_audio.dart           search pings, countdown beeps and recording chimes, kept awake in the background
   screens/home_screen.dart     live view, badges, controls
   screens/library_screen.dart  recordings list + native player
@@ -116,8 +116,7 @@ more edits:
 The sounds themselves are `assets/sounds/ping.wav` (every 3 s while the
 camera searches), `beep.wav` (one per second
 of the found countdown), `rec_start.wav` (rising) and `rec_stop.wav`
-(falling), rendered by `python3 tool/make_chimes.py` from the same notes as
-the web app's.
+(falling), rendered by `python3 tool/make_chimes.py`.
 
 Run `flutter create --platforms=android,ios .` in this directory once to
 generate the platform folders, then apply the edits above.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the session sounds to assets/sounds/ — the same notes as src/web/src/lib/chime.ts.
+"""Render the session sounds to assets/sounds/.
 
     python3 src/app_flutter/tool/make_chimes.py
 

@@ -1,24 +1,9 @@
 rules_version = '2';
-// A camera's key is its document id: a long random string shared by the
-// camera and the apps. Anyone holding a key can read that camera; nobody can
-// list cameras, so a key can't be found by looking. All writes go through
-// the API function or the camera's own service account (both bypass rules).
+// No client reads or writes Firestore directly: the phone app goes through
+// the API function, and the camera uses its own service account (both
+// bypass rules).
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /cameras/{camera} {
-      allow get: if true;
-      allow list, write: if false;
-
-      // the recording library and the live preview, under a known key
-      match /recordings/{name} {
-        allow read: if true;
-        allow write: if false;
-      }
-      match /live/{doc} {
-        allow get: if true;
-        allow list, write: if false;
-      }
-    }
     match /{document=**} {
       allow read, write: if false;
     }

@@ -4,7 +4,7 @@ import '../models.dart';
 import '../theme.dart';
 
 /// Box colours: green for the climber, yellow for anyone else, red while
-/// the camera can't tell which is the climber. As in the web app.
+/// the camera can't tell which is the climber.
 const boxColours = {
   BoxLabel.climber: Color(0xFF34C759),
   BoxLabel.other: Color(0xFFFFCC00),

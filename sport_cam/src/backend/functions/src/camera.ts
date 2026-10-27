@@ -7,9 +7,9 @@
  *   cameras/{cameraKey}/recordings/*    the recording library (recordings.ts)
  *
  * The camera key is the document id: a long random string the camera and
- * every app share. Knowing it is what lets you read the camera and call its
- * functions; firestore.rules lets anyone *get* a camera by key but never
- * *list* them, so the key can't be discovered.
+ * phone app share. Knowing it is what lets you call its functions;
+ * firestore.rules gives clients no direct access, so the key can't be
+ * discovered by listing.
  *
  * The camera owns its state, as it did with the home server. It writes the
  * document itself (state, telemetry, a heartbeat) with `stateBy: "device"`.

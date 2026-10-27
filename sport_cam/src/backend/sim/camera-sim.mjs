@@ -17,7 +17,7 @@
  * Environment (npm run dev sets these):
  *   FIRESTORE_EMULATOR_HOST   e.g. 127.0.0.1:8080
  *   GCLOUD_PROJECT            demo-sportcam
- *   CAMERA_KEY                the key the web app uses in dev
+ *   CAMERA_KEY                the key the phone app uses in dev
  *   TRACKING_MODE             with_uwb | without_uwb
  *   API_BASE                  the functions emulator's URL for `api`
  *

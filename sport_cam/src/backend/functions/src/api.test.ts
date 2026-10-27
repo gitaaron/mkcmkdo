@@ -176,10 +176,11 @@ describe("firestore rules", () => {
   const rest = (path: string) =>
     fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/v1/projects/${PROJECT}/databases/(default)/documents/${path}`);
 
-  it("lets anyone with the key read the camera, its preview and its recordings", async () => {
+  it("doesn't let a client read a camera, even with its key: the API does that", async () => {
     await cam().collection("recordings").doc("a.mp4").set({ name: "a.mp4" });
-    expect((await rest(`cameras/${key}`)).status).toBe(200);
-    expect((await rest(`cameras/${key}/recordings`)).status).toBe(200);
+    expect((await rest(`cameras/${key}`)).status).toBe(403);
+    expect((await rest(`cameras/${key}/recordings`)).status).toBe(403);
+    expect((await rest(`cameras/${key}/live/preview`)).status).toBe(403);
   });
 
   it("never lets anyone list cameras or write", async () => {

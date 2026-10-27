@@ -8,7 +8,7 @@
 # node_modules are installed on first start.
 #
 # Common tasks inside the workspace:
-#   npm run dev                        # app :5173 + Firebase emulators + simulated camera
+#   npm run dev                        # Firebase emulators + simulated camera
 #   npm run docs                       # docs viewer :8090
 #   (BUILD = with_uwb or without_uwb)
 #   ./BUILD/cad/render_all.sh                    # OpenSCAD → BUILD/cad/stl/*.stl
@@ -24,7 +24,6 @@ services:
       - .:/workspace
       # keep container node_modules off the host mount (and vice versa)
       - node_modules:/workspace/node_modules
-      - web_node_modules:/workspace/src/web/node_modules
       # emulator downloads (Firestore/Storage jars), kept between restarts
       - firebase_cache:/root/.cache/firebase
     working_dir: /workspace
@@ -40,9 +39,8 @@ services:
       https_proxy: ${https_proxy:-}
       no_proxy: ${no_proxy:-}
     ports:
-      - "5173:5173"   # web app (vite)
       - "5001:5001"   # functions emulator (the API)
-      - "8080:8080"   # Firestore emulator (the web app connects to it directly)
+      - "8080:8080"   # Firestore emulator
       - "9199:9199"   # Storage emulator
       - "4000:4000"   # emulator UI
       - "8090:8090"   # docs viewer
@@ -55,5 +53,4 @@ services:
 
 volumes:
   node_modules:
-  web_node_modules:
   firebase_cache:

@@ -9,13 +9,12 @@ workspace, the docs viewer, and diagram regeneration. CAD workflow:
 ```
 src/
   backend/        Firebase: the api function, Firestore and Storage rules, the simulated camera
-  web/            the Vue web app (Firebase Hosting)
   app_flutter/    the native phone app (direct connection + Firebase)
   with_uwb/       Pi software (device/), anchor firmware (firmware/), tag firmware (wearable/)
   without_uwb/    Pi software (device/)
 ```
 
-npm workspaces: `src/backend`, `src/backend/functions`, `src/web`. Run all
+npm workspaces: `src/backend`, `src/backend/functions`. Run all
 `npm` commands from the repo root.
 
 ## Quick start: the emulators
@@ -24,7 +23,7 @@ Requirements: Node 22; Java 17+ (Firestore and Storage emulators).
 
 ```bash
 npm install
-npm run dev                  # emulators + simulated camera + web app on :5173
+npm run dev                  # emulators + simulated camera
 npm run dev:without_uwb      # the same, with the simulated camera as the camera-only build
 ```
 
@@ -32,9 +31,8 @@ That starts, together:
 
 | | Where | |
 | --- | --- | --- |
-| Web app (Vite, hot reload) | http://localhost:5173 | proxies `/api` to the functions emulator |
 | Functions emulator | :5001 | the `api` function, rebuilt on save (`tsc --watch`) and reloaded |
-| Firestore emulator | :8080 | the web app subscribes to it directly |
+| Firestore emulator | :8080 | the camera's document, preview and library |
 | Storage emulator | :9199 | recordings |
 | Emulator UI | http://localhost:4000 | watch `cameras/dev-camera-key` change as you press buttons |
 | Simulated camera | `src/backend/sim/camera-sim.mjs` | test frames, telemetry, a sample recording |
@@ -42,7 +40,8 @@ That starts, together:
 Simulated camera: same protocol as the Pi. Maintains `cameras/dev-camera-key`,
 adopts app requests, posts preview frames while watched, and on recording
 stop uploads `sim/sample.mp4` via `createUploadUrl` → `PUT` →
-`finalizeRecording`. The dev web app uses this key automatically.
+`finalizeRecording`. Point the phone app at it with
+`--dart-define=SPORTCAM_FALLBACK=http://<your-computer>:5001/demo-sportcam/us-central1/api --dart-define=SPORTCAM_CAMERA_KEY=dev-camera-key`.
 
 - First run downloads the emulators (a few hundred MB; cached in
   `~/.cache/firebase`).
@@ -59,13 +58,13 @@ stop uploads `sim/sample.mp4` via `createUploadUrl` → `PUT` →
 | `UPLOAD_API_BASE` | `"http://<your-computer>:5001/demo-sportcam/us-central1/api"` |
 | environment | `FIRESTORE_EMULATOR_HOST=<your-computer>:8080` |
 
-No credentials needed. Web app: `http://<your-computer>:5173/#key=<that key>`.
+No credentials needed. Phone app: as above, with `SPORTCAM_CAMERA_KEY=<that key>`.
 
 ### Tests
 
 ```bash
 npm test                                              # the API, against its own emulators (works alongside npm run dev)
-npm run typecheck                                     # function + web app
+npm run typecheck                                     # the function
 python3 src/<build>/device/tests/test_cloud.py       # the Pi's Firebase link, against an in-memory Firestore
 for t in src/<build>/device/tests/test_*.py; do python3 $t | tail -1; done   # all the Pi's offline tests
 ```
@@ -86,7 +85,7 @@ No CI service. Checks run locally, through Claude Code and git:
 | --- | --- |
 | `*.md`, `tools/check-build-markers.py` | `python3 tools/check-build-markers.py` |
 | `cad/`, `<build>/cad/`, `src/<build>/device/sportcam/config.py` | `python3 cad/fit.py --check --deep` (`--deep` only with OpenSCAD installed) |
-| `src/backend/`, `src/web/`, `package*.json` | `npm run typecheck` |
+| `src/backend/`, `package*.json` | `npm run typecheck` |
 | `src/backend/` | `npm test` (needs Java for the emulators; skipped without) |
 | `src/<build>/device/` | every `src/<build>/device/tests/test_*.py`, in `.venv-test/` (created on first use with `uv`, or `python3 -m venv`) |
 | `src/app_flutter/` | `dart run tool/verify_models.dart` (skipped without a Dart SDK) |
@@ -122,7 +121,7 @@ docker compose exec workspace bash  # shell with every tool available
 
 | Aspect | Detail |
 | --- | --- |
-| Published ports | 5173 (app), 5001 / 8080 / 9199 (emulators), 4000 (emulator UI), 8090 (docs) |
+| Published ports | 5001 / 8080 / 9199 (emulators), 4000 (emulator UI), 8090 (docs) |
 | Repo | bind-mounted at `/workspace`; `node_modules` in named volumes (no host/container conflicts) |
 | Supported tasks | `npm run dev`, `npm test`, `npm run docs`, `./<build>/cad/render_all.sh`, `python3 <build>/cad/render_previews.py`, `<build>/schematics/render_*.py` |
 

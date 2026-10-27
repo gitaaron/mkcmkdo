@@ -198,21 +198,23 @@ bank's cable always works too.
 
 ## 7. The app
 
-- **The web app, from anywhere.** Open the link `firebase-setup.sh` printed
-  (`https://<project>.web.app/#key=…`) on your phone or computer; add it to
-  your home screen. It shows the camera's state and a live preview, drives
-  it, and plays the recording library. Needs step 3.
-- **The native app, on the camera's Wi-Fi** — full-rate video with no internet:
-  `cd src/app_flutter && flutter pub get && flutter run`. It finds the camera by
-  mDNS ([09](../../design/09-direct-connection-and-app.md)). Add
-  `--dart-define=SPORTCAM_FALLBACK=https://<project>.web.app --dart-define=SPORTCAM_CAMERA_KEY=<key>`
-  and it reaches the camera through Firebase when it's not on the same
-  network. For the record start/stop chimes to play with the phone in your
-  bag, apply the platform setup in
-  [`src/app_flutter/README.md`](../../../src/app_flutter/README.md) first, and
-  allow notifications on Android when asked.
+The phone app: `cd src/app_flutter && flutter pub get && flutter run`.
 
-Both word their buttons for this build: the camera reports
+- **On the camera's Wi-Fi**: it finds the camera by mDNS
+  ([09](../../design/09-direct-connection-and-app.md)) and shows full-rate
+  video, with no internet needed.
+- **From anywhere**: add
+  `--dart-define=SPORTCAM_FALLBACK=https://<project>.web.app --dart-define=SPORTCAM_CAMERA_KEY=<key>`
+  (both printed by `firebase-setup.sh`) and it reaches the camera through
+  Firebase when it's not on the same network: state, a live preview,
+  control and the recording library. Needs step 3.
+
+For the record start/stop chimes to play with the phone in your bag, apply
+the platform setup in
+[`src/app_flutter/README.md`](../../../src/app_flutter/README.md) first, and
+allow notifications on Android when asked.
+
+It words its buttons for this build: the camera reports
 `TRACKING_MODE = "without_uwb"` itself ([07 — Tracking mode](../../design/07-backend-and-app.md#tracking-mode)).
 
 **At a new gym:** power on. The ring chases white while the camera looks

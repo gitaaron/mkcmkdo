@@ -93,8 +93,7 @@ cat <<EOF
 
 ==> Then deploy:   npm run deploy
 
-==> Your app link (keep it private — the key in it is what lets you in):
-    https://${PROJECT_ID}.web.app/#key=${CAMERA_KEY}
-    Flutter app:  --dart-define=SPORTCAM_FALLBACK=https://${PROJECT_ID}.web.app
-                  --dart-define=SPORTCAM_CAMERA_KEY=${CAMERA_KEY}
+==> The phone app (keep the key private — it is what lets you in):
+    flutter run --dart-define=SPORTCAM_FALLBACK=https://${PROJECT_ID}.web.app \\
+                --dart-define=SPORTCAM_CAMERA_KEY=${CAMERA_KEY}
 EOF

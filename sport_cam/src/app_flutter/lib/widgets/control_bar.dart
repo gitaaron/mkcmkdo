@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 
-/// Bottom buttons — same rules as the web app (the awake label depends on the
-/// build, see [ModeText]):
+/// Bottom buttons (the awake label depends on the build, see [ModeText]):
 ///   off       → none (the camera is still booting)
 ///   sleep     → Wake up · Record (skips awake: straight into the search)
 ///   awake     → Sleep · Start tracking | Track & record

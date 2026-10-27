@@ -12,7 +12,7 @@ Subsystem docs:
 05 — Tracking system ([with UWB](../with_uwb/design/05-tracking-system.md) ·
 [without UWB](../without_uwb/design/05-tracking-system.md)),
 [06 — Device software](06-device-software.md),
-[07 — Backend & app](07-backend-and-app.md),
+[07 — Backend](07-backend-and-app.md),
 [08 — Recordings & cloud](08-recordings-and-cloud.md),
 [09 — Direct connection & native app](09-direct-connection-and-app.md).
 
@@ -21,8 +21,8 @@ Subsystem docs:
 | Subsystem | Compute | Role |
 | --- | --- | --- |
 | **Camera unit** | Raspberry Pi 4 | camera and zoom lens, pan/tilt servos, LED ring, battery gauge, video encode and stream, person detection, tracking control loop<!--with_uwb-->; with UWB, three anchors<!--/--> |
-| **Backend** | Firebase: one Cloud Function (TypeScript), Firestore, Cloud Storage, Hosting | API, per-camera live state and preview, recording library, web app hosting. Shared by both builds |
-| **Companion app** | Vue 3 web app (Firebase Hosting); Flutter app | live view and control, remotely or direct on the camera's Wi-Fi. Shared by both builds |
+| **Backend** | Firebase: one Cloud Function (TypeScript), Firestore, Cloud Storage, Hosting | API (Hosting gives it the `web.app` address), per-camera live state and preview, recording library. Shared by both builds |
+| **Phone app** | Flutter (iOS / Android) | live view and control, remotely or direct on the camera's Wi-Fi. Shared by both builds |
 
 <!--with_uwb-->
 

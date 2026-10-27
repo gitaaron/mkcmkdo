@@ -106,7 +106,7 @@ class _StatusRingState extends State<StatusRing>
           width: 26,
           height: 26,
           decoration: BoxDecoration(
-            // hollow while disconnected — matches the web app's behaviour
+            // hollow while disconnected
             color: widget.connected ? color : Colors.transparent,
             shape: BoxShape.circle,
             border: Border.all(

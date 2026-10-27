@@ -38,7 +38,7 @@ limit).
 | --- | --- |
 | `createUploadUrl({name})` | V4-signed Cloud Storage `PUT` URL, valid 30 min, for a clip (`.mp4`) or its boxes (`.boxes.json`) |
 | `finalizeRecording({name,bytes,durationS,boxes})` | verifies the object exists and its size matches, and with `boxes: true` that the boxes were uploaded too; writes `cameras/{key}/recordings/{name}`; clears the app's upload indicator |
-| `getRecordings()` | that collection, newest first, each with `url` and `boxesUrl` (null without boxes; the web app subscribes instead) |
+| `getRecordings()` | that collection, newest first, each with `url` and `boxesUrl` (null without boxes) |
 | `GET /api/recordings/:name?k=<key>` | a clip: 302 to a signed Cloud Storage `GET` URL, valid 6 h. Its boxes: streamed through the function, so the apps can fetch them without CORS on the bucket |
 
 - **Range requests** are required for seeking in a phone `<video>`; Cloud
@@ -52,7 +52,7 @@ limit).
 While recording, the camera notes every person the detector finds, a few
 times a second, with the tracker's verdict on each (`boxlog.py`). They are
 saved beside the clip as `<clip>.boxes.json`, uploaded with it, and deleted
-from the card with it. Both apps' players draw them over the video and have a
+from the card with it. The app's player draws them over the video and have a
 **Boxes on / off** control. The same boxes are drawn over the
 [live view](#in-the-live-view), with a control of its own.
 
@@ -101,7 +101,7 @@ every box is `unsure` (red).
 | Link | How they arrive | Rate |
 | --- | --- | --- |
 | Direct (Flutter app) | WebSocket message `{"type": "boxes", "size": [1280, 720], "boxes": [[x, y, w, h, label], …]}` on each fresh detection | every detection: ≈ 3/s tracking, 1 per 2 s awake |
-| Firebase (web app, Flutter relay) | inside the preview frame they belong to: `cameras/{key}/live/preview` gets `size` and `boxes: [{x, y, w, h, label}, …]` (maps: Firestore can't nest arrays). `getPreview` returns them as `[x, y, w, h, label]` lists | with each preview frame, 1/s |
+| Firebase (relay) | inside the preview frame they belong to: `cameras/{key}/live/preview` gets `size` and `boxes: [{x, y, w, h, label}, …]` (maps: Firestore can't nest arrays). `getPreview` returns them as `[x, y, w, h, label]` lists | with each preview frame, 1/s |
 
 - An empty list means the detector looked and saw nobody. The camera drops
   boxes older than 3 s (`LIVE_BOXES_MAX_AGE_S`), and the apps drop them 3 s
@@ -135,21 +135,21 @@ Commands: `./scripts/firebase-setup.sh <project-id>` (once), then
 | Create Firestore database and bucket | `<project>-recordings` |
 | Grant URL signing | function's service account gets Token Creator on itself |
 | Create camera service account | Firestore-only; key saved as `sportcam-firebase.json` (copy to the Pi) |
-| Generate camera key | printed with the `config.py` lines and the app link |
+| Generate camera key | printed with the `config.py` lines and the phone app's `--dart-define`s |
 | No `gcloud` installed | prints the equivalent console steps |
 
 **Manual step:** upgrade the project to the **Blaze** plan (required for Cloud
 Functions). Free-tier quotas still apply.
 
-`npm run deploy` (`scripts/firebase-deploy.sh`) builds the web app and the
-function, then deploys functions, hosting and the Firestore and Storage rules
+`npm run deploy` (`scripts/firebase-deploy.sh`) builds the function, then
+deploys functions, hosting and the Firestore and Storage rules
 from `src/backend`:
 
 | Endpoint / rule | Content |
 | --- | --- |
-| `https://<project>.web.app` | web app; opening the `#key=…` link once stores the key in the browser |
+| `https://<project>.web.app` | a one-line page pointing to the phone app |
 | `https://<project>.web.app/api/**` | the API (`api` function, `src/backend/functions/src/app.ts`) |
-| Firestore rules | camera document, preview and recordings readable with the key; no listing; no client writes |
+| Firestore rules | no client access; the phone app reads through the API |
 | Storage rules | deny all; clients use short-lived signed URLs only |
 
 Storage layout:

@@ -10,7 +10,8 @@
  * Every call names its camera with the camera key, in an `X-Camera-Key`
  * header (or `?k=` where a header can't be set, like a <video> src).
  * Hosting rewrites /api/** here, so the app and the camera reach it at
- * https://<project>.web.app/api/…; under the emulator, Vite proxies to it.
+ * https://<project>.web.app/api/…; under the emulator, at the functions
+ * emulator's URL for `api`.
  *
  * It is the same protocol the camera's own local API speaks
  * (<build>/device/sportcam/local_api.py), so the apps are one client with two

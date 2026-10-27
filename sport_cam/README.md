@@ -12,7 +12,7 @@ companion app.
 | Recording | 1080p H.264, 12 Mbit/s, on the Pi; uploaded to Firebase after each clip |
 | Power | USB-C PD power bank, 92 Wh: <!--with_uwb-->6.2 h<!--/--><!--both--> (with UWB) / <!--/--><!--without_uwb-->8.4 h<!--/--><!--both--> (without UWB)<!--/--> tracking and recording |
 | States | sleep, awake, tracking (initiate recording), recording ([01](docs/product/01-requirements.md#state-machine)) |
-| Control | web app and Flutter app; from anywhere through Firebase, or direct on the camera's Wi-Fi |
+| Control | phone app (Flutter); from anywhere through Firebase, or direct on the camera's Wi-Fi |
 
 ## Builds
 
@@ -76,7 +76,7 @@ Conventions:
 | 04 | [Electronics](docs/design/04-electronics.md) | shared | Why a Pi 4, PTZ controller, LED ring, power switch and latch, power budget and runtime, SD card, bring-up |
 | 05 | Tracking system: [with UWB](docs/with_uwb/design/05-tracking-system.md) · [without UWB](docs/without_uwb/design/05-tracking-system.md) | per build | <!--with_uwb-->UWB geometry, anchors and control loops<!--/--><!--both--> · <!--/--><!--without_uwb-->search sweep, found → record and vision loops<!--/--> |
 | 06 | [Device software](docs/design/06-device-software.md) | shared | Pi camera service, motion, vision, status ring, the Firebase link |
-| 07 | [Backend & app](docs/design/07-backend-and-app.md) | shared | Firebase (one function, Firestore, Storage), the camera key, the API, the Vue app |
+| 07 | [Backend](docs/design/07-backend-and-app.md) | shared | Firebase (one function, Firestore, Storage), the camera key, the API |
 | 08 | [Recordings, cloud & gym Wi-Fi](docs/design/08-recordings-and-cloud.md) | shared | Upload → library pipeline, Firebase backend, phone-driven Wi-Fi setup |
 | 09 | [Direct connection & native app](docs/design/09-direct-connection-and-app.md) | shared | mDNS discovery, camera-hosted API, the Flutter app |
 | | **Setup** | [`docs/setup/`](docs/setup/), `docs/<build>/setup/` | start here: [with UWB](docs/with_uwb/setup/README.md) · [without UWB](docs/without_uwb/setup/README.md) |
@@ -122,7 +122,6 @@ docs/               all the docs
   without_uwb/      the camera-only build's own docs — same layout
 src/                all the code and apps
   backend/          Firebase: the api function, Firestore/Storage rules, the simulated camera — runs on the emulators locally
-  web/              Vue 3 web app (Vite, served by Firebase Hosting)
   app_flutter/      native phone app: mDNS discovery + direct camera connection, Firebase from anywhere
   with_uwb/         Pi software (device/: PTZ, UWB ranging, tag sessions, the Firebase link),
                     our own DS-TWR anchor sketch (firmware/, for the dual-serial protocol; ULA1s run
