@@ -19,7 +19,7 @@ from sportcam import config
 from sportcam.bearingcal import bearing_stats
 from sportcam.rangecal import biases as rangecal_biases, expected_ranges
 from sportcam import uwb as uwb_mod
-from sportcam.uwb import UwbArray, _KalmanAngle, parse_mc, solve_elevation
+from sportcam.uwb import UwbArray, _KalmanAngle, parse_mc, parse_mc_tag, solve_elevation
 
 failures: list[str] = []
 
@@ -231,6 +231,21 @@ def main() -> None:
           s_kf <= config.TAG_BEARING_SIGMA_DEG, f"{s_kf:.1f}°")
     check("…and its τ is close to TAG_BEARING_CORR_S",
           abs(t_kf - config.TAG_BEARING_CORR_S) < 0.1, f"{t_kf:.2f} s")
+
+    print("\nseveral tags")
+    check("a frame names its tag", parse_mc_tag("mc 0f 00000663 000005a3 00000512 000004cb 095f c1 0 a3:0") == 3)
+    check("…tag 0 when the field is missing", parse_mc_tag("mc 0f 00000663 000005a3 0 0 1 1 0") == 0)
+    arr = UwbArray()
+    arr._store(2, [5.0, 5.0, None])
+    arr._store(5, [3.0, 3.0, None])
+    check("each tag's ranges are kept apart", sorted(arr.tag_ages()) == [2, 5])
+    check("following none: whichever tag ranged last", abs(arr.fix().dist_m - 3.0) < 1e-9)
+    arr.follow(2)
+    check("following a tag: only its ranges", abs(arr.fix().dist_m - 5.0) < 1e-9)
+    arr._store(5, [1.0, 1.0, None])
+    check("…another tag ranging changes nothing", abs(arr.fix().dist_m - 5.0) < 1e-9 and arr.following == 2)
+    arr.follow(7)
+    check("following a tag never heard: no fix, never on", arr.fix() is None and arr.frame_age() == float("inf"))
 
     print()
     if failures:

@@ -5,17 +5,22 @@
  * Talks to the Firebase emulators exactly the way the real Pi talks to
  * Firebase (src/<build>/device/sportcam/cloud.py):
  *
- *   - writes cameras/{key}: mode, state, telemetry and a heartbeat
- *   - listens to that document and adopts any state an app asked for
+ *   - writes cameras/{key}: mode, state, its session's hash, telemetry and a heartbeat
+ *   - listens to that document and adopts any state an app asked for, with
+ *     the hash of the secret the API handed whoever started the session
  *   - posts preview frames to cameras/{key}/live/preview while an app watches,
  *     with made-up live person boxes
  *   - when a "recording" stops, uploads sim/sample.mp4 through the API
  *     (createUploadUrl → PUT → finalizeRecording), like uploader.py, with
  *     made-up person boxes beside it so the players' overlay has something
- *     to show
+ *     to show, stamped with that session's hash so it lands in its owner's
+ *     library
+ *   - makes two people to sign in as (DEV_PEOPLE, below): an admin, who
+ *     also gets a sample clip, and a climber
  *
  * Environment (npm run dev sets these):
  *   FIRESTORE_EMULATOR_HOST   e.g. 127.0.0.1:8080
+ *   FIREBASE_AUTH_EMULATOR_HOST  e.g. 127.0.0.1:9099
  *   GCLOUD_PROJECT            demo-sportcam
  *   CAMERA_KEY                the key the phone app uses in dev
  *   TRACKING_MODE             with_uwb | without_uwb
@@ -23,10 +28,12 @@
  *
  * Regenerate the frames with `python3 src/backend/sim/gen_frames.py`.
  */
+import { createHash, randomBytes } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -42,10 +49,16 @@ if (!["with_uwb", "without_uwb"].includes(MODE)) {
   console.error(`[sim] TRACKING_MODE must be with_uwb or without_uwb (got '${MODE}')`);
   process.exit(1);
 }
-if (!process.env.FIRESTORE_EMULATOR_HOST) {
-  console.error("[sim] FIRESTORE_EMULATOR_HOST is not set — the simulator only runs against the emulators");
+if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+  console.error("[sim] FIRESTORE_EMULATOR_HOST and FIREBASE_AUTH_EMULATOR_HOST must be set — the simulator only runs against the emulators");
   process.exit(1);
 }
+
+/** Who to sign in to the app as, in dev. Nobody can sign up: an admin adds people. */
+const DEV_PEOPLE = [
+  { email: "admin@sportcam.dev", password: "sportcam-dev", admin: true },
+  { email: "climber@sportcam.dev", password: "sportcam-dev", admin: false },
+];
 
 initializeApp({ projectId: PROJECT });
 const db = getFirestore();
@@ -102,15 +115,15 @@ async function put(name, bytes) {
   if (!res.ok) throw new Error(`upload HTTP ${res.status}`);
 }
 
-/** The same flow as the Pi's uploader.py. */
-async function uploadSample(durationS) {
+/** The same flow as the Pi's uploader.py; `claimHash` is the session's, or null if nobody owns it. */
+async function uploadSample(durationS, claimHash) {
   const name = `rec_${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}.mp4`;
   const bytes = readFileSync(SAMPLE);
   await cam.update({ upload: { name, sent: 0, total: bytes.length } });
   await put(name, bytes);
   await cam.update({ upload: { name, sent: bytes.length, total: bytes.length } });
   await put(name.replace(/\.mp4$/, ".boxes.json"), sampleBoxes(durationS ?? 10));
-  await call("finalizeRecording", { name, bytes: bytes.length, durationS, boxes: true });
+  await call("finalizeRecording", { name, bytes: bytes.length, durationS, boxes: true, claimHash });
   console.log(`[sim] recording saved: ${name}`);
 }
 
@@ -130,7 +143,17 @@ async function waitForEmulators() {
 
 await waitForEmulators();
 
+async function devPerson({ email, password, admin }) {
+  const auth = getAuth();
+  const user = await auth.getUserByEmail(email).catch(() => auth.createUser({ email, password }));
+  if (admin) await auth.setCustomUserClaims(user.uid, { admin: true });
+  return user.uid;
+}
+const [adminUid] = await Promise.all(DEV_PEOPLE.map(devPerson));
+console.log(`[sim] sign in to the app as ${DEV_PEOPLE.map((p) => p.email).join(" or ")}, password ${DEV_PEOPLE[0].password}`);
+
 let state = "awake";              // like the device after Wi-Fi: awake, asleep 30 s later
+let sessionHash = null;           // the session's owner, as the API set it when the app started it
 let awakeSince = Date.now();
 let recStarted = 0;
 let trackingSince = 0;
@@ -155,6 +178,7 @@ await cam.set({
   mode: MODE,
   state,
   stateBy: "device",
+  sessionHash,
   telemetry: {},
   deviceSeenAt: Timestamp.now(),
   whepUrl: null,
@@ -165,9 +189,11 @@ await cam.set({
 });
 console.log(`[sim] camera '${KEY}' online (${MODE}, ${frames.length} test frames)`);
 
-function adopt(next) {
+function adopt(next, hash = sessionHash) {
   const prev = state;
+  const clipOwner = sessionHash;
   state = next;
+  sessionHash = next === "tracking" || next === "recording" ? hash ?? null : null;
   if (next === "awake") awakeSince = Date.now();
   if (next === "tracking") {
     trackingSince = Date.now();
@@ -179,7 +205,7 @@ function adopt(next) {
   if (next === "recording") recStarted = Date.now();
   if (prev === "recording" && next !== "recording") {
     const durationS = Math.round((Date.now() - recStarted) / 100) / 10;
-    uploadSample(durationS).catch((e) => console.error("[sim] upload failed:", e.message));
+    uploadSample(durationS, clipOwner).catch((e) => console.error("[sim] upload failed:", e.message));
   }
   console.log(`[sim] ${prev} → ${next}`);
 }
@@ -191,15 +217,24 @@ cam.onSnapshot((snap) => {
   if (!d) return;
   viewerAt = d.viewerAt ? d.viewerAt.toMillis() : 0;
   if (d.stateBy === "app" && d.state !== state) {
-    adopt(d.state);
-    cam.update({ state, stateBy: "device", updatedAt: Timestamp.now() });
+    adopt(d.state, d.sessionHash);
+    report();
   }
 });
 
-// Seed an empty library so the Library screen has something to play.
-const lib = await cam.collection("recordings").limit(1).get();
+/** What the camera did, written back as the device's own. */
+function report() {
+  cam.update({ state, stateBy: "device", sessionHash, updatedAt: Timestamp.now() })
+    .catch((e) => console.error("[sim] state report failed:", e.message));
+}
+
+// Seed an empty library so the admin's Library screen has something to play:
+// a session of theirs, as if they had started it from the app.
+const lib = await db.collection("recordings").where("camera", "==", KEY).limit(1).get();
 if (lib.empty && statSync(SAMPLE, { throwIfNoEntry: false })) {
-  uploadSample(3).catch((e) => console.error("[sim] seeding the library failed:", e.message));
+  const hash = createHash("sha256").update(randomBytes(32).toString("base64url")).digest("hex");
+  await db.collection("claims").doc(hash).set({ owner: adminUid, createdAt: Timestamp.now() });
+  uploadSample(3, hash).catch((e) => console.error("[sim] seeding the library failed:", e.message));
 }
 
 const tracking = () => state === "tracking" || state === "recording";
@@ -263,12 +298,12 @@ setInterval(() => {
   }
   if (state === "tracking" && Date.now() - trackingSince >= searchMs + FOUND_CONFIRM_MS) {
     adopt("recording");
-    cam.update({ state, stateBy: "device", updatedAt: Timestamp.now() });
+    report();
   }
   if (state === "awake" && Date.now() - viewerAt < VIEWER_WINDOW_MS) awakeSince = Date.now(); // live view open
   if (state === "awake" && Date.now() - awakeSince >= AWAKE_TIMEOUT_MS) {
     adopt("sleep");
-    cam.update({ state, stateBy: "device", updatedAt: Timestamp.now() });
+    report();
   }
 }, 50);
 

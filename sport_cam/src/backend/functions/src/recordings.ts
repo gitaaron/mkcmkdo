@@ -1,44 +1,57 @@
 /**
  * The recording library: MP4s in Cloud Storage, metadata in Firestore.
  *
- *   createUploadUrl({name})                            → { url, method, headers }
- *   finalizeRecording({name, bytes, durationS, boxes}) → RecordingMeta
- *   getRecordings()                                    → { recordings: RecordingMeta[] }
+ *   camera:  createUploadUrl({name})                                       → { url, method, headers }
+ *            finalizeRecording({name, bytes, durationS, boxes, claimHash}) → RecordingMeta
+ *   person:  getRecordings()                                               → { recordings: RecordingMeta[] }
+ *            getPlaybackUrl({camera, name})                                → { url }
+ *
+ * Each clip is one document, `recordings/{cameraKey}:{name}`, with the
+ * `claimHash` of the session it was filmed in and its `owner`: the person who
+ * registered that hash (sessions.ts), or null until someone does. A person's
+ * library is the clips they own, from every camera; nobody sees anyone
+ * else's, and a clip nobody owns is seen by no one.
  *
  * The camera uploads straight to Cloud Storage on a V4-signed PUT URL, so the
- * video never passes through a function. Playback is a 302 to a signed GET
- * URL; Cloud Storage serves range requests, so phones can seek.
+ * video never passes through a function. Playback is a signed GET URL
+ * (`getPlaybackUrl`), handed only to the owner; Cloud Storage serves range
+ * requests, so phones can seek.
  *
  * Beside each clip the camera may upload `<clip>.boxes.json`: the people it
  * detected while recording, for the players to draw over the video (the
  * device's boxlog.py has the format). `boxes: true` on finalize says it did.
- * It is small and fetched by script, so it is always streamed through here:
- * a redirect to Cloud Storage would need CORS on the bucket.
+ * It is small and fetched by script, so it is always streamed through here,
+ * to its owner: a redirect to Cloud Storage would need CORS on the bucket.
  *
  * Under the emulator there is nothing to sign with, so the upload URL points
  * back at this function (PUT /api/recordings/upload/:name), and playback
  * streams the object through it, honouring Range.
  */
 import type { Request, Response } from "express";
-import { Timestamp, type DocumentReference } from "firebase-admin/firestore";
+import { Timestamp, getFirestore, type DocumentData, type DocumentReference } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import type { User } from "./auth.js";
 import { FnError } from "./errors.js";
+import { HASH_RE, ownerOf } from "./sessions.js";
 
 export interface RecordingMeta {
   name: string;
+  camera: string;
   bytes: number;
   createdAt: string;
   durationS: number | null;
-  url: string; // app-facing playback URL (range-capable)
+  url: string; // this API's playback route: needs the owner's Authorization header
   boxesUrl: string | null; // the person boxes to draw over it, if the camera sent them
 }
 
 const SIGNED_PUT_MIN = 30;
 const SIGNED_GET_HOURS = 6;
 const NAME_RE = /^[A-Za-z0-9._-]+\.(mp4|boxes\.json)$/;
+const KEY_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const isBoxes = (name: string) => name.endsWith(".boxes.json");
 const contentType = (name: string) => (isBoxes(name) ? "application/json" : "video/mp4");
 export const boxesName = (clip: string) => clip.replace(/\.mp4$/, ".boxes.json");
+const clipName = (name: string) => name.replace(/\.boxes\.json$/, ".mp4");
 
 export const emulated = () => !!process.env.FIREBASE_STORAGE_EMULATOR_HOST || process.env.FUNCTIONS_EMULATOR === "true";
 
@@ -53,11 +66,24 @@ function bucketName(): string {
 }
 
 const bucket = () => getStorage().bucket(bucketName());
-const objectPath = (cam: DocumentReference, name: string) => `recordings/${cam.id}/${name}`;
-const playbackUrl = (cam: DocumentReference, name: string) =>
-  `/api/recordings/${name}?k=${encodeURIComponent(cam.id)}`;
-const boxesUrl = (cam: DocumentReference, clip: string, has: unknown) =>
-  has === true ? playbackUrl(cam, boxesName(clip)) : null;
+const objectPath = (camera: string, name: string) => `recordings/${camera}/${name}`;
+const clipRef = (camera: string, name: string) => getFirestore().collection("recordings").doc(`${camera}:${name}`);
+const playbackUrl = (camera: string, name: string) =>
+  `/api/recordings/${name}?c=${encodeURIComponent(camera)}`;
+const boxesUrl = (camera: string, clip: string, has: unknown) =>
+  has === true ? playbackUrl(camera, boxesName(clip)) : null;
+
+function meta(r: DocumentData): RecordingMeta {
+  return {
+    name: r.name,
+    camera: r.camera,
+    bytes: r.bytes,
+    durationS: r.durationS ?? null,
+    createdAt: (r.createdAt as Timestamp).toDate().toISOString(),
+    url: playbackUrl(r.camera, r.name),
+    boxesUrl: boxesUrl(r.camera, r.name, r.boxes),
+  };
+}
 
 export async function createUploadUrl(cam: DocumentReference, data: any) {
   const name = safeName(data?.name);
@@ -67,7 +93,7 @@ export async function createUploadUrl(cam: DocumentReference, data: any) {
   if (emulated()) {
     return { url: `/api/recordings/upload/${name}?k=${encodeURIComponent(cam.id)}`, method: "PUT", headers };
   }
-  const [url] = await bucket().file(objectPath(cam, name)).getSignedUrl({
+  const [url] = await bucket().file(objectPath(cam.id, name)).getSignedUrl({
     version: "v4",
     action: "write",
     expires: Date.now() + SIGNED_PUT_MIN * 60_000,
@@ -81,51 +107,70 @@ export async function finalizeRecording(cam: DocumentReference, data: any): Prom
   if (!name || isBoxes(name) || typeof data?.bytes !== "number") {
     throw new FnError("invalid-argument", "expected { name: '<file>.mp4', bytes }");
   }
-  const file = bucket().file(objectPath(cam, name));
+  const claimHash = data.claimHash ?? null;
+  if (claimHash !== null && !(typeof claimHash === "string" && HASH_RE.test(claimHash))) {
+    throw new FnError("invalid-argument", "claimHash must be a SHA-256 in hex, or null");
+  }
+  const file = bucket().file(objectPath(cam.id, name));
   const [exists] = await file.exists();
   if (!exists) throw new FnError("failed-precondition", `recording '${name}' was never uploaded`);
-  const [meta] = await file.getMetadata();
-  const stored = Number(meta.size);
+  const [fileMeta] = await file.getMetadata();
+  const stored = Number(fileMeta.size);
   if (stored !== data.bytes) {
     throw new FnError("failed-precondition", `size mismatch: stored ${stored}, expected ${data.bytes}`);
   }
   const boxes = data.boxes === true;
-  if (boxes && !(await bucket().file(objectPath(cam, boxesName(name))).exists())[0]) {
+  if (boxes && !(await bucket().file(objectPath(cam.id, boxesName(name))).exists())[0]) {
     throw new FnError("failed-precondition", `boxes for '${name}' were never uploaded`);
   }
-  const doc = { name, bytes: stored, durationS: data.durationS ?? null, boxes, createdAt: Timestamp.now() };
-  await cam.collection("recordings").doc(name).set(doc);
+  const doc = {
+    camera: cam.id, name, bytes: stored, durationS: data.durationS ?? null, boxes,
+    claimHash, owner: await ownerOf(claimHash), createdAt: Timestamp.now(),
+  };
+  await clipRef(cam.id, name).set(doc);
   // clears the app's "uploading…" bar
   await cam.update({ upload: null });
-  return {
-    name, bytes: stored, durationS: doc.durationS,
-    createdAt: doc.createdAt.toDate().toISOString(),
-    url: playbackUrl(cam, name), boxesUrl: boxesUrl(cam, name, boxes),
-  };
+  return meta(doc);
 }
 
-export async function getRecordings(cam: DocumentReference): Promise<{ recordings: RecordingMeta[] }> {
-  const snap = await cam.collection("recordings").orderBy("createdAt", "desc").limit(100).get();
-  return {
-    recordings: snap.docs.map((d) => {
-      const r = d.data();
-      return {
-        name: r.name,
-        bytes: r.bytes,
-        durationS: r.durationS ?? null,
-        createdAt: (r.createdAt as Timestamp).toDate().toISOString(),
-        url: playbackUrl(cam, r.name),
-        boxesUrl: boxesUrl(cam, r.name, r.boxes),
-      };
-    }),
-  };
+/** The caller's own clips, from every camera, newest first. */
+export async function getRecordings(user: User): Promise<{ recordings: RecordingMeta[] }> {
+  const snap = await getFirestore().collection("recordings")
+    .where("owner", "==", user.uid).orderBy("createdAt", "desc").limit(100).get();
+  return { recordings: snap.docs.map((d) => meta(d.data())) };
 }
 
-/** GET /api/recordings/:name?k=<camera key> — playback, or a clip's boxes. */
-export async function serve(cam: DocumentReference, req: Request, res: Response): Promise<void> {
+/** The clip `name` from `camera`, if `user` owns it; not-found otherwise, so others can't probe for it. */
+async function ownClip(user: User, camera: unknown, name: string) {
+  if (typeof camera !== "string" || !KEY_RE.test(camera)) throw new FnError("invalid-argument", "bad camera");
+  const snap = await clipRef(camera, clipName(name)).get();
+  if (!snap.exists || snap.get("owner") !== user.uid) throw new FnError("not-found", "no such recording");
+  return bucket().file(objectPath(camera, name));
+}
+
+/**
+ * Where the owner's player can fetch the clip: a signed Cloud Storage URL,
+ * valid 6 h, that needs no other credentials. Under the emulator, this API's
+ * own route, which needs the Authorization header.
+ */
+export async function getPlaybackUrl(user: User, data: any): Promise<{ url: string }> {
+  const name = safeName(data?.name);
+  if (!name || isBoxes(name)) throw new FnError("invalid-argument", "expected { camera, name: '<file>.mp4' }");
+  const file = await ownClip(user, data?.camera, name);
+  if (emulated()) return { url: playbackUrl(data.camera, name) };
+  const [url] = await file.getSignedUrl({
+    version: "v4",
+    action: "read",
+    expires: Date.now() + SIGNED_GET_HOURS * 3_600_000,
+  });
+  return { url };
+}
+
+/** GET /api/recordings/:name?c=<camera key> — the owner's clip, or its boxes. */
+export async function serve(user: User, req: Request, res: Response): Promise<void> {
   const name = safeName(req.params.name);
   if (!name) throw new FnError("invalid-argument", "bad recording name");
-  const file = bucket().file(objectPath(cam, name));
+  const file = await ownClip(user, req.query.c, name);
   const [exists] = await file.exists();
   if (!exists) throw new FnError("not-found", "no such recording");
 
@@ -135,17 +180,12 @@ export async function serve(cam: DocumentReference, req: Request, res: Response)
     return;
   }
   if (!emulated()) {
-    const [url] = await file.getSignedUrl({
-      version: "v4",
-      action: "read",
-      expires: Date.now() + SIGNED_GET_HOURS * 3_600_000,
-    });
-    res.redirect(302, url);
+    res.redirect(302, (await getPlaybackUrl(user, { camera: req.query.c, name })).url);
     return;
   }
 
-  const [meta] = await file.getMetadata();
-  const size = Number(meta.size);
+  const [fileMeta] = await file.getMetadata();
+  const size = Number(fileMeta.size);
   const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
   res.setHeader("Accept-Ranges", "bytes");
   res.setHeader("Content-Type", "video/mp4");
@@ -173,6 +213,6 @@ export async function emulatorUpload(cam: DocumentReference, req: Request, res: 
   if (!name) throw new FnError("invalid-argument", "bad recording name");
   // The functions emulator has already read the body into rawBody.
   const body: Buffer = (req as any).rawBody ?? (Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0));
-  await bucket().file(objectPath(cam, name)).save(body, { contentType: contentType(name), resumable: false });
+  await bucket().file(objectPath(cam.id, name)).save(body, { contentType: contentType(name), resumable: false });
   res.json({ result: { name, bytes: body.length } });
 }

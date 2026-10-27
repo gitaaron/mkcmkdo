@@ -25,40 +25,56 @@ Rules, in the order they are checked:
   control loop drops to awake (5 s by default). A tag switched off and a tag
   hidden behind a body look the same, so a long enough dropout ends the
   session too — and the tag reappearing then starts a fresh one.
+* **Each tag is its own.** Several tags can be on at once (one per climber
+  waiting their turn); presence and arming are kept per tag, and `tag` says
+  which one started the session, for the camera to follow and to look up
+  whose it is. Only a tag `startable` allows starts one — with
+  TAG_NEEDS_PAIRING, one paired to a phone (pairing.py). An unpaired tag's
+  arrival is used up all the same, so pairing a tag that is already on does
+  not start a session out of the blue.
 """
 from __future__ import annotations
+
+from typing import Callable
 
 from . import config
 
 
 class AutoSession:
     def __init__(self) -> None:
-        self.active = False           # this session was started by the tag
-        self._present = False         # the tag is on, as far as we can tell
-        self._armed = True            # the next arrival may start a session
-        self._ranging_since: float | None = None
+        self.active = False           # this session was started by a tag
+        self.tag: int | None = None   # …this one
+        self.startable: Callable[[int | None], bool] = lambda _tag: True
+        self._present: set[int | None] = set()      # tags on, as far as we can tell
+        self._disarmed: set[int | None] = set()     # tags whose arrival is used up
+        self._ranging_since: dict[int | None, float] = {}
 
-    def update(self, now: float, frame_age_s: float, state: str, ready: bool) -> str | None:
+    def update(self, now: float, ages: dict[int, float] | float, state: str,
+               ready: bool) -> str | None:
         """One tick. Returns a state to apply, or None to leave things alone.
 
-        `frame_age_s` is how long since the last ranging frame, whatever the
-        camera state; `ready` is the tracker's `ready_to_record`.
+        `ages` is how long since each tag's last ranging frame, whatever the
+        camera state (`UwbArray.tag_ages()`); a bare number is one unnamed
+        tag. `ready` is the tracker's `ready_to_record`.
         """
-        # --- presence, debounced in both directions -----------------------
-        if frame_age_s < 0.5:
-            if self._ranging_since is None:
-                self._ranging_since = now
-            if now - self._ranging_since >= config.TAG_PRESENT_S:
-                self._present = True
-        else:
-            self._ranging_since = None
-            if frame_age_s >= config.LOST_END_S:
-                self._present = False
-                self._armed = True    # gone long enough: the next arrival counts
+        if not isinstance(ages, dict):
+            ages = {None: ages}
+        # --- presence, debounced in both directions, per tag ---------------
+        for tag, age in ages.items():
+            if age < 0.5:
+                since = self._ranging_since.setdefault(tag, now)
+                if now - since >= config.TAG_PRESENT_S:
+                    self._present.add(tag)
+            else:
+                self._ranging_since.pop(tag, None)
+                if age >= config.LOST_END_S:
+                    self._present.discard(tag)
+                    self._disarmed.discard(tag)   # gone long enough: the next arrival counts
 
         # --- a session ended, by whatever route ----------------------------
         if state in ("awake", "sleep"):
             self.active = False
+            self.tag = None
 
         # --- found for FOUND_CONFIRM_S → record ----------------------------
         if state == "tracking" and ready:
@@ -68,13 +84,15 @@ class AutoSession:
             return None
 
         # --- start ---------------------------------------------------------
-        if self._present and self._armed:
-            self._armed = False       # this arrival is used up either way
-            if state in ("awake", "sleep"):
+        for tag in sorted(self._present - self._disarmed, key=lambda t: (t is None, t or 0)):
+            self._disarmed.add(tag)   # this arrival is used up either way
+            if state in ("awake", "sleep") and self.startable(tag):
                 self.active = True
+                self.tag = tag
                 return "tracking"
         return None
 
     @property
     def tag_present(self) -> bool:
-        return self._present
+        """Any tag is on."""
+        return bool(self._present)

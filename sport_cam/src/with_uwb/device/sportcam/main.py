@@ -26,6 +26,10 @@ State lives on the device. Whichever channel a command arrives on, it goes
 through `apply_state()` and is then broadcast to all of them — so the app, the
 LED ring and Firestore never disagree.
 
+So does the session's owner: `session_hash` (owners.py), set when a session
+starts (`start_session()`), stamped beside each clip it records, and cleared
+when it ends. Only a phone holding its secret may stop it.
+
 Run:  python -m sportcam.main          (from device/)
 """
 from __future__ import annotations
@@ -34,7 +38,7 @@ import asyncio
 import signal
 import time
 
-from . import config, wifi_link
+from . import config, owners, wifi_link
 from .boxlog import BoxLog
 from .camera import Camera
 from .cloud import CloudLink
@@ -42,6 +46,7 @@ from .discovery import Advertiser
 from .led import StatusRing
 from .local_api import LocalApi
 from .power import PowerMonitor
+from .pairing import Pairings
 from .ptz import Ptz
 from .session import AutoSession
 from .storage import StorageMonitor
@@ -74,12 +79,16 @@ class Head:
         self.uwb = UwbArray()
         self.tracker = Tracker(self.uwb, self.camera, self.ptz)
         self.session = AutoSession()
+        self.pairings = Pairings()
+        # with TAG_NEEDS_PAIRING, only a tag paired to a phone starts sessions
+        self.session.startable = lambda tag: not config.TAG_NEEDS_PAIRING or self.pairings.paired(tag)
         self.led = StatusRing()
         self.power = PowerMonitor()
         self.storage = StorageMonitor()
         self.local = LocalApi(self)
         self.cloud = CloudLink(self)
         self.mdns = Advertiser()
+        self.session_hash: str | None = None   # whose session this is (owners.py)
         self._rec_path = ""
         self._rec_started = 0.0
         self.boxlog = BoxLog()     # person boxes beside the clip, for the players' overlay
@@ -197,9 +206,14 @@ class Head:
             self.tracker.forget_awake()
         if old not in ("tracking", "recording") and new in ("tracking", "recording"):
             self.tracker.reset_lock()     # a new session acquires afresh
+        if new not in ("tracking", "recording"):
+            self.session_hash = None       # the session is over, by whatever route
+            if old in ("tracking", "recording"):
+                self.uwb.follow(None)
         if old != "recording" and new == "recording":
             self._rec_path = self.camera.start_recording()
             self._rec_started = time.monotonic()
+            owners.stamp(self._rec_path, self.session_hash)
             self.boxlog.start(self._rec_path, self._rec_started)
             self.tracker.confirm()
             print(f"[rec] → {self._rec_path}")
@@ -227,10 +241,32 @@ class Head:
             self.ptz.home()                         # back to the boot focus and zoom
             self._near_focus = False
 
+    async def start_session(self, target: str, session_hash: str | None,
+                            tag: int | None = None) -> None:
+        """Start a session — tracking, or straight to recording — owned by
+        `session_hash`, following `tag` (or the tag paired to that hash; or,
+        with neither, whichever tag ranges). apply_state() may still refuse
+        (no detector, card full); then there is no session, and nobody owns
+        it."""
+        self.session_hash = session_hash
+        self.uwb.follow(tag if tag is not None else self.pairings.tag_for(session_hash))
+        await self.apply_state(target)
+        if self.state not in ("tracking", "recording"):
+            self.session_hash = None
+            self.uwb.follow(None)
+
+    def session_secret(self, pairing: object = None) -> str:
+        """The secret for a session the app starts. A phone that has paired a
+        tag here starts with its pairing secret: the camera follows that
+        tag, and it is one owner's session however it started."""
+        if owners.is_secret(pairing) and self.pairings.tag_for(owners.hash_secret(pairing)) is not None:
+            return pairing
+        return owners.new_secret()
+
     async def report_state(self) -> None:
         """Tell everyone: direct app clients, Firestore, mDNS TXT."""
         await self.local.broadcast(self.local.state_payload())
-        await self.cloud.report_state(self.state)
+        await self.cloud.report_state(self.state, self.session_hash)
         await self.mdns.update_state(public_state(self.state))
 
     async def warn(self, code: str, **detail) -> None:
@@ -243,8 +279,8 @@ class Head:
         await self.cloud.upload_progress(msg)
         await self.local.broadcast(msg)
         if msg.get("sent") == msg.get("total"):
-            await self.local.broadcast(
-                {"type": "recordings", **(await self.local._get_recordings(None))})
+            # Not the list: each phone asks for its own clips (local_api.py).
+            await self.local.broadcast({"type": "recordingsChanged"})
 
     # ---- loops ------------------------------------------------------------
     async def control_loop(self) -> None:
@@ -274,9 +310,15 @@ class Head:
             self.led.lost = False
         # The tag switching on (or the person found for FOUND_CONFIRM_S) can move the
         # state, through the same apply_state() as any other command.
-        want = self.session.update(now, self.uwb.frame_age(), self.state,
+        want = self.session.update(now, self.uwb.tag_ages(), self.state,
                                    self.tracker.ready_to_record)
-        if want and want != self.state:
+        if want == "tracking" and want != self.state:
+            # a tag switched on: its session, its owner's (pairing.py)
+            tag = self.session.tag
+            print(f"[session] {self.state} → {want} (tag {tag})")
+            await self.start_session(want, self.pairings.hash_for(tag), tag)
+            await self.report_state()
+        elif want and want != self.state:
             print(f"[session] {self.state} → {want}")
             await self.apply_state(want)
             await self.report_state()

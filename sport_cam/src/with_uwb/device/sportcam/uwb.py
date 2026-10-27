@@ -30,12 +30,21 @@ they present ranges completely differently:
     Ranges are hexadecimal millimetres. **Every range arrives in one frame**,
     which is strictly better than the alternative below: r₁, r₂ and r₃ are
     then sampled within one ranging cycle, and both formulas assume that.
+    The last field names the tag the frame is about (``a0:0``: tag 0, seen
+    by anchor 0), so several tags — T0–T7, set by each tag's DIP switch —
+    range side by side and are told apart.
 
 ``dual-serial``
     One serial port per anchor, each running our own DS-TWR sketch and
     printing ``R,<tag_id>,<range_m>``. Kept because it needs no particular
     vendor, but the ranges come from independent streams and are only as
     simultaneous as their loops happen to be.
+
+**Several tags.** Ranges are kept per tag. `fix()` and `frame_age()` are
+about the tag being *followed* (`follow()`: the one whose session is
+running, pairing.py), or, following none, whichever tag ranged last — right
+with one tag, meaningless with two on at once. `tag_ages()` says which tags
+are on, for session.py.
 """
 from __future__ import annotations
 
@@ -85,10 +94,17 @@ class _KalmanAngle:
         return self.x
 
 
-# "mc <mask> <r0> <r1> <r2> <r3> <nranges> <rseq> <debug> <role>"
+# "mc <mask> <r0> <r1> <r2> <r3> <nranges> <rseq> <debug> <role><tag>:<anchor>"
 _MC = re.compile(
     r"^mc\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s",
     re.IGNORECASE)
+_MC_TAG = re.compile(r"\s[at](\d+):\d+\s*$", re.IGNORECASE)
+
+
+def parse_mc_tag(line: str) -> int:
+    """The tag a RangeData frame is about (``a<tag>:<anchor>``); 0 if the field is missing."""
+    m = _MC_TAG.search(line.strip())
+    return int(m.group(1)) if m else 0
 
 
 def parse_mc(line: str) -> tuple[float | None, ...] | None:
@@ -149,10 +165,40 @@ def solve_elevation(r1: float, r2: float, r3: float, b: float,
 
 class UwbArray:
     def __init__(self) -> None:
-        self._ranges: list[float | None] = [None, None, None]
+        # each tag's latest ranges (A1, A2, A3, bias removed) and when they came
+        self._by_tag: dict[int, tuple[list[float | None], float]] = {}
+        self._follow: int | None = None
+        self._ranges: list[float | None] = [None, None, None]   # the followed tag's
         self._stamp = 0.0
         self._kalman = _KalmanAngle(config.UWB_BASELINE_M)
         self._kalman_elev = _KalmanAngle(config.UWB_A3_UP_M)
+
+    def follow(self, tag: int | None) -> None:
+        """Track `tag` from now on (None: whichever tag ranges). The filters
+        restart: another tag is another person somewhere else."""
+        if tag == self._follow:
+            return
+        self._follow = tag
+        self._kalman = _KalmanAngle(config.UWB_BASELINE_M)
+        self._kalman_elev = _KalmanAngle(config.UWB_A3_UP_M)
+        ranges, stamp = self._by_tag.get(tag, ([None, None, None], 0.0)) if tag is not None else \
+            (self._ranges, self._stamp)
+        self._ranges, self._stamp = list(ranges), stamp
+
+    @property
+    def following(self) -> int | None:
+        return self._follow
+
+    def _store(self, tag: int, ranges: list[float | None]) -> None:
+        now = time.monotonic()
+        self._by_tag[tag] = (ranges, now)
+        if self._follow is None or self._follow == tag:
+            self._ranges, self._stamp = ranges, now
+
+    def tag_ages(self) -> dict[int, float]:
+        """Seconds since each tag ever heard last ranged — which are on."""
+        now = time.monotonic()
+        return {tag: now - stamp for tag, (_, stamp) in list(self._by_tag.items())}
 
     def start(self) -> None:
         # Daemon threads of their own, not the event loop's default executor:
@@ -178,6 +224,7 @@ class UwbArray:
                         got = parse_mc(line)
                         if got is None:
                             continue
+                        tag = parse_mc_tag(line)
                         r0, r1, r2, _ = got
                         if r0 is None or r1 is None:
                             continue        # no bearing without both of A1 and A2
@@ -185,9 +232,8 @@ class UwbArray:
                         # likely to be body-shadowed); keep the bearing and
                         # simply report no elevation for that frame.
                         bias = config.RANGE_BIAS_M
-                        self._ranges = [r0 - bias[0], r1 - bias[1],
-                                        r2 - bias[2] if r2 is not None else None]
-                        self._stamp = time.monotonic()
+                        self._store(tag, [r0 - bias[0], r1 - bias[1],
+                                          r2 - bias[2] if r2 is not None else None])
             except (serial.SerialException, ValueError):
                 time.sleep(2.0)             # unplugged / booting — retry forever
 
@@ -199,14 +245,17 @@ class UwbArray:
                     while True:
                         line = ser.readline().decode(errors="ignore").strip()
                         if line.startswith("R,"):
-                            _, _tag, rng = line.split(",")
-                            self._ranges[idx] = float(rng) - config.RANGE_BIAS_M[idx]
-                            self._stamp = time.monotonic()
+                            _, tag_id, rng = line.split(",")
+                            tag = int(tag_id) if tag_id.strip().isdigit() else 0
+                            ranges = list(self._by_tag.get(tag, ([None, None, None], 0.0))[0])
+                            ranges[idx] = float(rng) - config.RANGE_BIAS_M[idx]
+                            self._store(tag, ranges)
             except (serial.SerialException, ValueError):
                 time.sleep(2.0)
 
     def frame_age(self) -> float:
-        """Seconds since the last frame carrying A1 and A2 — is the tag on?"""
+        """Seconds since the last frame carrying A1 and A2 from the followed
+        tag (any tag, following none) — is the tag on?"""
         return time.monotonic() - self._stamp if self._stamp else float("inf")
 
     # ---- fix --------------------------------------------------------------

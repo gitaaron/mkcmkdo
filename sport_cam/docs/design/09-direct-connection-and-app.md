@@ -13,9 +13,9 @@ protocol** as the Firebase function:
 
 | | Firebase | **Camera (direct)** |
 | --- | --- | --- |
-| `POST /api/call/*` | ✅ (with the camera key) | ✅ |
+| `POST /api/call/*` | ✅ (signed in, with the camera key) | ✅ |
 | Live view | preview, ~1 frame/s, while watched | `GET /api/stream.mjpeg`, 15 fps (or WebRTC) |
-| `GET /api/recordings/:name` | signed URL | ✅ (clips not yet uploaded) |
+| `GET /api/recordings/:name` | the owner's signed URL | ✅ your clips not yet uploaded (`X-Session-Secrets`) |
 | Live state | Firestore document | `WS /ws` |
 | Live person boxes | with each preview frame | `WS /ws` `boxes` message, each detection |
 | Joystick (aim by hand) | — | the app sends `WS /ws` `jog` messages ([below](#aiming-by-hand)) |
@@ -27,6 +27,12 @@ protocol** as the Firebase function:
   take the same path; app, LED ring and Firestore stay consistent.
 - State includes `mode` (`config.TRACKING_MODE`), so a direct client selects
   the build's wording ([07 — Tracking mode](07-backend-and-app.md#tracking-mode)).
+- **Whose session it is holds with no internet too.** The camera hands the
+  phone that starts a session its secret and refuses a stop without it; it
+  lists and serves a clip on its card only to a phone holding its session's
+  secret. Nothing here needs an account or the backend: the phone claims the
+  clips in the cloud library later
+  ([07 — Accounts](07-backend-and-app.md#accounts-and-whose-recording-is-whose)).
 
 ## Discovery: mDNS / Bonjour
 
@@ -83,15 +89,18 @@ One screen (requirement F5 in [01](../product/01-requirements.md#functional-requ
 
 | Element | Behaviour |
 | --- | --- |
+| **Sign in** (`lib/screens/login_screen.dart`) | before anything else, when the app is built with a backend: email, password, **Forgot password?**. No sign-up ([07 — Accounts](07-backend-and-app.md#accounts-and-whose-recording-is-whose)) |
 | **Top left — connection** (`ConnectionBadge`) | green **"SportCam · Direct · 10.0.0.42"**; blue **"Firebase"**; amber pulsing **"Searching…"**; red **"Offline — tap to retry"**. Tap to re-scan |
 | **Below the badge** | recordings button with clip-count badge; under it, **Boxes on / off** for the live view (remembered on the phone, separately from the player's) |
 | **Live view** | the MJPEG stream (direct) or the preview (Firebase), with the camera's [person boxes](08-recordings-and-cloud.md#in-the-live-view) painted over it (`widgets/person_boxes.dart`). Only in `awake`, `tracking` and `recording`; in `sleep` the sensor is off and the screen says the camera is asleep |
 | **Bottom right — joystick** (`widgets/joystick.dart`) | in `awake` over the direct connection only: a knob in a ring to aim the camera by hand ([below](#aiming-by-hand)) |
 | **Top right — status ring** (`widgets/status_ring.dart`) | the camera's state in the LED colours ([01 — State machine](../product/01-requirements.md#state-machine)); hollow while the camera is offline |
+| **Under the ring — account menu** | who is signed in; <!--with_uwb-->**Pair my tag**; <!--/--><!--both-->with UWB, **Pair my tag**; <!--/-->for admins, **People** (`lib/screens/admin_screen.dart`: everyone who can sign in, and **Add person**); **Sign out** |
 | **Bottom buttons** (`widgets/control_bar.dart`) | swap with the state, with the labels in [01 — State machine](../product/01-requirements.md#state-machine). In `sleep`: **Wake up** and **Record** |
 | **Stalled-tracking pill** | if tracking stalls: <!--with_uwb-->"Can't pick you out — step into view, away from anyone else"<!--/--><!--both--> (with UWB) or<!--/--><!--without_uwb--> "Can't find anyone — step into the room, facing the camera" (<!--/--><!--both-->without UWB, <!--/--><!--without_uwb-->after 15 s with nobody found)<!--/--> |
+| **Someone else's session** | while a session another phone started runs, **Sleep** and **Stop** are greyed out under *"Someone else is recording — only their phone can stop it"*. The app knows from the state's `sessionHash`, compared with the hashes of the secrets it holds (`lib/keys.dart`) |
 | **No optimistic UI** | a button calls the API, and the screen changes only when the camera reports its new state, so the app, the LED ring and other phones stay consistent |
-| **Recording library** (`lib/screens/library_screen.dart`) | opened from the recordings button. An upload pill shows progress while a clip uploads; **"Recording saved — watch now"** when it lands |
+| **Recording library** (`lib/screens/library_screen.dart`) | opened from the recordings button: **your** clips only — the cloud library, from every camera, plus, connected directly, yours still on the camera's card (*"on the camera, uploading soon"*). An upload pill shows progress while a clip uploads; **"Recording saved — watch now"** when one of yours lands |
 | **Recording player** (`lib/screens/library_screen.dart`) | the native player with the clip's [person boxes](08-recordings-and-cloud.md#person-boxes) painted over it, a **Boxes on / off** button beside play/pause (remembered on the phone) and a legend. Over the direct connection the boxes come from the camera's card (`/api/recordings/<clip>.boxes.json`) |
 | **Sounds** (`lib/session_audio.dart`) | a sonar ping every 3 s while searching, a beep each second of the found countdown (3, 2, 1), then a rising chime on record start; falling on stop. Queued, so the chime follows the last beep. Plays **including in the background**. While connected the app stays awake: Android foreground service with a "SportCam connected" notification; iOS background audio mode (looped silence). Mixes over music; plays with the iOS silent switch on. Platform setup: [`src/app_flutter/README.md`](../../src/app_flutter/README.md) |
 
@@ -123,4 +132,5 @@ and the checks that run without hardware or a Flutter SDK:
 | --- | --- | --- |
 | **Multicast blocked** (some guest/corporate Wi-Fi) | discovery fails | remembered address; `sportcam.local` if the OS resolves it |
 | **MJPEG bandwidth** (≈ 2–4 Mbit/s at 720p15) | fine on a LAN | WebRTC via MediaMTX (`WHEP_URL`): the camera already reports the URL in its state, but the app doesn't play WebRTC yet |
-| **No authentication on the local API** | anyone on the same Wi-Fi can control the camera | use a private hotspot at public venues. Fix: check the camera-key header, as the Firebase API does |
+| **No sign-in on the local API** | anyone on the same Wi-Fi can drive the camera: wake it, aim it, start a session when none is running. Not stop someone else's, nor see their clips | use a private hotspot at public venues. Fix: check the camera-key header, as the Firebase API does |
+| **Secrets over plain HTTP on the LAN** | someone capturing the Wi-Fi traffic could copy a session secret, and with it stop that session or claim its clips first | WPA2/3 Wi-Fi; the backend refuses a second claim on a secret already claimed. Fix: TLS with a pinned self-signed certificate |

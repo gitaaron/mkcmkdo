@@ -7,9 +7,14 @@
  *   cameras/{cameraKey}/recordings/*    the recording library (recordings.ts)
  *
  * The camera key is the document id: a long random string the camera and
- * phone app share. Knowing it is what lets you call its functions;
+ * phone app share. The app's calls also need a signed-in person (auth.ts);
  * firestore.rules gives clients no direct access, so the key can't be
  * discovered by listing.
+ *
+ * `sessionHash` is the SHA-256 of the secret held by whoever started the
+ * session running now (sessions.ts): only a call carrying that secret may
+ * stop it. Null outside a session, and for a session nobody owns (a UWB tag
+ * that isn't paired).
  *
  * The camera owns its state, as it did with the home server. It writes the
  * document itself (state, telemetry, a heartbeat) with `stateBy: "device"`.
@@ -18,7 +23,9 @@
  * adopts that and writes back what it actually did.
  */
 import { FieldValue, Timestamp, getFirestore, type DocumentReference } from "firebase-admin/firestore";
+import type { User } from "./auth.js";
 import { FnError } from "./errors.js";
+import { hashSecret, holds, isSecret, newSecret, permissionDenied, registerIn } from "./sessions.js";
 
 /**
  * "off" is never asked for: it is how the camera reads while it boots (connecting,
@@ -55,6 +62,7 @@ export interface CameraDoc {
   mode: TrackingMode;
   state: CamState;
   stateBy: "app" | "device";
+  sessionHash: string | null;
   telemetry: Telemetry;
   deviceSeenAt: Timestamp | null;   // the camera's heartbeat
   whepUrl: string | null;           // WebRTC stream on the camera's LAN, if it runs one
@@ -68,6 +76,7 @@ export interface CameraDoc {
 export interface StateSnapshot {
   mode: TrackingMode;
   state: CamState;
+  sessionHash: string | null;       // the app compares it with its own secrets' hashes: "is this mine to stop?"
   telemetry: Telemetry;
   deviceOnline: boolean;
   whepUrl: string | null;
@@ -96,6 +105,7 @@ export function snapshot(d: CameraDoc): StateSnapshot {
   return {
     mode: d.mode,
     state: d.state,
+    sessionHash: d.sessionHash ?? null,
     telemetry: d.telemetry ?? {},
     deviceOnline: isOnline(d),
     whepUrl: d.whepUrl ?? null,
@@ -129,15 +139,30 @@ export async function getState(ref: DocumentReference): Promise<StateSnapshot> {
   return snapshot(await load(ref));
 }
 
+/** Who is asking for a state, and the secrets their phone holds. */
+export interface Asker {
+  user: User;
+  secrets: string[];
+  /** With UWB: the secret of the tag paired to this phone, to start its session with. */
+  pairing?: unknown;
+}
+
+const inSession = (s: CamState) => s === "tracking" || s === "recording";
+
 /**
  * Ask the camera for a new state. `pick` maps the current state to the one
  * wanted (or null for "nothing to do", which setPower uses to be idempotent). Refused while the camera is offline:
  * nothing would act on it, and the app would show a state the camera isn't in.
+ *
+ * Leaving or advancing a session needs its secret (sessions.ts). Starting one
+ * makes a secret, registers it to the asker, and returns it as
+ * `sessionSecret` — the only time it is ever sent.
  */
 export async function requestState(
   ref: DocumentReference,
   pick: (current: CamState) => CamState | null,
-): Promise<StateSnapshot> {
+  asker: Asker,
+): Promise<StateSnapshot & { sessionSecret?: string }> {
   return getFirestore().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new FnError("not-found", "no camera with that key — has it connected yet?");
@@ -146,9 +171,21 @@ export async function requestState(
     if (to === null) return snapshot(d);
     assertTransition(d.state, to);   // includes "already there", as on the camera's own API
     if (!isOnline(d)) throw new FnError("failed-precondition", "the camera is offline");
+    if (inSession(d.state) && d.sessionHash && !holds(asker.secrets, d.sessionHash)) throw permissionDenied();
+
+    let sessionHash = inSession(to) ? d.sessionHash ?? null : null;
+    let sessionSecret: string | undefined;
+    if (!inSession(d.state) && inSession(to)) {
+      sessionSecret = isSecret(asker.pairing) ? asker.pairing : newSecret();
+      sessionHash = hashSecret(sessionSecret);
+      if (!(await registerIn(tx, sessionHash, asker.user.uid))) {
+        throw new FnError("permission-denied", "that tag is paired to someone else");
+      }
+    }
     const now = Timestamp.now();
-    tx.update(ref, { state: to, stateBy: "app", updatedAt: now });
-    return snapshot({ ...d, state: to, updatedAt: now });
+    tx.update(ref, { state: to, stateBy: "app", sessionHash, updatedAt: now });
+    const out = snapshot({ ...d, state: to, sessionHash, updatedAt: now });
+    return sessionSecret ? { ...out, sessionSecret } : out;
   });
 }
 

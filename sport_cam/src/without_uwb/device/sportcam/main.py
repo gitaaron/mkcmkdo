@@ -28,6 +28,10 @@ State lives on the device. Whichever channel a command arrives on, it goes
 through `apply_state()` and is then broadcast to all of them — so the app, the
 LED ring and Firestore never disagree.
 
+So does the session's owner: `session_hash` (owners.py), set when a session
+starts (`start_session()`), stamped beside each clip it records, and cleared
+when it ends. Only a phone holding its secret may stop it.
+
 Run:  python -m sportcam.main          (from device/)
 """
 from __future__ import annotations
@@ -36,7 +40,7 @@ import asyncio
 import signal
 import time
 
-from . import config, wifi_link
+from . import config, owners, wifi_link
 from .boxlog import BoxLog
 from .camera import Camera
 from .cloud import CloudLink
@@ -80,6 +84,7 @@ class Head:
         self.local = LocalApi(self)
         self.cloud = CloudLink(self)
         self.mdns = Advertiser()
+        self.session_hash: str | None = None   # whose session this is (owners.py)
         self._rec_path = ""
         self._rec_started = 0.0
         self.boxlog = BoxLog()     # person boxes beside the clip, for the players' overlay
@@ -197,9 +202,12 @@ class Head:
             self.tracker.forget_awake()
         if old not in ("tracking", "recording") and new in ("tracking", "recording"):
             self.tracker.reset_lock()     # a new session acquires afresh
+        if new not in ("tracking", "recording"):
+            self.session_hash = None       # the session is over, by whatever route
         if old != "recording" and new == "recording":
             self._rec_path = self.camera.start_recording()
             self._rec_started = time.monotonic()
+            owners.stamp(self._rec_path, self.session_hash)
             self.boxlog.start(self._rec_path, self._rec_started)
             self.tracker.confirm()
             print(f"[rec] → {self._rec_path}")
@@ -227,10 +235,23 @@ class Head:
             self.ptz.home()                         # back to the boot focus and zoom
             self._near_focus = False
 
+    async def start_session(self, target: str, session_hash: str | None) -> None:
+        """Start a session — tracking, or straight to recording — owned by
+        `session_hash`. apply_state() may still refuse (no detector, card
+        full); then there is no session, and nobody owns it."""
+        self.session_hash = session_hash
+        await self.apply_state(target)
+        if self.state not in ("tracking", "recording"):
+            self.session_hash = None
+
+    def session_secret(self, _pairing: object = None) -> str:
+        """The secret for a session the app starts: a new one each time."""
+        return owners.new_secret()
+
     async def report_state(self) -> None:
         """Tell everyone: direct app clients, Firestore, mDNS TXT."""
         await self.local.broadcast(self.local.state_payload())
-        await self.cloud.report_state(self.state)
+        await self.cloud.report_state(self.state, self.session_hash)
         await self.mdns.update_state(public_state(self.state))
 
     async def warn(self, code: str, **detail) -> None:
@@ -243,8 +264,8 @@ class Head:
         await self.cloud.upload_progress(msg)
         await self.local.broadcast(msg)
         if msg.get("sent") == msg.get("total"):
-            await self.local.broadcast(
-                {"type": "recordings", **(await self.local._get_recordings(None))})
+            # Not the list: each phone asks for its own clips (local_api.py).
+            await self.local.broadcast({"type": "recordingsChanged"})
 
     # ---- loops ------------------------------------------------------------
     async def control_loop(self) -> None:

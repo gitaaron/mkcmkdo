@@ -92,15 +92,22 @@ class FakeHead:
         self.applied: list[str] = []
         self.link: cloud.CloudLink | None = None
         self.refuse_recording = False
+        self.session_hash: str | None = None
 
     async def apply_state(self, new: str) -> None:
         if new == "recording" and self.refuse_recording:   # e.g. the card is full
             new = "tracking"
+        if new not in ("tracking", "recording"):
+            self.session_hash = None
         self.applied.append(new)
         self.state = new
 
+    async def start_session(self, target: str, session_hash) -> None:
+        self.session_hash = session_hash
+        await self.apply_state(target)
+
     async def report_state(self) -> None:
-        await self.link.report_state(self.state)
+        await self.link.report_state(self.state, self.session_hash)
 
 
 async def main() -> None:
@@ -126,11 +133,15 @@ async def main() -> None:
 
     print("commands from the app")
     the_doc = FakeCol.docs[doc_path]
-    the_doc.update({"state": "tracking", "stateBy": "app"})
+    check("…and that no session is running", "sessionHash" in doc() and doc()["sessionHash"] is None, str(doc()))
+    owner = "ab" * 32
+    the_doc.update({"state": "tracking", "stateBy": "app", "sessionHash": owner})
     await asyncio.sleep(0.1)
     check("adopts the app's request", head.applied == ["tracking"], str(head.applied))
-    check("writes back what it did", doc().get("state") == "tracking" and doc().get("stateBy") == "device",
-          str(doc()))
+    check("…as a session owned by whoever the API gave the secret to", head.session_hash == owner)
+    check("writes back what it did, and whose session it is",
+          doc().get("state") == "tracking" and doc().get("stateBy") == "device"
+          and doc().get("sessionHash") == owner, str(doc()))
     head.refuse_recording = True
     the_doc.update({"state": "recording", "stateBy": "app"})
     await asyncio.sleep(0.1)
@@ -140,6 +151,16 @@ async def main() -> None:
     the_doc.update({"state": "awake", "stateBy": "device"})
     await asyncio.sleep(0.1)
     check("ignores its own writes", head.applied == before, str(head.applied))
+    the_doc.update({"state": "awake", "stateBy": "app", "sessionHash": None})
+    await asyncio.sleep(0.1)
+    check("a session's end clears its owner", doc().get("sessionHash") is None and head.session_hash is None,
+          str(doc()))
+    the_doc.update({"state": "tracking", "stateBy": "app", "sessionHash": "not-a-hash"})
+    await asyncio.sleep(0.1)
+    check("a malformed session hash is not adopted: nobody owns that session", head.session_hash is None
+          and head.state == "tracking", str(doc()))
+    the_doc.update({"state": "awake", "stateBy": "app"})
+    await asyncio.sleep(0.1)
 
     print("telemetry and heartbeat")
     await link.telemetry({"type": "telemetry", "pan": 3.0, "phase": "search"})

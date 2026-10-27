@@ -6,35 +6,71 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 
+import '../camera_client.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/person_boxes.dart';
 
-/// Recording library. Playback uses `video_player` — ExoPlayer on Android,
-/// AVPlayer on iOS — so H.264 decoding is hardware-accelerated and seeking
-/// works against the camera's (or server's) range-capable endpoint.
+/// The signed-in person's recordings, and nobody else's: the cloud library,
+/// plus their clips still on the card of a camera connected directly.
+/// Playback uses `video_player` — ExoPlayer on Android, AVPlayer on iOS — so
+/// H.264 decoding is hardware-accelerated and seeking works against the
+/// camera's (or Cloud Storage's) range-capable endpoint.
 class LibraryScreen extends StatelessWidget {
-  const LibraryScreen({
-    super.key,
-    required this.recordings,
-    required this.base,
-  });
+  const LibraryScreen({super.key, required this.client});
 
-  final List<Recording> recordings;
-  final String base;
+  final CameraClient client;
+
+  Future<void> _play(BuildContext context, Recording r) async {
+    final Playback video;
+    final Playback? boxes;
+    try {
+      video = await client.playback(r);
+      boxes = await client.boxes(r);
+    } on ApiException catch (err) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Can't play it: ${err.message}")),
+        );
+      }
+      return;
+    }
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PlayerScreen(
+          video: video,
+          boxes: boxes,
+          title: _when(r.createdAt),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: client,
+      builder: (context, _) => _build(context, client.recordings),
+    );
+  }
+
+  Widget _build(BuildContext context, List<Recording> recordings) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: SportColors.panel,
-        title: const Text('Recordings'),
+        title: const Text('My recordings'),
       ),
       body: recordings.isEmpty
           ? const Center(
-              child: Text(
-                'No recordings yet.',
-                style: TextStyle(color: SportColors.muted),
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'No recordings yet. Tap Record on the camera, and your '
+                  'clips appear here once they are saved.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: SportColors.muted),
+                ),
               ),
             )
           : ListView.separated(
@@ -66,21 +102,14 @@ class LibraryScreen extends StatelessWidget {
                       [
                         r.durationLabel,
                         r.sizeLabel,
+                        if (!r.inCloud) 'on the camera, uploading soon',
                       ].where((s) => s.isNotEmpty).join(' · '),
                       style: const TextStyle(
                         color: SportColors.muted,
                         fontSize: 12.5,
                       ),
                     ),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => PlayerScreen(
-                          url: r.absoluteUrl(base),
-                          boxesUrl: r.absoluteBoxesUrl(base),
-                          title: _when(r.createdAt),
-                        ),
-                      ),
-                    ),
+                    onTap: () => _play(context, r),
                   ),
                 );
               },
@@ -96,16 +125,17 @@ class LibraryScreen extends StatelessWidget {
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({
     super.key,
-    required this.url,
+    required this.video,
     required this.title,
-    this.boxesUrl,
+    this.boxes,
   });
 
-  final String url;
+  /// The clip, and the headers that show it's the viewer's.
+  final Playback video;
   final String title;
 
   /// The person boxes saved beside the clip, drawn over it; null if none.
-  final String? boxesUrl;
+  final Playback? boxes;
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -115,7 +145,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   static const _showKey = 'showBoxes';
 
   late final VideoPlayerController _controller =
-      VideoPlayerController.networkUrl(Uri.parse(widget.url));
+      VideoPlayerController.networkUrl(
+        Uri.parse(widget.video.url),
+        httpHeaders: widget.video.headers,
+      );
   String? _error;
   BoxTrack? _track;
   bool _showBoxes = true;
@@ -152,10 +185,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final prefs = await SharedPreferences.getInstance();
     final show = prefs.getBool(_showKey) ?? true;
     BoxTrack? track;
-    final url = widget.boxesUrl;
-    if (url != null) {
+    final boxes = widget.boxes;
+    if (boxes != null) {
       try {
-        final res = await http.get(Uri.parse(url));
+        final res = await http.get(Uri.parse(boxes.url), headers: boxes.headers);
         if (res.statusCode == 200)
           track = BoxTrack.fromJson(jsonDecode(res.body));
       } catch (_) {

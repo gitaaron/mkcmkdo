@@ -7,13 +7,14 @@ and Wi-Fi provisioning at a new location.
 
 ```
 stop recording
-   └─► Pi finalizes the MP4 (moov atom written — file is playable)
+   └─► Pi finalizes the MP4 (moov atom written — file is playable),
+       stamped with its session's hash (<clip>.owner)
         └─► background upload  createUploadUrl → PUT, for the clip and its boxes
              │                  → finalizeRecording
              │   (tracking + live streaming continue; app shows progress)
              └─► backend confirms byte count
                   └─► Pi deletes its local copy   (SD card = buffer, not store)
-                       └─► app library streams it back, with seeking
+                       └─► its owner's app library streams it back, with seeking
 ```
 
 - The local file is deleted only after `finalizeRecording` returns (byte
@@ -38,15 +39,17 @@ limit).
 | Callable | Function |
 | --- | --- |
 | `createUploadUrl({name})` | V4-signed Cloud Storage `PUT` URL, valid 30 min, for a clip (`.mp4`) or its boxes (`.boxes.json`) |
-| `finalizeRecording({name,bytes,durationS,boxes})` | verifies the object exists and its size matches, and with `boxes: true` that the boxes were uploaded too; writes `cameras/{key}/recordings/{name}`; clears the app's upload indicator |
-| `getRecordings()` | that collection, newest first, each with `url` and `boxesUrl` (null without boxes) |
-| `GET /api/recordings/:name?k=<key>` | a clip: 302 to a signed Cloud Storage `GET` URL, valid 6 h. Its boxes: streamed through the function, so the apps can fetch them without CORS on the bucket |
+| `finalizeRecording({name,bytes,durationS,boxes,claimHash})` | verifies the object exists and its size matches, and with `boxes: true` that the boxes were uploaded too; writes `recordings/{key}:{name}` with the session's `claimHash` and its `owner` (whoever has claimed that hash, else null until someone does — [07](07-backend-and-app.md#accounts-and-whose-recording-is-whose)); clears the app's upload indicator |
+| `getRecordings()` | the signed-in caller's clips, from every camera, newest first, each with its `camera`, `url` and `boxesUrl` (null without boxes) |
+| `getPlaybackUrl({camera, name})` | for the owner: a signed Cloud Storage `GET` URL, valid 6 h, that the player fetches with no other credentials |
+| `GET /api/recordings/:name?c=<key>` | for the owner (`Authorization` header): a clip, 302 to its signed URL; its boxes, streamed through the function, so the apps can fetch them without CORS on the bucket. Anyone else: 404 |
 
 - **Range requests** are required for seeking in a phone `<video>`; Cloud
   Storage supports them.
 - **Emulators:** no URL signing available. `createUploadUrl` returns the
-  function's own `PUT /api/recordings/upload/:name`, and playback streams
-  through the function with `Range` support. Transparent to the uploader.
+  function's own `PUT /api/recordings/upload/:name`, and `getPlaybackUrl`
+  the function's own playback route, which streams with `Range` support (the
+  app sends its token with it). Transparent to the uploader.
 
 ### Person boxes
 
@@ -114,7 +117,8 @@ every box is `unsure` (red).
 
 The camera uploads to `UPLOAD_API_BASE` as `CAMERA_KEY` (set in 14 —
 Software setup, the Firebase step). Both empty: recordings stay on the card,
-and phones play them over the direct connection
+and each phone plays its own over the direct connection, showing the
+camera its session secret
 ([09](09-direct-connection-and-app.md)).
 
 ## The deployed backend
@@ -137,7 +141,8 @@ Storage layout:
 | Data | Location |
 | --- | --- |
 | Video | `recordings/<camera key>/<name>.mp4` in the bucket |
-| Metadata | `cameras/<camera key>/recordings/<name>` in Firestore |
+| Metadata | `recordings/<camera key>:<name>` in Firestore, with `owner` and `claimHash` |
+| Who owns which session | `claims/<session hash>` = `{owner}`, written by `claimRecordings` and by starts through Firebase |
 
 **Running cost** ([C11](../product/01-requirements.md#non-functional-requirements)).
 Heartbeat every 5 s ≈ 17 000 Firestore writes per powered-on day (free tier:

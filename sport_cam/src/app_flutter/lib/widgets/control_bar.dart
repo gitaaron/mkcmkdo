@@ -9,12 +9,16 @@ import '../theme.dart';
 ///   awake     → Sleep · Start tracking | Track & record
 ///   tracking  → Sleep · Stop tracking (search → found → recording runs by itself)
 ///   recording → Sleep · Stop recording (saves the clip, back to awake)
+///
+/// [locked]: the session running is someone else's — only the phone that
+/// started it can stop it (or put the camera to sleep), so both are off.
 class ControlBar extends StatelessWidget {
   const ControlBar({
     super.key,
     required this.state,
     this.text = ModeText.withUwb,
     required this.enabled,
+    this.locked = false,
     required this.onSetPower,
     required this.onStartTracking,
     required this.onStopTracking,
@@ -24,6 +28,7 @@ class ControlBar extends StatelessWidget {
   final CamState state;
   final ModeText text;
   final bool enabled;
+  final bool locked;
   final void Function(bool on) onSetPower;
   final VoidCallback onStartTracking;
   final VoidCallback onStopTracking;
@@ -31,6 +36,8 @@ class ControlBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final inSession = state == CamState.tracking || state == CamState.recording;
+    final active = enabled && !(locked && inSession);
     final (String? leftLabel, VoidCallback? leftAction) = switch (state) {
       CamState.off => (null, null),
       CamState.sleep => ('Wake up', () => onSetPower(true)),
@@ -66,7 +73,7 @@ class ControlBar extends StatelessWidget {
             Expanded(
               child: _Btn(
                 label: leftLabel,
-                onTap: enabled ? leftAction : null,
+                onTap: active ? leftAction : null,
                 background: SportColors.panel,
                 foreground: SportColors.ink,
                 border: SportColors.border,
@@ -77,7 +84,7 @@ class ControlBar extends StatelessWidget {
             Expanded(
               child: _Btn(
                 label: rightLabel,
-                onTap: enabled ? rightAction : null,
+                onTap: active ? rightAction : null,
                 // Record from sleep starts a recording session: red
                 background: state == CamState.sleep
                     ? SportColors.recording

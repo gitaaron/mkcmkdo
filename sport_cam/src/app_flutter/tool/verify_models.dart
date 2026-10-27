@@ -126,6 +126,16 @@ void main() {
         'http://10.0.0.5:8787/api/recordings/rec_20260921010951.boxes.json',
   );
 
+  check('a clip on the card names no camera', !recs.first.inCloud);
+  final inCloud = Recording.fromJson({
+    ...(recJson['recordings'] as List<dynamic>).first as Map<String, dynamic>,
+    'camera': 'dev-camera-key',
+  });
+  check(
+    "one from the cloud library names its camera",
+    inCloud.inCloud && inCloud.camera == 'dev-camera-key',
+  );
+
   // The person boxes beside a clip, as the device's boxlog.py writes them.
   final track = BoxTrack.fromJson(
     jsonDecode(

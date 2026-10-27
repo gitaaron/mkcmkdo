@@ -19,7 +19,7 @@ npm workspaces: `src/backend`, `src/backend/functions`. Run all
 
 ## Quick start: the emulators
 
-Requirements: Node 22; Java 17+ (Firestore and Storage emulators).
+Requirements: Node 22; Java 17+ (Firestore, Storage and Authentication emulators).
 
 ```bash
 npm install
@@ -34,14 +34,19 @@ That starts, together:
 | Functions emulator | :5001 | the `api` function, rebuilt on save (`tsc --watch`) and reloaded |
 | Firestore emulator | :8080 | the camera's document, preview and library |
 | Storage emulator | :9199 | recordings |
+| Authentication emulator | :9099 | the people who sign in to the app |
 | Emulator UI | http://localhost:4000 | watch `cameras/dev-camera-key` change as you press buttons |
-| Simulated camera | `src/backend/sim/camera-sim.mjs` | test frames, telemetry, a sample recording |
+| Simulated camera | `src/backend/sim/camera-sim.mjs` | test frames, telemetry, a sample recording; makes the dev accounts |
 
 Simulated camera: same protocol as the Pi. Maintains `cameras/dev-camera-key`,
 adopts app requests, posts preview frames while watched, and on recording
 stop uploads `sim/sample.mp4` via `createUploadUrl` → `PUT` →
-`finalizeRecording`. Point the phone app at it with
-`--dart-define=SPORTCAM_FALLBACK=http://<your-computer>:5001/demo-sportcam/us-central1/api --dart-define=SPORTCAM_CAMERA_KEY=dev-camera-key`.
+`finalizeRecording`, stamped with the session's hash so it lands in its
+starter's library. Point the phone app at it with
+`--dart-define=SPORTCAM_FALLBACK=http://<your-computer>:5001/demo-sportcam/us-central1/api --dart-define=SPORTCAM_CAMERA_KEY=dev-camera-key --dart-define=SPORTCAM_AUTH_EMULATOR=<your-computer>:9099`,
+and sign in as `admin@sportcam.dev` (an admin, with a sample clip) or
+`climber@sportcam.dev`, password `sportcam-dev`. Sign in on two phones as
+different people to see one camera shared.
 
 - First run downloads the emulators (a few hundred MB; cached in
   `~/.cache/firebase`).
@@ -99,8 +104,12 @@ Claude isn't re-tested on every stop when nothing changed.
 ```bash
 npx firebase login
 ./scripts/firebase-setup.sh <project-id>   # once: project, Firestore, bucket, camera account, camera key
-npm run deploy                             # build + deploy functions, hosting, rules
+npm run deploy                             # build + deploy functions, hosting, rules, index
+GCLOUD_PROJECT=<project-id> npm run add-admin -w @sportcam/backend -- <email> <password>   # once: the first admin
 ```
+
+Before the app can sign anyone in, turn on **Email/Password** in the
+console (Authentication → Sign-in method); setup prints the link.
 
 Then enter the printed values in the camera's `config.py`
 ([14 — Software setup](../with_uwb/setup/14-software-setup.md)).

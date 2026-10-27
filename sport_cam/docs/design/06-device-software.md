@@ -33,7 +33,8 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 | `power.py` | battery gauge (INA260, INA226 or none): Wh integration, runtime estimate, low/critical levels |
 | `storage.py` | SD free space in minutes of recording; low/critical levels |
 | `focuscal.py` | `python3 -m sportcam.focuscal <metres>`: focus sweep at five focal lengths; prints `FOCUS_GRID` |
-| `uploader.py` | background upload to the backend: progress, retry, boot-time backlog drain ([08](08-recordings-and-cloud.md)) |
+| `uploader.py` | background upload to the backend: progress, retry, boot-time backlog drain; sends each clip's session hash as its `claimHash` ([08](08-recordings-and-cloud.md)) |
+| `owners.py` | whose session it is: session secrets and their SHA-256, the `<clip>.owner` stamp beside each clip; only a call holding the secret stops a session, and only a phone holding it sees the clip on the card ([07 — Accounts](07-backend-and-app.md#accounts-and-whose-recording-is-whose)) |
 | `boxlog.py` | while recording, the tracker's labelled person boxes from each detection; written beside the clip as `<clip>.boxes.json` and uploaded with it ([08](08-recordings-and-cloud.md#person-boxes)) |
 | `wifi_portal.py` | `sportcam-wifi`: tries the saved networks, else pairing: hotspot, setup page and `/api/join`; writes `/run/sportcam-wifi.json` ([08](08-recordings-and-cloud.md#connecting-the-camera-to-gym-wi-fi-from-your-phone)) |
 | `wifi_link.py` | the head's side: boot states `connecting` / `pairing` from the status file, Wi-Fi share QR code parser, join request; both report as `off` to apps |
@@ -48,6 +49,7 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 | Installation | 14 — Software setup, step 3 onward ([with UWB](../with_uwb/setup/14-software-setup.md), [without UWB](../without_uwb/setup/14-software-setup.md)). Runs from `/home/pi/sportcam/src/<build>/device` |
 | Privileges | `sportcam-head` runs as an ordinary user (hence SPI for the LED ring; the PWM/DMA driver needs root). `sportcam-wifi` (portal) runs as root and is the only thing that changes the network; the head reads its QR codes and asks it to join |
 | Sleep | `apply_state("sleep")` stops the sensor (`Camera.set_awake(False)`) and parks the head; the frame loop publishes nothing, so there is no live view on either path. The local API, Firebase link, mDNS<!--with_uwb--> and UWB ranging<!--/--><!--both--> (and, with UWB, ranging)<!--/--> stay up to be woken. Live frames go out only in `awake`, `tracking` and `recording` (`LIVE_STATES`) |
+| Whose session | `Head.session_hash`: set by `start_session()` when a session starts (from the local API, from Firebase, <!--with_uwb-->or from a paired tag<!--/--><!--both-->or, with UWB, from a paired tag<!--/-->), stamped beside each clip it records, reported with every state, cleared when the session ends |
 | Recording upload | on stop, `main.py` hands the MP4 and its person boxes to `uploader.py` as a background task; tracking and streaming continue. The local copies are deleted after the backend confirms the byte count ([08](08-recordings-and-cloud.md)) |
 
 Live video:
@@ -173,6 +175,7 @@ builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
 { "mode": "with_uwb" | "without_uwb",       // config.TRACKING_MODE
   "state": "off" | "sleep" | "awake" | "tracking" | "recording",   // "off": booting
   "stateBy": "device",                       // "app" when the API wrote a request
+  "sessionHash": "<sha256 hex>" | null,      // whose session is running (owners.py); null outside one
   "telemetry": { "pan": -12.5, "tilt": 10.0, "zoomMm": 7.4, "dist": 4.2,
                  "phase": "no-person-in-frame" | "person-in-frame"   // awake
                         | "search" | "found" | "track" | null,      // tracking / recording; sleep, off
@@ -184,7 +187,8 @@ builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
   "whepUrl": null,                           // config.WHEP_URL
   "upload": { "name": "rec_….mp4", "sent": 12345, "total": 99999 } | null }
 // written by the API
-{ "state": "tracking", "stateBy": "app" }   // an app's request
+{ "state": "tracking", "stateBy": "app",    // an app's request; starting a session, with
+  "sessionHash": "<sha256 hex>" }           // the hash of the secret the API gave its starter
 { "viewerAt": <server time> }               // an app is watching
 // cameras/{CAMERA_KEY}/live/preview — written by the camera while watched
 { "jpeg": <bytes>, "at": <server time> }
@@ -193,7 +197,7 @@ builds<!--with_uwb-->; the UWB build adds `tagPresent` to the telemetry<!--/-->.
 | Behaviour | Detail |
 | --- | --- |
 | State ownership | the camera owns its state. On connect it writes its state first, so a recording started offline survives reconnection |
-| App requests | the listener adopts any state written with `stateBy: "app"`, applies it via `apply_state()` (same path as a direct command), and writes back the result |
+| App requests | the listener adopts any state written with `stateBy: "app"`, applies it via `apply_state()` (same path as a direct command), and writes back the result. A session started this way takes the `sessionHash` the API wrote as its owner (`start_session()`) |
 | Camera-initiated changes | found for 3 s starting a recording, low battery, build-specific events: written immediately |
 | Write throttling (free tier) | telemetry on the heartbeat (sooner on a phase change, so the apps can ping while searching, and on each second of `countdown` so they can beep on it); upload progress every 2 s; previews only while `viewerAt` < 60 s old |
 | Credentials | service account restricted to Firestore (`FIREBASE_CREDENTIALS`) |
@@ -210,9 +214,10 @@ Programs: camera service and wearable tag firmware.
 
 | Module | Function |
 | --- | --- |
-| `uwb.py` | range parsing (ULA1 frames, or the `dual-serial` sketch), bearing maths, Kalman → (θ, d) |
+| `uwb.py` | range parsing (ULA1 frames, or the `dual-serial` sketch), bearing maths, Kalman → (θ, d). Ranges are kept per tag (the frame's `a<tag>:<anchor>` field); `follow()` picks the tag whose session runs, and `tag_ages()` says which are on |
 | `tracker.py` | SEARCH → FOUND → TRACK state machine and control loops from [05](../with_uwb/design/05-tracking-system.md): awake person-in-frame watch (`watch_awake()`, for the LED and app only: a session always starts in SEARCH), turn to the ranged position, the tag-wearer match (`_match_tag()`: only the person where the tag is counts), pan/tilt from ranging, CV bias trims, framing, focus from distance |
-| `session.py` | tag-driven sessions: tag on → tracking (search → found) → recording after 3 s found; tag off → awake ([01](../product/01-requirements.md#state-machine-with-uwb)) |
+| `session.py` | tag-driven sessions: tag on → tracking (search → found) → recording after 3 s found; tag off → awake ([01](../product/01-requirements.md#state-machine-with-uwb)). Presence is per tag; with `TAG_NEEDS_PAIRING`, only a paired tag starts one, and `tag` says which did |
+| `pairing.py` | tag number → pairing hash, in `PAIRINGS_FILE`: whose sessions each tag starts. `pairTag` on the local API pairs the one tag switched on ([07 — Accounts](07-backend-and-app.md#accounts-and-whose-recording-is-whose)) |
 | `rangecal.py` | `python3 -m sportcam.rangecal <metres>`: per-anchor range bias and noise with the tag on the boresight; prints `RANGE_BIAS_M` |
 | `bearingcal.py` | `python3 -m sportcam.bearingcal <metres>`: the filtered bearing's noise and correlation time with the wearer standing on the boresight; prints `TAG_BEARING_SIGMA_DEG` and `TAG_BEARING_CORR_S` |
 
@@ -233,7 +238,9 @@ fill target, edge guard, stale relax); `test_session.py` (SEARCH →
 FOUND → recording after 3 s, always SEARCH first, tag-driven sessions, the
 tag wearer picked out from bystanders, someone nearer the lens and a belayer
 beside them, each box labelled green, yellow or red, one telemetry push per
-countdown second, the boxes saved beside the clip, stop recording → awake).
+countdown second, the boxes saved beside the clip, stop recording → awake,
+an unpaired tag starting nothing and a paired one's session owned by its
+phone, the tag followed and the clip stamped).
 
 ### Where ranges come from
 
@@ -254,7 +261,8 @@ Tests: `src/with_uwb/device/tests/test_uwb.py` parses the manual's worked
 example; checks the mask, hex scaling, bearing geometry and elevation solve
 (exact to 0.01° across the envelope, including A3's backward offset),
 `rangecal`'s bias, and `bearingcal`'s σ and τ, including that the
-`TAG_BEARING_*` defaults match what the Kalman filter does at this baseline.
+`TAG_BEARING_*` defaults match what the Kalman filter does at this baseline;
+and several tags: the tag field, ranges kept apart, following one.
 
 ### Wearable tag — ULA1 (`src/with_uwb/wearable/`)
 
@@ -263,6 +271,7 @@ example; checks the mask, hex scaling, bearing geometry and elevation solve
 | Hardware | ULA1, vendor `RTLS_Tag` firmware, USB bank power |
 | Function | ranges each anchor in turn; broadcasts the results |
 | Controls | none; power on/off is the session control |
+| Identity | its DIP switch makes it T0–T7, carried in every frame. Several tags can be on at once; each person pairs theirs to their phone once (**Pair my tag**) |
 | Optional sketch | `src/with_uwb/wearable/tag_firmware/`: Makerfabs ESP32-UWB board with a pair/record button, sent over BLE as `SPORTCAM-BTN:<kind>` and relayed as `tagButton`. Not ported to the ULA1 (needs the free pins from the vendor schematic) |
 
 ### Firebase link, with UWB

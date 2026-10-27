@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from sportcam import config  # noqa: E402
+from sportcam import config, owners  # noqa: E402
 from sportcam.discovery import Advertiser  # noqa: E402
 from sportcam.local_api import LocalApi  # noqa: E402
 
@@ -75,16 +75,28 @@ class StubHead:
         self.acquire_stalled = False
         self.pan_deg = 0.0
         self.tilt_deg = 0.0
+        self.session_hash = None
         self.local = LocalApi(self)
 
     def jog(self, pan: float, tilt: float) -> None:
         print(f"[stub] jog pan {pan:+.2f} tilt {tilt:+.2f}")
 
     async def apply_state(self, new: str) -> None:
+        if new not in ("tracking", "recording"):
+            self.session_hash = None
         if new == "recording":
-            with open(os.path.join(config.RECORD_DIR, "rec_stub.mp4"), "wb") as f:
+            path = os.path.join(config.RECORD_DIR, "rec_stub.mp4")
+            with open(path, "wb") as f:
                 f.write(b"\0" * 4096)
+            owners.stamp(path, self.session_hash)
         self.state = new
+
+    async def start_session(self, target: str, session_hash) -> None:
+        self.session_hash = session_hash
+        await self.apply_state(target)
+
+    def session_secret(self, pairing=None) -> str:
+        return owners.new_secret()
 
     async def report_state(self) -> None:
         await self.local.broadcast(self.local.state_payload())

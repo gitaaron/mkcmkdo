@@ -154,6 +154,10 @@ class Telemetry {
   );
 }
 
+/// One of the signed-in person's clips: in the cloud library (from any
+/// camera, [camera] set), or still on the card of the camera this phone is
+/// connected to directly ([camera] null) — only the clips of sessions this
+/// phone holds the secret of, either way.
 class Recording {
   const Recording({
     required this.name,
@@ -162,6 +166,7 @@ class Recording {
     required this.url,
     this.durationS,
     this.boxesUrl,
+    this.camera,
   });
 
   final String name;
@@ -169,6 +174,12 @@ class Recording {
   final DateTime createdAt;
   final String url;
   final double? durationS;
+
+  /// The camera key of a clip in the cloud library; null for one still on
+  /// the camera's card.
+  final String? camera;
+
+  bool get inCloud => camera != null;
 
   /// The person boxes to draw over the video ([BoxTrack]); null if the
   /// camera sent none.
@@ -183,6 +194,7 @@ class Recording {
     url: j['url'] as String,
     durationS: (j['durationS'] as num?)?.toDouble(),
     boxesUrl: j['boxesUrl'] as String?,
+    camera: j['camera'] as String?,
   );
 
   String absoluteUrl(String base) => _absolute(url, base);
@@ -204,6 +216,16 @@ class Recording {
     final s = (d % 60).round().toString().padLeft(2, '0');
     return '$m:$s';
   }
+}
+
+/// Where a player fetches a clip (or its boxes), and the headers it needs:
+/// the person's ID token for the backend, the session secrets for the
+/// camera's own card; none for a signed Cloud Storage URL.
+class Playback {
+  const Playback(this.url, [this.headers = const {}]);
+
+  final String url;
+  final Map<String, String> headers;
 }
 
 /// Who a person box is, for its colour: the climber (green), anyone else

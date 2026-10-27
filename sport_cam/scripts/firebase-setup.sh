@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # One-time Firebase setup for SportCam: the project, Firestore, the recordings
-# bucket, a Firestore-only account for the camera, and the camera key.
+# bucket, a Firestore-only account for the camera, and the camera key; then
+# what to do by hand: email/password sign-in, the app's API key, the first
+# admin.
 #
 #   ./scripts/firebase-setup.sh <project-id>       e.g. sportcam-aaron
 #
@@ -79,10 +81,16 @@ CAMERA_KEY=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
 
 cat <<EOF
 
-==> One manual step (Google requires it in the console):
-    Upgrade the project to the Blaze (pay-as-you-go) plan — Cloud Functions
-    need it. Free-tier quotas still apply; light use costs ~\$0.
-    https://console.firebase.google.com/project/${PROJECT_ID}/usage/details
+==> Three manual steps (Google requires them in the console):
+    1. Upgrade the project to the Blaze (pay-as-you-go) plan — Cloud Functions
+       need it. Free-tier quotas still apply; light use costs ~\$0.
+       https://console.firebase.google.com/project/${PROJECT_ID}/usage/details
+    2. Authentication → Get started → Sign-in method → Email/Password → Enable
+       (not "Email link"). People sign in to the app with it; nobody can sign
+       up — an admin adds them.
+       https://console.firebase.google.com/project/${PROJECT_ID}/authentication/providers
+    3. Project settings → General → Web API key: the app needs it below
+       (no web app? "Add app" → Web, any name, to get one).
 
 ==> The camera: put these in src/<build>/device/sportcam/config.py on the Pi
     FIREBASE_PROJECT = "${PROJECT_ID}"
@@ -93,7 +101,12 @@ cat <<EOF
 
 ==> Then deploy:   npm run deploy
 
-==> The phone app (keep the key private — it is what lets you in):
+==> And make yourself the first admin (gcloud auth application-default login first):
+    GCLOUD_PROJECT=${PROJECT_ID} npm run add-admin -w @sportcam/backend -- you@example.com '<a password>'
+    Everyone else you add from the app: account menu → People → Add person.
+
+==> The phone app (the camera key names the camera; signing in is what lets people in):
     flutter run --dart-define=SPORTCAM_FALLBACK=https://${PROJECT_ID}.web.app \\
-                --dart-define=SPORTCAM_CAMERA_KEY=${CAMERA_KEY}
+                --dart-define=SPORTCAM_CAMERA_KEY=${CAMERA_KEY} \\
+                --dart-define=SPORTCAM_FIREBASE_API_KEY=<the Web API key from step 3>
 EOF

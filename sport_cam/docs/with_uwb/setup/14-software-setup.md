@@ -21,7 +21,7 @@ in the vendor's ULA1 package).
 | A1 (arm, +Y) | `RTLS_Anchor` | ON off off off | A0 |
 | A2 (arm, −Y) | `RTLS_Anchor` | ON off off ON | A1 |
 | A3 (mast) | `RTLS_Anchor` | ON off ON off | A2 |
-| Tag (wearable) | `RTLS_Tag` | off off off off | T0 |
+| Tag (wearable) | `RTLS_Tag` | off off off off | T0 (a second tag: off off off ON, T1; and so on to T7) |
 
 - Use the **RTLS** pair, not `RangingAnchor`/`RangingTag`. Only RTLS sends the
   one frame carrying every range that the camera reads.
@@ -129,15 +129,23 @@ Once, on a computer, from the repo root (log in first with
 | Let the function sign URLs | its service account gets Token Creator on itself |
 | Create the camera's service account | Firestore-only; key saved as `sportcam-firebase.json` |
 | Make the camera key | printed with the `config.py` lines and the phone app's `--dart-define`s |
+| Accounts | prints the console steps: turn on **Email/Password** sign-in, find the **Web API key** |
 | No `gcloud` installed | prints the equivalent console steps instead |
 
-Then upgrade the project to the **Blaze** (pay-as-you-go) plan in the
-Firebase console: Cloud Functions need it, and the free-tier quotas still
-apply. Deploy:
+Then, in the Firebase console: upgrade the project to the **Blaze**
+(pay-as-you-go) plan (Cloud Functions need it, and the free-tier quotas still
+apply); turn on **Authentication → Sign-in method → Email/Password**; and
+note the **Web API key** (Project settings → General) for the app. Deploy,
+and make yourself the first admin:
 
 ```bash
 npm run deploy
+gcloud auth application-default login
+GCLOUD_PROJECT=<project-id> npm run add-admin -w @sportcam/backend -- you@example.com '<password>'
 ```
+
+Everyone else is added from the app (account menu → **People** → **Add
+person**); there is no sign-up.
 
 What that deploys: [08 — The deployed backend](../../design/08-recordings-and-cloud.md#the-deployed-backend).
 Optionally, add a lifecycle rule to the bucket in the Cloud Storage console
@@ -367,10 +375,12 @@ The phone app: `cd src/app_flutter && flutter pub get && flutter run`.
   ([09](../../design/09-direct-connection-and-app.md)) and shows full-rate
   video, with no internet needed.
 - **From anywhere**: add
-  `--dart-define=SPORTCAM_FALLBACK=https://<project>.web.app --dart-define=SPORTCAM_CAMERA_KEY=<key>`
-  (both printed by `firebase-setup.sh`) and it reaches the camera through
+  `--dart-define=SPORTCAM_FALLBACK=https://<project>.web.app --dart-define=SPORTCAM_CAMERA_KEY=<key> --dart-define=SPORTCAM_FIREBASE_API_KEY=<Web API key>`
+  (printed by `firebase-setup.sh`) and it reaches the camera through
   Firebase when it's not on the same network: state, a live preview,
-  control and the recording library. Needs step 4.
+  control and the recording library. It then opens on a sign-in page:
+  each person signs in with the account an admin made them, and sees
+  only the recordings they started. Needs step 4.
 
 Apply the platform setup in
 [`src/app_flutter/README.md`](../../../src/app_flutter/README.md) first
@@ -391,6 +401,13 @@ front of the lens. The ring chases white, then turns blue. The camera
 remembers the network. Code not read: join the `SportCam-Setup` hotspot
 (password on the label), open `http://10.42.0.1`, pick the network and
 paste the password.
+
+**Pair your tag** once, on the camera's Wi-Fi: switch on your tag (only
+yours), then account menu → **Pair my tag**. Switching it on then starts a
+recording that is yours: only your phone can stop it, and only you see the
+clip. An unpaired tag starts nothing (`TAG_NEEDS_PAIRING`). Several
+climbers each with a tag: give each tag its own address on its DIP switch
+(T0–T7, step 1) and pair each to its owner's phone.
 
 ## 10. Wearing the tag
 

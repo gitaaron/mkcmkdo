@@ -7,6 +7,12 @@ writes it with `stateBy: "app"`; this module's listener sees that, runs it
 through `Head.apply_state()` like any other command, and writes back what the
 camera actually did (`stateBy: "device"`).
 
+A session started through Firebase arrives with its `sessionHash`: the API
+made the secret, gave it to the phone that asked, and wrote the hash for the
+camera to adopt as the session's owner (owners.py). The camera writes its own
+session hash back with every state, so the API refuses a stop from anyone
+else just as the camera's own API does.
+
 While an app is watching (`viewerAt` in the last minute) it also posts a
 low-rate preview frame to `cameras/{CAMERA_KEY}/live/preview`, so the live
 view works from anywhere without a video relay.
@@ -30,7 +36,7 @@ import os
 import time
 from typing import Any, Callable
 
-from . import config
+from . import config, owners
 from .wifi_link import BOOT_STATES, public_state
 
 try:                                    # not installed on a bench without the cloud link
@@ -108,6 +114,7 @@ class CloudLink:
             "mode": config.TRACKING_MODE,
             "state": public_state(self.head.state),
             "stateBy": "device",
+            "sessionHash": self.head.session_hash,
             "telemetry": self._telemetry,
             "deviceSeenAt": server_time(),
             "whepUrl": config.WHEP_URL,
@@ -127,16 +134,22 @@ class CloudLink:
                 self.viewer_at = seen.timestamp() if hasattr(seen, "timestamp") else float(seen)
             want = d.get("state")
             if d.get("stateBy") == "app" and want and want != self.head.state and self._loop:
-                fut = asyncio.run_coroutine_threadsafe(self._adopt(want), self._loop)
+                fut = asyncio.run_coroutine_threadsafe(self._adopt(want, d.get("sessionHash")), self._loop)
                 fut.add_done_callback(_log_failure)
 
-    async def _adopt(self, want: str) -> None:
+    async def _adopt(self, want: str, session_hash: Any = None) -> None:
         if want == self.head.state or self.head.state in BOOT_STATES:
             return                       # not up yet: nothing to adopt
         if want not in ("sleep", "awake", "tracking", "recording"):
             return                       # "off" is a boot state, never a request
         print(f"[cloud] app asked for {want}")
-        await self.head.apply_state(want)
+        session = ("tracking", "recording")
+        if want in session and self.head.state not in session:
+            # a new session, owned by whoever the API gave its secret to
+            await self.head.start_session(
+                want, session_hash if isinstance(session_hash, str) and owners.HASH_RE.match(session_hash) else None)
+        else:
+            await self.head.apply_state(want)
         await self.head.report_state()
 
     async def _write(self, ref: Any, fields: dict) -> None:
@@ -155,8 +168,9 @@ class CloudLink:
         await self._write(self._doc, fields)
 
     # ---- what the head reports ------------------------------------------
-    async def report_state(self, state: str) -> None:
-        await self._write(self._doc, {"state": public_state(state), "stateBy": "device", "updatedAt": server_time()})
+    async def report_state(self, state: str, session_hash: str | None = None) -> None:
+        await self._write(self._doc, {"state": public_state(state), "stateBy": "device",
+                                      "sessionHash": session_hash, "updatedAt": server_time()})
 
     async def warning(self, code: str) -> None:
         """The latest warning, for apps on the relay: getState carries it."""

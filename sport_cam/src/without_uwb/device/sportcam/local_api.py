@@ -7,8 +7,10 @@ API speaks (src/backend/functions), so the app talks to both identically:
     GET  /api/stream.mjpeg         live MJPEG (multipart/x-mixed-replace); no
                                    frames in sleep, when the sensor is off
     GET  /api/recordings/:name     local clip, HTTP Range supported, or its
-                                   <clip>.boxes.json (person boxes, boxlog.py)
-    WS   /ws                       state, recordings and live person-box broadcasts;
+                                   <clip>.boxes.json (person boxes, boxlog.py),
+                                   for a phone holding its session's secret
+                                   (`X-Session-Secrets` header)
+    WS   /ws                       state, "recordingsChanged" and live person-box broadcasts;
                                    the app sends {"type":"jog","pan":x,"tilt":y}
                                    (each −1…1) while its joystick is held
     GET  /api/health               {"ok":true,"backend":"device", …}
@@ -18,6 +20,13 @@ hotspot) the phone can reach the Pi directly, so live video and control work
 with no internet — and at full frame rate, where the Firebase path only
 carries a low-rate preview.
 The Pi advertises itself over mDNS (see discovery.py) so the app finds it.
+
+Whose is what (owners.py): starting a session answers with its
+`sessionSecret`, given to that phone alone; leaving or advancing the session
+needs it back (`{"secrets": […]}`, every secret the phone holds), so only the
+person recording can stop it. A clip still on the card is listed and served
+only to a phone holding the secret of the session that filmed it. None of
+this needs the internet.
 """
 from __future__ import annotations
 
@@ -31,7 +40,7 @@ from typing import Any, Awaitable, Callable
 
 from aiohttp import WSMsgType, web
 
-from . import config
+from . import config, owners
 from .boxlog import sidecar
 from .wifi_link import public_state
 
@@ -39,6 +48,7 @@ CallableFn = Callable[[Any], Awaitable[Any]]
 
 HTTP_BY_CODE = {
     "invalid-argument": 400,
+    "permission-denied": 403,
     "not-found": 404,
     "failed-precondition": 412,
     "internal": 500,
@@ -80,10 +90,10 @@ class LocalApi:
         self.fns: dict[str, CallableFn] = {
             "getState": self._get_state,
             "setPower": self._set_power,
-            "startTracking": lambda d: self._transition("tracking"),
-            "stopTracking": lambda d: self._transition("awake"),
-            "startRecording": lambda d: self._transition("recording"),
-            "stopRecording": lambda d: self._transition("awake"),
+            "startTracking": lambda d: self._transition("tracking", d),
+            "stopTracking": lambda d: self._transition("awake", d),
+            "startRecording": lambda d: self._transition("recording", d),
+            "stopRecording": lambda d: self._transition("awake", d),
             "getRecordings": self._get_recordings,
         }
 
@@ -127,6 +137,7 @@ class LocalApi:
             "type": "state",
             "mode": config.TRACKING_MODE,
             "state": public_state(self.head.state),
+            "sessionHash": self.head.session_hash,
             "telemetry": {
                 "pan": round(self.head.pan_deg, 1),
                 "tilt": round(self.head.tilt_deg, 1),
@@ -152,22 +163,39 @@ class LocalApi:
         target = "awake" if data["on"] else "sleep"
         if self.head.state == target or (data["on"] and self.head.state != "sleep"):
             return await self._get_state(None)
-        return await self._transition(target)
+        return await self._transition(target, data)
 
-    async def _transition(self, target: str) -> dict:
-        if target not in TRANSITIONS[self.head.state]:
-            raise FnError("failed-precondition",
-                          f"cannot go from '{self.head.state}' to '{target}'")
-        await self.head.apply_state(target)
+    async def _transition(self, target: str, data: Any) -> dict:
+        state = self.head.state
+        if target not in TRANSITIONS[state]:
+            raise FnError("failed-precondition", f"cannot go from '{state}' to '{target}'")
+        session = ("tracking", "recording")
+        owner = self.head.session_hash
+        if state in session and owner and not owners.holds(owners.secrets_of(data), owner):
+            raise FnError("permission-denied", "only the phone that started this recording can stop it")
+        secret = None
+        if state not in session and target in session:
+            pairing = data.get("pairing") if isinstance(data, dict) else None
+            secret = self.head.session_secret(pairing)
+            await self.head.start_session(target, owners.hash_secret(secret))
+        else:
+            await self.head.apply_state(target)
         await self.head.report_state()
-        return await self._get_state(None)
+        out = await self._get_state(None)
+        if secret and self.head.session_hash == owners.hash_secret(secret):
+            out["sessionSecret"] = secret      # to this phone only, this once
+        return out
 
-    async def _get_recordings(self, _data: Any) -> dict:
-        """Clips still on the Pi (i.e. not yet uploaded and deleted)."""
+    async def _get_recordings(self, data: Any) -> dict:
+        """The caller's clips still on the Pi (i.e. not yet uploaded and
+        deleted): those stamped with a secret it sent (`{"secrets": […]}`)."""
+        mine = owners.hashes_of(owners.secrets_of(data))
         out = []
         if os.path.isdir(config.RECORD_DIR):
             for name in sorted(os.listdir(config.RECORD_DIR), reverse=True):
                 if not name.endswith(".mp4"):
+                    continue
+                if owners.owner_of(os.path.join(config.RECORD_DIR, name)) not in mine:
                     continue
                 st = os.stat(os.path.join(config.RECORD_DIR, name))
                 boxes = os.path.basename(sidecar(name))
@@ -250,7 +278,11 @@ class LocalApi:
             return web.json_response(
                 {"error": {"code": "invalid-argument", "message": "bad name"}}, status=400)
         path = os.path.join(config.RECORD_DIR, name)
-        if not os.path.isfile(path):
+        clip = path if name.endswith(".mp4") else path[:-len(".boxes.json")] + ".mp4"
+        secrets = [s.strip() for s in req.headers.get("X-Session-Secrets", "").split(",")]
+        mine = owners.hashes_of([s for s in secrets if owners.is_secret(s)])
+        if not os.path.isfile(path) or owners.owner_of(clip) not in mine:
+            # someone else's looks the same as none at all
             return web.json_response(
                 {"error": {"code": "not-found", "message": "no such recording"}}, status=404)
         # FileResponse implements Range/If-Range — phones need it to seek.
@@ -261,7 +293,6 @@ class LocalApi:
         await ws.prepare(req)
         self._ws_clients.add(ws)
         await ws.send_json(self.state_payload())
-        await ws.send_json({"type": "recordings", **(await self._get_recordings(None))})
         try:
             async for msg in ws:
                 if msg.type == WSMsgType.TEXT:

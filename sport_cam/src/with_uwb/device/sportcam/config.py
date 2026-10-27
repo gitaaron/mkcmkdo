@@ -199,6 +199,11 @@ LOST_END_S = 5.0              # no ranges → drop to awake (saving any recordin
 # that happens often.
 AUTO_SESSION = True            # False: the tag only ranges; start from the app
 TAG_PRESENT_S = 1.0            # unbroken ranging this long = the tag is on
+# Only a tag paired to a phone (pairing.py) starts a session: its clips are
+# that person's, and only they can stop it. False: any tag starts one, and an
+# unpaired tag's clips belong to no one — nobody can see them.
+TAG_NEEDS_PAIRING = True
+PAIRINGS_FILE = "/home/pi/sportcam-pairings.json"   # tag number → pairing hash
 # SEARCH → FOUND → recording, as in the camera-only build, but SEARCH is a
 # turn to the tag's bearing rather than a sweep, and every session starts
 # there (there is no awake bypass: awake cannot tell who is wearing the tag).

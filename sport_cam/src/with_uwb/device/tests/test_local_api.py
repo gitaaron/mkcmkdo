@@ -19,7 +19,9 @@ import aiohttp
 
 from sportcam import config
 from sportcam.discovery import SERVICE_TYPE, Advertiser
+from sportcam import owners
 from sportcam.local_api import LocalApi
+from sportcam.pairing import Pairings
 
 config.RECORD_DIR = os.path.join(os.path.dirname(__file__), "_recordings")
 os.makedirs(config.RECORD_DIR, exist_ok=True)
@@ -67,6 +69,14 @@ class StubTracker:
     def lost_for(self): return 0.0
 
 
+class StubUwb:
+    def __init__(self):
+        self.on: list[int] = []          # tags switched on
+
+    def tag_ages(self):
+        return {t: 0.1 for t in self.on}
+
+
 class StubHead:
     """Minimal stand-in for Head: same attributes local_api touches."""
     def __init__(self):
@@ -82,18 +92,33 @@ class StubHead:
         self.tilt_deg = 0.0
         self.recorded: list[str] = []
         self.jogs: list[tuple[float, float]] = []
+        self.session_hash = None
+        self.uwb = StubUwb()
+        self.pairings = Pairings(os.path.join(config.RECORD_DIR, "pairings.json"))
         self.local = LocalApi(self)
 
     def jog(self, pan: float, tilt: float) -> None:
         self.jogs.append((pan, tilt))
 
     async def apply_state(self, new: str) -> None:
+        if new not in ("tracking", "recording"):
+            self.session_hash = None
         if new == "recording":
             path = os.path.join(config.RECORD_DIR, "rec_stub.mp4")
             with open(path, "wb") as f:
                 f.write(b"\0" * 2048)
+            owners.stamp(path, self.session_hash)
             self.recorded.append(path)
         self.state = new
+
+    async def start_session(self, target: str, session_hash) -> None:
+        self.session_hash = session_hash
+        await self.apply_state(target)
+
+    def session_secret(self, pairing=None) -> str:
+        if owners.is_secret(pairing) and self.pairings.tag_for(owners.hash_secret(pairing)) is not None:
+            return pairing
+        return owners.new_secret()
 
     async def report_state(self) -> None:
         await self.local.broadcast(self.local.state_payload())
@@ -125,19 +150,33 @@ async def main() -> None:
             st, body = await call(s, "startTracking")
             check("startTracking → tracking",
                   st == 200 and body["result"]["state"] == "tracking", str(body))
+            secret = body["result"].get("sessionSecret", "")
+            mine = {"secrets": [secret]}
+            check("…handing this phone the session's secret, and everyone its hash",
+                  owners.is_secret(secret)
+                  and body["result"]["sessionHash"] == owners.hash_secret(secret), str(body))
 
             st, body = await call(s, "startRecording")
+            check("another phone can't advance someone's session (403)",
+                  st == 403 and body["error"]["code"] == "permission-denied", str(body))
+            st, body = await call(s, "startRecording", mine)
             check("startRecording → recording",
                   st == 200 and body["result"]["state"] == "recording", str(body))
             check("recording actually started", len(head.recorded) == 1)
+            check("…stamped with its session's owner",
+                  owners.owner_of(head.recorded[0]) == owners.hash_secret(secret))
 
-            st, body = await call(s, "startRecording")
+            st, body = await call(s, "startRecording", mine)
             check("illegal transition rejected (412)",
                   st == 412 and body["error"]["code"] == "failed-precondition", str(body))
 
-            st, body = await call(s, "stopRecording")
-            check("stopRecording → awake (the session ends)",
-                  st == 200 and body["result"]["state"] == "awake", str(body))
+            for fn, data in (("stopRecording", {}), ("stopTracking", {}), ("setPower", {"on": False})):
+                st, body = await call(s, fn, {**data, "secrets": ["someone-elses-secret-0123"]})
+                check(f"nobody else can stop it: {fn} (403)", st == 403, str(body))
+            st, body = await call(s, "stopRecording", {"secrets": ["another-of-mine-0123456", secret]})
+            check("stopRecording with its secret → awake (the session ends)",
+                  st == 200 and body["result"]["state"] == "awake"
+                  and body["result"]["sessionHash"] is None, str(body))
 
             st, body = await call(s, "setPower", {"on": False})
             check("setPower off → sleep", st == 200 and body["result"]["state"] == "sleep", str(body))
@@ -146,7 +185,11 @@ async def main() -> None:
             st, body = await call(s, "startTracking")
             check("startTracking from sleep → tracking, skipping awake (Record)",
                   st == 200 and body["result"]["state"] == "tracking", str(body))
-            await call(s, "setPower", {"on": False})
+            second = {"secrets": [body["result"]["sessionSecret"]]}
+            st, body = await call(s, "setPower", {"on": False})
+            check("Sleep stops a session only for its owner (403)", st == 403, str(body))
+            st, body = await call(s, "setPower", {"on": False, **second})
+            check("…who can", st == 200 and body["result"]["state"] == "sleep", str(body))
             st, body = await call(s, "setPower", {"on": True})
             check("setPower on wakes it → awake (Wake up)",
                   st == 200 and body["result"]["state"] == "awake", str(body))
@@ -160,16 +203,49 @@ async def main() -> None:
             st, body = await call(s, "nope")
             check("unknown function → 404", st == 404, str(body))
 
+            # --- pairing a tag ------------------------------------------
+            st, body = await call(s, "pairTag")
+            check("pairTag with no tag on → 412", st == 412, str(body))
+            head.uwb.on = [2, 5]
+            st, body = await call(s, "pairTag")
+            check("pairTag with two tags on → 412, saying so", st == 412 and "2 tags" in body["error"]["message"],
+                  str(body))
+            head.uwb.on = [5]
+            st, body = await call(s, "pairTag")
+            pairing = body.get("result", {}).get("pairingSecret", "")
+            check("pairTag pairs the one tag on, and hands this phone its secret",
+                  st == 200 and body["result"]["tag"] == 5 and owners.is_secret(pairing)
+                  and head.pairings.hash_for(5) == owners.hash_secret(pairing), str(body))
+            check("…kept across a restart",
+                  Pairings(head.pairings.path).hash_for(5) == owners.hash_secret(pairing))
+            st, body = await call(s, "startTracking", {"pairing": pairing})
+            check("a phone with a paired tag starts its session with the pairing secret",
+                  st == 200 and body["result"].get("sessionSecret") == pairing, str(body))
+            await call(s, "stopTracking", {"secrets": [pairing]})
+            st, body = await call(s, "startTracking", {"pairing": "not-a-pairing-secret-0123"})
+            check("…and one that isn't a pairing gets a fresh secret",
+                  st == 200 and body["result"].get("sessionSecret") not in ("", "not-a-pairing-secret-0123"),
+                  str(body))
+            await call(s, "stopTracking", {"secrets": [body["result"]["sessionSecret"]]})
+            head.uwb.on = []
+
             # --- recordings --------------------------------------------
             st, body = await call(s, "getRecordings")
+            check("getRecordings shows nobody else's clips", body["result"]["recordings"] == [], str(body))
+            st, body = await call(s, "getRecordings", mine)
             names = [r["name"] for r in body["result"]["recordings"]]
-            check("getRecordings lists local clip", "rec_stub.mp4" in names, str(names))
+            check("getRecordings lists the caller's local clip", names == ["rec_stub.mp4"], str(names))
 
             async with s.get(f"{BASE}/api/recordings/rec_stub.mp4",
-                             headers={"Range": "bytes=0-99"}) as r:
+                             headers={"Range": "bytes=0-99", "X-Session-Secrets": secret}) as r:
                 chunk = await r.read()
             check("recording playback supports Range",
                   r.status == 206 and len(chunk) == 100, f"status={r.status} len={len(chunk)}")
+            for headers in ({}, {"X-Session-Secrets": "someone-elses-secret-0123"}):
+                async with s.get(f"{BASE}/api/recordings/rec_stub.mp4", headers=headers) as r:
+                    pass
+                check(f"…but not to a phone without its secret ({headers or 'none'})", r.status == 404,
+                      f"status={r.status}")
 
             async with s.get(f"{BASE}/api/recordings/../config.py") as r:
                 pass
@@ -195,10 +271,7 @@ async def main() -> None:
             # --- websocket ----------------------------------------------
             async with s.ws_connect(f"{BASE}/ws") as ws:
                 first = json.loads((await ws.receive(timeout=5)).data)
-                second = json.loads((await ws.receive(timeout=5)).data)
                 check("WS pushes state on connect", first["type"] == "state", str(first)[:80])
-                check("WS pushes recordings on connect",
-                      second["type"] == "recordings", str(second)[:80])
                 await call(s, "startTracking")
                 third = json.loads((await ws.receive(timeout=5)).data)
                 check("WS broadcasts state change",

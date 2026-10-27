@@ -13,28 +13,47 @@ for the architecture and why this is native rather than web.
 flutter pub get
 flutter run                                    # device/emulator on the same Wi-Fi
 flutter run --dart-define=SPORTCAM_FALLBACK=https://<project>.web.app \
-            --dart-define=SPORTCAM_CAMERA_KEY=<CAMERA_KEY>
+            --dart-define=SPORTCAM_CAMERA_KEY=<CAMERA_KEY> \
+            --dart-define=SPORTCAM_FIREBASE_API_KEY=<Web API key>
 ```
 
-`SPORTCAM_FALLBACK` is only used when no camera answers on the LAN; it points
-at the deployed Firebase backend, and `SPORTCAM_CAMERA_KEY` names your camera
-there (`scripts/firebase-setup.sh` prints both). Through Firebase the app
+`SPORTCAM_FALLBACK` points at the deployed Firebase backend: the library
+and sign-in always use it, and the camera's control does when no camera
+answers on the LAN. `SPORTCAM_CAMERA_KEY` names your camera there, and
+`SPORTCAM_FIREBASE_API_KEY` is the project's Web API key, for signing in
+(`scripts/firebase-setup.sh` prints all three). Through Firebase the app
 polls the camera's state and shows its once-a-second preview. Against the
 emulators (`npm run dev`), use
-`http://<your-computer>:5001/demo-sportcam/us-central1/api` and `dev-camera-key`.
+`http://<your-computer>:5001/demo-sportcam/us-central1/api`, `dev-camera-key`
+and `--dart-define=SPORTCAM_AUTH_EMULATOR=<your-computer>:9099` in place of
+the API key; sign in as `admin@sportcam.dev` or `climber@sportcam.dev`,
+password `sportcam-dev`.
+
+With a backend, the app opens on a sign-in page; there is no sign-up (an
+admin adds people: account menu → **People** → **Add person**). Each person
+sees only the recordings they started, and only the phone that started a
+recording can stop it — see
+[07 — Accounts](../../docs/design/07-backend-and-app.md#accounts-and-whose-recording-is-whose).
+Without `SPORTCAM_FALLBACK` nobody signs in, and each phone sees the clips
+of the sessions it started still on the camera's card.
 
 ## Layout
 
 ```
 lib/
-  main.dart                    app entry, fallback backend config
+  main.dart                    app entry, backend and sign-in config; the sign-in gate
+  auth.dart                    email/password sign-in (Firebase Authentication REST), ID tokens
+  keys.dart                    the session and tag-pairing secrets this phone holds
   models.dart                  CamState, LinkMode, CameraEndpoint, Recording…
   discovery.dart               mDNS sweep for _sportcam._tcp
-  camera_client.dart           connection strategy + callable API + WS state
+  camera_client.dart           connection strategy + callable API + WS state; whose session,
+                               the person's own library, claims
   theme.dart                   palette shared with the LED ring
   session_audio.dart           search pings, countdown beeps and recording chimes, kept awake in the background
   screens/home_screen.dart     live view, badges, controls
-  screens/library_screen.dart  recordings list + native player
+  screens/login_screen.dart    sign in, forgot password
+  screens/admin_screen.dart    admins: People, Add person
+  screens/library_screen.dart  my recordings + native player
   widgets/
     connection_badge.dart      top-left: how we're reaching the camera
     status_ring.dart           top-right: camera state (LED colours)
@@ -59,8 +78,12 @@ cd src/app_flutter
 dart run tool/verify_models.dart                     # parsing checks
 dart run tool/verify_against_device.dart             # contract check against the camera, direct
 dart run tool/verify_against_device.dart \
-    http://127.0.0.1:5001/demo-sportcam/us-central1/api dev-camera-key   # …and through Firebase (npm run dev running)
+    http://127.0.0.1:5001/demo-sportcam/us-central1/api dev-camera-key   # …and through Firebase, signed in (npm run dev running)
 ```
+
+With a Flutter SDK, `flutter test` adds the widget and unit tests in
+`test/` (the joystick; the locked control bar, the secrets store, token
+claims).
 
 The contract check is the one that matters: it drives the real Python camera
 API, or the real Firebase function on the emulators, with the app's own Dart

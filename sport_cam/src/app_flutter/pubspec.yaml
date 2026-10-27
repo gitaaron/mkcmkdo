@@ -17,6 +17,8 @@ dependencies:
   # native players: ExoPlayer (Android) / AVPlayer (iOS) for recordings
   video_player: ^2.9.2
   shared_preferences: ^2.3.2
+  # SHA-256 of the session secrets, to tell whose session is running
+  crypto: ^3.0.3
   # recording start/stop chimes, and the silent loop that keeps iOS awake
   audioplayers: ^6.8.1
   # Android foreground service, so the chimes still play in the background

@@ -18,13 +18,15 @@ import math
 import os
 import random
 import sys
+import tempfile
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 
-from sportcam import config
+from sportcam import config, owners
 from sportcam.led import chase, fill
+from sportcam.pairing import Pairings
 from sportcam.session import AutoSession
 from sportcam.tracker import Tracker
 from test_tracker import FakeCamera, FakePtz, FakeUwb
@@ -366,6 +368,14 @@ class SwitchableUwb(FakeUwb):
             return 0.0
         return GONE if self.off_at is None else time.monotonic() - self.off_at
 
+    def tag_ages(self):
+        """It is tag 0 (T0); never switched on, it has never been heard."""
+        age = self.frame_age()
+        return {} if age == GONE else {0: age}
+
+    def follow(self, tag):
+        self.following = tag
+
 
 class FakeRecCamera(FakeCamera):
     def __init__(self, bbox):
@@ -419,6 +429,11 @@ async def full_flow() -> None:
     head.uwb = SwitchableUwb()
     head.tracker = Tracker(head.uwb, head.camera, head.ptz)
     head.session = AutoSession()
+    head.session_hash = None
+    head.pairings = Pairings(os.path.join(tempfile.mkdtemp(), "pairings.json"))
+    head.session.startable = lambda tag: not config.TAG_NEEDS_PAIRING or head.pairings.paired(tag)
+    if os.path.exists("/tmp/sportcam-test.owner"):
+        os.remove("/tmp/sportcam-test.owner")
     head.led = FakeRing()
     head.storage = FakeStorage()
     head.power = FakePower()
@@ -492,8 +507,20 @@ async def full_flow() -> None:
     check("live view: awake boxes are all 'can't tell' (nobody picked yet)",
           head.live_boxes() and labels(head.live_boxes()) == {"unsure"}, f"{head.live_boxes()}")
 
+    # --- a tag nobody has paired starts nothing ---------------------------------
+    head.uwb.on_since, head.uwb.off_at = time.monotonic(), None
+    await tick_for(0.3)
+    check("an unpaired tag switched on starts no session: its clips would be no one's",
+          head.state == "awake", head.state)
+    head.uwb.on_since, head.uwb.off_at = None, time.monotonic()
+    await tick_for(config.LOST_END_S + 0.1)
+    pairing = head.pairings.pair(0)              # what pairTag does, on the camera's Wi-Fi
+
     head.uwb.on_since, head.uwb.off_at = time.monotonic(), None
     await tick_for(0.15)
+    check("paired, the tag's session is its phone's, and the camera follows that tag",
+          head.session_hash == owners.hash_secret(pairing) and head.uwb.following == 0,
+          f"{head.session_hash} {getattr(head.uwb, 'following', None)}")
     check("tag on with a person in frame → tracking, search (awake cannot say who they are)",
           head.state == "tracking" and head.phase == "search" and head.led.searching, f"{seen}")
     await tick_for(config.ACQUIRE_SETTLE_S + 1.5)   # the eased turn to the tag, then settle
@@ -507,6 +534,8 @@ async def full_flow() -> None:
           f"{seen}")
     check("the app heard 3, 2, 1 (one beep each)", countdown_heard(countdown_sent) == [3, 2, 1],
           f"{countdown_sent}")
+    check("the clip is stamped as the tag's owner's",
+          owners.owner_of("/tmp/sportcam-test.mp4") == owners.hash_secret(pairing))
     msg = head.local.last_boxes()
     check("live view: each detection goes to direct viewers, the climber labelled",
           msg is not None and msg["size"] == list(config.PREVIEW_SIZE)
@@ -517,6 +546,8 @@ async def full_flow() -> None:
     await tick_for(1.0)
     check("tag off → back to standby, recording stopped",
           head.state == "awake" and not head.camera.recording, f"{seen}")
+    check("…the session over: no owner, no tag followed",
+          head.session_hash is None and head.uwb.following is None)
     side = "/tmp/sportcam-test.boxes.json"
     frames = json.load(open(side))["frames"] if os.path.exists(side) else []
     check("the clip's person boxes are saved beside it, the climber labelled",
@@ -630,6 +661,8 @@ async def switched_off() -> None:
     head._rec_path, head._rec_started = "/tmp/sportcam-test.mp4", main_mod.time.monotonic()
     head._near_focus = False
     head._tasks = set()
+    head.session_hash = None
+    head.uwb = Stub()
 
     async def run_forever():
         await asyncio.sleep(3600)

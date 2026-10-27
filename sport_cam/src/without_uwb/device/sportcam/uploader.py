@@ -6,7 +6,10 @@ a store. Talks to the Firebase API (config.UPLOAD_API_BASE,
 "https://<project>.web.app"), naming this camera with config.CAMERA_KEY.
 
 Flow:  createUploadUrl → PUT file (chunked, with progress) → the same for its
-       person boxes (`<clip>.boxes.json`, boxlog.py), if any → finalizeRecording
+       person boxes (`<clip>.boxes.json`, boxlog.py), if any → finalizeRecording,
+       with the session hash the clip was stamped with (`<clip>.owner`,
+       owners.py) as its `claimHash`: the backend puts it in the library of
+       whoever holds that session's secret
 
 The PUT goes straight to Cloud Storage on a signed URL; under the emulator
 the URL is relative and points back at the API.
@@ -20,7 +23,7 @@ from typing import Awaitable, Callable
 
 import aiohttp
 
-from . import config
+from . import config, owners
 from .boxlog import sidecar
 from .storage import pending_files
 
@@ -89,6 +92,7 @@ async def upload_recording(path: str, duration_s: float | None, progress: Progre
     total = os.path.getsize(path)
     boxes = sidecar(path)
     has_boxes = os.path.exists(boxes)
+    claim_hash = owners.owner_of(path)
 
     async with aiohttp.ClientSession() as session:
         await _put(session, path, progress)
@@ -96,13 +100,15 @@ async def upload_recording(path: str, duration_s: float | None, progress: Progre
             await _put(session, boxes, None)
         meta = await _call(session, "finalizeRecording",
                            {"name": name, "bytes": total, "durationS": duration_s,
-                            "boxes": has_boxes})
+                            "boxes": has_boxes, "claimHash": claim_hash})
         print(f"[upload] confirmed: {json.dumps(meta)[:120]}")
 
     if config.DELETE_AFTER_UPLOAD:
         os.remove(path)
         if has_boxes:
             os.remove(boxes)
+        if claim_hash:
+            os.remove(owners.owner_file(path))
         print(f"[upload] local copy removed: {path}")
 
 

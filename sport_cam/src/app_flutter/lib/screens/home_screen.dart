@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,11 +12,13 @@ import '../widgets/joystick.dart';
 import '../widgets/mjpeg_view.dart';
 import '../widgets/person_boxes.dart';
 import '../widgets/status_ring.dart';
+import 'admin_screen.dart';
 import 'library_screen.dart';
 
 /// The single screen: live video, connection badge (top-left), camera-state
-/// ring (top-right), state-dependent controls at the bottom, and in awake a
-/// joystick (bottom-right) to aim the camera by hand.
+/// ring (top-right) with the account menu under it, state-dependent controls
+/// at the bottom, and in awake a joystick (bottom-right) to aim the camera by
+/// hand.
 ///
 /// Opening the app starts streaming — discovery runs on launch and the
 /// video view attaches as soon as a camera answers.
@@ -61,15 +65,53 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openLibrary() {
-    final base = client.base;
-    if (base == null) return;
     client.dismissToast();
+    unawaited(client.refreshRecordings());
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            LibraryScreen(recordings: client.recordings, base: base),
+      MaterialPageRoute<void>(builder: (_) => LibraryScreen(client: client)),
+    );
+  }
+
+  Future<void> _pairTag() async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pair your tag'),
+        content: const Text(
+          'Switch on your tag, and make sure no other tag near the camera '
+          'is on. Once paired, switching it on starts a recording that is '
+          'yours: only this phone can stop it, and only you see the clip.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Pair'),
+          ),
+        ],
       ),
     );
+    if (go != true) return;
+    final said = await client.pairTag();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(said)));
+    }
+  }
+
+  Future<void> _account(_Account choice) async {
+    switch (choice) {
+      case _Account.pairTag:
+        await _pairTag();
+      case _Account.people:
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => AdminScreen(client: client)),
+        );
+      case _Account.signOut:
+        await client.auth.signOut();
+    }
   }
 
   @override
@@ -151,6 +193,19 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
+          // who is signed in: pair a tag, add people, sign out
+          Positioned(
+            top: top + 62,
+            right: 14,
+            child: _AccountButton(
+              email: client.auth.user?.email,
+              canPairTag: client.mode == TrackingMode.withUwb,
+              admin: client.auth.user?.admin ?? false,
+              signOut: client.auth.enabled,
+              onSelected: _account,
+            ),
+          ),
+
           // recordings
           Positioned(
             top: top + 62,
@@ -176,6 +231,14 @@ class _HomeScreenState extends State<HomeScreen> {
               text: text.stalled,
               accent: SportColors.tracking,
               alignment: Alignment(0, -0.78),
+            ),
+
+          // someone else's session: the stop buttons are theirs
+          if (client.isConnected && client.othersSession)
+            const _Pill(
+              text: "Someone else is recording — only their phone can stop it",
+              accent: SportColors.muted,
+              alignment: Alignment(0, 0.4),
             ),
 
           // the camera refused something or is running low: says why
@@ -210,6 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
               state: client.state,
               text: text,
               enabled: client.isConnected,
+              locked: client.othersSession,
               onSetPower: client.setPower,
               onStartTracking: client.startTracking,
               onStopTracking: client.stopTracking,
@@ -217,6 +281,57 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+enum _Account { pairTag, people, signOut }
+
+class _AccountButton extends StatelessWidget {
+  const _AccountButton({
+    required this.email,
+    required this.canPairTag,
+    required this.admin,
+    required this.signOut,
+    required this.onSelected,
+  });
+
+  final String? email;
+  final bool canPairTag;
+  final bool admin;
+  final bool signOut;
+  final void Function(_Account) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!canPairTag && !admin && !signOut) return const SizedBox.shrink();
+    return PopupMenuButton<_Account>(
+      tooltip: 'Account',
+      onSelected: onSelected,
+      color: SportColors.panel,
+      itemBuilder: (_) => [
+        if (email != null)
+          PopupMenuItem<_Account>(
+            enabled: false,
+            child: Text(email!, style: const TextStyle(color: SportColors.muted)),
+          ),
+        if (canPairTag)
+          const PopupMenuItem(value: _Account.pairTag, child: Text('Pair my tag')),
+        if (admin)
+          const PopupMenuItem(value: _Account.people, child: Text('People')),
+        if (signOut)
+          const PopupMenuItem(value: _Account.signOut, child: Text('Sign out')),
+      ],
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: SportColors.panel.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: SportColors.border),
+        ),
+        child: const Icon(Icons.person_outline, size: 20, color: SportColors.ink),
       ),
     );
   }

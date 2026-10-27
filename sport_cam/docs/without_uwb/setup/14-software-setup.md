@@ -103,15 +103,23 @@ Once, on a computer, from the repo root (log in first with
 | Let the function sign URLs | its service account gets Token Creator on itself |
 | Create the camera's service account | Firestore-only; key saved as `sportcam-firebase.json` |
 | Make the camera key | printed with the `config.py` lines and the phone app's `--dart-define`s |
+| Accounts | prints the console steps: turn on **Email/Password** sign-in, find the **Web API key** |
 | No `gcloud` installed | prints the equivalent console steps instead |
 
-Then upgrade the project to the **Blaze** (pay-as-you-go) plan in the
-Firebase console: Cloud Functions need it, and the free-tier quotas still
-apply. Deploy:
+Then, in the Firebase console: upgrade the project to the **Blaze**
+(pay-as-you-go) plan (Cloud Functions need it, and the free-tier quotas still
+apply); turn on **Authentication → Sign-in method → Email/Password**; and
+note the **Web API key** (Project settings → General) for the app. Deploy,
+and make yourself the first admin:
 
 ```bash
 npm run deploy
+gcloud auth application-default login
+GCLOUD_PROJECT=<project-id> npm run add-admin -w @sportcam/backend -- you@example.com '<password>'
 ```
+
+Everyone else is added from the app (account menu → **People** → **Add
+person**); there is no sign-up.
 
 What that deploys: [08 — The deployed backend](../../design/08-recordings-and-cloud.md#the-deployed-backend).
 Optionally, add a lifecycle rule to the bucket in the Cloud Storage console
@@ -267,10 +275,12 @@ The phone app: `cd src/app_flutter && flutter pub get && flutter run`.
   ([09](../../design/09-direct-connection-and-app.md)) and shows full-rate
   video, with no internet needed.
 - **From anywhere**: add
-  `--dart-define=SPORTCAM_FALLBACK=https://<project>.web.app --dart-define=SPORTCAM_CAMERA_KEY=<key>`
-  (both printed by `firebase-setup.sh`) and it reaches the camera through
+  `--dart-define=SPORTCAM_FALLBACK=https://<project>.web.app --dart-define=SPORTCAM_CAMERA_KEY=<key> --dart-define=SPORTCAM_FIREBASE_API_KEY=<Web API key>`
+  (printed by `firebase-setup.sh`) and it reaches the camera through
   Firebase when it's not on the same network: state, a live preview,
-  control and the recording library. Needs step 3.
+  control and the recording library. It then opens on a sign-in page:
+  each person signs in with the account an admin made them, and sees
+  only the recordings they started. Needs step 3.
 
 Apply the platform setup in
 [`src/app_flutter/README.md`](../../../src/app_flutter/README.md) first

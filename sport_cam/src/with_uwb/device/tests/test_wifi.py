@@ -158,7 +158,7 @@ class FakeReporter:
     def __init__(self):
         self.states: list[str] = []
 
-    async def report_state(self, state):         # cloud
+    async def report_state(self, state, _session_hash=None):   # cloud
         self.states.append(public_state(state))
 
     async def update_state(self, state):         # mDNS
@@ -186,6 +186,7 @@ def make_head():
     head.storage = FakeStorage()
     head.cloud = head.mdns = head.local = FakeReporter()
     head._jog, head._jog_at = (0.0, 0.0), float("-inf")
+    head.session_hash = None
     return head
 
 

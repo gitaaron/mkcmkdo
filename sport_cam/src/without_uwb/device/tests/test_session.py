@@ -20,7 +20,7 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 
-from sportcam import config
+from sportcam import config, owners
 from sportcam.led import chase, fill
 from sportcam.session import AutoSession
 from sportcam.tracker import Tracker
@@ -148,6 +148,10 @@ async def full_flow() -> None:
     head._tasks = set()
     head._boxes_sent_at = None
     head._jog, head._jog_at = (0.0, 0.0), float("-inf")
+    head.session_hash = None
+    owner = "c0" * 32                   # the hash of the secret the app was handed
+    if os.path.exists("/tmp/sportcam-test.owner"):
+        os.remove("/tmp/sportcam-test.owner")
     head._awake_since = CLOCK.t
     head.boxlog = BoxLog()
 
@@ -189,7 +193,7 @@ async def full_flow() -> None:
     head.camera.no_detector = None
 
     # --- the app's track / record button -----------------------------------------
-    await head.apply_state("tracking")
+    await head.start_session("tracking", owner)
     await head.report_state()
     looks = head.camera.detections
     pans: list[float] = []             # before each tick's look
@@ -216,6 +220,8 @@ async def full_flow() -> None:
           f"{countdown_sent}")
     check("phase is track; countdown back to 0",
           head.phase == "track" and head.telemetry()["countdown"] == 0)
+    check("the clip is stamped with whose session it is",
+          owners.owner_of("/tmp/sportcam-test.mp4") == owner and head.session_hash == owner)
     await tick_for(2.0)
     check("camera is pointing at the person", abs(head.ptz.pan_deg - person.bearing) < 5.0,
           f"pan {head.ptz.pan_deg:.1f}")
@@ -239,6 +245,7 @@ async def full_flow() -> None:
     # --- stop recording: the session ends --------------------------------------------
     await head.apply_state("tracking")          # what an older app sends
     check("stop recording → awake", head.state == "awake" and not head.camera.recording)
+    check("…and nobody owns anything any more", head.session_hash is None)
     side = "/tmp/sportcam-test.boxes.json"
     frames = json.load(open(side))["frames"] if os.path.exists(side) else []
     check("the clip's person boxes are saved beside it, the climber labelled",
@@ -406,6 +413,7 @@ async def switched_off() -> None:
     head._rec_path, head._rec_started = "/tmp/sportcam-test.mp4", main_mod.time.monotonic()
     head._near_focus = False
     head._tasks = set()
+    head.session_hash = None
 
     async def run_forever():
         await asyncio.sleep(3600)
