@@ -43,7 +43,7 @@ phone app at the functions emulator. Running, testing, deploying:
 | Role | the camera's Firestore document id, and its password |
 | Transport | `X-Camera-Key` header on every API call; `?k=` on video URLs |
 | Firestore rules | no client access at all: the phone app reads through the function, and the camera writes with its service account |
-| Distribution | setup prints the key; it is built into the phone app with `--dart-define=SPORTCAM_CAMERA_KEY=…` ([09](09-direct-connection-and-app.md#running-and-testing-it)) |
+| Distribution | setup prints the key; it is built into the phone app with `--dart-define=SPORTCAM_CAMERA_KEY=…` (14 — Software setup, the app step) |
 | Revocation | change `CAMERA_KEY` on the camera |
 
 ## Tracking mode

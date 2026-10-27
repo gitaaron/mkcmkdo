@@ -38,11 +38,9 @@ Decision: Pi 4. Recording is the main job and the Pi 5's software encoder is
 the largest item it would add to the power budget. The detector's speed is
 sufficient at 3 fps (see your build's section below).
 
-**Schematics:** sources in <!--both-->each build's<!--/--><!--with_uwb: the build's--><!--without_uwb: the build's--> `schematics/`;
-`render_schematics.py` (schemdraw) renders the PNGs;
-`schematics/interactive/index.html` is a zoomable whole-system view, served
-by `npm run docs` at <!--with_uwb-->http://localhost:8090/with_uwb/schematics/interactive/index.html<!--/--><!--both--> or<!--/--> <!--without_uwb-->http://localhost:8090/without_uwb/schematics/interactive/index.html<!--/-->
-(libraries vendored; works offline).
+**Schematics:** sources in <!--both-->each build's<!--/--><!--with_uwb: the build's--><!--without_uwb: the build's--> `schematics/`, rendered to
+PNGs by `render_schematics.py` (schemdraw), plus a zoomable whole-system view
+(`schematics/interactive/`), linked from 12 — Wiring.
 
 ## Head unit
 
@@ -80,7 +78,6 @@ All motion is register writes to one I2C device:
 ### Driving the WS2812B ring
 
 - Path: SPI0 MOSI (GPIO10) → 74AHCT125 (3.3 V → 5 V) → DIN.
-- Enable SPI: `raspi-config` → Interface Options.
 - Driver: `src/<build>/device/sportcam/led.py`, using
   `adafruit-circuitpython-neopixel-spi`.
 - Not used: `rpi_ws281x` (PWM/DMA on GPIO18). It requires the service to run
@@ -202,9 +199,8 @@ A PD bank doesn't report its charge, so the camera meters consumption:
 - Sensor on the 12 V side, read at 1 Hz.
 - `src/<build>/device/sportcam/power.py` integrates Wh and reports fraction
   remaining, present draw, and minutes left (60 s rolling average).
-- Counting starts when the camera service starts, assuming a full bank.
-  **Start each session on a charged bank.** Restarting the service resets
-  the count; there is no app control for it.
+- Counting starts when the camera service starts, assuming a full bank, so
+  restarting the service resets it. There is no app control for it.
 
 | `POWER_MONITOR` | Part | Notes |
 | --- | --- | --- |
@@ -214,10 +210,9 @@ A PD bank doesn't report its charge, so the camera meters consumption:
 
 Both sensors use I2C 0x40.
 
-| Threshold | Action |
-| --- | --- |
-| **20 %** (low) | ring dims and blinks orange at 1 Hz; app warning; estimate continues |
-| **7 %** (critical) | recording stopped and saved; both axes park; state `sleep` |
+What the camera does at 20 % (low) and 7 % (critical):
+[01 — State machine](../product/01-requirements.md#state-machine). The
+estimate carries on below 20 %.
 
 ### The SD card
 
@@ -234,20 +229,16 @@ confirms the byte count.
 
 - 64 GB exceeds one battery charge of recording; larger cards help only
   with spare banks and several offline sessions.
-- Write rate 1.5 MB/s; any genuine Class 10 card is sufficient. Counterfeit
-  cards are the most common cause of Pi corruption; buy a known brand.
+- Write rate 1.5 MB/s; any genuine Class 10 card is sufficient.
 - Clips accumulate when uploads fail
   ([08 — Failure behaviour](08-recordings-and-cloud.md#failure-behaviour)).
-  `storage.py` guards the space:
+  `storage.py` guards the space, measured in minutes of recording, with the
+  limits in [01 — State machine](../product/01-requirements.md#state-machine)
+  (< 20 min warn, < 5 min stop, 500 MB kept free).
 
-| Free recording time | Action |
-| --- | --- |
-| < 20 min | ring blinks orange; app warning |
-| < 5 min | new recordings refused; a running one is stopped cleanly |
-| 500 MB reserve | never used for video (filesystems corrupt at zero free space) |
-
-Rationale for stopping early: the encoder fails ungracefully on ENOSPC and
-leaves a truncated file; a controlled stop leaves a playable one.
+Why stop early: the encoder fails ungracefully on ENOSPC and leaves a
+truncated file; a controlled stop leaves a playable one. The 500 MB reserve
+is there because filesystems corrupt at zero free space.
 
 ### Saving power
 
@@ -261,23 +252,6 @@ leaves a truncated file; a controlled stop leaves a playable one.
 | CPU clock cap | lower baseline | Pi firmware |
 
 Grounding: single star point at the buck output.
-
-## Bring-up order
-
-Stage-by-stage, verifying each before the next:
-
-1. Buck trimmed to 5.1 V under load, before anything is connected.
-2. Power latch and switch: the rocker turns the buck on and off.
-3. Pi.
-4. I2C devices, and the latch's HOLD and SENSE.
-5. LED ring.
-6. PTZ controller and camera.
-7. **With UWB**: anchors.
-
-Procedure and checks: 12 — Wiring guide
-([with UWB](../with_uwb/setup/12-wiring.md#wiring-order-with-checks),
-[without UWB](../without_uwb/setup/12-wiring.md#wiring-order-with-checks));
-then the bench checks in 15 — Verification.
 
 ---
 

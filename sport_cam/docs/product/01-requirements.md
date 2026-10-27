@@ -47,12 +47,12 @@ view; camera-only for lower cost, size and power.
 | F1 | **Pan, tilt, zoom.** Pan 160° (±80°); tilt 130° (−45° to +85°); optical zoom 96° → 33° horizontal (≈ 3.5×). All three from the Arducam PTZ base | [03](../design/03-mechanical-design.md) |
 | F2 | **Follow a person** <!--both-->by UWB tag or by vision, per build<!--/--><!--with_uwb: by the UWB tag they wear--><!--without_uwb: by vision alone-->, and zoom to keep them framed | <!--both-->05 tracking ([with UWB](../with_uwb/design/05-tracking-system.md), [without UWB](../without_uwb/design/05-tracking-system.md))<!--/--><!--with_uwb:[05](../with_uwb/design/05-tracking-system.md)--><!--without_uwb:[05](../without_uwb/design/05-tracking-system.md)--> |
 | F3 | **Record unattended.** Recording starts once a found person has stayed in frame for 3 s, and stops at session end. A clip is saved even when the battery runs out | [Ideal path](#ideal-path) |
-| F4 | **LED status ring** showing each state and sub-state (connecting, pairing, sleep, awake with or without a person in frame, search, found, recording) and low battery | [State machine](#state-machine) |
+| F4 | **LED status ring** showing each state and sub-state (connecting, pairing, sleep, awake with or without a person in frame, search, found, recording), low battery and low card space | [State machine](#state-machine) |
 | F5 | **Phone app**: opens into the live view; state-dependent bottom buttons; status ring top right in the LED colours | [09](../design/09-direct-connection-and-app.md#the-apps-screen) |
 | F6 | **Remote use.** State, live preview and control from any internet-connected phone or computer. One backend and one app serve both builds; the camera reports its build | [07](../design/07-backend-and-app.md#tracking-mode) |
-| F7 | **Recordings library.** Each stopped recording uploads to the backend and appears in the app's library | [08](../design/08-recordings-and-cloud.md) |
+| F7 | **Recordings library.** Each stopped recording uploads to the backend and appears in the app's library. The camera's copy is deleted only once the backend has it whole. Not in v1: watching a recording while it is still being made | [08](../design/08-recordings-and-cloud.md) |
 | F8 | **Direct connection.** On the camera's Wi-Fi, a phone discovers and controls it with no server or internet | [09](../design/09-direct-connection-and-app.md) |
-| F9 | **Person boxes in recordings and the live view.** A box round every person the camera detects: **green** round the climber, **yellow** round anyone else, and **red** round everyone while it can't tell which is the climber (in `awake` nobody has been picked yet, so every box is red). Each recording keeps its boxes and both apps' players draw them over the video; both apps' live views draw them over the picture as the camera detects. The player and the live view each have a **Boxes on / off** button, remembered on that phone or browser | [08](../design/08-recordings-and-cloud.md#person-boxes) |
+| F9 | **Person boxes in recordings and the live view.** A box round every person the camera detects: **green** round the climber, **yellow** round anyone else, and **red** round everyone while it can't tell which is the climber (in `awake` nobody has been picked yet, so every box is red). Each recording keeps its boxes and the app's player draws them over the video; its live view draws them over the picture as the camera detects. The player and the live view each have a **Boxes on / off** button, remembered on that phone | [08](../design/08-recordings-and-cloud.md#person-boxes) |
 | F10 | **Wi-Fi setup at a new gym.** With no saved network in range, the camera enters [pairing](#pairing) on its own; the phone shows its Wi-Fi share QR code to the lens, so the password is never retyped. The network is remembered for next time | [Pairing](#pairing); [08](../design/08-recordings-and-cloud.md#connecting-the-camera-to-gym-wi-fi-from-your-phone) |
 | F11 | **Sleep to save the battery.** Awake 30 s with no session started and nobody watching the live view, the camera sleeps: its sensor stops and the head parks, while the Pi stays reachable. From sleep the app offers **Wake up** and **Record**; Record goes straight to the search. No live view in sleep | [State machine](#state-machine) |
 | F12 | **On/off switch.** A rocker switch in the enclosure wall turns the camera on and off; no unplugging. Off is a clean shutdown from any state: a recording in progress is saved (and uploads at the next boot), the head parks and the ring goes dark, then the camera cuts its own power. Nothing draws from the bank while it is off | [04 — Power switch](../design/04-electronics.md#power-switch) |
@@ -78,6 +78,7 @@ in the doc that makes it. C1 and C2 differ by build.
 | C8 | **No home server** | deployed backend is Firebase only (Functions, Firestore, Storage, Hosting) | no machine to keep running; reachable from anywhere | [07](../design/07-backend-and-app.md) |
 | C9 | **Testable without cloud or camera** | backend runs on the Firebase emulators with a simulated camera (`npm run dev`); API tests run against them (`npm test`) | test before deploying, without hardware | [Appendix C](../appendix/appendix-c-development.md) |
 | C10 | **Owner-only access** | every call and read requires the camera key; cameras can't be listed; no client writes | backend is public | [07 — The camera key](../design/07-backend-and-app.md#the-camera-key) |
+| C11 | **Free to run** | a camera powered on all day stays inside Firebase's free tier (≤ 20 000 Firestore writes a day); an idle project costs nothing | a personal camera shouldn't carry a monthly bill | [06 — Firebase link](../design/06-device-software.md#firebase-link) (write throttling); [08](../design/08-recordings-and-cloud.md#the-deployed-backend) |
 
 ## Ideal path
 
@@ -220,6 +221,9 @@ Rules:
   the zoom closes back in. Next step is build-specific.
 - Battery < 20 %: ring dims and blinks orange at 1 Hz over the state colour.
   Battery < 7 %: save, park, `sleep`.
+- Card space < 20 min of recording: ring blinks orange at 1 Hz over the
+  state colour, and the app warns. < 5 min: no new recording starts, and a
+  running one is stopped and saved cleanly. 500 MB is always left free.
 - `connecting` and `pairing` happen only at power on, before `awake`; no app
   can reach the camera yet, so every app shows it as `off`. `off` is never
   asked for: the camera has no software off, only `sleep`; the rocker switch
@@ -290,7 +294,7 @@ Rules:
 ![SportCam tracking a climber with a UWB tag](../with_uwb/images/intro-scene.png)
 
 The climber wears a UWB tag on the rear of the harness, off-spine
-([wearing the tag](../with_uwb/design/05-tracking-system.md#wearing-the-tag)).
+([wearing the tag](../with_uwb/setup/14-software-setup.md#10-wearing-the-tag)).
 The camera, 6–12 m back
 ([placement envelope](../with_uwb/design/05-tracking-system.md#camera-placement-envelope)),
 ranges the tag at 20 Hz through body and clothing and points at the result.

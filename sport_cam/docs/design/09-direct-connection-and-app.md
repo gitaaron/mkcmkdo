@@ -113,21 +113,14 @@ springs back and the camera stops where it is.
 
 ## Running and testing it
 
-See [`src/app_flutter/README.md`](../../src/app_flutter/README.md):
-
-- `flutter run`: LAN discovery only.
-- Add `--dart-define` backend address and camera key (both printed by
-  `firebase-setup.sh`) for Firebase fallback.
-- Required platform setup: iOS `NSBonjourServices`; Android multicast and
-  cleartext permissions. Without it discovery silently finds nothing.
-- Checks without hardware or a Flutter SDK, including a contract check of
-  the app's model code against the real camera API and the real Firebase
-  function.
+Installing it: 14 — Software setup, the app step. Building, platform setup
+and the checks that run without hardware or a Flutter SDK:
+[`src/app_flutter/README.md`](../../src/app_flutter/README.md).
 
 ## Known limits
 
 | Limit | Impact | Mitigation |
 | --- | --- | --- |
 | **Multicast blocked** (some guest/corporate Wi-Fi) | discovery fails | remembered address; `sportcam.local` if the OS resolves it |
-| **MJPEG bandwidth** (≈ 2–4 Mbit/s at 720p15) | fine on a LAN | WebRTC via MediaMTX (`WHEP_URL`); the app already receives the URL in the state |
+| **MJPEG bandwidth** (≈ 2–4 Mbit/s at 720p15) | fine on a LAN | WebRTC via MediaMTX (`WHEP_URL`): the camera already reports the URL in its state, but the app doesn't play WebRTC yet |
 | **No authentication on the local API** | anyone on the same Wi-Fi can control the camera | use a private hotspot at public venues. Fix: check the camera-key header, as the Firebase API does |

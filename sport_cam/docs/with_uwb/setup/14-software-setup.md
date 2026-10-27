@@ -84,9 +84,35 @@ step gives **stand-alone** operation: direct phone connection only;
 recordings stay on the card
 ([09](../../design/09-direct-connection-and-app.md)).
 
-Once, on a computer: `./scripts/firebase-setup.sh <project-id>`, then
-`npm run deploy` ([08](../../design/08-recordings-and-cloud.md#deploying-the-firebase-backend)).
-Setup prints three values and writes the camera's key file. Copy the key
+Once, on a computer, from the repo root (log in first with
+`npx firebase login`):
+
+```bash
+./scripts/firebase-setup.sh <project-id>
+```
+
+| It does | Result |
+| --- | --- |
+| Create the project | `src/backend/.firebaserc` |
+| Create the Firestore database and the bucket | `<project>-recordings` |
+| Let the function sign URLs | its service account gets Token Creator on itself |
+| Create the camera's service account | Firestore-only; key saved as `sportcam-firebase.json` |
+| Make the camera key | printed with the `config.py` lines and the phone app's `--dart-define`s |
+| No `gcloud` installed | prints the equivalent console steps instead |
+
+Then upgrade the project to the **Blaze** (pay-as-you-go) plan in the
+Firebase console: Cloud Functions need it, and the free-tier quotas still
+apply. Deploy:
+
+```bash
+npm run deploy
+```
+
+What that deploys: [08 — The deployed backend](../../design/08-recordings-and-cloud.md#the-deployed-backend).
+Optionally, add a lifecycle rule to the bucket in the Cloud Storage console
+(e.g. delete after 365 days) so the library doesn't grow forever.
+
+Setup printed three values and wrote the camera's key file. Copy the key
 file to the Pi:
 
 ```bash
@@ -98,7 +124,7 @@ Set the values in `~/sportcam/src/with_uwb/device/sportcam/config.py`:
 | Setting | Set it to |
 | --- | --- |
 | `FIREBASE_PROJECT` | your project id |
-| `CAMERA_KEY` | the key the setup printed — it's also in your app link |
+| `CAMERA_KEY` | the key the setup printed |
 | `UPLOAD_API_BASE` | `https://<project>.web.app` |
 | `FIREBASE_CREDENTIALS` | leave as `/home/pi/sportcam-firebase.json` |
 
@@ -148,8 +174,11 @@ height of the A1/A2 boards, antenna facing the camera. Then:
 python3 -m sportcam.rangecal 5
 ```
 
-Paste the `RANGE_BIAS_M = (…)` it prints. If it warns that a bias is over
-30 cm, the setup is wrong (distance, aim, or anchor order), not the radios.
+It takes 300 frames and compares each anchor's median range with the
+geometry. Paste the `RANGE_BIAS_M = (…)` it prints. If it warns that a bias
+is over 30 cm, the setup is wrong (distance, aim, or anchor order), not the
+radios. It also prints each anchor's noise: well above `UWB_RANGE_SIGMA_M`
+(0.10 m) means multipath or a badly placed anchor, so look at that first.
 On the 250 mm mast, 5 cm of A3 error is about 12° of tilt, so don't skip
 this.
 
@@ -306,10 +335,12 @@ The phone app: `cd src/app_flutter && flutter pub get && flutter run`.
   Firebase when it's not on the same network: state, a live preview,
   control and the recording library. Needs step 4.
 
-For the record start/stop chimes to play with the phone in your bag, apply
-the platform setup in
-[`src/app_flutter/README.md`](../../../src/app_flutter/README.md) first, and
-allow notifications on Android when asked.
+Apply the platform setup in
+[`src/app_flutter/README.md`](../../../src/app_flutter/README.md) first
+(iOS `NSBonjourServices`; Android multicast and cleartext permissions).
+Without it, discovery silently finds nothing, and the record start/stop
+chimes don't play with the phone in your bag. Allow notifications on Android
+when asked.
 
 It words its buttons for this build: the camera reports
 `TRACKING_MODE = "with_uwb"` itself ([07 — Tracking mode](../../design/07-backend-and-app.md#tracking-mode)).
@@ -323,6 +354,34 @@ front of the lens. The ring chases white, then turns blue. The camera
 remembers the network. Code not read: join the `SportCam-Setup` hotspot
 (password on the label), open `http://10.42.0.1`, pick the network and
 paste the password.
+
+## 10. Wearing the tag
+
+Where the tag goes decides how often the climber's body blocks it
+([why](../design/05-tracking-system.md#wearing-the-tag)).
+
+General ranking: upper-arm band > back of cap/collar > chest/back pocket.
+Avoid: wrist (arm swing moves the bearing), below the waist.
+
+**Indoor climbing (bouldering / top-rope / lead).**
+
+The climber faces the wall and the camera is behind them, so the back faces
+the camera for most of the climb. A back-mounted tag is rarely body-shadowed.
+
+| Discipline | Position | Rationale |
+| --- | --- | --- |
+| Top-rope / lead | **Rear of the harness waist belt, 5–10 cm off-spine** (strap bars through the belt webbing, or clipped beside the haul loop) | stable; camera-facing; clear of belay loop and rope |
+| Bouldering | **Low back, off-spine, under the shirt** on an elastic waistband; or upper-arm band | no harness; off-spine for falls onto mats |
+| Either | chalk-bag belt | works, but bags rotate and get repositioned; bearing jitters |
+
+| Topic | Guidance |
+| --- | --- |
+| Front of torso | never: compressed against the wall on slabs and mantles; full occlusion |
+| Spine | keep 5–10 cm off-spine; a 45 g pod is safe to land on elsewhere |
+| Overhangs | body horizontal, tag may face the ceiling. Ranges continue (diffraction); A3 usually has the clearest path. Expect the noisiest angles, not loss of lock |
+| Camera distance | 8–12 m from the wall base (works 2–20 m, [placement envelope](../design/05-tracking-system.md#camera-placement-envelope)). Tilt −45° to +85° covers a 15 m top-out from 7 m (≈ 65°) |
+| Jumpy bearing | multipath from steel and concrete. Raise `UWB_RANGE_SIGMA_M` from 0.10 toward 0.15 before changing any gain |
+| Sweat and chalk | USB-C slot faces down when worn; clean the case, not the board. Chalk is non-conductive. No top vents (sweat ingress) |
 
 ## Values you end up setting
 

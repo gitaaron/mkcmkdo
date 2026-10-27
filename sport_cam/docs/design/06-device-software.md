@@ -186,14 +186,8 @@ Programs: camera service and wearable tag firmware.
 | `rangecal.py` | `python3 -m sportcam.rangecal <metres>`: per-anchor range bias and noise with the tag on the boresight; prints `RANGE_BIAS_M` |
 | `bearingcal.py` | `python3 -m sportcam.bearingcal <metres>`: the filtered bearing's noise and correlation time with the wearer standing on the boresight; prints `TAG_BEARING_SIGMA_DEG` and `TAG_BEARING_CORR_S` |
 
-`config.py` additionally holds the anchor geometry and calibration biases.
-
-Range bias calibration is required with the 250 mm mast (a few cm of A3 bias
-≈ 10° of tilt). Run after `ptzcheck`, tag 5.00 m out on the boresight:
-
-```bash
-cd ~/sportcam/src/with_uwb/device && python3 -m sportcam.rangecal 5
-```
+`config.py` additionally holds the anchor geometry and calibration biases
+([05 — Calibration](../with_uwb/design/05-tracking-system.md#calibration)).
 
 ### Vision, with UWB
 

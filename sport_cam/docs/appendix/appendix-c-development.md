@@ -105,7 +105,7 @@ npm run deploy                             # build + deploy functions, hosting, 
 Then enter the printed values in the camera's `config.py`
 ([14 — Software setup](../with_uwb/setup/14-software-setup.md)).
 Deployed resources, camera key, cost:
-[08](../design/08-recordings-and-cloud.md#deploying-the-firebase-backend).
+[08](../design/08-recordings-and-cloud.md#the-deployed-backend).
 
 ## Docker workspace (all toolchain requirements pre-installed)
 

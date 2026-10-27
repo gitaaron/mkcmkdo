@@ -18,7 +18,7 @@ printing is shared by both builds; the others are build-specific.
 | Measure before printing | [15 — Verification](15-verification.md#before-you-print): nine measurements decide whether the prints fit the bought parts. Enter them in `cad/ordered_parts.toml` and run `python3 cad/fit.py` ([Appendix A](../../appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)) |
 | Assembly guide | single HTML page; open from disk or via `npm run docs`. Build scripts: [assembly/README.md](assembly/README.md) |
 
-**Working directory.** Commands touching `cad/` or `docs/` are relative to
+**Working directory.** Commands touching `cad/` are relative to
 [`with_uwb/`](../../../with_uwb/): run from there (`cd with_uwb`), or prefix `with_uwb/` from the repo
 root (scripts resolve paths from their own location). Pi software:
 `src/with_uwb/device/`. Shared code (Firebase backend, apps): elsewhere under

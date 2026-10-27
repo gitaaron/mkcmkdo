@@ -161,22 +161,7 @@ wrong `PAN_SIGN` or `TILT_SIGN` drives the camera away from the subject.
 
 ## Tuning
 
-Change one parameter at a time and film a short walk or climb after each.
-Defaults are in `src/without_uwb/device/sportcam/config.py`.
-
-| Symptom | Likely cause | Adjust |
-| --- | --- | --- |
-| Camera sweeps past a person, or never stops | detector missing them; sweep too fast; light | lower `DETECT_HIT_THRESHOLD` (0.3 → 0.2), lower `SEARCH_PAN_DPS`; check the preview |
-| Records furniture or empty wall | false positives | raise `DETECT_HIT_THRESHOLD`; raise `FOUND_CONFIRM_S` |
-| Camera oscillates around the person | gain too high for the detection rate | lower `TRACK_PAN_GAIN` / `TRACK_TILT_GAIN` (0.6 → 0.45); widen `TRACK_DEADBAND_FRACTION` |
-| Camera lags a mover and the person drifts out of frame | gain too low | raise the gains toward 0.8; raise `PAN_MAX_DPS`; widen `ZOOM_FILL_TARGET` margin (lower it) |
-| Shot "breathes" in and out | zoom too reactive | lower `ZOOM_VISION_GAIN`; raise `ZOOM_MIN_STEP_MM` |
-| Person clipped at the edge | fill target too high or guard too late | lower `ZOOM_FILL_TARGET` (0.65 → 0.55); raise `ZOOM_GUARD_EDGE` |
-| Bystanders take over | gate too wide | lower `TRACK_GATE_FRACTION` (0.45 → 0.3) |
-| Tracking jumps to someone else after a short loss | re-search too eager | raise `RESEARCH_AFTER_S`; lower `TRACK_GATE_FRACTION` |
-| Gives up on an empty room too soon, or never | give-up timer | `SEARCH_GIVE_UP_S` |
-| Person seen late or missed at the sweep's ends | tilt rows miss them | edit `SEARCH_TILT_ROWS_DEG` for your lens height and room |
-| Detector too slow on the Pi | strip too wide | lower `DETECT_STRIP_FRACTION`; lower `DETECT_DOWNSCALE_W` (hurts small, far people) |
+Tuning by symptom: [14 — Software setup, step 9](../setup/14-software-setup.md#9-tuning).
 
 ## Parameter reference
 

@@ -58,9 +58,35 @@ step gives **stand-alone** operation: direct phone connection only;
 recordings stay on the card
 ([09](../../design/09-direct-connection-and-app.md)).
 
-Once, on a computer: `./scripts/firebase-setup.sh <project-id>`, then
-`npm run deploy` ([08](../../design/08-recordings-and-cloud.md#deploying-the-firebase-backend)).
-Setup prints three values and writes the camera's key file. Copy the key
+Once, on a computer, from the repo root (log in first with
+`npx firebase login`):
+
+```bash
+./scripts/firebase-setup.sh <project-id>
+```
+
+| It does | Result |
+| --- | --- |
+| Create the project | `src/backend/.firebaserc` |
+| Create the Firestore database and the bucket | `<project>-recordings` |
+| Let the function sign URLs | its service account gets Token Creator on itself |
+| Create the camera's service account | Firestore-only; key saved as `sportcam-firebase.json` |
+| Make the camera key | printed with the `config.py` lines and the phone app's `--dart-define`s |
+| No `gcloud` installed | prints the equivalent console steps instead |
+
+Then upgrade the project to the **Blaze** (pay-as-you-go) plan in the
+Firebase console: Cloud Functions need it, and the free-tier quotas still
+apply. Deploy:
+
+```bash
+npm run deploy
+```
+
+What that deploys: [08 — The deployed backend](../../design/08-recordings-and-cloud.md#the-deployed-backend).
+Optionally, add a lifecycle rule to the bucket in the Cloud Storage console
+(e.g. delete after 365 days) so the library doesn't grow forever.
+
+Setup printed three values and wrote the camera's key file. Copy the key
 file to the Pi:
 
 ```bash
@@ -72,7 +98,7 @@ Set the values in `~/sportcam/src/without_uwb/device/sportcam/config.py`:
 | Setting | Set it to |
 | --- | --- |
 | `FIREBASE_PROJECT` | your project id |
-| `CAMERA_KEY` | the key the setup printed — it's also in your app link |
+| `CAMERA_KEY` | the key the setup printed |
 | `UPLOAD_API_BASE` | `https://<project>.web.app` |
 | `FIREBASE_CREDENTIALS` | leave as `/home/pi/sportcam-firebase.json` |
 
@@ -209,10 +235,12 @@ The phone app: `cd src/app_flutter && flutter pub get && flutter run`.
   Firebase when it's not on the same network: state, a live preview,
   control and the recording library. Needs step 3.
 
-For the record start/stop chimes to play with the phone in your bag, apply
-the platform setup in
-[`src/app_flutter/README.md`](../../../src/app_flutter/README.md) first, and
-allow notifications on Android when asked.
+Apply the platform setup in
+[`src/app_flutter/README.md`](../../../src/app_flutter/README.md) first
+(iOS `NSBonjourServices`; Android multicast and cleartext permissions).
+Without it, discovery silently finds nothing, and the record start/stop
+chimes don't play with the phone in your bag. Allow notifications on Android
+when asked.
 
 It words its buttons for this build: the camera reports
 `TRACKING_MODE = "without_uwb"` itself ([07 — Tracking mode](../../design/07-backend-and-app.md#tracking-mode)).
@@ -270,6 +298,27 @@ If it keeps sweeping and the app says it can't find anyone, the camera is
 pointing somewhere you aren't, or the detector can't see you: recheck step 4,
 face the camera, and make sure the room is lit.
 
+## 9. Tuning
+
+Once the live checks pass, tune by symptom. Change one parameter at a time
+and film a short walk or climb after each. Defaults are in
+`src/without_uwb/device/sportcam/config.py`; what each one means:
+[05 — Parameter reference](../design/05-tracking-system.md#parameter-reference).
+
+| Symptom | Likely cause | Adjust |
+| --- | --- | --- |
+| Camera sweeps past a person, or never stops | detector missing them; sweep too fast; light | lower `DETECT_HIT_THRESHOLD` (0.3 → 0.2), lower `SEARCH_PAN_DPS`; check the preview |
+| Records furniture or empty wall | false positives | raise `DETECT_HIT_THRESHOLD`; raise `FOUND_CONFIRM_S` |
+| Camera oscillates around the person | gain too high for the detection rate | lower `TRACK_PAN_GAIN` / `TRACK_TILT_GAIN` (0.6 → 0.45); widen `TRACK_DEADBAND_FRACTION` |
+| Camera lags a mover and the person drifts out of frame | gain too low | raise the gains toward 0.8; raise `PAN_MAX_DPS`; widen `ZOOM_FILL_TARGET` margin (lower it) |
+| Shot "breathes" in and out | zoom too reactive | lower `ZOOM_VISION_GAIN`; raise `ZOOM_MIN_STEP_MM` |
+| Person clipped at the edge | fill target too high or guard too late | lower `ZOOM_FILL_TARGET` (0.65 → 0.55); raise `ZOOM_GUARD_EDGE` |
+| Bystanders take over | gate too wide | lower `TRACK_GATE_FRACTION` (0.45 → 0.3) |
+| Tracking jumps to someone else after a short loss | re-search too eager | raise `RESEARCH_AFTER_S`; lower `TRACK_GATE_FRACTION` |
+| Gives up on an empty room too soon, or never | give-up timer | `SEARCH_GIVE_UP_S` |
+| Person seen late or missed at the sweep's ends | tilt rows miss them | edit `SEARCH_TILT_ROWS_DEG` for your lens height and room |
+| Detector too slow on the Pi | strip too wide | lower `DETECT_STRIP_FRACTION`; lower `DETECT_DOWNSCALE_W` (hurts small, far people) |
+
 ## Values you end up setting
 
 All in `src/without_uwb/device/sportcam/config.py`:
@@ -283,5 +332,5 @@ All in `src/without_uwb/device/sportcam/config.py`:
 | `DETECT_HIT_THRESHOLD` | step 8.4: raise for fewer false people |
 | `TRACK_PAN_GAIN`, `TRACK_TILT_GAIN` | step 8.2: raise if the camera lags a fast mover, lower if it oscillates |
 | `RESEARCH_AFTER_S`, `SEARCH_GIVE_UP_S` | step 8.5: how long before re-sweeping, and before giving up on an empty room |
-| `FOUND_CONFIRM_S`, `FOUND_LOST_S` and `ACQUIRE_STALLED_S` | defaults are fine; see [05](../design/05-tracking-system.md) to tune |
+| `FOUND_CONFIRM_S`, `FOUND_LOST_S`, `ACQUIRE_STALLED_S` and the rest | defaults are fine; tune by symptom in step 9 |
 | `FIREBASE_PROJECT`, `CAMERA_KEY`, `UPLOAD_API_BASE` | step 3, only with Firebase |

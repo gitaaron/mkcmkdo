@@ -53,7 +53,7 @@ latest result: [`cad/FIT_REPORT.md`](../../cad/FIT_REPORT.md).
 | Axis | Mechanism | Range | Notes |
 | --- | --- | --- | --- |
 | Pan | PTZ base servo, direct | **±80° soft (160° total)** | servo travel 180°; soft limits stop short of the bracket fouling |
-| Tilt | PTZ base servo, direct | **−45° … +85°** | verify with `python3 -m sportcam.ptzcheck` |
+| Tilt | PTZ base servo, direct | **−45° … +85°** | soft limits; confirmed on the bench (14 — Software setup) |
 | Zoom | Arducam motorized lens | 96° → 33° horizontal (≈ 3.5× optical) | ≈ 2.8–10.6 mm EFL on this sensor |
 
 **Pan limit consequences.** No following through 360°, no short way round
@@ -93,11 +93,10 @@ subject fills `5.4 / d` of it:
 - **The lid is the structure:** 5 walls, 40 % infill. Everything above it is
   cantilevered off four slots.
 - **Stability:** the pan axis carries only the camera, so head balance is
-  irrelevant; tripod stability is not. Mount the battery tray low and spread
-  the legs<!--with_uwb--> (wider with the UWB arms and mast fitted)<!--/-->.
-- **Cable service loop:** ribbon and servo lead cross the pan axis. Leave
-  ≈ 80 mm of slack under the lid; sweep both axes to their limits by hand
-  before securing it.
+  irrelevant; tripod stability is not. Hence the battery tray sits low on a
+  leg or the centre column<!--with_uwb-->, and the UWB arms and mast make the head top-heavy<!--/-->.
+- **Cable service loop:** ribbon and servo lead cross the pan axis, so they
+  need ≈ 80 mm of slack under the lid (12 — Wiring, connection C1).
 
 ## Printed parts and CAD
 
@@ -114,15 +113,6 @@ checked by `cad/fit.py`.
 | Part list, previews, STL links | BOM: [with UWB](../with_uwb/setup/10-bill-of-materials.md#printed-parts), [without UWB](../without_uwb/setup/10-bill-of-materials.md#printed-parts) |
 | Print settings, orientation, supports, times | [11 — 3D printing](../setup/11-3d-printing.md) |
 | OpenSCAD sources and `cad/fit.py` | [Appendix A](../appendix/appendix-a-cad-parts.md) |
-
-## Assembly
-
-Interactive 3D assembly guide per build
-([with UWB](../with_uwb/setup/assembly/index.html),
-[without UWB](../without_uwb/setup/assembly/index.html); open the
-file directly or from the docs viewer). Steps: enclosure electronics, lid and
-camera, battery, cabling, bring-up<!--with_uwb-->; with UWB also the anchor arms and A3
-mast<!--/-->. Each step highlights and animates the part being fitted.
 
 ---
 

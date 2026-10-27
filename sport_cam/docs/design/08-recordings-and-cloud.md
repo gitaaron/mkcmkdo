@@ -25,8 +25,9 @@ stop recording
 - Cost: delay before playback. 12 Mbit/s → ≈ 450 MB per 5 min clip → 30–90 s
   upload on typical Wi-Fi. The app shows progress, then a **"Recording saved
   — watch now"** toast.
-- Out of scope (v1): playback during recording (would need fragmented MP4 or
-  HLS).
+- Watching a clip while it is still recording is out of scope
+  ([F7](../product/01-requirements.md#functional-requirements)); it would
+  need fragmented MP4 or HLS.
 
 ## The library in Firebase
 
@@ -52,7 +53,7 @@ limit).
 While recording, the camera notes every person the detector finds, a few
 times a second, with the tracker's verdict on each (`boxlog.py`). They are
 saved beside the clip as `<clip>.boxes.json`, uploaded with it, and deleted
-from the card with it. The app's player draws them over the video and have a
+from the card with it. The app's player draws them over the video and has a
 **Boxes on / off** control. The same boxes are drawn over the
 [live view](#in-the-live-view), with a control of its own.
 
@@ -109,41 +110,20 @@ every box is `unsure` (red).
 - Over WebRTC the picture is full-rate but the boxes still come with the
   preview, once a second, so they lag a moving climber.
 - **Boxes on / off** sits under the recordings button. It is remembered
-  separately from the player's (web: `sportcam.showLiveBoxes`; Flutter:
-  `showLiveBoxes`).
+  separately from the player's (`showLiveBoxes`).
 
-Camera configuration (`src/<build>/device/sportcam/config.py`):
+The camera uploads to `UPLOAD_API_BASE` as `CAMERA_KEY` (set in 14 —
+Software setup, the Firebase step). Both empty: recordings stay on the card,
+and phones play them over the direct connection
+([09](09-direct-connection-and-app.md)).
 
-```python
-UPLOAD_API_BASE = "https://sportcam-aaron.web.app"
-CAMERA_KEY = "…"                                    # printed by firebase-setup.sh
-```
+## The deployed backend
 
-Both empty: recordings stay on the card; phones can play them over the
-direct connection ([09](09-direct-connection-and-app.md)).
-
-## Deploying the Firebase backend
-
-Commands: `./scripts/firebase-setup.sh <project-id>` (once), then
-`npm run deploy` ([Appendix C](../appendix/appendix-c-development.md#deploying)).
-
-`firebase-setup.sh`:
-
-| Step | Result |
-| --- | --- |
-| Create project | `src/backend/.firebaserc` |
-| Create Firestore database and bucket | `<project>-recordings` |
-| Grant URL signing | function's service account gets Token Creator on itself |
-| Create camera service account | Firestore-only; key saved as `sportcam-firebase.json` (copy to the Pi) |
-| Generate camera key | printed with the `config.py` lines and the phone app's `--dart-define`s |
-| No `gcloud` installed | prints the equivalent console steps |
-
-**Manual step:** upgrade the project to the **Blaze** plan (required for Cloud
-Functions). Free-tier quotas still apply.
-
-`npm run deploy` (`scripts/firebase-deploy.sh`) builds the function, then
-deploys functions, hosting and the Firestore and Storage rules
-from `src/backend`:
+Set up once with `firebase-setup.sh` and deployed with `npm run deploy`
+(steps: 14 — Software setup, the Firebase step; commands:
+[Appendix C](../appendix/appendix-c-development.md#deploying)). The deploy
+(`scripts/firebase-deploy.sh`) builds the function, then deploys functions,
+hosting and the Firestore and Storage rules from `src/backend`:
 
 | Endpoint / rule | Content |
 | --- | --- |
@@ -159,11 +139,9 @@ Storage layout:
 | Video | `recordings/<camera key>/<name>.mp4` in the bucket |
 | Metadata | `cameras/<camera key>/recordings/<name>` in Firestore |
 
-Automatic cleanup: add a bucket lifecycle rule (e.g. delete after 365 days).
-
-**Running cost.** Heartbeat every 5 s ≈ 17 000 Firestore writes per powered-on
-day (free tier: 20 000/day). Previews only while an app is watching. Idle
-project: no cost.
+**Running cost** ([C11](../product/01-requirements.md#non-functional-requirements)).
+Heartbeat every 5 s ≈ 17 000 Firestore writes per powered-on day (free tier:
+20 000/day). Previews only while an app is watching. Idle project: no cost.
 
 ## Connecting the camera to gym Wi-Fi from your phone
 
@@ -171,21 +149,10 @@ The Pi has no keyboard or display, and a phone won't give a saved Wi-Fi
 password to an app or web page. It will show it as a **Wi-Fi share QR code**
 (Android: Settings → Wi-Fi → the network → **Share**; iOS 18+: Passwords →
 Wi-Fi → the network → **Show Network QR Code**), and the camera can read
-that. Requirements and states: [01 — Pairing](../product/01-requirements.md#pairing).
+that.
 
-1. Power on. State `connecting` (ring: white chase). A saved network joins:
-   `awake`, done.
-2. None of the saved networks in range at the first scan (≈ 10 s), or none
-   joined in 60 s: state `pairing` (ring: white, slow blink). Hotspot
-   **`SportCam-Setup`** up, head parked, lens wide and focused near.
-3. Hold the phone's Wi-Fi share code 15–30 cm in front of the lens. *Or*
-   join `SportCam-Setup` (password on the head's label), let the setup page
-   open (or go to **`http://10.42.0.1`**), pick the network and paste the
-   password.
-4. `connecting` while the Pi drops the hotspot and joins; NetworkManager
-   stores the network for next time. Wrong password: the hotspot returns,
-   `pairing` again.
-5. Joined: `awake`. Open the app.
+The steps the user takes, and the states they pass through, are in
+[01 — Pairing](../product/01-requirements.md#pairing).
 
 Two services share the job ([06](06-device-software.md)):
 
@@ -224,7 +191,7 @@ reconnects automatically afterwards.
 | --- | --- |
 | Wi-Fi drops mid-upload | `upload_with_retry`: exponential backoff 5 s → 5 min, 8 attempts; file kept until confirmed |
 | Backend unreachable for the whole session | retry ladder ends after ≈ 15 min; file kept. `upload_loop` retries everything on the card at start-up and every 15 min, oldest first |
-| Card nearly full | < 20 min of space: ring blinks orange, app warns. < 5 min: new recordings refused, a running one stopped cleanly ([04](04-electronics.md#the-sd-card)) |
+| Card nearly full | < 20 min of space: ring blinks orange, app warns. < 5 min: new recordings refused, a running one stopped cleanly ([01 — State machine](../product/01-requirements.md#state-machine), [04](04-electronics.md#the-sd-card)) |
 | Backend unreachable at record time | no effect on recording (local); only upload needs the network |
 | Internet down at the gym | tracking and recording continue; direct phone connection works on the same Wi-Fi; remote apps show the camera offline |
 | Partial upload | Cloud Storage creates the object only on PUT completion, and `finalizeRecording` checks size: no partial files in the library |

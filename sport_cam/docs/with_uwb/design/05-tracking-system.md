@@ -7,7 +7,7 @@ residual aim error, set the zoom framing, and confirm a person is in view
 before a session records.
 
 Contents: sensor choice, geometry, control loops, placement envelope,
-calibration, tag placement.
+what calibration corrects, tag placement.
 
 ## Why UWB (and not BLE, GPS, or vision alone)
 
@@ -227,7 +227,7 @@ decided in `Tracker._match_tag` in three steps:
 | --- | --- | --- |
 | **Gate** | a new box is admitted only if its bearing (pan angle + its position in the frame at the current zoom) is within `TAG_MATCH_BEARING_DEG` (14°, ≈ 2σ of the filtered bearing) of the tag's, and the distance its height implies (thin lens, `SUBJECT_HEIGHT_M`) is within ×/÷ `TAG_MATCH_RANGE_RATIO` (2) of the ranged distance. A box clipped at the top or bottom can only fail as too near | anyone off to the side; anyone much nearer or farther than the tag, such as a person walking past the lens |
 | **Follow** | the gate only admits. Each person admitted is followed from detection to detection by bearing (moved < `TAG_FOLLOW_DEG`, 6°), averaged on every detection, and forgotten only after `TAG_FORGET_S` (5 s) out of view | a second person taking over between detections; a rival dropping out of the comparison because bearing noise briefly pushed them outside the gate |
-| **Average** | each person keeps the running mean of (box bearing − tag bearing). SEARCH takes whoever is nearest on average. FOUND records only once everyone else is further from the tag by `TAG_MATCH_Z` (3) standard errors of those averages, and at least `TAG_MATCH_MARGIN_DEG` (4°). The standard error is `TAG_BEARING_SIGMA_DEG` (7°) over √(seconds watched / `TAG_BEARING_CORR_S`), where 0.35 s is the Kalman filter's memory. Both are estimates until `bearingcal` measures them ([Calibration](#calibration), step 4). Until then the countdown holds at 1. If someone else earns that lead instead, FOUND switches to them and the countdown starts again | someone standing beside the wearer |
+| **Average** | each person keeps the running mean of (box bearing − tag bearing). SEARCH takes whoever is nearest on average. FOUND records only once everyone else is further from the tag by `TAG_MATCH_Z` (3) standard errors of those averages, and at least `TAG_MATCH_MARGIN_DEG` (4°). The standard error is `TAG_BEARING_SIGMA_DEG` (7°) over √(seconds watched / `TAG_BEARING_CORR_S`), where 0.35 s is the Kalman filter's memory. Both are estimates until `bearingcal` measures them ([Calibration](#calibration)). Until then the countdown holds at 1. If someone else earns that lead instead, FOUND switches to them and the countdown starts again | someone standing beside the wearer |
 
 The average is what makes this work. One bearing is ≈ 7° RMS, too noisy to
 split a climber from a belayer standing 1 m away at 10 m (≈ 6°). But the
@@ -297,13 +297,15 @@ below the framing target; beyond ≈ 30 m the UWB link fails first.
 
 ## Calibration
 
-| # | Step | Method | Notes |
-| --- | --- | --- | --- |
-| 1 | **Antenna delay** (optional) | tune each board's DW1000 antenna-delay constant until its range to a taped 5.00 m is close | only if the firmware exposes it; step 2 absorbs the remainder. Skip with stock ULA1 firmware |
-| 2 | **Range bias** | pan centred; tag **5.00 m** out on the boresight, level with A1/A2; `python3 -m sportcam.rangecal 5` | 300 frames; median range per anchor vs geometric truth (A1/A2: hypot(d, b/2); A3: hypot(d + back, up)); prints `RANGE_BIAS_M`. Also corrects A1–A2 imbalance. Reports per-anchor noise; investigate if well above `UWB_RANGE_SIGMA_M`. A3 bias is critical: 5 cm ≈ 12° elevation at 10 m |
-| 3 | **A3 geometry** | measure A3 height above A1/A2 and distance behind the pan axis; set `UWB_A3_UP_M`, `UWB_A3_BACK_M` | defaults 0.250 / 0.089 (kept in step with the CAD by `cad/fit.py`) match the printed mast with the dowel cut to 246 mm and fully seated. Check: tag level with the anchors at 5 m reads ≈ 0° |
-| 4 | **Bearing noise** | after step 2; the wearer stands still on the boresight with the tag worn as in use; `python3 -m sportcam.bearingcal 5`, then `10` | filtered bearing through the tracker's own Kalman filter, 60 s per run; prints σ (RMS about the mean) and τ (autocorrelation falls to 1/e) for `TAG_BEARING_SIGMA_DEG` and `TAG_BEARING_CORR_S`, which set how long the [tag-wearer match](#telling-the-tag-wearer-from-everyone-else) averages. Take the larger σ and longer τ: overestimates only make it slower, underestimates can let it pick the wrong person. Mean over 3° flags a stale step 2 or a wearer off the boresight |
-| 5 | **Lens and servos** | zoom curve, focus grid, axis centre and direction | same in both builds; procedure in [14 — Software setup](../setup/14-software-setup.md#6-calibrate). With A3, `TILT_SIGN` matters as much as `PAN_SIGN`: a wrong sign drives the camera away from the subject |
+What has to be measured on your hardware, and why. The procedure is
+[14 — Software setup, step 6](../setup/14-software-setup.md#6-calibrate).
+
+| Quantity | Why it matters |
+| --- | --- |
+| **Range bias** per anchor (`RANGE_BIAS_M`) | every angle comes from differences between ranges, so a constant offset on one anchor is an angle error. It also corrects A1–A2 imbalance. A3 is critical: 5 cm of A3 bias ≈ 12° of elevation at 10 m. Tuning each board's DW1000 antenna delay would do the same job, but stock ULA1 firmware doesn't expose it, and the bias absorbs it |
+| **A3 geometry** (`UWB_A3_UP_M`, `UWB_A3_BACK_M`) | the [elevation solve](#elevation-from-the-third-anchor) uses both. The defaults (0.250 / 0.089) match the printed mast with the dowel cut to 246 mm, kept in step with the CAD by `cad/fit.py` |
+| **Bearing noise** (`TAG_BEARING_SIGMA_DEG`, `TAG_BEARING_CORR_S`) | sets how long the [tag-wearer match](#telling-the-tag-wearer-from-everyone-else) averages. Overestimates only make it slower; underestimates can let it pick the wrong person |
+| **Lens and servos** | zoom curve, focus grid, axis centre and direction, as in the camera-only build. With A3, `TILT_SIGN` matters as much as `PAN_SIGN`: a wrong sign drives the camera away from the subject |
 
 ## Wearing the tag
 
@@ -313,28 +315,8 @@ torso out of the tag → camera path. The pod (`cad/wearable_case.scad`) keeps
 a foam pad between the ceramic antenna and skin; direct skin contact detunes
 the antenna.
 
-General ranking: upper-arm band > back of cap/collar > chest/back pocket.
-Avoid: wrist (arm swing moves the bearing), below the waist.
-
-### Indoor climbing (bouldering / top-rope / lead)
-
-The climber faces the wall and the camera is behind them, so the back faces
-the camera for most of the climb. A back-mounted tag is rarely body-shadowed.
-
-| Discipline | Position | Rationale |
-| --- | --- | --- |
-| Top-rope / lead | **Rear of the harness waist belt, 5–10 cm off-spine** (strap bars through the belt webbing, or clipped beside the haul loop) | stable; camera-facing; clear of belay loop and rope |
-| Bouldering | **Low back, off-spine, under the shirt** on an elastic waistband; or upper-arm band | no harness; off-spine for falls onto mats |
-| Either | chalk-bag belt | works, but bags rotate and get repositioned; bearing jitters |
-
-| Topic | Guidance |
-| --- | --- |
-| Front of torso | never: compressed against the wall on slabs and mantles; full occlusion |
-| Spine | keep 5–10 cm off-spine; a 45 g pod is safe to land on elsewhere |
-| Overhangs | body horizontal, tag may face the ceiling. Ranges continue (diffraction); A3 usually has the clearest path. Expect the noisiest angles, not loss of lock |
-| Camera distance | 8–12 m from the wall base (works 2–20 m, [placement envelope](#camera-placement-envelope)). Tilt −45° to +85° covers a 15 m top-out from 7 m (≈ 65°) |
-| Jumpy bearing | multipath from steel and concrete. Raise `UWB_RANGE_SIGMA_M` from 0.10 toward 0.15 before changing any gain |
-| Sweat and chalk | USB-C slot faces down when worn; clean the case, not the board. Chalk is non-conductive. No top vents (sweat ingress) |
+Where to wear it for each discipline, and what to do about a jumpy
+bearing: [14 — Wearing the tag](../setup/14-software-setup.md#10-wearing-the-tag).
 
 ## Wearable behaviour
 

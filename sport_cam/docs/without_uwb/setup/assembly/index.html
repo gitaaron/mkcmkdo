@@ -314,7 +314,7 @@ const STEPS = [
       "<b>Card:</b> the app should show free space as minutes of recording. A 64 GB card reads roughly 10 hours when empty. Fill it deliberately once if you want to see the camera decline to record and say why.",
     ],
     warn: "If the camera turns <i>away</i> from a person instead of towards them, flip <code>PAN_SIGN</code> or <code>TILT_SIGN</code> (see the software setup). If the sweep never stops for anyone in the room, raise <code>DETECT_HIT_THRESHOLD</code> only after you have checked the lens is focused.",
-    note: "Full bring-up order is in <a href='../../../design/04-electronics.md' target='_blank'>doc 04</a>; the tracking maths and calibration are in <a href='../../design/05-tracking-system.md' target='_blank'>doc 05</a>.",
+    note: "Bring-up order, with a check at each stage: the <a href='../12-wiring.md#wiring-order-with-checks' target='_blank'>wiring guide</a>; the tracking maths and calibration are in <a href='../../design/05-tracking-system.md' target='_blank'>doc 05</a>.",
     scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...BATT, ...CABLES, "tripod"], add: [],
              view: "iso", focus: "all", demo: true, render: "complete" },
   },
