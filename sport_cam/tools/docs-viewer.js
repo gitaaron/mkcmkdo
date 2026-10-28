@@ -4,6 +4,13 @@
 // viewer, and shows the docs for one build at a time. The build toggle
 // (With UWB / Without UWB) is remembered in localStorage.
 //
+// Below it, a Full build / Bench test switch, remembered too. Each build has
+// a bench rig (docs/<build>/bench/): the camera and the Pi off a mains
+// supply, to test the app end to end. Bench test shows the build's bench
+// docs in place of its setup docs, and leaves out the shared setup docs
+// (printing), the assembly guide, the schematics and the docs about the
+// enclosure (03, appendices A and B).
+//
 // What the toggle hides, in the build you are not viewing:
 //   - sidebar entries for that build's own docs
 //   - sections headed "With UWB" / "Without UWB", or "<heading>, with UWB"
@@ -31,10 +38,12 @@ const BUILDS = {
   without_uwb: "Without UWB",
 };
 const STORE_KEY = "sportcam-docs-build";
+const BENCH_KEY = "sportcam-docs-bench";
 
 const toc = document.getElementById("toc");
 const content = document.getElementById("content");
 const toggle = document.getElementById("build-toggle");
+const benchToggle = document.getElementById("bench-toggle");
 let docs = [];
 let source = null; // the current doc's markdown, for re-rendering on toggle
 let pendingAnchor = null;
@@ -53,6 +62,15 @@ function saveBuild() {
     localStorage.setItem(STORE_KEY, build);
   } catch {}
 }
+
+function loadBench() {
+  try {
+    return localStorage.getItem(BENCH_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+let bench = loadBench();
 
 function currentDoc() {
   return decodeURIComponent(location.hash.slice(1)) || "README.md";
@@ -78,6 +96,19 @@ function buildOfAnchor(anchor) {
   return m ? m[1] + "_uwb" : null;
 }
 
+// Whether a sidebar entry belongs in the build, and the full build or bench
+// test, on show.
+function visible(d) {
+  if (d.section) return true;
+  if (d.build && d.build !== build) return false;
+  if (bench) return d.kind !== "setup" && !d.enclosure;
+  return d.kind !== "bench";
+}
+
+// The bench doc a setup doc is the twin of, or the other way round.
+const benchTwin = (path) =>
+  /\/bench\//.test(path) ? path.replace("/bench/", "/setup/") : path.replace(/^(docs\/\w+)\/setup\//, "$1/bench/");
+
 const otherBuild = () => (build === "with_uwb" ? "without_uwb" : "with_uwb");
 
 // --- toggle + sidebar ------------------------------------------------------
@@ -86,6 +117,12 @@ function renderToggle() {
   toggle.innerHTML = Object.entries(BUILDS)
     .map(([key, label]) => `<button type="button" data-build="${key}" aria-pressed="${key === build}">${label}</button>`)
     .join("");
+  benchToggle.innerHTML = [
+    [false, "Full build"],
+    [true, "Bench test"],
+  ]
+    .map(([on, label]) => `<button type="button" data-bench="${on}" aria-pressed="${on === bench}">${label}</button>`)
+    .join("");
 }
 
 toggle.addEventListener("click", (ev) => {
@@ -93,9 +130,14 @@ toggle.addEventListener("click", (ev) => {
   if (btn && btn.dataset.build !== build) setBuild(btn.dataset.build, { follow: true });
 });
 
+benchToggle.addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button[data-bench]");
+  if (btn) setBench(btn.dataset.bench === "true", { follow: true });
+});
+
 function renderToc() {
   toc.innerHTML = docs
-    .filter((d) => !d.build || d.build === build)
+    .filter(visible)
     .map((d) =>
       d.section
         ? "<h2>" + d.section + "</h2>"
@@ -134,6 +176,25 @@ function setBuild(next, { follow = false, render: rerender = true } = {}) {
     render(path, source);
     if (keep && document.getElementById(keep)) document.getElementById(keep).scrollIntoView();
   }
+}
+
+// Switch between the full build and bench test. With `follow`, a setup doc
+// is swapped for its bench twin (or back), and a doc the new choice doesn't
+// show for the README.
+function setBench(next, { follow = false } = {}) {
+  if (next === bench) return;
+  bench = next;
+  try {
+    localStorage.setItem(BENCH_KEY, bench ? "1" : "0");
+  } catch {}
+  renderToggle();
+  renderToc();
+  if (!follow) return;
+  const path = currentDoc();
+  const entry = docs.find((d) => d.path === path);
+  if (!entry || visible(entry)) return;
+  const twin = benchTwin(path);
+  location.hash = docs.some((d) => d.path === twin && visible(d)) ? twin : "README.md";
 }
 
 function firstVisibleHeading() {
@@ -314,6 +375,9 @@ async function loadDoc() {
   const path = currentDoc();
   const owner = buildOfPath(path);
   if (owner) setBuild(owner); // a deep link to one build's doc picks that build
+  // ...and a setup or bench doc picks the full build or bench test
+  const kind = docs.find((d) => d.path === path)?.kind;
+  if (kind) setBench(kind === "bench");
   markActive();
   const res = await fetch("/" + path);
   if (!res.ok) {

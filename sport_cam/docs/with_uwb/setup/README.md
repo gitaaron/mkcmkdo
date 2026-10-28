@@ -3,6 +3,10 @@
 Build procedure from ordering to a working camera, in order. 11 — 3D
 printing is shared by both builds; the others are build-specific.
 
+Want to try the phone app with the camera before building it? The
+[bench test](../bench/README.md) needs only the camera, the Pi, the buck, a
+mains supply and three of the radios, and runs this build's software.
+
 | # | Doc | Covers | Time |
 | --- | --- | --- | --- |
 | 10 | [**Bill of materials**](10-bill-of-materials.md) | every part to order, with prices and Canadian sources, and the printed parts | ≈ 2 weeks of deliveries |

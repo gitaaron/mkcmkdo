@@ -23,6 +23,12 @@ Setup entry point:
 [with UWB](docs/with_uwb/setup/README.md) ·
 [without UWB](docs/without_uwb/setup/README.md).
 
+To test the phone app end to end before building either, each build has a
+bench test: the camera and the Pi off a mains power supply, no enclosure, no
+battery, nothing printed, running that build's software. Bench test — start
+here: [with UWB](docs/with_uwb/bench/README.md) ·
+[without UWB](docs/without_uwb/bench/README.md).
+
 ### With UWB
 
 - **Sensing:** wearable UWB tag; three anchors on the head range it at
@@ -86,6 +92,7 @@ Conventions:
 | 13 | Assembly guide (interactive 3D): [with UWB](docs/with_uwb/setup/assembly/index.html) · [without UWB](docs/without_uwb/setup/assembly/index.html) | per build | Step-by-step build with a live 3D model of every step |
 | 14 | Software setup: [with UWB](docs/with_uwb/setup/14-software-setup.md) · [without UWB](docs/without_uwb/setup/14-software-setup.md) | per build | Blank SD card to filming: Pi, calibration, services, app |
 | 15 | Verification checklist: [with UWB](docs/with_uwb/setup/15-verification.md) · [without UWB](docs/without_uwb/setup/15-verification.md) | per build | What to measure before printing, check on arrival, confirm on the bench |
+| | Bench test: [with UWB](docs/with_uwb/bench/README.md) · [without UWB](docs/without_uwb/bench/README.md) | per build | The least hardware to test the app end to end, off a mains supply: parts (10), wiring (12), software and a local backend (14), the end-to-end checklist (15) |
 | | **Appendices** | [`docs/appendix/`](docs/appendix/) | |
 | A | [CAD printed parts](docs/appendix/appendix-a-cad-parts.md) | shared | Fitting the layout to your parts (`cad/fit.py`), render workflow, per-part notes, measure-first list |
 | B | [Open-source printed parts](docs/appendix/appendix-b-open-source-parts.md) | shared | Community STL alternatives and what each trade costs |
@@ -96,8 +103,11 @@ Conventions:
 ## Reading the docs
 
 On GitHub, or in the local docs viewer (sidebar in reading order, inline
-diagrams, working cross-links, and a **With UWB / Without UWB** toggle that
-filters docs, sections, table rows and wording; the choice persists):
+diagrams, working cross-links, a **With UWB / Without UWB** toggle that
+filters docs, sections, table rows and wording, and a **Full build / Bench
+test** switch: bench test shows the build's bench docs in place of its setup
+docs, and leaves out printing, assembly, the schematics and the enclosure;
+both choices persist):
 
 ```bash
 npm run docs       # → http://localhost:8090
@@ -118,6 +128,7 @@ docs/               all the docs
   with_uwb/         the UWB build's own docs
     design/         05 — tracking system
     setup/          README (start here), 10, 12–15 — BOM, wiring, assembly guide (assembly/), software setup, verification
+    bench/          README (start here), 10, 12, 14, 15 — the bench test: parts, wiring, software, end-to-end checklist
     images/         rendered diagrams and part previews
   without_uwb/      the camera-only build's own docs — same layout
 src/                all the code and apps
