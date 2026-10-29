@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>SportCam — bench rig wiring schematic (d3-hwschematic)</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📷</text></svg>" />
+<!--
+  Interactive block-level schematic of the bench rig
+  (docs/without_uwb/bench/12-wiring.md), rendered with d3-hwschematic from the
+  same vendored libraries as index.html. Edge labels carry the wiring
+  guide's connection numbers (A1, P1, R2, I1, …). Serve it with the docs
+  viewer:
+
+      npm run docs        → http://localhost:8090/without_uwb/schematics/interactive/bench.html
+-->
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/elk.bundled.js"></script>
+<script src="vendor/d3-hwschematic.js"></script>
+<link rel="stylesheet" href="vendor/d3-hwschematic.css" />
+<style>
+  html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; overflow: hidden; }
+  header { padding: 10px 16px; background: #1a2233; color: #fff; height: 24px; }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  #scheme { width: 100vw; height: calc(100vh - 44px); display: block; }
+</style>
+</head>
+<body>
+<header><h1>SportCam bench rig wiring, without UWB (drag to pan, wheel to zoom)</h1></header>
+<svg id="scheme"></svg>
+<script>
+const port = (id, name, side) => ({
+  id, hwMeta: { name }, direction: side, properties: { side: side === "OUTPUT" ? "EAST" : "WEST" },
+});
+const node = (id, name, ports, isExternal = false) => ({
+  id,
+  hwMeta: { name, cls: "Component", isExternalPort: isExternal },
+  properties: { "org.eclipse.elk.portConstraints": "FIXED_ORDER" },
+  ports,
+  children: [],
+  edges: [],
+});
+
+// Block-level netlist of the bench rig. Edge names start with the
+// connection's number in the bench wiring guide.
+const graph = {
+  id: "root",
+  hwMeta: { name: "SportCam bench rig", maxId: 1000 },
+  properties: { "org.eclipse.elk.hierarchyHandling": "INCLUDE_CHILDREN" },
+  ports: [],
+  edges: [],
+  children: [
+    node("wall", "Wall outlet", [port("w_ac", "AC", "OUTPUT")], true),
+    node("psu", "USB-C adapter 5.1 V 3 A (B1)", [port("psu_ac", "AC", "INPUT"), port("psu_out", "USB-C 5V", "OUTPUT")]),
+    node("pi", "Raspberry Pi 4", [
+      port("pi_5v", "USB-C 5V", "INPUT"),
+      port("pi_p2", "pin 2 5V", "OUTPUT"), port("pi_p6", "pin 6 GND", "OUTPUT"),
+      port("pi_sda", "pin 3 SDA G2", "OUTPUT"), port("pi_scl", "pin 5 SCL G3", "OUTPUT"),
+      port("pi_csi", "CSI", "OUTPUT"),
+    ]),
+    node("ptz", "Arducam PTZ ctrl (0x0C)", [
+      port("ptz_5v", "5V", "INPUT"), port("ptz_gnd", "GND", "INPUT"),
+      port("ptz_sda", "SDA", "INPUT"), port("ptz_scl", "SCL", "INPUT"),
+      port("ptz_zoom", "zoom motor", "OUTPUT"), port("ptz_focus", "focus motor", "OUTPUT"),
+      port("ptz_pan", "pan servo", "OUTPUT"), port("ptz_tilt", "tilt servo", "OUTPUT"),
+    ]),
+    node("cam", "IMX477 + zoom lens", [
+      port("cam_csi", "CSI", "INPUT"), port("cam_zoom", "zoom", "INPUT"), port("cam_focus", "focus", "INPUT"),
+    ]),
+    node("pan", "Pan servo (kit lead)", [port("pan_in", "lead", "INPUT")]),
+    node("tilt", "Tilt servo (kit lead)", [port("tilt_in", "lead", "INPUT")]),
+  ],
+};
+
+let eid = 0;
+const edge = (srcNode, srcPort, dstNode, dstPort, name) => ({
+  id: "e" + (eid++), hwMeta: { name },
+  sources: [[srcNode, srcPort]], targets: [[dstNode, dstPort]],
+});
+graph.edges = [
+  edge("wall", "w_ac", "psu", "psu_ac", "mains"),
+  edge("psu", "psu_out", "pi", "pi_5v", "P1 5.1 V 3 A"),
+  edge("pi", "pi_p2", "ptz", "ptz_5v", "J1 5V"),
+  edge("pi", "pi_p6", "ptz", "ptz_gnd", "J2 GND"),
+  edge("pi", "pi_sda", "ptz", "ptz_sda", "I1 SDA"),
+  edge("pi", "pi_scl", "ptz", "ptz_scl", "I2 SCL"),
+  edge("pi", "pi_csi", "cam", "cam_csi", "C1 15-pin FFC"),
+  edge("ptz", "ptz_zoom", "cam", "cam_zoom", "factory"),
+  edge("ptz", "ptz_focus", "cam", "cam_focus", "factory"),
+  edge("ptz", "ptz_pan", "pan", "pan_in", "as the kit came"),
+  edge("ptz", "ptz_tilt", "tilt", "tilt_in", "as the kit came"),
+];
+
+const svg = d3.select("#scheme")
+  .attr("width", window.innerWidth)
+  .attr("height", window.innerHeight - 44);
+const schematic = new d3.HwSchematic(svg);
+const zoom = d3.zoom().on("zoom", (ev) => schematic.root.attr("transform", ev.transform));
+svg.call(zoom).on("dblclick.zoom", null);
+schematic.bindData(graph).then(
+  () => {},
+  (err) => { document.querySelector("header h1").textContent = "layout error: " + err; },
+);
+</script>
+</body>
+</html>

@@ -8,8 +8,8 @@
 // a bench rig (docs/<build>/bench/): the camera and the Pi off a mains
 // supply, to test the app end to end. Bench test shows the build's bench
 // docs in place of its setup docs, and leaves out the shared setup docs
-// (printing), the assembly guide, the schematics and the docs about the
-// enclosure (03, appendices A and B).
+// (printing), the assembly guide, the full build's schematic (the bench has
+// its own) and the docs about the enclosure (03, appendices A and B).
 //
 // What the toggle hides, in the build you are not viewing:
 //   - sidebar entries for that build's own docs

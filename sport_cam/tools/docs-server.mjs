@@ -154,7 +154,10 @@ async function listDocs() {
     list.sort(byNumber);
     entries.push(...list.map(({ href, ...e }) => (href ? { ...e, path: href } : e)));
     if (setup)
-      for (const b of BUILDS) entries.push({ path: `${b}/schematics/interactive/index.html`, title: "Wiring schematic, interactive", build: b, kind });
+      for (const b of BUILDS) {
+        entries.push({ path: `${b}/schematics/interactive/index.html`, title: "Wiring schematic, interactive", build: b, kind });
+        entries.push({ path: `${b}/schematics/interactive/bench.html`, title: "Bench wiring schematic, interactive", build: b, kind: "bench" });
+      }
   }
   entries.push({ section: "Appendices" });
   entries.push(...(await mdEntries("docs/appendix")).sort(byNumber));

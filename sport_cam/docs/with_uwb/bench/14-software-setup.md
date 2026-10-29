@@ -6,7 +6,7 @@ bench doesn't have left out; where a step is the same, it links there.
 
 | | |
 | --- | --- |
-| Prerequisite | the [bench wiring](12-wiring.md) done, through step 5 |
+| Prerequisite | the [bench wiring](12-wiring.md) done; its power-under-load check (step 3) comes after `ptzcheck` below |
 | Equipment | a computer with [Raspberry Pi Imager](https://www.raspberrypi.com/software/), Node 22, Java 17+, the Flutter SDK and the Arduino IDE; one phone, or two to test sharing the camera; all on the same Wi-Fi |
 | Duration | ≈ **1.5 h** |
 
@@ -74,6 +74,7 @@ The offline tests, then the head:
 ```bash
 for t in tests/test_*.py; do python3 $t | tail -1; done
 python3 -m sportcam.ptzcheck      # sweeps both axes; the pan creeps in whole-degree ticks, as expected here
+vcgencmd get_throttled            # throttled=0x0: the adapter held 5 V while the motors ran (12, step 3)
 ```
 
 If a positive pan turns the lens the wrong way, or a positive tilt doesn't
@@ -105,7 +106,7 @@ and the gauge's absence are expected.
 
 **Stopping it:** stop any recording from the app first, then Ctrl-C.
 (Ctrl-C parks the head but doesn't save a clip still recording; the full
-build's service saves it.) Then `sudo poweroff`, and unplug the supply once
+build's service saves it.) Then `sudo poweroff`, and unplug the adapter once
 the Pi's green LED stops.
 
 ## 6. The app, on the camera alone

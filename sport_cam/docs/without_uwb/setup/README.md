@@ -4,8 +4,8 @@ Build procedure from ordering to a working camera, in order. 11 — 3D
 printing is shared by both builds; the others are build-specific.
 
 Want to try the phone app with the camera before building it? The
-[bench test](../bench/README.md) needs only the camera, the Pi, the buck and
-a mains supply, and runs this build's software.
+[bench test](../bench/README.md) needs only the camera, the Pi and a USB-C
+adapter, and runs this build's software.
 
 | # | Doc | Covers | Time |
 | --- | --- | --- | --- |
