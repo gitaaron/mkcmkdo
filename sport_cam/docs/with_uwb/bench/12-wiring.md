@@ -84,7 +84,7 @@ The servo leads stay plugged into the PTZ controller, as the kit came
 
 ## Anchors and tag
 
-Flash the three radios first ([14, step 1](14-software-setup.md#1-flash-the-radios-on-your-computer)).
+Flash the three radios first ([14, step 3](14-software-setup.md#3-flash-the-radios-on-your-computer)).
 
 | # | From | To | Notes |
 | --- | --- | --- | --- |

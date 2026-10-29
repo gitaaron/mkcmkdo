@@ -7,7 +7,7 @@ bench doesn't have left out; where a step is the same, it links there.
 | | |
 | --- | --- |
 | Prerequisite | the [bench wiring](12-wiring.md) done; its power-under-load check (step 3) comes after `ptzcheck` below |
-| Equipment | a computer with [Raspberry Pi Imager](https://www.raspberrypi.com/software/), Node 22, Java 17+, the Flutter SDK and the Arduino IDE; one phone, or two to test sharing the camera; all on the same Wi-Fi |
+| Equipment | a Mac with this repo checked out, [Raspberry Pi Imager](https://www.raspberrypi.com/software/), Node 22, Java 17+, the Flutter SDK and the Arduino IDE; one phone, or two to test sharing the camera; all on the same Wi-Fi |
 | Duration | ≈ **1.5 h** |
 
 | Left out of the full setup | Why |
@@ -20,9 +20,44 @@ bench doesn't have left out; where a step is the same, it links there.
 | the services and the Wi-Fi portal | run the camera in a terminal instead; Wi-Fi comes from the Pi Imager settings |
 | the power switch setup | no latch on the bench |
 
-## 1. Flash the radios (on your computer)
+## 1. Raspberry Pi OS (on your Mac)
 
-As [the full build's step 1](../setup/14-software-setup.md#1-flash-the-radios-on-your-computer),
+As [the full build's step 1](../setup/14-software-setup.md#1-raspberry-pi-os-on-your-mac),
+every page of it: an SSH key on your Mac, Raspberry Pi Imager, the card
+written as Raspberry Pi OS (Legacy, 64-bit) Lite with hostname `sportcam`,
+user `pi`, your Wi-Fi and SSH with your key. Power the Pi by plugging in the
+USB-C adapter.
+
+**Done when:** `ssh pi@sportcam.local` logs in from your Mac without asking
+for a password.
+
+## 2. Install the camera software (from your Mac)
+
+From the repo's root, on your Mac:
+
+```bash
+./scripts/pi-install.sh with_uwb --bench
+```
+
+As [the full build's step 2](../setup/14-software-setup.md#2-install-the-camera-software-from-your-mac)
+(OS upgrade, packages, the code, its Python packages, the offline tests, a
+reboot, checks), less what the bench leaves out: no SPI, pigpio or
+`getmodel`. 15–25 minutes the first time. It also tells the camera what the
+bench lacks, in `sportcam/config.py`:
+
+| Setting | Set to | Because |
+| --- | --- | --- |
+| `SERVO_DRIVER` | `"arducam"` | the servos stay on the PTZ controller |
+| `POWER_MONITOR` | `"none"` | no battery gauge: no battery warnings |
+| `UWB_ANCHORS` | `2` | no A3: tilt follows the person detector |
+
+**Done when:** it ends with `All set`: the camera found, and `0c` (the PTZ
+controller) on I2C. A failed check names the connection to look at: fix it
+and run the script again.
+
+## 3. Flash the radios (on your computer)
+
+As [the full build's step 3](../setup/14-software-setup.md#3-flash-the-radios-on-your-computer),
 for three boards: A1, A2 and the tag. A3 isn't fitted.
 
 | Board | Sketch | DIP switch 1 2 3 4 | Vendor name |
@@ -34,45 +69,11 @@ for three boards: A1, A2 and the tag. A3 isn't fitted.
 **Done when:** with the tag powered, A1's port at 115200 baud in the Arduino
 serial monitor shows lines starting `mc 03 …`: two ranges, A1's and A2's.
 
-## 2. Raspberry Pi OS
-
-As [the full build's step 2](../setup/14-software-setup.md#2-raspberry-pi-os)
-— Bookworm 64-bit, username `pi`, hostname `sportcam`, **your Wi-Fi** and SSH
-set in Imager — but enable only I2C:
-
-```bash
-sudo raspi-config nonint do_i2c 0       # the PTZ controller
-sudo apt update && sudo apt full-upgrade -y
-sudo reboot
-```
-
-**Done when:** `rpicam-hello -t 2000` shows the camera, and `i2cdetect -y 1`
-lists `0c`. No picture: add `dtoverlay=imx477` to
-`/boot/firmware/config.txt` and reboot.
-
-## 3. Install the camera software
-
-```bash
-sudo apt install -y git python3-pip python3-picamera2 python3-opencv i2c-tools
-git clone https://github.com/gitaaron/sport_cam.git ~/sportcam
-cd ~/sportcam/src/with_uwb/device
-sudo pip3 install --break-system-packages -r requirements.txt
-```
-
-Then tell it what the bench lacks, in `sportcam/config.py`:
-
-```bash
-sed -i -e 's/^SERVO_DRIVER = .*/SERVO_DRIVER = "arducam"/' \
-       -e 's/^POWER_MONITOR = .*/POWER_MONITOR = "none"/' \
-       -e 's/^UWB_ANCHORS = .*/UWB_ANCHORS = 2/' sportcam/config.py
-```
-
 ## 4. Bench checks
 
-The offline tests, then the head:
+On the Pi (`ssh pi@sportcam.local`), from `~/sportcam/src/with_uwb/device`, the head:
 
 ```bash
-for t in tests/test_*.py; do python3 $t | tail -1; done
 python3 -m sportcam.ptzcheck      # sweeps both axes; the pan creeps in whole-degree ticks, as expected here
 vcgencmd get_throttled            # throttled=0x0: the adapter held 5 V while the motors ran (12, step 3)
 ```
@@ -81,7 +82,7 @@ If a positive pan turns the lens the wrong way, or a positive tilt doesn't
 point it up, flip `PAN_SIGN` / `TILT_SIGN`
 ([full build, step 5a](../setup/14-software-setup.md#5-bench-checks-motion-and-radios)).
 
-**Done when:** the tests pass and both axes sweep.
+**Done when:** both axes sweep.
 
 Then the radios, tag on:
 
@@ -90,7 +91,7 @@ python3 -m serial.tools.miniterm /dev/ttyUSB0 115200     # Ctrl-] to quit
 ```
 
 **Done when** it streams `mc 03 …` at 8–20 lines a second. One range per
-line: the Ranging sketches are on, not RTLS (step 1).
+line: the Ranging sketches are on, not RTLS (step 3).
 
 ## 5. Run the camera
 

@@ -41,7 +41,7 @@ Prices: approximate CAD street prices, Oct 2026, ±15 %.
 
 | # | Status | Part | Qty | ≈ CAD | Source | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 6 | | **Haorutech ULA1 UWB module (ESP32 + DWM1000)** | 3 | — | as the full build | two anchors, A1 and A2, and the tag. Flashed from your computer over their USB plugs ([14, step 1](14-software-setup.md#1-flash-the-radios-on-your-computer)) |
+| 6 | | **Haorutech ULA1 UWB module (ESP32 + DWM1000)** | 3 | — | as the full build | two anchors, A1 and A2, and the tag. Flashed from your computer over their USB plugs ([14, step 3](14-software-setup.md#3-flash-the-radios-on-your-computer)) |
 | 15 | | Slim USB power bank, 2 500–5 000 mAh | 1 | — | as the full build | powers the tag. Any USB-A power bank or phone charger does on the bench |
 
 ## Power

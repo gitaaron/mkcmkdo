@@ -7,80 +7,109 @@ Procedure from a blank SD card to a tracking camera. Each step ends with a
 | | |
 | --- | --- |
 | Prerequisite | [assembly guide](assembly/index.html) and [wiring guide](12-wiring.md) complete, through "Power-on checks" |
-| Equipment | the assembled camera on its tripod; 16 GB+ microSD; computer with [Raspberry Pi Imager](https://www.raspberrypi.com/software/); tape measure; phone or laptop on the same Wi-Fi |
+| Equipment | the assembled camera on its tripod; 16 GB+ microSD; a Mac with this repo checked out and [Raspberry Pi Imager](https://www.raspberrypi.com/software/) (step 1); tape measure; phone or laptop on the same Wi-Fi |
 | Duration | ≈ **1 h**, mostly calibration |
 
-## 1. Raspberry Pi OS
+## 1. Raspberry Pi OS (on your Mac)
 
-In Raspberry Pi Imager choose **Raspberry Pi OS (64-bit), Bookworm** (Lite is
-fine), and in its settings:
+Puts the OS on the microSD card with your Wi-Fi and your Mac's SSH key
+already in it, so the Pi joins the network by itself and never needs a
+screen or keyboard.
 
-- **username `pi`**. The services assume `/home/pi`.
-- hostname `sportcam`
-- your Wi-Fi, and SSH enabled
-
-Boot it in the camera, SSH in (`ssh pi@sportcam.local`), then:
+**a. An SSH key on your Mac.** Open Terminal (Applications → Utilities →
+Terminal) and run:
 
 ```bash
-sudo raspi-config nonint do_i2c 0       # PTZ controller + battery gauge
-sudo raspi-config nonint do_spi 0       # LED ring
-sudo apt update && sudo apt full-upgrade -y
-sudo reboot
+ls ~/.ssh/id_ed25519.pub || ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
+pbcopy < ~/.ssh/id_ed25519.pub        # the public key, onto the clipboard for c
 ```
 
-**Done when:** `rpicam-hello -t 2000` shows the camera, and
-`i2cdetect -y 1` lists `0c` (PTZ) and `40` (gauge). If the camera is missing,
-add `dtoverlay=imx477` to `/boot/firmware/config.txt` and reboot.
+The first line prints the key's path if you already have one, and makes one
+(no passphrase) if you don't. A key with a passphrase works too, once it is
+in the keychain: `ssh-add --apple-use-keychain ~/.ssh/id_ed25519`.
 
-## 2. Install the camera software
+**b. Raspberry Pi Imager.** On
+[raspberrypi.com/software](https://www.raspberrypi.com/software/), click
+**Download for macOS**, open the `.dmg` and drag **Raspberry Pi Imager**
+into **Applications** (or: `brew install --cask raspberry-pi-imager`). Open
+it from Applications, and click **Open** if macOS asks whether you're sure.
+
+**c. Write the card.** Put the microSD card in your Mac's card slot or a USB
+card reader. In Imager, page by page:
+
+| Page | What to do |
+| --- | --- |
+| **Device** | **Raspberry Pi 4** → **Next** |
+| **OS** | **Raspberry Pi OS (other)** → **Raspberry Pi OS (Legacy, 64-bit) Lite** → **Next**. Legacy is Bookworm (Debian 12), which the camera software is tested on; the newer one at the top of the list is not |
+| **Storage** | your card, recognisable by its size (leave **Exclude system drives** on) → **Next** |
+| **Customisation: Hostname** | `sportcam` → **Next** |
+| **Customisation: Localisation** | your capital city (e.g. Ottawa). It sets the time zone, the keyboard and the Wi-Fi country → **Next** |
+| **Customisation: User** | username `pi` (the services assume `/home/pi`), and a password → **Next** |
+| **Customisation: Wi-Fi** | **Secure network**; the SSID and password of the network your Mac is on. The SSID is case-sensitive. Not a guest network: those usually keep devices from seeing each other → **Next** |
+| **Customisation: Remote access** | turn on **Enable SSH**, choose **public key authentication**, and paste (⌘V) the key from a. (**Browse** instead: ⌘⇧. shows the hidden `.ssh` folder.) → **Next** |
+| **Customisation: Raspberry Pi Connect** | leave it off → **Next** |
+| **Writing** | check the summary → **Write** → **I understand, erase and write** → your Mac's password when macOS asks. Writing and verifying takes 5–10 min → **Finish** |
+
+If macOS says *"The disk you inserted was not readable by this computer"*,
+click **Ignore**. Imager ejects the card when it's done; take it out.
+
+**d. Boot.** With the Pi off, push the card into the slot on the underside
+of the Pi, contacts towards the board. Switch the camera on at its rocker.
+The first boot takes 2–3 minutes and restarts once by itself; the green LED
+flickers while it works.
+
+**e. Log in from your Mac:**
 
 ```bash
-sudo apt install -y git python3-pip python3-picamera2 python3-opencv i2c-tools
-git clone https://github.com/gitaaron/sport_cam.git ~/sportcam
-cd ~/sportcam/src/without_uwb/device
-sudo pip3 install --break-system-packages -r requirements.txt
+ping -c 3 sportcam.local
+ssh pi@sportcam.local
 ```
 
-**Pan and tilt driver.** The servos are driven by the Pi's hardware PWM
-through the pigpio daemon (`SERVO_DRIVER = "pigpio"`,
-[04 — Servo drive](../../design/04-electronics.md#servo-drive)). The service
-talks to the daemon over a local socket, so it still doesn't run as root.
-Analog audio uses the same PWM block, so turn it off:
+The first time, ssh asks *"Are you sure you want to continue connecting
+(yes/no/[fingerprint])?"*: type `yes`. You land at `pi@sportcam:~ $` with no
+password asked. Type `exit`.
+
+**Done when:** `ssh pi@sportcam.local` logs in without asking for a
+password.
+
+| If | Then |
+| --- | --- |
+| `ping: cannot resolve sportcam.local` 5 minutes after power-on | the Pi isn't on the Wi-Fi, or your network hides it. Look for `sportcam` in your router's list of devices. Listed: use its IP address in place of `sportcam.local`, here and in step 2 (`--host`). Not listed: the SSID or password is wrong; write the card again |
+| ssh asks for `pi@sportcam.local's password`, or says `Permission denied (publickey)` | the key in Imager isn't this Mac's: write the card again with the key from a |
+| `WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!` | the card was written again since you last logged in: `ssh-keygen -R sportcam.local`, then ssh again |
+
+## 2. Install the camera software (from your Mac)
+
+From the repo's root, on your Mac:
 
 ```bash
-sudo apt install -y pigpio python3-pigpio
-sudo systemctl enable --now pigpiod
-echo 'dtparam=audio=off' | sudo tee -a /boot/firmware/config.txt
-sudo reboot
+./scripts/pi-install.sh without_uwb
 ```
 
-If apt has no `pigpio` package, build it from
-[source](https://github.com/joan2937/pigpio) (`make && sudo make install`)
-and install its `pigpiod` unit. A head still wired as the Arducam kit came,
-with the servo leads on the PTZ controller, needs none of this: set
-`SERVO_DRIVER = "arducam"` instead (whole-degree steps).
+It logs in to `pi@sportcam.local` and does the rest; 20–30 minutes the
+first time, most of it the OS upgrade. The Pi reboots near the end. The
+code comes from your checkout, uncommitted edits included, so the Pi runs
+what you have.
 
-**Done when:** `pigs hwver` prints a number (pigpiod is up).
+| It does | Detail |
+| --- | --- |
+| Interfaces | I2C (PTZ controller, battery gauge) and SPI (LED ring) turned on |
+| OS | upgraded; `python3-picamera2`, `python3-opencv`, `i2c-tools` and `pip` installed |
+| Pan and tilt | pigpio (from apt, or built from [source](https://github.com/joan2937/pigpio) if apt has none), with `pigpiod` enabled: the servos run off the Pi's hardware PWM through it (`SERVO_DRIVER = "pigpio"`, [04 — Servo drive](../../design/04-electronics.md#servo-drive)), and the service talks to it over a local socket, so it doesn't run as root. Analog audio off: it shares the PWM block |
+| Code | `src/without_uwb/device` → `~/sportcam/src/without_uwb/device`. A `config.py` already there is kept, with your calibration; `--reset-config` replaces it |
+| Python packages | `requirements.txt`, system-wide: both services use the system `python3`, the Wi-Fi portal runs as root, and Picamera2 is apt-only |
+| Tests | the offline tests, before anything is put in place |
+| Person detector | MobileNet-SSD's weights (`getmodel`, ≈ 48 MB download, 19 MB kept). HOG works out of the box; MobileNet-SSD finds climbers in poses HOG misses ([06 — The two detectors](../../design/06-device-software.md#the-two-detectors)), and the comparison in [verification](15-verification.md) needs it |
+| Checks, after the reboot | the camera is found (if not, it adds `dtoverlay=imx477` and reboots once more); `0c` (PTZ) and `40` (gauge) on I2C; `pigpiod` answers |
 
-**Person detector (optional now, worth it later).** HOG works out of the
-box. MobileNet-SSD finds climbers in poses HOG misses
-([06 — The two detectors](../../design/06-device-software.md#the-two-detectors));
-fetch its weights now so the comparison in
-[verification](15-verification.md) can run:
+**Done when:** it ends with `All set`. A failed check names the connection
+to look at: fix it and run the script again. Every part of it is safe to
+repeat, and running it again is also how you update the Pi after changing
+the code on your Mac.
 
-```bash
-python3 -m sportcam.getmodel      # ≈ 48 MB download, keeps 19 MB in models/
-```
-
-System-wide install rationale: both services use the system `python3`; the
-Wi-Fi portal runs as root; Picamera2 is apt-only (a virtualenv would need
-`--system-site-packages` and edited unit files).
-
-**Done when:** the offline tests pass:
-
-```bash
-for t in tests/test_*.py; do python3 $t | tail -1; done
-```
+A head still wired as the Arducam kit came, with the servo leads on the PTZ
+controller, doesn't use pigpio: set `SERVO_DRIVER = "arducam"` in
+`config.py` (whole-degree steps).
 
 ## 3. Connect it to Firebase (optional)
 
@@ -147,10 +176,11 @@ online.
 
 ## 4. Bench checks: camera and motion
 
-Run everything from `~/sportcam/src/without_uwb/device`.
+On the Pi (`ssh pi@sportcam.local`), run everything from
+`~/sportcam/src/without_uwb/device`.
 
 **a. Camera:** `rpicam-hello -t 2000` shows a picture. If it does not, see
-step 1.
+step 2's checks.
 
 **b. Pan and tilt:**
 

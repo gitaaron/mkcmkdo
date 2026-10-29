@@ -46,7 +46,7 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 
 | Aspect | Detail |
 | --- | --- |
-| Installation | 14 — Software setup, step 3 onward ([with UWB](../with_uwb/setup/14-software-setup.md), [without UWB](../without_uwb/setup/14-software-setup.md)). Runs from `/home/pi/sportcam/src/<build>/device` |
+| Installation | 14 — Software setup, step 2 onward ([with UWB](../with_uwb/setup/14-software-setup.md), [without UWB](../without_uwb/setup/14-software-setup.md)). Runs from `/home/pi/sportcam/src/<build>/device` |
 | Privileges | `sportcam-head` runs as an ordinary user (hence SPI for the LED ring; the PWM/DMA driver needs root). `sportcam-wifi` (portal) runs as root and is the only thing that changes the network; the head reads its QR codes and asks it to join |
 | Sleep | `apply_state("sleep")` stops the sensor (`Camera.set_awake(False)`) and parks the head; the frame loop publishes nothing, so there is no live view on either path. The local API, Firebase link, mDNS<!--with_uwb--> and UWB ranging<!--/--><!--both--> (and, with UWB, ranging)<!--/--> stay up to be woken. Live frames go out only in `awake`, `tracking` and `recording` (`LIVE_STATES`) |
 | Whose session | `Head.session_hash`: set by `start_session()` when a session starts (from the local API, from Firebase, <!--with_uwb-->or from a paired tag<!--/--><!--both-->or, with UWB, from a paired tag<!--/-->), stamped beside each clip it records, reported with every state, cleared when the session ends |
@@ -254,7 +254,7 @@ phone, the tag followed and the clip stamped).
 `ula1` requires the vendor's **`RTLS_Tag` / `RTLS_Anchor`** sketches; the
 `Ranging` pair reports one distance at a time. One range where three are
 expected = wrong pair loaded: reflash
-([14, step 1](../with_uwb/setup/14-software-setup.md#1-flash-the-radios-on-your-computer))
+([14, step 3](../with_uwb/setup/14-software-setup.md#3-flash-the-radios-on-your-computer))
 or use `dual-serial`.
 
 Tests: `src/with_uwb/device/tests/test_uwb.py` parses the manual's worked

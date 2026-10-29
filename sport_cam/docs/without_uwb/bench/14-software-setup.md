@@ -7,7 +7,7 @@ bench doesn't have left out; where a step is the same, it links there.
 | | |
 | --- | --- |
 | Prerequisite | the [bench wiring](12-wiring.md) done; its power-under-load check (step 3) comes after `ptzcheck` below |
-| Equipment | a computer with [Raspberry Pi Imager](https://www.raspberrypi.com/software/), Node 22, Java 17+ and the Flutter SDK; one phone, or two to test sharing the camera; all on the same Wi-Fi |
+| Equipment | a Mac with this repo checked out, [Raspberry Pi Imager](https://www.raspberrypi.com/software/), Node 22, Java 17+ and the Flutter SDK; one phone, or two to test sharing the camera; all on the same Wi-Fi |
 | Duration | ≈ **1 h** |
 
 | Left out of the full setup | Why |
@@ -19,42 +19,44 @@ bench doesn't have left out; where a step is the same, it links there.
 | the services and the Wi-Fi portal | run the camera in a terminal instead; Wi-Fi comes from the Pi Imager settings |
 | the power switch setup | no latch on the bench |
 
-## 1. Raspberry Pi OS
+## 1. Raspberry Pi OS (on your Mac)
 
-As [the full build's step 1](../setup/14-software-setup.md#1-raspberry-pi-os)
-— Bookworm 64-bit, username `pi`, hostname `sportcam`, **your Wi-Fi** and SSH
-set in Imager — but enable only I2C:
+As [the full build's step 1](../setup/14-software-setup.md#1-raspberry-pi-os-on-your-mac),
+every page of it: an SSH key on your Mac, Raspberry Pi Imager, the card
+written as Raspberry Pi OS (Legacy, 64-bit) Lite with hostname `sportcam`,
+user `pi`, your Wi-Fi and SSH with your key. Power the Pi by plugging in the
+USB-C adapter.
+
+**Done when:** `ssh pi@sportcam.local` logs in from your Mac without asking
+for a password.
+
+## 2. Install the camera software (from your Mac)
+
+From the repo's root, on your Mac:
 
 ```bash
-sudo raspi-config nonint do_i2c 0       # the PTZ controller
-sudo apt update && sudo apt full-upgrade -y
-sudo reboot
+./scripts/pi-install.sh without_uwb --bench
 ```
 
-**Done when:** `rpicam-hello -t 2000` shows the camera, and `i2cdetect -y 1`
-lists `0c`. No picture: add `dtoverlay=imx477` to
-`/boot/firmware/config.txt` and reboot.
+As [the full build's step 2](../setup/14-software-setup.md#2-install-the-camera-software-from-your-mac)
+(OS upgrade, packages, the code, its Python packages, the offline tests, a
+reboot, checks), less what the bench leaves out: no SPI, pigpio or
+`getmodel`. 15–25 minutes the first time. It also tells the camera what the
+bench lacks, in `sportcam/config.py`:
 
-## 2. Install the camera software
+| Setting | Set to | Because |
+| --- | --- | --- |
+| `SERVO_DRIVER` | `"arducam"` | the servos stay on the PTZ controller |
+| `POWER_MONITOR` | `"none"` | no battery gauge: no battery warnings |
 
-```bash
-sudo apt install -y git python3-pip python3-picamera2 python3-opencv i2c-tools
-git clone https://github.com/gitaaron/sport_cam.git ~/sportcam
-cd ~/sportcam/src/without_uwb/device
-sudo pip3 install --break-system-packages -r requirements.txt
-```
+**Done when:** it ends with `All set`: the camera found, and `0c` (the PTZ
+controller) on I2C. A failed check names the connection to look at: fix it
+and run the script again.
 
-Then tell it what the bench lacks, in `sportcam/config.py`:
-
-```bash
-sed -i -e 's/^SERVO_DRIVER = .*/SERVO_DRIVER = "arducam"/' \
-       -e 's/^POWER_MONITOR = .*/POWER_MONITOR = "none"/' sportcam/config.py
-```
-
-**Done when:** the offline tests pass, and the head moves:
+Then the head, on the Pi (`ssh pi@sportcam.local`), from
+`~/sportcam/src/without_uwb/device`:
 
 ```bash
-for t in tests/test_*.py; do python3 $t | tail -1; done
 python3 -m sportcam.ptzcheck      # sweeps both axes; the pan creeps in whole-degree ticks, as expected here
 vcgencmd get_throttled            # throttled=0x0: the adapter held 5 V while the motors ran (12, step 3)
 ```
@@ -62,6 +64,8 @@ vcgencmd get_throttled            # throttled=0x0: the adapter held 5 V while th
 If a positive pan turns the lens the wrong way, or a positive tilt doesn't
 point it up, flip `PAN_SIGN` / `TILT_SIGN`
 ([full build, step 4b](../setup/14-software-setup.md#4-bench-checks-camera-and-motion)).
+
+**Done when:** both axes sweep.
 
 ## 3. Run the camera
 
