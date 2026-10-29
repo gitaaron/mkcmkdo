@@ -34,7 +34,7 @@ Subject localisation is build-specific: [With UWB](#with-uwb),
 | Extra hardware | 3 × ULA1 anchors, 2 anchor arms, A3 mast, wearable pod | none |
 | Head size | ≈ 42 cm across the arms, 28 cm to the mast top; Ø 141 mm enclosure | Ø 135 mm enclosure, no protrusions |
 | Runtime, 92 Wh bank, tracking + recording | ≈ 6.2 h | ≈ 8.4 h (estimated) |
-| Cost, excluding tripod | ≈ C$1099 | ≈ C$736 |
+| Cost, excluding tripod | ≈ C$1117 | ≈ C$754 |
 | `TRACKING_MODE` | `"with_uwb"` | `"without_uwb"` |
 
 Selection: UWB when the subject must be distinguished from other people in

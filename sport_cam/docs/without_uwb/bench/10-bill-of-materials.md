@@ -38,7 +38,7 @@ Prices: approximate CAD street prices, Oct 2026, ±15 %.
 
 | # | Status | Part | Qty | ≈ CAD | Source | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| B1 | A | **Raspberry Pi 15 W USB-C power supply (5.1 V, 3 A)** | 1 | $15 | [Amazon.ca](https://www.amazon.ca/s?k=raspberry+pi+4+official+usb-c+power+supply) | powers everything: the Pi, and through its header the PTZ controller. The official one, or another 5.1 V 3 A adapter: a phone charger that sags under the motors browns the Pi out ([wiring](12-wiring.md#why-this-works-on-the-bench-and-not-in-the-full-build)) |
+| B1 |  | **Raspberry Pi 15 W USB-C power supply (5.1 V, 3 A)** | 1 | $15 | [Amazon.ca](https://www.amazon.ca/s?k=raspberry+pi+4+official+usb-c+power+supply) | powers everything: the Pi, and through its header the PTZ controller. The official one, or another 5.1 V 3 A adapter: a phone charger that sags under the motors browns the Pi out ([wiring](12-wiring.md#why-this-works-on-the-bench-and-not-in-the-full-build)) |
 
 ## Wiring
 

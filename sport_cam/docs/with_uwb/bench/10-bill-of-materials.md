@@ -68,5 +68,6 @@ something doesn't work. A computer with the Arduino IDE, to flash the radios.
 | New for the bench (B1, B2), if you don't already have them | **≈ $20** |
 | Already owned (items 1–4, 6, 15, 20, a stick) | — |
 
-The radios, the tag bank and the extensions go on into the full build as they are. The adapter stays on the bench: the full build runs off its power bank,
-through the buck ([wiring](../setup/12-wiring.md)).
+The radios, the tag bank and the extensions go on into the full build as
+they are. The adapter stays on the bench: the full build runs off its power
+bank, through the buck ([wiring](../setup/12-wiring.md)).
