@@ -210,9 +210,11 @@ pip install schemdraw matplotlib pillow
 python3 with_uwb/schematics/render_diagrams.py       # → docs/with_uwb/images/
 python3 with_uwb/schematics/render_schematics.py
 python3 with_uwb/schematics/render_bench.py        # bench rig, wired up → bench-wiring.png
+python3 with_uwb/schematics/render_wiring.py       # full build, wired up → full-wiring.png + interactive/wiring.html
 python3 without_uwb/schematics/render_diagrams.py    # → docs/without_uwb/images/
 python3 without_uwb/schematics/render_schematics.py
 python3 without_uwb/schematics/render_bench.py        # bench rig, wired up → bench-wiring.png
+python3 without_uwb/schematics/render_wiring.py       # full build, wired up → full-wiring.png + interactive/wiring.html
 ```
 
 CAD, part previews and the assembly guide's meshes, per build:

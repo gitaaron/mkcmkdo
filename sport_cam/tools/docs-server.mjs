@@ -156,6 +156,7 @@ async function listDocs() {
     if (setup)
       for (const b of BUILDS) {
         entries.push({ path: `${b}/schematics/interactive/index.html`, title: "Wiring schematic, interactive", build: b, kind });
+        entries.push({ path: `${b}/schematics/interactive/wiring.html`, title: "Wiring picture and connection table, interactive", build: b, kind });
         entries.push({ path: `${b}/schematics/interactive/bench.html`, title: "Bench wiring schematic, interactive", build: b, kind: "bench" });
       }
   }

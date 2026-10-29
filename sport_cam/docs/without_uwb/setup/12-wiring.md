@@ -8,9 +8,13 @@ each one happens, and links back here.
 
 | Diagram | Shows |
 | --- | --- |
+| [Wiring picture with the connection table](../../../without_uwb/schematics/interactive/wiring.html) | every part wired up, top-down, beside the connection list below: click a row, or a wire, to light up that connection. Open it in a browser or from `npm run docs` |
+| [Full build, wired up](../images/full-wiring.png) | the same picture, to copy wire for wire |
 | [Interactive wiring schematic](../../../without_uwb/schematics/interactive/index.html) | the whole system as one clickable graph. Open it in a browser or from `npm run docs` |
 | [Head schematic](../images/schematic-head.png) | every signal into and out of the Pi |
 | [Power tree](../images/power-tree.png) | the bank → 12 V → 5 V chain and what hangs off it |
+
+![The full build with every part wired up](../images/full-wiring.png)
 
 The design reasons behind each connection are in
 [04 — Electronics](../../design/04-electronics.md).

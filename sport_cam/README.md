@@ -99,6 +99,7 @@ Conventions:
 | C | [Development workflow](docs/appendix/appendix-c-development.md) | shared | Where the code is, running everything on the Firebase emulators, tests, deploying, Docker workspace, docs viewer |
 | D | [Glossary](docs/appendix/appendix-d-glossary.md) | shared | The terms the docs use, from *buck converter* to *WS2812B* |
 | | Interactive wiring schematic: [with UWB](with_uwb/schematics/interactive/index.html) · [without UWB](without_uwb/schematics/interactive/index.html) | per build | Zoomable view of the whole system (best through `npm run docs`) |
+| | Wiring picture with the connection table: [with UWB](with_uwb/schematics/interactive/wiring.html) · [without UWB](without_uwb/schematics/interactive/wiring.html) | per build | Every part wired up; click a connection to light up its wire (best through `npm run docs`) |
 
 ## Reading the docs
 
@@ -144,7 +145,7 @@ tools/              docs viewer (npm run docs) + its build-marker check, git hoo
 
 with_uwb/           the UWB build's own CAD and schematics
   cad/              OpenSCAD sources (+ render_all.sh → stl/), incl. anchor arms, mast, wearable pod
-  schematics/       render_diagrams.py, render_schematics.py, render_bench.py → docs/with_uwb/images/; interactive/ wiring viewers (full build and bench)
+  schematics/       render_diagrams.py, render_schematics.py, render_wiring.py, render_bench.py → docs/with_uwb/images/; interactive/ wiring viewers (full build and bench) and the clickable wiring picture
 
 without_uwb/        the camera-only build — same layout, without the anchor and wearable parts
 ```
