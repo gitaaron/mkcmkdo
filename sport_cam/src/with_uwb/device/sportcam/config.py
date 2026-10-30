@@ -118,6 +118,11 @@ TILT_MAX_ACCEL_DPS2 = 45.0
 # pull turns at these rates.
 JOG_PAN_MAX_DPS = 60.0
 JOG_TILT_MAX_DPS = 45.0
+# …and these ramp the speed up when the knob moves and down when it is let
+# go, so the head eases in and out instead of starting and stopping dead.
+# Higher is snappier; at these, full speed is a quarter of a second away.
+JOG_PAN_ACCEL_DPS2 = 240.0
+JOG_TILT_ACCEL_DPS2 = 180.0
 JOG_TIMEOUT_S = 0.3            # no joystick message this long: stop. A dropped
                                # connection can't leave the head turning
 

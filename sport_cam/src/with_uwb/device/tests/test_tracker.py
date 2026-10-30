@@ -89,6 +89,7 @@ class FakePtz:
         self.tilt_calls = 0
         self.focus_dist = None
         self.jogs = 0
+        self.jogging = False                   # no easing: stops at once
 
     @property
     def hfov_deg(self):

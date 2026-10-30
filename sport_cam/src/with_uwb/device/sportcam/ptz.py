@@ -47,6 +47,7 @@ except ImportError:          # dev machine / CI, or the Arducam servo driver
     pigpio = None
 
 from . import config
+from .motion import accelerate
 
 CHIP_ADDR = 0x0C
 
@@ -65,6 +66,10 @@ _CHANNELS = {
 _REG_BUSY = 0x04
 _REG_MODE = 0x30
 _REG_VERSION = 0x40
+# The controller ignores a write within ~10 ms of the one before (lands at 20 ms:
+# scripts/pi/ptz-gap-check.sh), so writes are spaced by this much. Pan then
+# tilt in one control tick lost the tilt
+_WRITE_GAP_S = 0.025
 _IMX477_FIRMWARE = 0x0104
 # the IMX477 kit's controller: channel -> (register, min, max, lens reset register)
 _IMX477_LENS = {
@@ -79,6 +84,7 @@ class Focuser:
     def __init__(self, bus: int = 1) -> None:
         self._bus = SMBus(bus) if SMBus else None
         self._lock = threading.Lock()
+        self._wrote_at = 0.0
         self.available = self._bus is not None
         self.firmware = self._read(_REG_VERSION) if self._bus else None
 
@@ -104,7 +110,12 @@ class Focuser:
 
     def _write(self, reg: int, value: int) -> None:
         with self._lock:
+            # sooner than this after the last write, the controller ignores it
+            wait = self._wrote_at + _WRITE_GAP_S - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
             self._bus.write_i2c_block_data(CHIP_ADDR, reg, [(value >> 8) & 0xFF, value & 0xFF])
+            self._wrote_at = time.monotonic()
 
     def set(self, channel: str, value: int, wait: bool = False) -> int:
         _reg, lo, hi = _CHANNELS[channel]
@@ -154,13 +165,18 @@ class ArducamServos:
 
     def __init__(self, focuser: Focuser) -> None:
         self.focuser = focuser
+        self._sent: dict[str, int] = {}
 
     @property
     def available(self) -> bool:
         return self.focuser.available
 
     def write(self, channel: str, raw_deg: float) -> None:
-        self.focuser.set(channel, round(raw_deg))
+        # Only a changed degree: each write waits out _WRITE_GAP_S, so
+        # an unchanged axis re-sent every tick would only hold up the other
+        raw = round(raw_deg)
+        if self._sent.get(channel) != raw:
+            self._sent[channel] = self.focuser.set(channel, raw)
 
 
 class PigpioServos:
@@ -215,6 +231,8 @@ class Ptz:
                        else ArducamServos(self.focuser))
         self._pan = 0.0
         self._tilt = 0.0
+        self._jog_vel = (0.0, 0.0)             # deg/s: the joystick's eased speed
+        self._jog_at = 0.0
         self._zoom_mm = config.ZOOM_MIN_MM
         self._last_zoom_at = 0.0
         self._focus_dist_m: float | None = None    # distance the focus was set for
@@ -252,15 +270,33 @@ class Ptz:
         `x` (right +) and `y` (up +) are the knob's offset from centre as a
         fraction of the ring's radius. The speed grows with the square of the
         offset, so a small pull aims finely and a full one turns at
-        JOG_PAN_MAX_DPS / JOG_TILT_MAX_DPS. The soft limits still apply.
+        JOG_PAN_MAX_DPS / JOG_TILT_MAX_DPS. It gets there, and back to a stop
+        at (0, 0), no faster than JOG_*_ACCEL_DPS2. The soft limits still apply.
         """
+        now = time.monotonic()
+        if now - self._jog_at > 0.25:          # not a continuing jog: from rest
+            self._jog_vel = (0.0, 0.0)
+        self._jog_at = now
         r = math.hypot(x, y)
-        if r == 0.0:
-            return
         if r > 1.0:
             x, y, r = x / r, y / r, 1.0
-        self.set_pan(self._pan + x * r * config.JOG_PAN_MAX_DPS * dt)
-        self.set_tilt(self._tilt + y * r * config.JOG_TILT_MAX_DPS * dt)
+        vp, vt = self._jog_vel
+        vp = accelerate(vp, x * r * config.JOG_PAN_MAX_DPS, config.JOG_PAN_ACCEL_DPS2, dt)
+        vt = accelerate(vt, y * r * config.JOG_TILT_MAX_DPS, config.JOG_TILT_ACCEL_DPS2, dt)
+        if vp:
+            want = self._pan + vp * dt
+            if self.set_pan(want) != want:    # at a soft limit
+                vp = 0.0
+        if vt:
+            want = self._tilt + vt * dt
+            if self.set_tilt(want) != want:
+                vt = 0.0
+        self._jog_vel = (vp, vt)
+
+    @property
+    def jogging(self) -> bool:
+        """Still turning from the joystick: easing to a stop after it let go."""
+        return self._jog_vel != (0.0, 0.0)
 
     def start(self) -> None:
         """Wake the controller, centre the head and home the lens. On startup."""
@@ -272,6 +308,7 @@ class Ptz:
         """Centre both axes and relax the lens. Called on shutdown."""
         self.set_pan(0.0)
         self.set_tilt(0.0)
+        self._jog_vel = (0.0, 0.0)
 
     # ---- zoom / focus -----------------------------------------------------
     @property
@@ -346,6 +383,7 @@ class Ptz:
         if raw != self._focus_raw:
             self._focus_raw = raw
             self.focuser.set(OPT_FOCUS, raw)
+
 
 
 def focus_raw(efl_mm: float, dist_m: float,

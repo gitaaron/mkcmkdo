@@ -20,7 +20,8 @@
 #   - copies src/<build>/device from this checkout, installs its Python
 #     requirements and runs its offline tests
 #   - puts it in ~/sportcam/src/<build>/device, keeping a config.py already
-#     there (your calibration) unless --reset-config
+#     there (your calibration) unless --reset-config, plus any settings new
+#     since, at their defaults
 #   - bench: sets SERVO_DRIVER, POWER_MONITOR (and UWB_ANCHORS) for the bench
 #   - reboots, and checks the camera, the I2C devices (and pigpiod)
 # Safe to run again: each step skips or repeats harmlessly.
@@ -172,6 +173,40 @@ if [[ $RESET_CONFIG == 0 && -f $DEST/sportcam/config.py ]]; then
   echo "  kept the config.py already on the Pi (--reset-config replaces it)"
 fi
 tar -C "$STAGED" "${keep[@]}" -cf - . | tar -C "$DEST" -xf -
+if [[ ${#keep[@]} -gt 0 ]]; then
+  # Settings this version added: onto the end of the kept config.py, with
+  # their defaults, or the code reading them fails on the missing name
+  python3 - "$STAGED/sportcam/config.py" "$DEST/sportcam/config.py" <<'PY'
+import ast
+import sys
+
+new_path, kept_path = sys.argv[1:]
+
+def settings(tree):
+    """Top-level assignments: name -> the statement that sets it."""
+    out = {}
+    for node in tree.body:
+        targets = (node.targets if isinstance(node, ast.Assign)
+                   else [node.target] if isinstance(node, ast.AnnAssign) else [])
+        for t in targets:
+            for n in ast.walk(t):
+                if isinstance(n, ast.Name):
+                    out[n.id] = node
+    return out
+
+new_src = open(new_path).read()
+have = settings(ast.parse(open(kept_path).read()))
+missing = {n: node for n, node in settings(ast.parse(new_src)).items() if n not in have}
+if missing:
+    lines = new_src.splitlines()
+    stmts = sorted({id(node): node for node in missing.values()}.values(), key=lambda n: n.lineno)
+    with open(kept_path, "a") as f:
+        f.write("\n# Added by install.sh: new in this version, at their defaults\n")
+        for node in stmts:
+            f.write("\n".join(lines[node.lineno - 1:node.end_lineno]) + "\n")
+    print("  config.py: added " + ", ".join(sorted(missing)))
+PY
+fi
 rm -rf ~/.sportcam-staging
 cd "$DEST"
 

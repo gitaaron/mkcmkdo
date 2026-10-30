@@ -72,6 +72,7 @@ class FakePtz:
         self.focus_dist: float | None = None
         self.max_pan_step = 0.0
         self.jogs = 0
+        self.jogging = False                   # no easing: stops at once
 
     @property
     def hfov_deg(self) -> float:

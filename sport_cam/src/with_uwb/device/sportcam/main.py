@@ -349,11 +349,12 @@ class Head:
         Only in awake. Tracking and recording own the head, and sleep and
         the boot states have no picture to aim by.
         """
-        if time.monotonic() - self._jog_at > config.JOG_TIMEOUT_S:
-            return
         pan, tilt = self._jog
-        if pan or tilt:
+        if time.monotonic() - self._jog_at > config.JOG_TIMEOUT_S:
+            pan = tilt = 0.0                   # let go, or the app went quiet
+        if pan or tilt or self.ptz.jogging:    # …and once let go, ease to a stop
             self.ptz.jog(pan, tilt, 1.0 / config.UWB_RATE_HZ)
+        if pan or tilt:
             self._awake_since = time.monotonic()   # someone is using it
 
     async def health_loop(self) -> None:

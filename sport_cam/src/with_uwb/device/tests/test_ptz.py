@@ -154,6 +154,22 @@ def main() -> None:
     p.focuser.writes.clear()
     p.jog(0.0, 0.0, 1.0)
     check("knob at the centre: no servo writes", p.focuser.writes == [])
+    p.park()
+    p.jog(1.0, 0.0, 0.05)
+    first = p.pan_deg
+    check("eases in: the first tick is slower than full speed",
+          0 < first < config.JOG_PAN_MAX_DPS * 0.05, f"{first:.2f}")
+    for _ in range(20):
+        p.jog(1.0, 0.0, 0.05)
+    held_at = p.pan_deg
+    p.jog(0.0, 0.0, 0.05)
+    check("let go, it eases out: still turning one tick later",
+          p.pan_deg > held_at and p.jogging, f"{p.pan_deg - held_at:.2f}")
+    for _ in range(20):
+        p.jog(0.0, 0.0, 0.05)
+    stopped_at = p.pan_deg
+    p.jog(0.0, 0.0, 0.05)
+    check("…and comes to a stop", not p.jogging and p.pan_deg == stopped_at)
 
     # ---- servo drivers: pigpio hardware PWM, or the controller's registers --
     class FakePi:

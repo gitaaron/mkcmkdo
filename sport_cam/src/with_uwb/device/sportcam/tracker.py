@@ -53,6 +53,7 @@ from simple_pid import PID
 from . import config
 from .boxlog import CLIMBER, OTHER, UNSURE, Box
 from .camera import Camera
+from .motion import ease_to
 from .ptz import Ptz
 from .uwb import UwbArray
 
@@ -415,13 +416,13 @@ class Tracker:
         # a bystander; the tag can, and that is the whole reason it is there.
 
         # Ease rather than slew at full rate, so ranging noise and each
-        # vision bias update bend the motion instead of jerking it (_ease).
-        pan, self._pan_vel = _ease(self.ptz.pan_deg, self._pan_vel, target, dt,
-                                   config.PAN_MAX_DPS, config.PAN_MAX_ACCEL_DPS2)
+        # vision bias update bend the motion instead of jerking it (motion.ease_to).
+        pan, self._pan_vel = ease_to(self.ptz.pan_deg, self._pan_vel, target, dt,
+                                     config.PAN_MAX_DPS, config.PAN_MAX_ACCEL_DPS2)
         self.ptz.set_pan(pan)
         if tilt_target is not None:
-            tilt, self._tilt_vel = _ease(self.ptz.tilt_deg, self._tilt_vel, tilt_target, dt,
-                                         config.TILT_MAX_DPS, config.TILT_MAX_ACCEL_DPS2)
+            tilt, self._tilt_vel = ease_to(self.ptz.tilt_deg, self._tilt_vel, tilt_target, dt,
+                                           config.TILT_MAX_DPS, config.TILT_MAX_ACCEL_DPS2)
             self.ptz.set_tilt(tilt)
         else:
             self._tilt_vel = 0.0               # tilt is vision's PID's (nudge_tilt)
@@ -534,21 +535,3 @@ def _lead_needed(a: _Person, b: _Person) -> float:
 
 def _clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
-
-
-def _ease(pos: float, vel: float, goal: float, dt: float,
-          max_dps: float, max_accel: float) -> tuple[float, float]:
-    """One tick of easing toward `goal` → (new position, new velocity).
-
-    The wanted speed is the distance left over TRACK_EASE_S, capped at
-    `max_dps` and at the speed from which `max_accel` can still stop at the
-    goal. The velocity moves toward it by at most `max_accel`·dt per tick.
-    """
-    err = goal - pos
-    want = math.copysign(min(abs(err) / config.TRACK_EASE_S,
-                             math.sqrt(2.0 * max_accel * abs(err)), max_dps), err)
-    vel += _clamp(want - vel, -max_accel * dt, max_accel * dt)
-    step = vel * dt
-    if err * step > 0 and abs(step) >= abs(err):
-        return goal, 0.0                       # arriving: land on it, not past it
-    return pos + step, vel
