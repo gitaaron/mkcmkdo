@@ -44,7 +44,7 @@ Prices: approximate CAD street prices, Oct 2026, ±15 %.
 
 | # | Status | Part | Qty | ≈ CAD | Source | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| B2 | A | **Female-to-female jumper wires (Dupont), 20 cm** | 4 | $5 (pack) | [Amazon.ca](https://www.amazon.ca/s?k=female+to+female+dupont+jumper+wires) | Pi header to the PTZ controller: 5V, GND, SDA, SCL ([wiring](12-wiring.md#connections)). The Arducam kit may include a cable that does this |
+| B2 | A | Female-to-female jumper wires (Dupont), 20 cm (optional) | 6 | $5 (pack) | [Amazon.ca](https://www.amazon.ca/s?k=female+to+female+dupont+jumper+wires) | spares only. The Arducam kit's 6-wire cable runs from the PTZ controller straight onto the Pi's header ([wiring](12-wiring.md#connections)); these stand in for it if a wire is too short or its end is a bare lead |
 
 **Tools you also need:** none for the wiring. A multimeter helps if
 something doesn't work.
@@ -53,7 +53,7 @@ something doesn't work.
 
 | | ≈ CAD |
 | --- | --- |
-| New for the bench (B1, B2), if you don't already have them | **≈ $20** |
+| New for the bench (B1), if you don't already have it; B2 only if the kit's cable won't do | **≈ $15** |
 | Already owned (items 1–4) | — |
 
 The adapter stays on the bench: the full build runs off its power bank,

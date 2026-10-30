@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Render the bench rig, every part wired up, top-down → docs/with_uwb/images/bench-wiring.png.
 
-A picture to copy, wire for wire: the USB-C adapter, the Pi, the jumpers to
-the PTZ controller, the camera and the anchors, each lead labelled with its
+A picture to copy, wire for wire: the USB-C adapter, the Pi, the kit's 6-wire
+cable to the PTZ controller, the servo and lens leads, the camera and the
+anchors, each lead labelled with its
 number in docs/with_uwb/bench/12-wiring.md. Not to scale.
 
 Usage:  python3 with_uwb/schematics/render_bench.py
@@ -34,6 +35,10 @@ RED = "#d64541"
 BLACK = "#222222"
 SDA = "#2f6fed"
 SCL = "#e0a100"
+# The kit cable's own colours, as in Arducam's quick start and in the kit
+# (Arducam: the order can vary, so go by position)
+K_RED, K_BLACK, K_WHITE, K_BROWN, K_YELLOW, K_ORANGE = (
+    "#e53935", "#222222", "#c4c7cc", "#7b4a2a", "#f2c200", "#f57c00")
 RIBBON = "#b8bec9"
 USB = "#5b6475"
 
@@ -70,7 +75,8 @@ def wire(ax, pts, color, lw=2.6, z=6, label=None, at=0.5, ls="-", outline=True):
     codes.append(Path.LINETO)
     path = Path(verts, codes)
     if outline:
-        ax.add_patch(PathPatch(path, fc="none", ec="white", lw=lw + 1.6, zorder=z, capstyle="round"))
+        edge = GREY if color == K_WHITE else "white"
+        ax.add_patch(PathPatch(path, fc="none", ec=edge, lw=lw + 1.6, zorder=z, capstyle="round"))
     ax.add_patch(PathPatch(path, fc="none", ec=color, lw=lw, zorder=z + 0.1, capstyle="round",
                            linestyle=ls, joinstyle="round"))
     if label:
@@ -92,7 +98,7 @@ def along(pts, t):
 
 def tag(ax, xy, text, color, z=8):
     ax.text(xy[0], xy[1], text, ha="center", va="center", fontsize=8, fontweight="bold",
-            color="white" if color not in (SCL, RIBBON, METAL) else INK, zorder=z,
+            color="white" if color not in (SCL, RIBBON, METAL, K_WHITE, K_YELLOW) else INK, zorder=z,
             bbox=dict(boxstyle="round,pad=0.25", fc=color, ec="white", lw=0.8))
 
 
@@ -150,22 +156,34 @@ def pi4(ax, x, y):
     return pins, ports
 
 
+# The controller's 6-pin XH connector, by position: the servo supply pair,
+# the board's 5 V pair, then I2C (Arducam's PTZ quick start).
+CABLE = [(1, "SERVO VCC", K_RED), (2, "GND", K_BLACK), (3, "5V", K_WHITE),
+         (4, "GND", K_BROWN), (5, "SCL", K_YELLOW), (6, "SDA", K_ORANGE)]
+SERVO_LEAD = ("#7b4a2a", RED, "#e6c200")   # brown (GND), red (V+), yellow (signal)
+
+
 def ptz(ax, x, y):
-    """The PTZ controller: its 5V / SDA / SCL / GND pins along the bottom edge,
-    the factory motor leads along the top."""
-    w, h = 40, 24
-    board(ax, x, y, w, h, PCB_DARK, "Arducam PTZ controller", "I2C 0x0C; motor leads as the kit came", fs=8.5)
+    """The PTZ controller: the 6-pin cable connector along the bottom edge;
+    the pan and tilt servo sockets and the lens cable along the top."""
+    w, h = 54, 26
+    board(ax, x, y, w, h, PCB_DARK, "Arducam PTZ controller", "I2C 0x0C", fs=8.5)
     pins = {}
-    for i, n in enumerate(["5V", "SDA", "SCL", "GND"]):
-        px = x + 5 + i * PITCH * 1.4
-        ax.add_patch(Rectangle((px - 0.6, y + 2), 1.2, 1.2, fc=GOLD, ec="none", zorder=3))
-        ax.text(px, y + 4, n, ha="center", va="bottom", fontsize=5.5, color="white", zorder=3, rotation=90)
-        pins[n] = (px, y + 2.6)
-    for i, n in enumerate(["PAN", "TILT", "ZOOM", "FOCUS"]):
-        px = x + 8 + i * 8
-        ax.add_patch(Rectangle((px - 2.2, y + h - 3.6), 4.4, 2.6, fc="white", ec=INK, lw=0.6, zorder=3))
-        ax.text(px, y + h - 4.3, n, ha="center", va="top", fontsize=5.5, color="white", zorder=3)
-        pins[n] = (px, y + h - 1)
+    ax.add_patch(Rectangle((x + 4, y + 0.6), 6 * 4.4 + 1, 3.4, fc="white", ec=INK, lw=0.6, zorder=2.9))
+    for i, (n, name, _c) in enumerate(CABLE):
+        px = x + 6.5 + i * 4.4
+        ax.add_patch(Rectangle((px - 0.6, y + 1.7), 1.2, 1.2, fc=GOLD, ec="none", zorder=3))
+        ax.text(px, y + 4.6, f"{n} {name}", ha="center", va="bottom", fontsize=5.2, color="white",
+                zorder=3, rotation=90)
+        pins[n] = (px, y + 2.3)
+    note(ax, x + w - 1.5, y + 2.4, "6-pin\ncable", ha="right", fs=5.5, color="white", va="center")
+    for name, sx in (("PAN", x + 8), ("TILT", x + 20)):
+        ax.add_patch(Rectangle((sx - 3, y + h - 3.6), 6, 2.6, fc="white", ec=INK, lw=0.6, zorder=3))
+        ax.text(sx, y + h - 4.3, name, ha="center", va="top", fontsize=5.5, color="white", zorder=3)
+        pins[name] = [(sx - 1.6 + k * 1.6, y + h - 1) for k in range(3)]
+    ax.add_patch(Rectangle((x + 36, y + h - 3.6), 9, 2.6, fc="white", ec=INK, lw=0.6, zorder=3))
+    ax.text(x + 40.5, y + h - 4.3, "LENS", ha="center", va="top", fontsize=5.5, color="white", zorder=3)
+    pins["LENS"] = (x + 40.5, y + h - 1)
     return pins
 
 
@@ -181,16 +199,23 @@ def adapter(ax, x, y):
     return (x + 22, y + 7)
 
 
-def camera(ax, x, y):
-    """The PTZ camera head on its metal pan-tilt base, top-down."""
+def camera(ax, x, y, servos=False):
+    """The PTZ camera head on its metal pan-tilt base, top-down; with `servos`,
+    the pan and tilt servos' plug ends too."""
     ax.add_patch(Circle((x, y), 16, fc="#3a3f47", ec=INK, lw=1.2, zorder=2))  # base
     ax.add_patch(Circle((x, y), 11, fc="#4b515b", ec=INK, lw=1, zorder=2.1))
     ax.add_patch(FancyBboxPatch((x - 9, y - 6), 18, 12, boxstyle="round,pad=0,rounding_size=1",
                                 fc="#1e2228", ec=INK, lw=1, zorder=2.2))
     ax.add_patch(Circle((x - 11.5, y), 5, fc="#14181f", ec="#6b7380", lw=1.5, zorder=2.3))  # lens
-    ax.text(x + 18, y + 14, "PTZ camera (#1):\nIMX477 + zoom lens\non its pan-tilt base",
+    ax.text(x + 18, y + (6 if servos else 14), "PTZ camera (#1):\nIMX477 + zoom lens\non its pan-tilt base",
             ha="left", va="center", fontsize=8, fontweight="bold", color=INK, zorder=3)
-    return {"ribbon": (x - 5, y - 6), "leads": (x - 3, y + 6)}
+    # The two servos' plug ends, drawn where their leads come off the base
+    ends = {}
+    for name, sx in () if not servos else (("pan", x - 9), ("tilt", x + 7)):
+        ax.add_patch(Rectangle((sx - 5, y + 17), 10, 5, fc="#1e2228", ec=INK, lw=0.8, zorder=2.4))
+        ax.text(sx, y + 19.5, f"{name} servo", ha="center", va="center", fontsize=5.5, color="white", zorder=2.5)
+        ends[name] = (sx, y + 22)
+    return {"ribbon": (x - 5, y - 6), "lens": (x - 10, y + 6), **ends}
 
 
 def anchor(ax, x, y, name, sub):
@@ -204,7 +229,7 @@ def anchor(ax, x, y, name, sub):
 # ----------------------------------------------------------------------------
 def render():
     yb = 15 if UWB else 4  # room along the bottom for the anchor bar
-    W, H = 205, yb + 142
+    W, H = 205, yb + 152
     fig, ax = plt.subplots(figsize=(W / 12.5, H / 12.5), dpi=150)
     ax.set_xlim(0, W)
     ax.set_ylim(0, H)
@@ -219,8 +244,8 @@ def render():
             fontsize=8.5, color=GREY, va="top")
 
     pins, ports = pi4(ax, 40, yb + 20)
-    pz = ptz(ax, 14, yb + 92)
-    cam = camera(ax, 150, yb + 104)
+    pz = ptz(ax, 8, yb + 94)
+    cam = camera(ax, 150, yb + 104, servos=True)
 
     # P1: the adapter → Pi USB-C
     out = adapter(ax, 6, yb + 2)
@@ -230,21 +255,27 @@ def render():
     wire(ax, [out, (uc[0], out[1]), (uc[0], uc[1] - 7)], BLACK, lw=2.6)
     tag(ax, ((out[0] + uc[0]) / 2, out[1]), "P1", BLACK)
 
-    # J1, J2, I1, I2: four F-F jumpers, Pi header → PTZ controller. The
-    # inner-row pin 5 and the outer-row pin 6 share a column, so their leads
-    # leave a little apart.
-    jumpers = ((2, "5V", RED, "J1", 0, yb + 80), (3, "SDA", SDA, "I1", 0, yb + 82.5),
-               (5, "SCL", SCL, "I2", -0.9, yb + 85), (6, "GND", BLACK, "J2", 0.9, yb + 87.5))
-    for num, name, colour, lab, dx, lane in jumpers:
+    # J1-J4, I1, I2: the kit's 6-wire cable, controller → Pi header. Its
+    # female ends go straight on the pins. The order on the connector crosses
+    # some wires over; each lane is its own height.
+    to_pi = {1: (2, "J3"), 2: (14, "J4"), 3: (4, "J1"), 4: (6, "J2"), 5: (5, "I2"), 6: (3, "I1")}
+    lanes = {n: 78.5 + (n - 1) * 2.5 for n in to_pi}   # rightmost pin, highest lane: no crossings at the controller
+    for n, name, colour in CABLE:
+        num, lab = to_pi[n]
         px, py = pins[num]
-        tx, ty = pz[name]
+        tx, ty = pz[n]
+        lane = yb + lanes[n]
+        dx = {5: -0.9, 6: 0.9}.get(num, 0)   # pins 5 and 6 share a column
         top = pins[2][1] + 1.6
-        wire(ax, [(px, py), (px + dx, top), (px + dx, lane), (tx, lane), (tx, ty)], colour, lw=2)
+        wire(ax, [(px, py), (px + dx, top), (px + dx, lane), (tx, lane), (tx, ty)], colour, lw=1.8)
         pin_end(ax, (px, py), colour)
-        pin_end(ax, (tx, ty), colour)
-        tag(ax, (tx + 4 + 3.5 * jumpers.index((num, name, colour, lab, dx, lane)), lane), lab, colour)
-    note(ax, 60, yb + 88, "pin 2 → 5V,  pin 3 → SDA,\npin 5 → SCL,  pin 6 → GND\n"
-         "(F-F jumpers, B2). Match the\ncontroller end by its labels.", fs=7, color=INK, va="center")
+        tag(ax, (41 if n % 2 else 45, lane), lab, colour)
+    note(ax, 66, yb + 88, "The kit's 6-wire cable, by position (colours as\nArducam draws them; yours may differ):\n"
+         "1 servo VCC (red) → pin 2 (5V)   2 GND (black) → pin 14\n"
+         "3 5V (white) → pin 4   4 GND (brown) → pin 6\n"
+         "5 SCL (yellow) → pin 5   6 SDA (orange) → pin 3\n"
+         "Its female ends go straight onto the Pi's pins.",
+         fs=6.8, color=INK, va="center")
 
     # C1: camera ribbon → Pi CSI, round the right of the Pi
     cx, cy = ports["csi"]
@@ -253,13 +284,24 @@ def render():
     tag(ax, (rx, yb + 70), "C1", RIBBON)
     note(ax, cx + 4, yb + 9.5, "15-pin ribbon: silver contacts toward the HDMI ports", fs=7, va="bottom")
 
-    # Factory leads, PTZ controller → camera
-    for i, n in enumerate(["PAN", "TILT", "ZOOM", "FOCUS"]):
-        sx, sy = pz[n]
-        lane = yb + 126 - i * 1.6
-        lx = cam["leads"][0] - 4 + i * 1.6
-        wire(ax, [(sx, sy), (sx, lane), (lx, lane), (lx, cam["leads"][1])],
-             ["#e07b39", "#c9a227", "#7a7f8a", "#7a7f8a"][i], lw=1.1, z=5, outline=False)
+    # K1, K2: the servos' 3-wire plugs in the controller's sockets, as the kit
+    # came (pan left, tilt right); K3: the lens cable (zoom, focus), factory-fitted
+    for name, lab, lane in (("PAN", "K1", yb + 134), ("TILT", "K2", yb + 130.5)):
+        end_pt = cam[name.lower()]
+        for k, (sx, sy) in enumerate(pz[name]):
+            off = (k - 1) * 0.8
+            ex = end_pt[0] + off
+            wire(ax, [(sx, sy), (sx, lane - off), (ex, lane - off), (ex, end_pt[1])],
+                 SERVO_LEAD[k], lw=1.0, z=5, outline=False)
+        tag(ax, (pz[name][1][0] + 30, lane), lab, SERVO_LEAD[0])
+    lx, ly = pz["LENS"]
+    lane = yb + 124
+    wire(ax, [(lx, ly), (lx, lane), (131, lane), (131, cam["lens"][1]), cam["lens"]], "#7a7f8a",
+         lw=2.2, z=5, outline=False)
+    tag(ax, (lx + 30, lane), "K3", "#7a7f8a")
+    note(ax, 168, yb + 103, "K1 pan, K2 tilt: each servo's\n3-wire plug (brown GND, red V+,\n"
+         "yellow signal), in the controller's\nsockets as the kit came.\n"
+         "K3: the lens-motor and IR-cut\ncables, factory-fitted.", fs=6.5, color=GREY)
 
     # --- Anchors and tag ------------------------------------------------------
     if UWB:
@@ -280,7 +322,8 @@ def render():
         wire(ax, [(168, 6), (174, 6)], USB, lw=2.4, label="W1", at=0.5)
 
     # --- Legend ---------------------------------------------------------------
-    legend = [(RED, "+5 V"), (BLACK, "GND, adapter cable"), (SDA, "I2C SDA"), (SCL, "I2C SCL"),
+    legend = [(K_RED, "servo VCC, 5 V"), (K_WHITE, "controller 5 V"), (K_BLACK, "GND, adapter cable"),
+              (K_BROWN, "GND"), (K_ORANGE, "I2C SDA"), (K_YELLOW, "I2C SCL"),
               (RIBBON, "camera ribbon")] + ([(USB, "USB")] if UWB else [])
     lx, ly = 166, yb + 72
     ax.add_patch(FancyBboxPatch((lx, ly - len(legend) * 4.2 - 1), 34, len(legend) * 4.2 + 5.5,

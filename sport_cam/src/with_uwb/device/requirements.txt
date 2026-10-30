@@ -1,5 +1,5 @@
 # Raspberry Pi head-unit service.
-# System packages (apt): python3-picamera2 python3-opencv pigpio python3-pigpio
+# System packages (apt): python3-picamera2 python3-opencv python3-numpy libzbar0 pigpio python3-pigpio
 # (pigpiod drives pan/tilt with SERVO_DRIVER = "pigpio": systemctl enable --now pigpiod)
 # Enable I2C (PTZ controller + INA226) and SPI (LED ring) in raspi-config.
 google-cloud-firestore>=2.16      # the Firebase link (cloud.py)
@@ -7,6 +7,7 @@ aiohttp>=3.9
 zeroconf>=0.132
 pyserial>=3.5
 simple-pid>=2.0
-numpy>=1.26
+numpy>=1.24,<2                    # apt's python3-numpy: picamera2 (simplejpeg) and opencv are built against it
+pyzbar>=0.1.9                     # Wi-Fi QR codes (camera.py); needs apt's libzbar0
 smbus2>=0.4                       # Arducam PTZ controller (zoom, focus) + INA226 battery gauge
 adafruit-circuitpython-neopixel-spi>=1.0   # status ring over SPI (no root needed)

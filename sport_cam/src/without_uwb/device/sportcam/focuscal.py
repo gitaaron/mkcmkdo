@@ -69,8 +69,7 @@ def main() -> None:
         grid = {}
 
     _, f_lo, f_hi = _CHANNELS[OPT_FOCUS]
-    ptz.park()
-    ptz.home()
+    ptz.start()
     stops = [config.ZOOM_MIN_MM + i * (config.ZOOM_MAX_MM - config.ZOOM_MIN_MM) / 4
              for i in range(5)]
     config.ZOOM_RATE_LIMIT_S = 0.0                 # we are stepping on purpose

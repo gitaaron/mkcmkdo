@@ -10,6 +10,14 @@ I2C 0x0C (Arducam's `Focuser` register map):
     OPT_MOTOR_Y  0x06       0-180        tilt servo, degrees
     OPT_IRCUT    0x0C       0/1          IR-cut filter
 
+That is the older controllers' map. The IMX477 kit's controller (firmware
+0x0104 on, register 0x40) swaps zoom and focus and runs both 0-2100, from
+Arducam's B016712MP/Focuser.py. Everything here, config.py and focuscal keep
+the older 3000/0-20000 scale, and `Focuser.set` rescales for the newer one.
+It also powers up in mode 0 (register 0x30), in which it acknowledges every
+move and ignores it: `Ptz.start` switches it to mode 1 and resets the lens,
+as Arducam's tool does on its r and t keys.
+
 The pan and tilt registers take **whole degrees**. Zoomed in (≈ 33° across
 the frame at full zoom) one degree is ≈ 3 % of the frame, so a slow pan
 visibly steps. With `SERVO_DRIVER = "pigpio"` the two servo signal leads come
@@ -55,6 +63,14 @@ _CHANNELS = {
     OPT_MOTOR_Y: (0x06, 0, 180),
 }
 _REG_BUSY = 0x04
+_REG_MODE = 0x30
+_REG_VERSION = 0x40
+_IMX477_FIRMWARE = 0x0104
+# the IMX477 kit's controller: channel -> (register, min, max, lens reset register)
+_IMX477_LENS = {
+    OPT_ZOOM:  (0x01, 0, 2100, 0x0B),
+    OPT_FOCUS: (0x00, 0, 2100, 0x0A),
+}
 
 
 class Focuser:
@@ -64,25 +80,62 @@ class Focuser:
         self._bus = SMBus(bus) if SMBus else None
         self._lock = threading.Lock()
         self.available = self._bus is not None
+        self.firmware = self._read(_REG_VERSION) if self._bus else None
+
+    @property
+    def imx477(self) -> bool:
+        return (self.firmware or 0) >= _IMX477_FIRMWARE
+
+    def _register(self, channel: str, value: int) -> tuple[int, int]:
+        """The register and value to write for a value on the older scale."""
+        reg, lo, hi = _CHANNELS[channel]
+        if self.imx477 and channel in _IMX477_LENS:
+            reg, lo2, hi2, _reset = _IMX477_LENS[channel]
+            value = round(lo2 + (value - lo) * (hi2 - lo2) / (hi - lo))
+        return reg, value
+
+    def _read(self, reg: int) -> int | None:
+        try:
+            with self._lock:
+                hi, lo = self._bus.read_i2c_block_data(CHIP_ADDR, reg, 2)
+        except OSError:
+            return None
+        return (hi << 8) | lo
+
+    def _write(self, reg: int, value: int) -> None:
+        with self._lock:
+            self._bus.write_i2c_block_data(CHIP_ADDR, reg, [(value >> 8) & 0xFF, value & 0xFF])
 
     def set(self, channel: str, value: int, wait: bool = False) -> int:
-        reg, lo, hi = _CHANNELS[channel]
+        _reg, lo, hi = _CHANNELS[channel]
         value = int(max(lo, min(hi, value)))
         if self._bus:
-            with self._lock:
-                self._bus.write_i2c_block_data(
-                    CHIP_ADDR, reg, [(value >> 8) & 0xFF, value & 0xFF])
+            self._write(*self._register(channel, value))
             if wait:
                 self._wait_idle()
         return value
 
     def get(self, channel: str) -> int | None:
-        reg, _lo, _hi = _CHANNELS[channel]
         if not self._bus:
             return None
-        with self._lock:
-            hi, lo = self._bus.read_i2c_block_data(CHIP_ADDR, reg, 2)
-        return (hi << 8) | lo
+        reg, lo, hi = _CHANNELS[channel]
+        raw = self._read(self._register(channel, lo)[0])
+        if raw is not None and self.imx477 and channel in _IMX477_LENS:
+            _reg, lo2, hi2, _reset = _IMX477_LENS[channel]
+            raw = round(lo + (raw - lo2) * (hi - lo) / (hi2 - lo2))
+        return raw
+
+    def wake(self) -> None:
+        """The IMX477 kit's controller: lens reset, then out of mode 0."""
+        if not (self._bus and self.imx477):
+            return
+        for _reg, _lo, _hi, reset in _IMX477_LENS.values():
+            self._write(reset, 0)
+            self._wait_idle(15.0)
+        if self._read(_REG_MODE) == 0:
+            self._write(_REG_MODE, 1)
+            time.sleep(0.05)
+            self._wait_idle(20.0)
 
     def _wait_idle(self, timeout_s: float = 3.0) -> None:
         deadline = time.monotonic() + timeout_s
@@ -208,6 +261,12 @@ class Ptz:
             x, y, r = x / r, y / r, 1.0
         self.set_pan(self._pan + x * r * config.JOG_PAN_MAX_DPS * dt)
         self.set_tilt(self._tilt + y * r * config.JOG_TILT_MAX_DPS * dt)
+
+    def start(self) -> None:
+        """Wake the controller, centre the head and home the lens. On startup."""
+        self.focuser.wake()
+        self.park()
+        self.home()
 
     def park(self) -> None:
         """Centre both axes and relax the lens. Called on shutdown."""

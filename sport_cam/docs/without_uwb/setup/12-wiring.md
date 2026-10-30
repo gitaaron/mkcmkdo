@@ -180,9 +180,11 @@ signal pin.
 | M6 | both headers **+** and **−** | the 5 V rail (R7) | |
 | M7 | pan servo lead, tilt servo lead | pan header, tilt header | unplugged from the PTZ controller's servo sockets. Add a 30 cm servo extension (BOM 18) if a lead won't reach through the lid |
 
-Still on the controller as the kit came? Leave M1–M7 out, power the servos
-from R3 as before, and set `SERVO_DRIVER = "arducam"`. Everything works, in
-whole-degree steps.
+Still on the controller as the kit came? Leave M1–M7 out and set
+`SERVO_DRIVER = "arducam"`. The servos then take their power from the
+controller's servo VCC pair, pins 1 and 2 of its 6-pin connector (Arducam's
+red and black wires): run that pair to the 5 V rail as well, beside R3.
+Everything works, in whole-degree steps.
 
 ### Camera and PTZ — plug-in connections
 

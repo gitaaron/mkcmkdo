@@ -35,7 +35,7 @@ for a password.
 From the repo's root, on your Mac:
 
 ```bash
-./scripts/pi-install.sh without_uwb --bench
+./scripts/pi/install.sh without_uwb --bench
 ```
 
 As [the full build's step 2](../setup/14-software-setup.md#2-install-the-camera-software-from-your-mac)
@@ -51,14 +51,20 @@ bench lacks, in `sportcam/config.py`:
 
 **Done when:** it ends with `All set`: the camera found, and `0c` (the PTZ
 controller) on I2C. A failed check names the connection to look at: fix it
-and run the script again.
+and run the script again. For the camera alone, `./scripts/pi/camera-check.sh`
+is quicker: it reinstalls nothing, says why the camera isn't found, and
+once it is, opens a test photo on your Mac.
 
-Then the head, on the Pi (`ssh pi@sportcam.local`), from
-`~/sportcam/src/without_uwb/device`:
+Then the head. Every command on the Pi from here on runs from your Mac, from the repo root,
+through `./scripts/pi/run`: it logs in and runs the command in
+`~/sportcam/src/without_uwb/device`, where a tool's name (`ptzcheck`) is short for
+`python3 -m sportcam.ptzcheck`. Ctrl-C stops it on the Pi.
+`./scripts/pi/run nano sportcam/config.py` edits the settings, and
+`./scripts/pi/run` alone opens a shell there.
 
 ```bash
-python3 -m sportcam.ptzcheck      # sweeps both axes; the pan creeps in whole-degree ticks, as expected here
-vcgencmd get_throttled            # throttled=0x0: the adapter held 5 V while the motors ran (12, step 3)
+./scripts/pi/run ptzcheck                 # sweeps both axes; the pan creeps in whole-degree ticks, as expected here
+./scripts/pi/run vcgencmd get_throttled   # throttled=0x0: the adapter held 5 V while the motors ran (12, step 3)
 ```
 
 If a positive pan turns the lens the wrong way, or a positive tilt doesn't
@@ -69,10 +75,10 @@ point it up, flip `PAN_SIGN` / `TILT_SIGN`
 
 ## 3. Run the camera
 
-In a terminal on the Pi, from `~/sportcam/src/without_uwb/device`:
+From your Mac:
 
 ```bash
-python3 -m sportcam.main
+./scripts/pi/run main
 ```
 
 It waits 15 s for a Wi-Fi portal that isn't installed, then goes **awake**:
@@ -81,7 +87,7 @@ and the gauge's absence are expected.
 
 **Stopping it:** stop any recording from the app first, then Ctrl-C.
 (Ctrl-C parks the head but doesn't save a clip still recording; the full
-build's service saves it.) Then `sudo poweroff`, and unplug the adapter once
+build's service saves it.) Then `./scripts/pi/run sudo poweroff`, and unplug the adapter once
 the Pi's green LED stops.
 
 ## 4. The app, on the camera alone
@@ -117,16 +123,17 @@ password sportcam-dev`. (It also runs a simulated camera, `dev-camera-key`;
 the real one gets its own key below.) Your computer's firewall must let the
 Pi and the phone reach ports **5001**, **8080** and **9099**.
 
-On the Pi, point the camera at it, with your computer's address for
+Point the camera at it, with your computer's address for
 `<computer>` (e.g. `192.168.1.20`):
 
 ```bash
-cd ~/sportcam/src/without_uwb/device
+./scripts/pi/run <<'EOF'
 sed -i -e 's/^FIREBASE_PROJECT = .*/FIREBASE_PROJECT = "demo-sportcam"/' \
        -e 's/^CAMERA_KEY = .*/CAMERA_KEY = "bench-camera-key"/' \
        -e 's|^UPLOAD_API_BASE = .*|UPLOAD_API_BASE = "http://<computer>:5001/demo-sportcam/us-central1/api"|' \
        sportcam/config.py
-FIRESTORE_EMULATOR_HOST=<computer>:8080 python3 -m sportcam.main
+EOF
+./scripts/pi/run FIRESTORE_EMULATOR_HOST=<computer>:8080 main
 ```
 
 **Done when:** the log shows `[cloud] connected to demo-sportcam`, and the

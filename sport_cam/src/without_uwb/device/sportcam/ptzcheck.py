@@ -54,8 +54,12 @@ def main() -> None:
     if not ptz.servos.available:
         print("pigpiod is not running: sudo systemctl enable --now pigpiod")
         return
-    print("Centring both axes.")
-    ptz.park()
+    if ptz.focuser.firmware is None:
+        print("The PTZ controller doesn't answer at 0x0c: its cable (bench wiring guide)")
+        return
+    print(f"Waking the controller (firmware 0x{ptz.focuser.firmware:04x}); "
+          "the lens resets, up to half a minute.")
+    ptz.start()
     time.sleep(1.0)
     try:
         sweep("pan", ptz.set_pan, config.PAN_MIN_DEG, config.PAN_MAX_DEG)

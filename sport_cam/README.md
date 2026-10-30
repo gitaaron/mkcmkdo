@@ -140,7 +140,7 @@ src/                all the code and apps
                     the vendor's firmware), optional ESP32-UWB tag sketch (wearable/)
   without_uwb/      Pi software (device/: PTZ, vision search and tracking, auto-record sessions, the Firebase link)
 cad/                ordered_parts.toml + fit.py: fits both builds' CAD to the parts you bought
-scripts/            pi-install.sh (sets up the Pi from your Mac), firebase-setup.sh / firebase-deploy.sh
+scripts/            pi/: install.sh (sets up the Pi from your Mac), run (runs a command on it), camera-check.sh, ptz-check.sh; firebase-setup.sh / firebase-deploy.sh
 tools/              docs viewer (npm run docs) + its build-marker check, git hooks
 
 with_uwb/           the UWB build's own CAD and schematics

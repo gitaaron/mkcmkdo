@@ -129,8 +129,7 @@ class Head:
 
     # ---- entry point ------------------------------------------------------
     async def run(self) -> None:
-        self.ptz.park()
-        self.ptz.home()
+        self.ptz.start()
         self.uwb.start()
         await self.local.start()
         await self.mdns.start(public_state(self.state))

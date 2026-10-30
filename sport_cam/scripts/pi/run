@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Runs a command on the Pi from your computer, in the camera software's folder
+# (~/sportcam/src/<build>/device), so the setup guides never need `ssh` first.
+#
+#   ./scripts/pi/run ptzcheck              a sportcam tool: python3 -m sportcam.ptzcheck
+#   ./scripts/pi/run focuscal 5            ... with its arguments
+#   ./scripts/pi/run vcgencmd get_throttled    anything else runs as it is
+#   ./scripts/pi/run sudo systemctl stop sportcam-head
+#   ./scripts/pi/run FIRESTORE_EMULATOR_HOST=mac.local:8080 main     variables first
+#   ./scripts/pi/run <<'EOF'               a block of commands, from a heredoc
+#   sudo systemctl daemon-reload
+#   EOF
+#   ./scripts/pi/run                       a shell on the Pi, in that folder
+#
+# Options, before the command: --host <host> (default sportcam, or
+# $SPORTCAM_HOST), --build with_uwb|without_uwb (needed only when the Pi has
+# both installed). Ctrl-C stops the command on the Pi.
+set -uo pipefail
+
+HOST="${SPORTCAM_HOST:-sportcam}"
+BUILD="${SPORTCAM_BUILD:-}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --host) HOST="${2:?--host needs a value}"; shift 2 ;;
+    --build) BUILD="${2:?--build needs a value}"; shift 2 ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+
+PI="pi@${HOST}"
+SSH_OPTS=(-o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR)
+
+# The command, quoted for the Pi's shell: leading NAME=value pairs stay in
+# front, and a first word naming a sportcam module becomes python3 -m.
+envs="" cmd=""
+while [[ $# -gt 0 && "$1" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; do
+  envs+="$(printf '%q ' "$1")"; shift
+done
+if [[ $# -gt 0 ]]; then
+  first="$1"; shift
+  rest=""
+  [[ $# -gt 0 ]] && rest="$(printf ' %q' "$@")"
+  cmd="if [ -f sportcam/$(printf %q "$first").py ]; then ${envs}exec python3 -m sportcam.$(printf %q "$first")${rest};
+       else ${envs}exec $(printf %q "$first")${rest}; fi"
+fi
+
+remote="set -e
+build=$(printf %q "$BUILD")
+if [ -z \"\$build\" ]; then
+  set -- \$(ls -d ~/sportcam/src/*/device 2>/dev/null)
+  if [ \$# -eq 0 ]; then echo 'no camera software on this Pi yet: run ./scripts/pi/install.sh first' >&2; exit 1; fi
+  if [ \$# -gt 1 ]; then echo 'both builds are installed: add --build with_uwb or --build without_uwb' >&2; exit 1; fi
+  dir=\$1
+else
+  dir=~/sportcam/src/\$build/device
+  [ -d \"\$dir\" ] || { echo \"no \$build install on this Pi\" >&2; exit 1; }
+fi
+cd \"\$dir\"
+set +e"
+
+TTY=(-T); [[ -t 0 && -t 1 ]] && TTY=(-t)   # a terminal: Ctrl-C reaches the Pi
+if [[ -n "$cmd" ]]; then
+  exec ssh "${TTY[@]}" "${SSH_OPTS[@]}" "$PI" "$remote
+$cmd"
+elif [[ -t 0 ]]; then
+  exec ssh -t "${SSH_OPTS[@]}" "$PI" "$remote
+exec \$SHELL -l"
+else
+  # A heredoc: send the block after the prologue, run by a shell in the folder
+  { printf '%s\n' "$remote"; cat; } | exec ssh "${SSH_OPTS[@]}" "$PI" "bash -s"
+fi

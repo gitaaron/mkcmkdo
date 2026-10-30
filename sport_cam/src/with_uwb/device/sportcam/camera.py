@@ -30,6 +30,14 @@ try:
 except ImportError:
     cv2 = None
 
+# QR codes are decoded with zbar: Debian's OpenCV (the Pi's, from apt) is
+# built without its QR decoder, so cv2.QRCodeDetector finds a code there but
+# never reads it. OpenCV's decoder is the fallback where zbar isn't installed.
+try:
+    from pyzbar.pyzbar import ZBarSymbol, decode as zbar_decode
+except Exception:  # no pyzbar, or no libzbar0 under it
+    zbar_decode = None
+
 from . import config
 from .detector import make_detector
 
@@ -207,12 +215,16 @@ class Camera:
         """
         if not (self._cam and cv2 and self.awake):
             return None
-        if self._qr is None:
-            self._qr = cv2.QRCodeDetector()
         rgb = self._capture()
         if rgb is None:
             return None
         grey = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+        if zbar_decode:
+            for code in zbar_decode(grey, symbols=[ZBarSymbol.QRCODE]):
+                return code.data.decode("utf-8", "replace")
+            return None
+        if self._qr is None:
+            self._qr = cv2.QRCodeDetector()
         text, _pts, _ = self._qr.detectAndDecode(grey)
         return text or None
 

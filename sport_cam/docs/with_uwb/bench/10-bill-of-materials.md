@@ -54,7 +54,7 @@ Prices: approximate CAD street prices, Oct 2026, ±15 %.
 
 | # | Status | Part | Qty | ≈ CAD | Source | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| B2 |  | **Female-to-female jumper wires (Dupont), 20 cm** | 4 | $5 (pack) | [Amazon.ca](https://www.amazon.ca/s?k=female+to+female+dupont+jumper+wires) | Pi header to the PTZ controller: 5V, GND, SDA, SCL ([wiring](12-wiring.md#connections)). The Arducam kit may include a cable that does this |
+| B2 |  | Female-to-female jumper wires (Dupont), 20 cm (optional) | 6 | $5 (pack) | [Amazon.ca](https://www.amazon.ca/s?k=female+to+female+dupont+jumper+wires) | spares only. The Arducam kit's 6-wire cable runs from the PTZ controller straight onto the Pi's header ([wiring](12-wiring.md#connections)); these stand in for it if a wire is too short or its end is a bare lead |
 | 20 | | USB-A male-to-female extension cables, 50 cm | 2 | — | as the full build (item 20) | A1 and A2 into the Pi's USB-A ports, so the boards can sit 40 cm apart |
 | B3 | | **Anchor bar:** a straight stick of wood, ≥ 50 cm (a wooden ruler, a dowel or a slat), and masking tape | 1 | — | owned | holds A1 and A2 **400 mm apart** (`UWB_BASELINE_M`), level, in front of the camera. **Wood, not metal**: metal near an antenna detunes it |
 
@@ -65,7 +65,7 @@ something doesn't work. A computer with the Arduino IDE, to flash the radios.
 
 | | ≈ CAD |
 | --- | --- |
-| New for the bench (B1, B2), if you don't already have them | **≈ $20** |
+| New for the bench (B1), if you don't already have it; B2 only if the kit's cable won't do | **≈ $15** |
 | Already owned (items 1–4, 6, 15, 20, a stick) | — |
 
 The radios, the tag bank and the extensions go on into the full build as

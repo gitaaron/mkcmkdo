@@ -15,8 +15,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sportcam import config
 from sportcam import ptz as ptz_mod
-from sportcam.ptz import (OPT_FOCUS, OPT_MOTOR_X, OPT_MOTOR_Y, ArducamServos,
-                          PigpioServos, Ptz, focus_raw)
+from sportcam.ptz import (OPT_FOCUS, OPT_MOTOR_X, OPT_MOTOR_Y, OPT_ZOOM, ArducamServos,
+                          Focuser, PigpioServos, Ptz, focus_raw)
 
 failures: list[str] = []
 
@@ -33,6 +33,30 @@ GRID = {
     2.8:  [(2.0, 2600), (10.0, 2120), (30.0, 2040)],
     10.6: [(2.0, 19000), (10.0, 16600), (30.0, 16200)],
 }
+
+
+class FakeBus:
+    """The PTZ controller's registers: busy never set, mode as given."""
+
+    def __init__(self, firmware: int, mode: int = 0):
+        self.regs = {0x40: firmware, 0x30: mode, 0x04: 0}
+        self.writes: list[tuple[int, int]] = []
+
+    def read_i2c_block_data(self, addr, reg, n):
+        v = self.regs.get(reg, 0)
+        return [(v >> 8) & 0xFF, v & 0xFF]
+
+    def write_i2c_block_data(self, addr, reg, data):
+        self.regs[reg] = (data[0] << 8) | data[1]
+        self.writes.append((reg, self.regs[reg]))
+
+
+def focuser_on(bus: FakeBus) -> Focuser:
+    saved, ptz_mod.SMBus = ptz_mod.SMBus, lambda _n: bus
+    try:
+        return Focuser()
+    finally:
+        ptz_mod.SMBus = saved
 
 
 class RecordingFocuser:
@@ -181,6 +205,32 @@ def main() -> None:
           writes.get(OPT_MOTOR_X) == round(config.PAN_CENTER_RAW + 10.4 * config.PAN_SIGN)
           and writes.get(OPT_MOTOR_Y) == round(config.TILT_CENTER_RAW - 5.6 * config.TILT_SIGN),
           f"{writes}")
+
+    # ---- the IMX477 kit's controller (firmware 0x0104) ---------------------
+    bus = FakeBus(0x0104)
+    f = focuser_on(bus)
+    f.set(OPT_ZOOM, 20000)
+    f.set(OPT_FOCUS, 10000)
+    f.set(OPT_MOTOR_X, 120)
+    check("imx477: zoom on 0x01, focus on 0x00, rescaled to 0-2100; pan unchanged",
+          bus.writes == [(0x01, 2100), (0x00, 1050), (0x05, 120)], f"{bus.writes}")
+    check("imx477: reads come back on the older scale",
+          f.get(OPT_ZOOM) == 20000 and f.get(OPT_FOCUS) == 10000)
+    bus.writes.clear()
+    f.wake()
+    check("imx477: wake resets the lens, then leaves mode 0",
+          bus.writes == [(0x0B, 0), (0x0A, 0), (0x30, 1)], f"{bus.writes}")
+    bus.writes.clear()
+    f.wake()
+    check("imx477: already in mode 1, wake leaves the mode alone",
+          (0x30, 1) not in bus.writes, f"{bus.writes}")
+
+    bus = FakeBus(0x0000)
+    f = focuser_on(bus)
+    f.set(OPT_ZOOM, 20000)
+    f.wake()
+    check("older controller: zoom on 0x00 as is, and no wake writes",
+          bus.writes == [(0x00, 20000)], f"{bus.writes}")
 
     print()
     if failures:

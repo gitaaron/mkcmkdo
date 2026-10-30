@@ -4,9 +4,9 @@
 # docs/<build>/setup/14-software-setup.md (full build) or
 # docs/<build>/bench/14-software-setup.md (bench test).
 #
-#   ./scripts/pi-install.sh with_uwb                 full build
-#   ./scripts/pi-install.sh without_uwb --bench      bench test
-#   ./scripts/pi-install.sh with_uwb --host 192.168.1.42
+#   ./scripts/pi/install.sh with_uwb                 full build
+#   ./scripts/pi/install.sh without_uwb --bench      bench test
+#   ./scripts/pi/install.sh with_uwb --host 192.168.1.42
 #
 # Needs: the Pi imaged as in step 1 (user pi, SSH with your public key), on
 # the same network as this computer, so that `ssh pi@sportcam.local` logs in
@@ -25,9 +25,9 @@
 #   - reboots, and checks the camera, the I2C devices (and pigpiod)
 # Safe to run again: each step skips or repeats harmlessly.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
-usage() { echo "usage: pi-install.sh with_uwb|without_uwb [--bench] [--host <host>] [--reset-config]"; exit 1; }
+usage() { echo "usage: scripts/pi/install.sh with_uwb|without_uwb [--bench] [--host <host>] [--reset-config]"; exit 1; }
 
 BUILD="${1:-}"
 [[ "$BUILD" == with_uwb || "$BUILD" == without_uwb ]] || usage
@@ -66,7 +66,7 @@ if ! on_pi true; then
 Can't log in to ${PI} without a password. Check step 1's "Done when":
   ssh ${PI}
 must log you in without asking for a password. A different address:
-  ./scripts/pi-install.sh ${BUILD} --host <the Pi's IP address>
+  ./scripts/pi/install.sh ${BUILD} --host <the Pi's IP address>
 EOF
   exit 1
 fi
@@ -86,7 +86,7 @@ raspi-config nonint do_i2c 0                        # PTZ controller (+ battery 
 
 apt-get update
 $APT full-upgrade
-$APT install python3-pip python3-picamera2 python3-opencv i2c-tools
+$APT install python3-pip python3-picamera2 python3-opencv python3-numpy libzbar0 i2c-tools
 
 if [[ $BENCH == 0 ]]; then
   # Pan and tilt on the Pi's hardware PWM, through pigpiod
@@ -136,6 +136,11 @@ set -euo pipefail
 STAGED=~/.sportcam-staging/src/$BUILD/device
 DEST=~/sportcam/src/$BUILD/device
 cd "$STAGED"
+# numpy must be apt's: picamera2 (simplejpeg) and opencv are built against
+# it. Remove a pip numpy that shadows it (pip numpy 2 breaks them)
+if python3 -c 'import numpy, sys; sys.exit(not numpy.__file__.startswith("/usr/local"))' 2>/dev/null; then
+  sudo pip3 uninstall -y -q --break-system-packages numpy
+fi
 sudo pip3 install --break-system-packages -q -r requirements.txt
 
 failed=0
@@ -177,23 +182,28 @@ fi
 REMOTE
 
 step "Rebooting (I2C, SPI and the audio setting take effect)"
-on_pi "sudo systemctl reboot" || true
+on_pi "sudo systemctl reboot" 2>/dev/null || true   # "connection closed": expected
 sleep 15
 wait_for_pi
 
 step "Checks"
-camera_found() { on_pi "rpicam-hello --list-cameras 2>&1" | grep -q imx477; }
+# Capture, then search: grep -q quits at the first match, and under pipefail
+# the ssh still writing the long camera list then fails the check
+camera_found() { local cams; cams=$(on_pi "rpicam-hello --list-cameras 2>&1"); grep -q imx477 <<<"$cams"; }
 if ! camera_found; then
-  echo "no camera found: adding dtoverlay=imx477 and rebooting once more"
-  on_pi "grep -q '^dtoverlay=imx477' /boot/firmware/config.txt || echo 'dtoverlay=imx477' | sudo tee -a /boot/firmware/config.txt >/dev/null"
-  on_pi "sudo systemctl reboot" || true
+  # Arducam's PTZ quick start: auto-detect off, the IMX477 overlay under [all]
+  echo "no camera found: setting camera_auto_detect=0 and dtoverlay=imx477, rebooting once more"
+  on_pi "sudo sed -i 's/^camera_auto_detect=1/camera_auto_detect=0/' /boot/firmware/config.txt
+         grep -q '^camera_auto_detect=0' /boot/firmware/config.txt || printf '\\n[all]\\ncamera_auto_detect=0\\n' | sudo tee -a /boot/firmware/config.txt >/dev/null
+         grep -q '^dtoverlay=imx477' /boot/firmware/config.txt || printf '\\n[all]\\ndtoverlay=imx477\\n' | sudo tee -a /boot/firmware/config.txt >/dev/null"
+  on_pi "sudo systemctl reboot" 2>/dev/null || true   # "connection closed": expected
   sleep 15
   wait_for_pi
 fi
 
 ok=1
 check() { if eval "$2"; then echo "  ok    $1"; else echo "  FAIL  $1 — $3"; ok=0; fi; }
-I2C=$(on_pi "i2cdetect -y 1" || true)
+I2C=$(on_pi "sudo i2cdetect -y 1" || true)   # /usr/sbin: not on a plain SSH login's PATH
 check "camera (IMX477)" camera_found \
   "the camera ribbon: contacts the right way round, latches closed (wiring guide, C1)"
 check "PTZ controller at 0x0c" "grep -qE '^00:.* 0c( |$)' <<<\"\$I2C\"" \
@@ -203,6 +213,12 @@ if [[ $BENCH == 0 ]]; then
     "the gauge's I2C (wiring guide, I1-I4)"
   check "pigpiod running" "on_pi 'pigs hwver' >/dev/null 2>&1" \
     "on the Pi: sudo systemctl status pigpiod"
+fi
+
+if ! camera_found; then
+  echo "        the Pi reports:"
+  on_pi "rpicam-hello --list-cameras 2>&1; grep -nE '^(camera_auto_detect|dtoverlay=imx|\\[)' /boot/firmware/config.txt" \
+    | sed 's/^/          /' || true
 fi
 
 echo

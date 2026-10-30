@@ -16,8 +16,10 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from sportcam import config
+from sportcam import camera, config
 from sportcam.camera import Camera
+
+camera.Picamera2 = None      # never the real camera, even on the Pi
 
 failures: list[str] = []
 

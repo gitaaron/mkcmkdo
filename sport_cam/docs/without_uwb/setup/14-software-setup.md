@@ -83,7 +83,7 @@ password.
 From the repo's root, on your Mac:
 
 ```bash
-./scripts/pi-install.sh without_uwb
+./scripts/pi/install.sh without_uwb
 ```
 
 It logs in to `pi@sportcam.local` and does the rest; 20–30 minutes the
@@ -161,7 +161,8 @@ file to the Pi:
 scp sportcam-firebase.json pi@sportcam.local:/home/pi/   # then delete it on your computer
 ```
 
-Set the values in `~/sportcam/src/without_uwb/device/sportcam/config.py`:
+Set the values in `~/sportcam/src/without_uwb/device/sportcam/config.py`
+(`./scripts/pi/run nano sportcam/config.py`):
 
 | Setting | Set it to |
 | --- | --- |
@@ -170,22 +171,26 @@ Set the values in `~/sportcam/src/without_uwb/device/sportcam/config.py`:
 | `UPLOAD_API_BASE` | `https://<project>.web.app` |
 | `FIREBASE_CREDENTIALS` | leave as `/home/pi/sportcam-firebase.json` |
 
-**Done when:** after the services are installed (step 6), `journalctl -u sportcam-head`
+**Done when:** after the services are installed (step 6), `./scripts/pi/run journalctl -u sportcam-head`
 shows `[cloud] connected to <project>`, and your app link shows the camera
 online.
 
 ## 4. Bench checks: camera and motion
 
-On the Pi (`ssh pi@sportcam.local`), run everything from
-`~/sportcam/src/without_uwb/device`.
+Every command on the Pi from here on runs from your Mac, from the repo root,
+through `./scripts/pi/run`: it logs in and runs the command in
+`~/sportcam/src/without_uwb/device`, where a tool's name (`ptzcheck`) is short for
+`python3 -m sportcam.ptzcheck`. Ctrl-C stops it on the Pi.
+`./scripts/pi/run nano sportcam/config.py` edits the settings, and
+`./scripts/pi/run` alone opens a shell there.
 
-**a. Camera:** `rpicam-hello -t 2000` shows a picture. If it does not, see
-step 2's checks.
+**a. Camera:** `./scripts/pi/camera-check.sh` finds the camera and opens a
+test photo on your Mac. If it does not, see step 2's checks.
 
 **b. Pan and tilt:**
 
 ```bash
-python3 -m sportcam.ptzcheck
+./scripts/pi/run ptzcheck
 ```
 
 Sweeps each axis to its soft limits and back, then creeps the pan 0° → 3°
@@ -222,10 +227,10 @@ homed against their stops at boot.
 at each distance in turn, in the filming light:
 
 ```bash
-python3 -m sportcam.focuscal 2
-python3 -m sportcam.focuscal 5
-python3 -m sportcam.focuscal 10
-python3 -m sportcam.focuscal 30
+./scripts/pi/run focuscal 2
+./scripts/pi/run focuscal 5
+./scripts/pi/run focuscal 10
+./scripts/pi/run focuscal 30
 ```
 
 After the last run, paste the `FOCUS_GRID = {…}` it prints. Until then,
@@ -240,24 +245,28 @@ head's label: you need it only for the setup page, the fallback to the QR
 code ([Pairing](../../product/01-requirements.md#pairing)).
 
 ```bash
+./scripts/pi/run <<'EOF'
 sudo mkdir -p /etc/sportcam
 tr -dc 'a-z0-9' </dev/urandom | head -c 10 | sudo tee /etc/sportcam/hotspot-password; echo
 sudo chmod 600 /etc/sportcam/hotspot-password
+EOF
 ```
 
 ```bash
-sudo cp ~/sportcam/src/without_uwb/device/sportcam-head.service ~/sportcam/src/without_uwb/device/sportcam-wifi.service /etc/systemd/system/
+./scripts/pi/run <<'EOF'
+sudo cp sportcam-head.service sportcam-wifi.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now sportcam-head sportcam-wifi
-journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
+EOF
+./scripts/pi/run journalctl -u sportcam-head -f          # watch it start; Ctrl-C to stop
 ```
 
 **Done when** the LED ring chases white (connecting), then turns blue (awake): solid, or breathing slowly if the camera can see you. Left alone for 30 s with no app showing the live view, it goes to sleep: one dim blue pixel, camera off (**Wake up** in the app brings it back). Blinking white instead: it has no Wi-Fi it knows; pair it as below.
 
 | Operation | Command / note |
 | --- | --- |
-| Apply a `config.py` change | `sudo systemctl restart sportcam-head`. Also resets the battery gauge to "full" (step 8.6): don't restart mid-session on a part-used bank |
-| Before running `focuscal` or `ptzcheck` | `sudo systemctl stop sportcam-head` (they need exclusive access to the hardware) |
+| Apply a `config.py` change | `./scripts/pi/run sudo systemctl restart sportcam-head`. Also resets the battery gauge to "full" (step 8.6): don't restart mid-session on a part-used bank |
+| Before running `focuscal` or `ptzcheck` | `./scripts/pi/run sudo systemctl stop sportcam-head` (they need exclusive access to the hardware) |
 
 ### Power switch
 
@@ -267,6 +276,7 @@ for that. Without them, switching off cuts the power at once, like pulling the
 cable.
 
 ```bash
+./scripts/pi/run <<'EOF'
 # HOLD (GPIO17) high from the first second of boot; SENSE (GPIO27) falling = power key
 sudo tee -a /boot/firmware/config.txt <<'CFG'
 
@@ -285,6 +295,7 @@ sudo rpi-eeprom-config --apply /tmp/eeprom.txt
 sudo sed -i -e 's/^#\?RuntimeWatchdogSec=.*/RuntimeWatchdogSec=15s/' \
             -e 's/^#\?RebootWatchdogSec=.*/RebootWatchdogSec=2min/' /etc/systemd/system.conf
 sudo reboot
+EOF
 ```
 
 **Done when:** the camera is awake, you switch off, and the ring goes dark

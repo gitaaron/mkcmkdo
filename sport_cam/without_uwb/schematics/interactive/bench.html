@@ -53,21 +53,24 @@ const graph = {
     node("psu", "USB-C adapter 5.1 V 3 A (B1)", [port("psu_ac", "AC", "INPUT"), port("psu_out", "USB-C 5V", "OUTPUT")]),
     node("pi", "Raspberry Pi 4", [
       port("pi_5v", "USB-C 5V", "INPUT"),
-      port("pi_p2", "pin 2 5V", "OUTPUT"), port("pi_p6", "pin 6 GND", "OUTPUT"),
+      port("pi_p2", "pin 2 5V", "OUTPUT"), port("pi_p14", "pin 14 GND", "OUTPUT"),
+      port("pi_p4", "pin 4 5V", "OUTPUT"), port("pi_p6", "pin 6 GND", "OUTPUT"),
       port("pi_sda", "pin 3 SDA G2", "OUTPUT"), port("pi_scl", "pin 5 SCL G3", "OUTPUT"),
       port("pi_csi", "CSI", "OUTPUT"),
     ]),
+    // The controller's 6-pin cable connector, in pin order (Arducam's quick start)
     node("ptz", "Arducam PTZ ctrl (0x0C)", [
-      port("ptz_5v", "5V", "INPUT"), port("ptz_gnd", "GND", "INPUT"),
-      port("ptz_sda", "SDA", "INPUT"), port("ptz_scl", "SCL", "INPUT"),
-      port("ptz_zoom", "zoom motor", "OUTPUT"), port("ptz_focus", "focus motor", "OUTPUT"),
-      port("ptz_pan", "pan servo", "OUTPUT"), port("ptz_tilt", "tilt servo", "OUTPUT"),
+      port("ptz_svcc", "1 servo VCC", "INPUT"), port("ptz_gnd2", "2 GND", "INPUT"),
+      port("ptz_5v", "3 5V", "INPUT"), port("ptz_gnd", "4 GND", "INPUT"),
+      port("ptz_scl", "5 SCL", "INPUT"), port("ptz_sda", "6 SDA", "INPUT"),
+      port("ptz_lens", "lens motors + IR-cut", "OUTPUT"),
+      port("ptz_pan", "PAN socket", "OUTPUT"), port("ptz_tilt", "TILT socket", "OUTPUT"),
     ]),
     node("cam", "IMX477 + zoom lens", [
-      port("cam_csi", "CSI", "INPUT"), port("cam_zoom", "zoom", "INPUT"), port("cam_focus", "focus", "INPUT"),
+      port("cam_csi", "CSI", "INPUT"), port("cam_lens", "lens motors + IR-cut", "INPUT"),
     ]),
-    node("pan", "Pan servo (kit lead)", [port("pan_in", "lead", "INPUT")]),
-    node("tilt", "Tilt servo (kit lead)", [port("tilt_in", "lead", "INPUT")]),
+    node("pan", "Pan servo", [port("pan_in", "3-wire plug", "INPUT")]),
+    node("tilt", "Tilt servo", [port("tilt_in", "3-wire plug", "INPUT")]),
   ],
 };
 
@@ -79,15 +82,17 @@ const edge = (srcNode, srcPort, dstNode, dstPort, name) => ({
 graph.edges = [
   edge("wall", "w_ac", "psu", "psu_ac", "mains"),
   edge("psu", "psu_out", "pi", "pi_5v", "P1 5.1 V 3 A"),
-  edge("pi", "pi_p2", "ptz", "ptz_5v", "J1 5V"),
-  edge("pi", "pi_p6", "ptz", "ptz_gnd", "J2 GND"),
-  edge("pi", "pi_sda", "ptz", "ptz_sda", "I1 SDA"),
-  edge("pi", "pi_scl", "ptz", "ptz_scl", "I2 SCL"),
+  // The kit's 6-wire cable (colours as Arducam draws them)
+  edge("pi", "pi_p2", "ptz", "ptz_svcc", "J3 red: servo VCC"),
+  edge("pi", "pi_p14", "ptz", "ptz_gnd2", "J4 black: GND"),
+  edge("pi", "pi_p4", "ptz", "ptz_5v", "J1 white: 5V"),
+  edge("pi", "pi_p6", "ptz", "ptz_gnd", "J2 brown: GND"),
+  edge("pi", "pi_scl", "ptz", "ptz_scl", "I2 yellow: SCL"),
+  edge("pi", "pi_sda", "ptz", "ptz_sda", "I1 orange: SDA"),
   edge("pi", "pi_csi", "cam", "cam_csi", "C1 15-pin FFC"),
-  edge("ptz", "ptz_zoom", "cam", "cam_zoom", "factory"),
-  edge("ptz", "ptz_focus", "cam", "cam_focus", "factory"),
-  edge("ptz", "ptz_pan", "pan", "pan_in", "as the kit came"),
-  edge("ptz", "ptz_tilt", "tilt", "tilt_in", "as the kit came"),
+  edge("ptz", "ptz_lens", "cam", "cam_lens", "K3 factory-fitted"),
+  edge("ptz", "ptz_pan", "pan", "pan_in", "K1 as the kit came"),
+  edge("ptz", "ptz_tilt", "tilt", "tilt_in", "K2 as the kit came"),
 ];
 
 const svg = d3.select("#scheme")

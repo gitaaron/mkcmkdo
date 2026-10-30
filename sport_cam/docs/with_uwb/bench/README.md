@@ -9,14 +9,14 @@ battery.
 
 It runs the [UWB build](../setup/README.md)'s software, with a few settings
 for what the bench leaves out. Everything bought for it except the USB-C
-adapter and the jumper wires is a part of the full build.
+adapter is a part of the full build.
 The same rig without the radios is the
 [bench test without UWB](../../without_uwb/bench/README.md).
 
 | # | Doc | Covers | Time |
 | --- | --- | --- | --- |
 | 10 | [**Bill of materials**](10-bill-of-materials.md) | the parts you need, and what is left out and why | ≈ C$52 of new parts |
-| 12 | [**Wiring guide**](12-wiring.md) | the adapter, four jumpers to the PTZ controller, the camera ribbon and the two anchors, with a check after each step | ≈ 20 min |
+| 12 | [**Wiring guide**](12-wiring.md) | the adapter, the kit's 6-wire cable from the PTZ controller to the Pi, the camera ribbon and the two anchors, with a check after each step | ≈ 20 min |
 | 14 | [**Software setup**](14-software-setup.md) | the radios, the Pi, the camera software, the app, and the backend on your computer | ≈ 1.5 h |
 | 15 | [**End-to-end test checklist**](15-verification.md) | the camera with a phone and the tag; then with the backend and two people | ≈ 40 min |
 
