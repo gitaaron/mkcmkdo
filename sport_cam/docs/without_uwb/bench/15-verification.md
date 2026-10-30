@@ -14,7 +14,7 @@ A7–A8.
 | --- | --- | --- | --- |
 | A1 | **Discovery** | open the app | the badge goes from **Searching…** to **SportCam · Direct · <address>** within a few seconds |
 | A2 | **Live view** | look at the screen | the camera's picture, smooth (15 fps). A box round you when you stand in front of it, red in awake |
-| A3 | **Aim by hand** | camera awake: drag the joystick left, then up, then let go | it pans left, tilts up, and stops when you let go |
+| A3 | **Aim by hand** | camera awake: drag the left (pan) stick left and let go, then the right (tilt) stick up and let go | it pans left, tilts up, and eases to a stop each time you let go |
 | A4 | **A session** | stand 2–4 m in front, facing it; **Track & record** | "Looking for a person", pings; then found, beeps 3, 2, 1, a chime, the ring top right turns red: recording |
 | A5 | **Stop** | **Stop recording** | a falling chime; back to awake |
 | A6 | **The library** | the recordings button | the clip, *"on the camera, uploading soon"*; it plays, with the boxes drawn on it. No backend, so it stays on the card |

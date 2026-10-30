@@ -145,10 +145,12 @@ def main() -> None:
           jogged(0.0, 1.0) == (0.0, config.JOG_TILT_MAX_DPS), f"{jogged(0.0, 1.0)}")
     check("half a pull turns at a quarter of the speed",
           abs(jogged(0.5, 0.0)[0] - config.JOG_PAN_MAX_DPS / 4) < 1e-9, f"{jogged(0.5, 0.0)}")
-    pan, tilt = jogged(1.0, 1.0)
-    check("a pull past the rim counts as the rim, in the same direction",
-          abs(pan / config.JOG_PAN_MAX_DPS - 0.5 ** 0.5) < 1e-9
-          and abs(tilt / config.JOG_TILT_MAX_DPS - 0.5 ** 0.5) < 1e-9, f"{pan:.1f}, {tilt:.1f}")
+    check("both sticks full: each axis at its own full speed",
+          jogged(1.0, 1.0) == (config.JOG_PAN_MAX_DPS, config.JOG_TILT_MAX_DPS),
+          f"{jogged(1.0, 1.0)}")
+    check("one stick's speed doesn't depend on the other's",
+          jogged(0.5, 1.0)[0] == jogged(0.5, 0.0)[0], f"{jogged(0.5, 1.0)}")
+    check("past the end counts as the end", jogged(2.0, 0.0)[0] == config.JOG_PAN_MAX_DPS)
     check("…and the soft limits still hold", jogged(1.0, 0.0, dt=10.0)[0] == config.PAN_MAX_DEG)
     p.park()
     p.focuser.writes.clear()

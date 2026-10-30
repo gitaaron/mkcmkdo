@@ -13,15 +13,20 @@ import '../theme.dart';
 /// knob can travel (so the rim is 1). The camera stops by itself when the
 /// reports stop (`JOG_TIMEOUT_S`), so a dropped connection can't leave it
 /// turning. Releasing sends one (0, 0).
+///
+/// With [axis] set the knob only slides along it, and the other value is
+/// always 0: [AimSticks] puts one of each under the thumbs.
 class Joystick extends StatefulWidget {
   const Joystick({
     super.key,
     required this.onMove,
+    this.axis,
     this.size = 132,
     this.period = const Duration(milliseconds: 50),
   });
 
   final void Function(double x, double y) onMove;
+  final Axis? axis;
   final double size;
   final Duration period;
 
@@ -58,6 +63,11 @@ class _JoystickState extends State<Joystick> {
 
   void _place(Offset local) {
     var o = local - Offset(_ringR, _ringR);
+    o = switch (widget.axis) {
+      Axis.horizontal => Offset(o.dx, 0),
+      Axis.vertical => Offset(0, o.dy),
+      null => o,
+    };
     if (o.distance > _travel) o = o / o.distance * _travel;
     setState(() => _knob = o);
   }
@@ -81,8 +91,14 @@ class _JoystickState extends State<Joystick> {
   @override
   Widget build(BuildContext context) {
     final held = _pointer != null;
+    final axis = widget.axis;
     return Semantics(
-      label: 'Aim the camera: drag the knob, further for faster',
+      label: switch (axis) {
+        Axis.horizontal =>
+          'Pan the camera: drag left or right, further for faster',
+        Axis.vertical => 'Tilt the camera: drag up or down, further for faster',
+        null => 'Aim the camera: drag the knob, further for faster',
+      },
       child: Listener(
         behavior: HitTestBehavior.opaque,
         onPointerDown: _down,
@@ -104,6 +120,16 @@ class _JoystickState extends State<Joystick> {
                   ),
                 ),
               ),
+              // the slot the knob runs in, on a one-axis stick
+              if (axis != null)
+                Container(
+                  width: axis == Axis.horizontal ? _travel * 2 : 4,
+                  height: axis == Axis.vertical ? _travel * 2 : 4,
+                  decoration: BoxDecoration(
+                    color: SportColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               Transform.translate(
                 offset: _knob,
                 child: Container(
@@ -124,6 +150,45 @@ class _JoystickState extends State<Joystick> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Two one-axis sticks for the thumbs: pan on the left, tilt on the right.
+///
+/// The camera takes pan and tilt in one message, so each stick only updates
+/// its own half and both report the pair to [onMove]: holding one stick
+/// never zeroes the other's axis.
+class AimSticks extends StatefulWidget {
+  const AimSticks({super.key, required this.onMove, this.size = 132});
+
+  final void Function(double pan, double tilt) onMove;
+  final double size;
+
+  @override
+  State<AimSticks> createState() => _AimSticksState();
+}
+
+class _AimSticksState extends State<AimSticks> {
+  double _pan = 0;
+  double _tilt = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Joystick(
+          axis: Axis.horizontal,
+          size: widget.size,
+          onMove: (x, _) => widget.onMove(_pan = x, _tilt),
+        ),
+        Joystick(
+          axis: Axis.vertical,
+          size: widget.size,
+          onMove: (_, y) => widget.onMove(_pan, _tilt = y),
+        ),
+      ],
     );
   }
 }

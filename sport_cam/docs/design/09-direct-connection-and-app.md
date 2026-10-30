@@ -93,7 +93,7 @@ One screen (requirement F5 in [01](../product/01-requirements.md#functional-requ
 | **Top left — connection** (`ConnectionBadge`) | green **"SportCam · Direct · 10.0.0.42"**; blue **"Firebase"**; amber pulsing **"Searching…"**; red **"Offline — tap to retry"**. Tap to re-scan |
 | **Below the badge** | recordings button with clip-count badge; under it, **Boxes on / off** for the live view (remembered on the phone, separately from the player's) |
 | **Live view** | the MJPEG stream (direct) or the preview (Firebase), with the camera's [person boxes](08-recordings-and-cloud.md#in-the-live-view) painted over it (`widgets/person_boxes.dart`). Only in `awake`, `tracking` and `recording`; in `sleep` the sensor is off and the screen says the camera is asleep |
-| **Bottom right — joystick** (`widgets/joystick.dart`) | in `awake` over the direct connection only: a knob in a ring to aim the camera by hand ([below](#aiming-by-hand)) |
+| **Bottom — pan and tilt sticks** (`widgets/joystick.dart`) | in `awake` over the direct connection only: two knobs in rings, pan under the left thumb and tilt under the right, to aim the camera by hand ([below](#aiming-by-hand)) |
 | **Top right — status ring** (`widgets/status_ring.dart`) | the camera's state in the LED colours ([01 — State machine](../product/01-requirements.md#state-machine)); hollow while the camera is offline |
 | **Under the ring — account menu** | who is signed in; <!--with_uwb-->**Pair my tag**; <!--/--><!--both-->with UWB, **Pair my tag**; <!--/-->for admins, **People** (`lib/screens/admin_screen.dart`: everyone who can sign in, and **Add person**); **Sign out** |
 | **Bottom buttons** (`widgets/control_bar.dart`) | swap with the state, with the labels in [01 — State machine](../product/01-requirements.md#state-machine). In `sleep`: **Wake up** and **Record** |
@@ -106,16 +106,18 @@ One screen (requirement F5 in [01](../product/01-requirements.md#functional-requ
 
 ## Aiming by hand
 
-The joystick sits bottom right of the live view, above the buttons. Drag the
-knob and the camera turns towards the pull: left pans left, up tilts up. The
-further the knob is from the centre, the faster it turns. Let go and the knob
-springs back and the camera stops where it is.
+Two sticks sit at the bottom of the live view, above the buttons, one under
+each thumb: pan on the left, whose knob slides left and right, and tilt on the
+right, whose knob slides up and down. Drag a knob and the camera turns that
+way: left pans left, up tilts up. The further the knob is from the centre, the
+faster it turns, and the two work together for a diagonal. Let go and the knob
+springs back and that axis eases to a stop where it is.
 
 | | |
 | --- | --- |
 | When | `awake` only, over the direct connection. In `tracking` and `recording` the tracker drives the head; in `sleep` there is no picture to aim by; through Firebase a command takes about a second, so the camera would overshoot |
-| Message | while held, the app sends `{"type": "jog", "pan": x, "tilt": y}` on the WebSocket every 50 ms, even with the finger still: `x` right +, `y` up +, each the knob's offset as a fraction of its travel (the rim is 1). Releasing sends one `(0, 0)` |
-| Speed | the camera turns at `JOG_PAN_MAX_DPS × r × x` and `JOG_TILT_MAX_DPS × r × y` (60°/s and 45°/s at the rim), where `r` is the distance from the centre: speed grows with the square of the pull, so a small pull aims finely. The soft limits still apply |
+| Message | while either is held, the app sends `{"type": "jog", "pan": x, "tilt": y}` on the WebSocket every 50 ms, even with the finger still: `x` the pan stick (right +), `y` the tilt stick (up +), each its knob's offset as a fraction of its travel (the end is 1). Each stick changes only its own value, so holding one never zeroes the other. Releasing a stick sends its axis as 0 |
+| Speed | the camera turns at `JOG_PAN_MAX_DPS × x × abs(x)` and `JOG_TILT_MAX_DPS × y × abs(y)` (60°/s and 45°/s at the end): each axis's speed grows with the square of its own stick, so a small pull aims finely. It eases up to that speed and back down to a stop at `JOG_PAN_ACCEL_DPS2` / `JOG_TILT_ACCEL_DPS2`, using the same acceleration step as tracking (`motion.py`). The soft limits still apply |
 | Dead man | the camera moves only within `JOG_TIMEOUT_S` (0.3 s) of the last message, so a dropped Wi-Fi link or a backgrounded app can't leave it turning |
 | Where it runs | `LocalApi._on_jog` checks and clamps each message; `Head.jog` notes it; `Head.manual_aim` turns the head once per control tick (`Ptz.jog`), so it moves smoothly however unevenly messages arrive. Using it keeps the camera awake |
 | Then | a session started afterwards begins from where you aimed it: <!--with_uwb-->the camera turns from there to the tag<!--/--><!--both--> (with UWB), or <!--/--><!--without_uwb-->the sweep starts from there, and with a person in frame it skips the sweep<!--/--><!--both--> (without)<!--/-->. Going to sleep, and a session ending, re-centre the head |

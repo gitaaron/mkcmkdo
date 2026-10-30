@@ -267,22 +267,21 @@ class Ptz:
     def jog(self, x: float, y: float, dt: float) -> None:
         """Turn for `dt` seconds at a speed set by the app's joystick.
 
-        `x` (right +) and `y` (up +) are the knob's offset from centre as a
-        fraction of the ring's radius. The speed grows with the square of the
-        offset, so a small pull aims finely and a full one turns at
-        JOG_PAN_MAX_DPS / JOG_TILT_MAX_DPS. It gets there, and back to a stop
-        at (0, 0), no faster than JOG_*_ACCEL_DPS2. The soft limits still apply.
+        `x` (right +) and `y` (up +) are the app's pan and tilt sticks, each
+        its knob's offset as a fraction of its travel. Each axis's speed grows
+        with the square of its own stick, so a small pull aims finely and a
+        full one turns at JOG_PAN_MAX_DPS / JOG_TILT_MAX_DPS, whatever the
+        other stick does. It gets there, and back to a stop at (0, 0), no
+        faster than JOG_*_ACCEL_DPS2. The soft limits still apply.
         """
         now = time.monotonic()
         if now - self._jog_at > 0.25:          # not a continuing jog: from rest
             self._jog_vel = (0.0, 0.0)
         self._jog_at = now
-        r = math.hypot(x, y)
-        if r > 1.0:
-            x, y, r = x / r, y / r, 1.0
+        x, y = max(-1.0, min(1.0, x)), max(-1.0, min(1.0, y))
         vp, vt = self._jog_vel
-        vp = accelerate(vp, x * r * config.JOG_PAN_MAX_DPS, config.JOG_PAN_ACCEL_DPS2, dt)
-        vt = accelerate(vt, y * r * config.JOG_TILT_MAX_DPS, config.JOG_TILT_ACCEL_DPS2, dt)
+        vp = accelerate(vp, x * abs(x) * config.JOG_PAN_MAX_DPS, config.JOG_PAN_ACCEL_DPS2, dt)
+        vt = accelerate(vt, y * abs(y) * config.JOG_TILT_MAX_DPS, config.JOG_TILT_ACCEL_DPS2, dt)
         if vp:
             want = self._pan + vp * dt
             if self.set_pan(want) != want:    # at a soft limit

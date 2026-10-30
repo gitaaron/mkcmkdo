@@ -259,12 +259,14 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: _openLibrary,
             ),
 
-          // awake, on the camera's own Wi-Fi link: aim it by hand
+          // awake, on the camera's own Wi-Fi link: aim it by hand, pan under the
+          // left thumb and tilt under the right
           if (client.canAim && client.foreground)
             Positioned(
+              left: 18,
               right: 18,
               bottom: 96 + MediaQuery.of(context).padding.bottom,
-              child: Joystick(onMove: client.aim),
+              child: AimSticks(onMove: client.aim),
             ),
 
           Align(

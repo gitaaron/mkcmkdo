@@ -74,4 +74,58 @@ void main() {
     expect(sent.last, Offset.zero);
     await g.up();
   });
+
+  testWidgets('a one-axis stick ignores the other direction', (tester) async {
+    sent = [];
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Joystick(
+            axis: Axis.horizontal,
+            onMove: (x, y) => sent.add(Offset(x, y)),
+          ),
+        ),
+      ),
+    ));
+    final c = tester.getCenter(find.byType(Joystick));
+    final g = await tester.startGesture(c);
+    await g.moveTo(c + const Offset(-travel / 2, -travel)); // left and up
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(sent.last.dx, closeTo(-0.5, 1e-9));
+    expect(sent.last.dy, 0);
+    await g.up();
+  });
+
+  testWidgets('two sticks: each thumb drives its axis, neither zeroes the other',
+      (tester) async {
+    final aims = <Offset>[];
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: AimSticks(onMove: (p, t) => aims.add(Offset(p, t))),
+        ),
+      ),
+    ));
+    final sticks = find.byType(Joystick);
+    final panC = tester.getCenter(sticks.at(0));
+    final tiltC = tester.getCenter(sticks.at(1));
+    expect(panC.dx, lessThan(tiltC.dx)); // pan on the left
+
+    final pan = await tester.startGesture(panC, pointer: 1);
+    await pan.moveTo(panC + const Offset(-travel, 0));
+    final tilt = await tester.startGesture(tiltC, pointer: 2);
+    await tilt.moveTo(tiltC + const Offset(0, -travel)); // screen up
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(aims.last.dx, closeTo(-1, 1e-9));
+    expect(aims.last.dy, closeTo(1, 1e-9));
+
+    await pan.up(); // let go of pan: tilt keeps going
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(aims.last.dx, 0);
+    expect(aims.last.dy, closeTo(1, 1e-9));
+
+    await tilt.up();
+    await tester.pump();
+    expect(aims.last, Offset.zero);
+  });
 }

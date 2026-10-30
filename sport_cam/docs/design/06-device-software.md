@@ -27,7 +27,7 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 | `detector.py` | person detectors: HOG, or MobileNet-SSD on `cv2.dnn` (`DETECTOR`), each falling back to the other; boxes always in HOG's padded convention ([below](#vision-and-why-it-runs-slowly)) |
 | `getmodel.py` | `python3 -m sportcam.getmodel`: fetches the MobileNet-SSD weights (checksummed) into `models/` |
 | `detectbench.py` | bench tool: runs both detectors on the live picture and prints time per frame and hit rate |
-| `ptz.py` | PTZ controller at I2C 0x0C: pan, tilt, zoom, focus, soft limits, homing; `jog()` for the app's joystick ([09](09-direct-connection-and-app.md#aiming-by-hand)) |
+| `ptz.py` | PTZ controller at I2C 0x0C: pan, tilt, zoom, focus, soft limits, homing; `jog()` for the app's pan and tilt sticks ([09](09-direct-connection-and-app.md#aiming-by-hand)) |
 | `ptzcheck.py` | bench tool: sweeps both axes to their soft limits |
 | `led.py` | WS2812B ring over SPI (no root required) |
 | `power.py` | battery gauge (INA260, INA226 or none): Wh integration, runtime estimate, low/critical levels |
