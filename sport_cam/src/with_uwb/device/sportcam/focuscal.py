@@ -34,7 +34,7 @@ SETTLE_S = 0.15
 
 def sharpness(cam: Camera) -> float:
     import cv2
-    rgb = cam._cam.capture_array("lores")
+    rgb = cam._capture()
     h, w = rgb.shape[:2]
     centre = rgb[h // 3: 2 * h // 3, w // 3: 2 * w // 3]
     gray = cv2.cvtColor(centre, cv2.COLOR_RGB2GRAY)

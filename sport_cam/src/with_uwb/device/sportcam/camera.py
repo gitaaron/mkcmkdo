@@ -52,7 +52,9 @@ class Camera:
             self._cam = Picamera2()
             cfg = self._cam.create_video_configuration(
                 main={"size": config.RECORD_SIZE, "format": "YUV420"},
-                lores={"size": config.PREVIEW_SIZE, "format": "RGB888"},
+                # YUV: a Pi 4's ISP (VC4) can't output RGB on the lores
+                # stream; _capture converts
+                lores={"size": config.PREVIEW_SIZE, "format": "YUV420"},
             )
             self._cam.configure(cfg)
             self._cam.start()
@@ -160,7 +162,8 @@ class Camera:
         with self._cam_lock:
             if not (self._cam and self.awake):
                 return None
-            return self._cam.capture_array("lores")
+            yuv = self._cam.capture_array("lores")
+        return cv2.cvtColor(yuv, cv2.COLOR_YUV2RGB_I420)
 
     def preview_jpeg(self) -> bytes | None:
         rgb = self._capture()

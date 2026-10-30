@@ -86,7 +86,9 @@ raspi-config nonint do_i2c 0                        # PTZ controller (+ battery 
 
 apt-get update
 $APT full-upgrade
-$APT install python3-pip python3-picamera2 python3-opencv python3-numpy libzbar0 i2c-tools
+# python3-dev and build-essential: pip builds rpi_ws281x (a Blinka platform
+# package) from source on 64-bit Pi OS, which piwheels has no wheels for
+$APT install python3-pip python3-dev build-essential python3-picamera2 python3-opencv python3-numpy libzbar0 i2c-tools
 
 if [[ $BENCH == 0 ]]; then
   # Pan and tilt on the Pi's hardware PWM, through pigpiod
@@ -151,6 +153,13 @@ for t in tests/test_*.py; do
     echo "  FAIL  $t"; echo "$out" | tail -5 | sed 's/^/        /'; failed=1
   fi
 done
+# What `run main` loads, against the Pi's real libraries: Blinka dies at
+# `import board` when its Pi packages are missing, and the tests pass anyway
+if out=$(python3 -c 'import sportcam.main' 2>&1); then
+  echo "  pass  import sportcam.main"
+else
+  echo "  FAIL  import sportcam.main"; echo "$out" | tail -5 | sed 's/^/        /'; failed=1
+fi
 if [[ $failed == 1 ]]; then
   echo "offline tests failed: nothing was changed in $DEST"; exit 1
 fi

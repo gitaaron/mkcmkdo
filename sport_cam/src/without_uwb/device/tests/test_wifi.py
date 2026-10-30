@@ -88,8 +88,8 @@ def camera_reads_qr() -> None:
         def __init__(self, img):
             self.img = img
 
-        def capture_array(self, _stream):
-            return self.img
+        def capture_array(self, _stream):        # the lores stream is YUV420
+            return cv2.cvtColor(self.img, cv2.COLOR_RGB2YUV_I420)
 
     cam = Camera.__new__(Camera)
     cam._cam, cam._qr, cam.awake = FakeCam(frame), None, True

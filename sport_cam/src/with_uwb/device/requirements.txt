@@ -11,3 +11,8 @@ numpy>=1.24,<2                    # apt's python3-numpy: picamera2 (simplejpeg) 
 pyzbar>=0.1.9                     # Wi-Fi QR codes (camera.py); needs apt's libzbar0
 smbus2>=0.4                       # Arducam PTZ controller (zoom, focus) + INA226 battery gauge
 adafruit-circuitpython-neopixel-spi>=1.0   # status ring over SPI (no root needed)
+# Blinka's Pi platform packages: without them `import board` tries to pip
+# install them itself, which Debian refuses, and the whole service dies
+gpiod>=2.2.2,<3
+Adafruit-Blinka-Raspberry-Pi-PWM>=1.0.2
+rpi_ws281x>=4.0.0

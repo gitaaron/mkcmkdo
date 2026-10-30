@@ -21,7 +21,7 @@ import time
 try:
     import board
     import neopixel_spi
-except (ImportError, NotImplementedError):   # dev machine / no SPI
+except (ImportError, NotImplementedError, RuntimeError):   # dev machine / no SPI / Blinka missing its Pi packages
     board = None
     neopixel_spi = None
 
