@@ -123,6 +123,11 @@ class FakePtz:
     def focus_m(self):
         return self.focus_dist
 
+    focus_pos = None
+
+    def set_focus_pos(self, pos):
+        self.focus_pos = pos
+
 
 def run(tr, n, pause=0.0):
     for _ in range(n):

@@ -598,19 +598,19 @@ class CameraClient extends ChangeNotifier {
     ws.sink.add(jsonEncode({'type': 'jog', 'pan': r(pan), 'tilt': r(tilt)}));
   }
 
-  /// Zoom (focal length, mm) and focus (subject distance, m) by hand, from
+  /// Zoom (focal length, mm) and focus (motor position, 0…1) by hand, from
   /// the lens sliders ([LensControls]); either may be left out. When [canAim]
   /// only, on the WebSocket like [aim]. The camera clamps both to its lens,
   /// and puts the lens back to wide when it leaves awake.
-  void setLens({double? zoomMm, double? focusM}) {
+  void setLens({double? zoomMm, double? focusPos}) {
     final ws = _ws;
     if (ws == null || _link != LinkMode.direct) return;
-    if (zoomMm == null && focusM == null) return;
+    if (zoomMm == null && focusPos == null) return;
     double r(double v) => (v * 1000).roundToDouble() / 1000;
     ws.sink.add(jsonEncode({
       'type': 'lens',
       if (zoomMm != null) 'zoomMm': r(zoomMm),
-      if (focusM != null) 'focusM': r(focusM),
+      if (focusPos != null) 'focusPos': r(focusPos.clamp(0.0, 1.0)),
     }));
   }
 

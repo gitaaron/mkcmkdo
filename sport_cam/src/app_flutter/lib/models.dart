@@ -194,61 +194,41 @@ class ViewOrientation {
   int get hashCode => Object.hash(quarterTurns, mirror);
 }
 
-/// The camera's zoom (focal length, mm) and focus (subject distance it is
-/// set for, m), with the ranges its sliders run over. The defaults are the
-/// Arducam PTZ lens's (config.py), for a camera that doesn't send them.
+/// The camera's zoom (focal length, mm, with its range) and where its focus
+/// motor is ([focusPos], 0…1 of its travel), for the lens sliders. The zoom
+/// range defaults to the Arducam PTZ lens's (config.py), for a camera that
+/// doesn't send it.
 class Lens {
   const Lens({
     this.zoomMm = 2.8,
     this.zoomMinMm = 2.8,
     this.zoomMaxMm = 10.6,
-    this.focusM,
-    this.focusMinM = 0.5,
-    this.focusMaxM = 30,
+    this.focusPos,
   });
 
   final double zoomMm;
   final double zoomMinMm;
   final double zoomMaxMm;
 
-  /// Null until the camera has focused for a distance since it started.
-  final double? focusM;
-  final double focusMinM;
-  final double focusMaxM;
+  /// The focus motor's position, 0 at one stop and 1 at the other; null
+  /// until the camera has moved it since it started.
+  final double? focusPos;
 
-  /// Focus distance → slider position, 0 near … 1 far, linear in 1/distance.
-  double focusToSlider(double m) {
-    final near = 1 / focusMinM, far = 1 / focusMaxM;
-    return ((near - 1 / m) / (near - far)).clamp(0.0, 1.0);
-  }
-
-  /// Slider position (0 near … 1 far) → focus distance, m.
-  double sliderToFocus(double t) {
-    final near = 1 / focusMinM, far = 1 / focusMaxM;
-    return 1 / (near + t.clamp(0.0, 1.0) * (far - near));
-  }
-
-  /// From the telemetry: `zoomMm`, `zoomRangeMm`, `focusM`, `focusRangeM`.
+  /// From the telemetry: `zoomMm`, `zoomRangeMm`, `focusPos`.
   factory Lens.fromJson(Map<String, dynamic>? j) {
     const d = Lens();
-    (double, double) range(Object? r, double lo, double hi) {
-      if (r is List && r.length == 2 && r[0] is num && r[1] is num) {
-        final a = (r[0] as num).toDouble(), b = (r[1] as num).toDouble();
-        if (a > 0 && b > a) return (a, b);
-      }
-      return (lo, hi);
+    var (zMin, zMax) = (d.zoomMinMm, d.zoomMaxMm);
+    final r = j?['zoomRangeMm'];
+    if (r is List && r.length == 2 && r[0] is num && r[1] is num) {
+      final lo = (r[0] as num).toDouble(), hi = (r[1] as num).toDouble();
+      if (lo > 0 && hi > lo) (zMin, zMax) = (lo, hi);
     }
-
-    final (zMin, zMax) = range(j?['zoomRangeMm'], d.zoomMinMm, d.zoomMaxMm);
-    final (fMin, fMax) = range(j?['focusRangeM'], d.focusMinM, d.focusMaxM);
-    final focus = (j?['focusM'] as num?)?.toDouble();
+    final focus = (j?['focusPos'] as num?)?.toDouble();
     return Lens(
       zoomMm: ((j?['zoomMm'] as num?)?.toDouble() ?? zMin).clamp(zMin, zMax),
       zoomMinMm: zMin,
       zoomMaxMm: zMax,
-      focusM: focus == null || focus <= 0 ? null : focus.clamp(fMin, fMax),
-      focusMinM: fMin,
-      focusMaxM: fMax,
+      focusPos: focus?.clamp(0.0, 1.0),
     );
   }
 }

@@ -87,11 +87,17 @@ class StubHead:
         self.session_hash = None
         self.local = LocalApi(self)
 
+    def telemetry(self) -> dict:
+        return {"pan": self.pan_deg, "tilt": self.tilt_deg, "zoomMm": 2.8,
+                "focusPos": None, "phase": self.phase,
+                "acquireStalled": self.acquire_stalled,
+                **self.power.telemetry(), **self.storage.telemetry()}
+
     def jog(self, pan: float, tilt: float) -> None:
         self.jogs.append((pan, tilt))
 
-    def lens(self, zoom_mm: float | None, focus_m: float | None) -> None:
-        self.lenses.append((zoom_mm, focus_m))
+    def lens(self, zoom_mm: float | None, focus_pos: float | None) -> None:
+        self.lenses.append((zoom_mm, focus_pos))
 
     async def apply_state(self, new: str) -> None:
         if new not in ("tracking", "recording"):
@@ -237,6 +243,9 @@ async def main() -> None:
             async with s.ws_connect(f"{BASE}/ws") as ws:
                 first = json.loads((await ws.receive(timeout=5)).data)
                 check("WS pushes state on connect", first["type"] == "state", str(first)[:80])
+                check("…with the head's whole telemetry: the lens too",
+                      "zoomMm" in first["telemetry"] and "focusPos" in first["telemetry"],
+                      str(first["telemetry"]))
                 await call(s, "startTracking")
                 third = json.loads((await ws.receive(timeout=5)).data)
                 check("WS broadcasts state change",
@@ -253,15 +262,14 @@ async def main() -> None:
 
                 # …and its zoom and focus sliders
                 await ws.send_json({"type": "lens", "zoomMm": 6.0})
-                await ws.send_json({"type": "lens", "focusM": 4})
-                await ws.send_json({"type": "lens", "zoomMm": 99, "focusM": 0.1})
+                await ws.send_json({"type": "lens", "focusPos": 0.4})
+                await ws.send_json({"type": "lens", "zoomMm": 99, "focusPos": -2})
                 await ws.send_json({"type": "lens", "zoomMm": "tele"})
                 await ws.send_json({"type": "lens"})
                 await ws.send_json({"type": "ping"})
                 await ws.receive(timeout=5)
                 check("WS lens reaches the head, clamped to the lens, malformed dropped",
-                      head.lenses == [(6.0, None), (None, 4.0),
-                                      (config.ZOOM_MAX_MM, config.LENS_FOCUS_MIN_M)],
+                      head.lenses == [(6.0, None), (None, 0.4), (config.ZOOM_MAX_MM, 0.0)],
                       str(head.lenses))
 
         # --- mDNS -------------------------------------------------------

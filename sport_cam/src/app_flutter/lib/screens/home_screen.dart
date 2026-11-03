@@ -290,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: LensControls(
                 lens: client.telemetry.lens,
                 onZoom: (mm) => client.setLens(zoomMm: mm),
-                onFocus: (m) => client.setLens(focusM: m),
+                onFocus: (f) => client.setLens(focusPos: f),
               ),
             ),
 

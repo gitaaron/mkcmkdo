@@ -364,6 +364,32 @@ class Ptz:
         """The subject distance the focus is set for; None until first set."""
         return self._focus_dist_m
 
+    @property
+    def focus_pos(self) -> float | None:
+        """Where the focus motor was last sent, as a fraction of its travel
+        (0 at its low stop, 1 at its high); None until it has been."""
+        if self._focus_raw is None:
+            return None
+        _reg, lo, hi = _CHANNELS[OPT_FOCUS]
+        return (self._focus_raw - lo) / (hi - lo)
+
+    def set_focus_pos(self, pos: float) -> None:
+        """Send the focus motor to `pos` of its travel (0…1): the app's focus
+        slider, focusing by eye.
+
+        Straight to the motor, not through FOCUS_GRID, which until it is
+        calibrated maps every distance to the same position. Forgets the
+        distance it was focused for, so the tracker's next set_focus moves
+        the motor whatever it asks for.
+        """
+        _reg, lo, hi = _CHANNELS[OPT_FOCUS]
+        raw = round(lo + max(0.0, min(1.0, pos)) * (hi - lo))
+        self._focus_dist_m = None
+        self._last_focus_at = time.monotonic()
+        if raw != self._focus_raw:
+            self._focus_raw = raw
+            self.focuser.set(OPT_FOCUS, raw)
+
     def set_focus(self, dist_m: float, urgent: bool = False) -> None:
         """Focus for a subject `dist_m` away, at the current focal length.
 

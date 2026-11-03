@@ -5,34 +5,22 @@ import 'package:sportcam/widgets/lens_controls.dart';
 
 void main() {
   group('lens from telemetry', () {
-    test('reads zoom, focus and their ranges', () {
+    test('reads zoom, its range and the focus position', () {
       final l = Lens.fromJson({
         'zoomMm': 6.0,
         'zoomRangeMm': [2.8, 10.6],
-        'focusM': 4.0,
-        'focusRangeM': [0.5, 30],
+        'focusPos': 0.42,
       });
       expect(l.zoomMm, 6.0);
-      expect(l.focusM, 4.0);
-      expect(l.focusMaxM, 30);
+      expect(l.zoomMaxMm, 10.6);
+      expect(l.focusPos, 0.42);
     });
 
-    test('an older camera: the Arducam defaults, focus unknown', () {
+    test('an older camera: the Arducam zoom range, focus unknown', () {
       final l = Lens.fromJson({'zoomMm': 2.8});
       expect(l.zoomMinMm, 2.8);
       expect(l.zoomMaxMm, 10.6);
-      expect(l.focusM, isNull);
-    });
-
-    test('focus slider is even in 1/distance, near to far', () {
-      const l = Lens();
-      expect(l.sliderToFocus(0), closeTo(0.5, 1e-9));
-      expect(l.sliderToFocus(1), closeTo(30, 1e-9));
-      for (final m in [0.5, 1.0, 3.0, 12.0, 30.0]) {
-        expect(l.sliderToFocus(l.focusToSlider(m)), closeTo(m, 1e-9));
-      }
-      // halfway in 1/d is near the near end: 1 / ((2 + 1/30) / 2) ≈ 0.98 m
-      expect(l.sliderToFocus(0.5), closeTo(0.984, 1e-3));
+      expect(l.focusPos, isNull);
     });
   });
 
@@ -63,9 +51,9 @@ void main() {
     });
 
     testWidgets('show the camera\'s zoom and focus', (tester) async {
-      await pump(tester, const Lens(zoomMm: 5.6, focusM: 4.5));
+      await pump(tester, const Lens(zoomMm: 5.6, focusPos: 0.42));
       expect(find.text('2.0×'), findsOneWidget);
-      expect(find.text('4.5 m'), findsOneWidget);
+      expect(find.text('42%'), findsOneWidget);
     });
 
     testWidgets('dragging zoom sends a few, ending where it was let go',
@@ -94,14 +82,15 @@ void main() {
       expect(tester.widget<Text>(shown).data, '1.0×');
     });
 
-    testWidgets('focus sends a distance in metres', (tester) async {
-      await pump(tester, const Lens(focusM: 30));
+    testWidgets('focus sends the motor position the slider is at',
+        (tester) async {
+      await pump(tester, const Lens(focusPos: 0));
       final r = tester.getRect(find.byType(Slider).last);
       await tester.tapAt(r.center);
       await tester.pump();
       expect(focuses, isNotEmpty);
-      expect(focuses.last, inInclusiveRange(0.5, 30));
-      expect(focuses.last, lessThan(5)); // the middle of the slider is near
+      expect(focuses.last, closeTo(0.5, 0.05));
+      expect(find.text('50%'), findsOneWidget);
       await tester.pump(const Duration(seconds: 2));
     });
   });

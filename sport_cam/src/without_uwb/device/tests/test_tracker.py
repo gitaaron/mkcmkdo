@@ -104,6 +104,11 @@ class FakePtz:
     def focus_m(self) -> float | None:
         return self.focus_dist
 
+    focus_pos = None
+
+    def set_focus_pos(self, pos):
+        self.focus_pos = pos
+
     def park(self) -> None:
         pass
 

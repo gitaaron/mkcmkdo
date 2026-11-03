@@ -124,10 +124,9 @@ JOG_TILT_ACCEL_DPS2 = 180.0
 JOG_TIMEOUT_S = 0.3            # no joystick message this long: stop. A dropped
                                # connection can't leave the head turning
 # …and the app's zoom and focus sliders. The lens goes where they say at once,
-# past ZOOM_RATE_LIMIT_S / FOCUS_RATE_LIMIT_S (those stop the tracker's lens
-# breathing; the app sends a few a second at most while a slider moves). The
-# focus slider runs between these distances, evenly in 1/distance.
-LENS_FOCUS_MIN_M, LENS_FOCUS_MAX_M = 0.5, 30.0
+# past ZOOM_RATE_LIMIT_S (that stops the tracker's lens breathing; the app
+# sends a few a second at most while a slider moves). The focus slider moves
+# the focus motor itself, across its whole travel: you focus by eye.
 
 CONTROL_RATE_HZ = 20            # tracker / state-machine tick
 

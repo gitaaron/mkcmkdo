@@ -92,11 +92,17 @@ class StubHead:
         self.pairings = Pairings(os.path.join(config.RECORD_DIR, "pairings.json"))
         self.local = LocalApi(self)
 
+    def telemetry(self) -> dict:
+        return {"pan": self.pan_deg, "tilt": self.tilt_deg, "zoomMm": 2.8,
+                "focusPos": None, "phase": self.phase,
+                "acquireStalled": self.acquire_stalled,
+                **self.power.telemetry(), **self.storage.telemetry()}
+
     def jog(self, pan: float, tilt: float) -> None:
         print(f"[stub] jog pan {pan:+.2f} tilt {tilt:+.2f}")
 
-    def lens(self, zoom_mm: float | None, focus_m: float | None) -> None:
-        print(f"[stub] lens zoom {zoom_mm} mm focus {focus_m} m")
+    def lens(self, zoom_mm: float | None, focus_pos: float | None) -> None:
+        print(f"[stub] lens zoom {zoom_mm} mm focus {focus_pos}")
 
     async def apply_state(self, new: str) -> None:
         if new not in ("tracking", "recording"):

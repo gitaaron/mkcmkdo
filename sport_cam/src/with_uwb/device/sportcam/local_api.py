@@ -13,7 +13,7 @@ API speaks (src/backend/functions), so the app talks to both identically:
     WS   /ws                       state, "recordingsChanged" and live person-box broadcasts;
                                    the app sends {"type":"jog","pan":x,"tilt":y}
                                    (each −1…1) while its joystick is held, and
-                                   {"type":"lens","zoomMm":z,"focusM":d}
+                                   {"type":"lens","zoomMm":z,"focusPos":f}
                                    (either one) as its lens sliders move
     GET  /api/health               {"ok":true,"backend":"device", …}
 
@@ -141,17 +141,9 @@ class LocalApi:
             "mode": config.TRACKING_MODE,
             "state": public_state(self.head.state),
             "sessionHash": self.head.session_hash,
-            "telemetry": {
-                "pan": round(self.head.pan_deg, 1),
-                "tilt": round(self.head.tilt_deg, 1),
-                "dist": round(self.head.tracker.dist_m, 2) if self.head.tracker.dist_m else None,
-                "phase": self.head.phase,
-                "countdown": self.head.tracker.countdown if self.head.state == "tracking" else 0,
-                "acquireStalled": self.head.acquire_stalled,
-                "tagPresent": self.head.session.tag_present,
-                **self.head.power.telemetry(),
-                **self.head.storage.telemetry(),
-            },
+            # all of it, as the backend gets it: the lens and the view
+            # orientation too, not only what the status ring needs
+            "telemetry": self.head.telemetry(),
             "deviceOnline": True,        # you're talking to the device itself
             "whepUrl": config.WHEP_URL,  # None unless MediaMTX is running
             "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -250,7 +242,7 @@ class LocalApi:
             return max(lo, min(hi, float(v)))
         try:
             zoom = value("zoomMm", config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
-            focus = value("focusM", config.LENS_FOCUS_MIN_M, config.LENS_FOCUS_MAX_M)
+            focus = value("focusPos", 0.0, 1.0)
         except ValueError:
             return
         if zoom is not None or focus is not None:

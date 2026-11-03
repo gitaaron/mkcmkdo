@@ -8,8 +8,9 @@ import '../theme.dart';
 /// Zoom and focus by hand: two sliders above the aim sticks, awake only.
 ///
 /// Zoom runs wide → tele and reads as a multiple of the widest view. Focus
-/// runs near → far, evenly in 1/distance (how the lens actually moves), so
-/// the near end, where a small move matters, gets most of the slider.
+/// moves the focus motor across its travel (0–100 %): you focus by eye,
+/// watching the picture. Until the camera's focus is calibrated
+/// (`focuscal`), a distance would mean nothing to it.
 ///
 /// While a slider moves it reports at most once per [period], and once more
 /// where it was let go. The camera reports the lens back about once a
@@ -25,7 +26,7 @@ class LensControls extends StatelessWidget {
 
   final Lens lens;
   final void Function(double zoomMm) onZoom;
-  final void Function(double focusM) onFocus;
+  final void Function(double focusPos) onFocus;
   final Duration period;
 
   @override
@@ -56,23 +57,20 @@ class LensControls extends StatelessWidget {
             key: const ValueKey('focus'),
             icon: Icons.center_focus_strong,
             name: 'Focus',
-            // unknown until the camera has focused once: show far
-            value: l.focusM == null ? 1 : l.focusToSlider(l.focusM!),
+            // unknown until the camera has moved it: at its low stop, where
+            // waking the lens leaves it
+            value: l.focusPos ?? 0,
             min: 0,
             max: 1,
-            label: (t) => formatDistance(l.sliderToFocus(t)),
+            label: (t) => '${(t * 100).round()}%',
             period: period,
-            onSend: (t) => onFocus(l.sliderToFocus(t)),
+            onSend: onFocus,
           ),
         ],
       ),
     );
   }
 }
-
-/// "0.8 m", "4.5 m", "18 m".
-String formatDistance(double m) =>
-    m < 10 ? '${m.toStringAsFixed(1)} m' : '${m.round()} m';
 
 /// One slider of [LensControls]: shows the camera's [value] unless a finger
 /// has moved it in the last [settle], and sends what the finger asks for,

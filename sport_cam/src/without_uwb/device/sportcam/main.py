@@ -95,8 +95,9 @@ class Head:
         self._boxes_sent_at: float | None = None   # tracker.labelled_at last sent live
         self._jog = (0.0, 0.0)              # the app's joystick: pan, tilt in −1…1
         self._jog_at = float("-inf")        # when it last sent one
-        # The app's zoom (mm) and focus (m) sliders, awake only. None: not
-        # touched since the camera woke — the lens stays wide, as for tracking.
+        # The app's zoom (mm) and focus (0…1 of the motor's travel) sliders,
+        # awake only. None: not touched since the camera woke — the lens stays
+        # wide, focused for the zoom, as for tracking.
         self._lens_zoom: float | None = None
         self._lens_focus: float | None = None
         self._lens_new = False              # set since the last control tick
@@ -343,30 +344,30 @@ class Head:
         if pan or tilt:
             self._awake_since = time.monotonic()   # someone is using it
 
-    def lens(self, zoom_mm: float | None, focus_m: float | None) -> None:
+    def lens(self, zoom_mm: float | None, focus_pos: float | None) -> None:
         """The app's zoom and focus sliders: either may be left out. Awake
         only; control_tick moves the lens (manual_lens)."""
         if self.state != "awake":
             return
         if zoom_mm is not None:
             self._lens_zoom = zoom_mm
-        if focus_m is not None:
-            self._lens_focus = focus_m
+        if focus_pos is not None:
+            self._lens_focus = focus_pos
         self._lens_new = True
 
     def manual_lens(self) -> None:
         """Awake: move the lens to the app's latest zoom and focus.
 
-        Focus first, so the zoom move refocuses for the distance just asked
-        for (set_zoom_mm refocuses for the latest one it was told).
+        Zoom first: a zoom move refocuses from FOCUS_GRID, so a focus the
+        app has set goes back on after it.
         """
         if not self._lens_new:
             return
         self._lens_new = False
-        if self._lens_focus is not None:
-            self.ptz.set_focus(self._lens_focus, urgent=True)
         if self._lens_zoom is not None:
             self.ptz.set_zoom_mm(self._lens_zoom, urgent=True)
+        if self._lens_focus is not None:
+            self.ptz.set_focus_pos(self._lens_focus)
         self._awake_since = time.monotonic()      # someone is using it
 
     async def health_loop(self) -> None:
@@ -501,8 +502,8 @@ class Head:
             "tilt": round(self.ptz.tilt_deg, 1),
             "zoomMm": round(self.ptz.zoom_mm, 1),
             "zoomRangeMm": [config.ZOOM_MIN_MM, config.ZOOM_MAX_MM],
-            "focusM": round(self.ptz.focus_m, 2) if self.ptz.focus_m else None,
-            "focusRangeM": [config.LENS_FOCUS_MIN_M, config.LENS_FOCUS_MAX_M],
+            "focusPos": (round(self.ptz.focus_pos, 3)
+                         if self.ptz.focus_pos is not None else None),
             "view": {"rotateDeg": config.VIEW_ROTATE_DEG, "mirror": config.VIEW_MIRROR},
             "dist": round(self.tracker.dist_m, 2) if self.tracker.dist_m else None,
             "phase": self.phase,

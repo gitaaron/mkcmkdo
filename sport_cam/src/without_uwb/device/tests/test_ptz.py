@@ -133,6 +133,20 @@ def main() -> None:
     check("…and still inside the deadband does nothing", len(f.focuser.writes) == n)
     config.FOCUS_RATE_LIMIT_S = 0.0
 
+    # ---- the app's focus slider moves the motor itself ----------------------
+    f = Ptz()
+    f.focuser = RecordingFocuser()
+    f.set_focus(10.0)
+    f.set_focus_pos(0.25)
+    lo, hi = 0, 20000
+    check("focus slider: straight to that much of the motor's travel",
+          f.focuser.writes[-1] == (OPT_FOCUS, lo + (hi - lo) // 4) and f.focus_pos == 0.25,
+          f"{f.focuser.writes[-1]}, {f.focus_pos}")
+    n = len(f.focuser.writes)
+    f.set_focus(10.0)
+    check("…and the tracker's next focus moves it, even to the distance it had",
+          len(f.focuser.writes) == n + 1)
+
     # ---- zooming out for a lost person skips the rate limit ----------------
     config.ZOOM_RATE_LIMIT_S = 2.0                 # section 4 turned it off
     p = Ptz()

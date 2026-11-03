@@ -368,13 +368,13 @@ async def full_flow() -> None:
           f"{head.ptz.jogs - held} more moves")
 
     # the app's zoom and focus sliders hold the lens in awake…
-    head.lens(8.0, 3.0)
+    head.lens(8.0, 0.3)
     await tick_for(0.5)
     check("lens: awake, the app's zoom and focus hold (awake no longer forces wide)",
-          head.ptz.zoom_mm == 8.0 and head.ptz.focus_dist == 3.0,
-          f"zoom {head.ptz.zoom_mm}, focus {head.ptz.focus_dist}")
+          head.ptz.zoom_mm == 8.0 and head.ptz.focus_pos == 0.3,
+          f"zoom {head.ptz.zoom_mm}, focus {head.ptz.focus_pos}")
     check("…and the app sees them", head.telemetry()["zoomMm"] == 8.0
-          and head.telemetry()["focusM"] == 3.0, f"{head.telemetry()}")
+          and head.telemetry()["focusPos"] == 0.3, f"{head.telemetry()}")
     await head.apply_state("sleep")
     head.lens(5.0, None)
     check("…asleep, the sliders are ignored", head._lens_zoom is None)
