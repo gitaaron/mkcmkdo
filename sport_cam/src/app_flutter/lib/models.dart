@@ -125,6 +125,7 @@ class Telemetry {
     this.phase,
     this.countdown = 0,
     this.acquireStalled = false,
+    this.lens = const Lens(),
   });
 
   final double? pan;
@@ -144,6 +145,9 @@ class Telemetry {
   /// Acquiring for a while and the camera still cannot see / has not found anyone.
   final bool acquireStalled;
 
+  /// Where the zoom and focus are, for the lens sliders.
+  final Lens lens;
+
   factory Telemetry.fromJson(Map<String, dynamic>? j) => Telemetry(
     pan: (j?['pan'] as num?)?.toDouble(),
     tilt: (j?['tilt'] as num?)?.toDouble(),
@@ -151,7 +155,67 @@ class Telemetry {
     phase: j?['phase'] as String?,
     countdown: (j?['countdown'] as num?)?.toInt() ?? 0,
     acquireStalled: j?['acquireStalled'] as bool? ?? false,
+    lens: Lens.fromJson(j),
   );
+}
+
+/// The camera's zoom (focal length, mm) and focus (subject distance it is
+/// set for, m), with the ranges its sliders run over. The defaults are the
+/// Arducam PTZ lens's (config.py), for a camera that doesn't send them.
+class Lens {
+  const Lens({
+    this.zoomMm = 2.8,
+    this.zoomMinMm = 2.8,
+    this.zoomMaxMm = 10.6,
+    this.focusM,
+    this.focusMinM = 0.5,
+    this.focusMaxM = 30,
+  });
+
+  final double zoomMm;
+  final double zoomMinMm;
+  final double zoomMaxMm;
+
+  /// Null until the camera has focused for a distance since it started.
+  final double? focusM;
+  final double focusMinM;
+  final double focusMaxM;
+
+  /// Focus distance → slider position, 0 near … 1 far, linear in 1/distance.
+  double focusToSlider(double m) {
+    final near = 1 / focusMinM, far = 1 / focusMaxM;
+    return ((near - 1 / m) / (near - far)).clamp(0.0, 1.0);
+  }
+
+  /// Slider position (0 near … 1 far) → focus distance, m.
+  double sliderToFocus(double t) {
+    final near = 1 / focusMinM, far = 1 / focusMaxM;
+    return 1 / (near + t.clamp(0.0, 1.0) * (far - near));
+  }
+
+  /// From the telemetry: `zoomMm`, `zoomRangeMm`, `focusM`, `focusRangeM`.
+  factory Lens.fromJson(Map<String, dynamic>? j) {
+    const d = Lens();
+    (double, double) range(Object? r, double lo, double hi) {
+      if (r is List && r.length == 2 && r[0] is num && r[1] is num) {
+        final a = (r[0] as num).toDouble(), b = (r[1] as num).toDouble();
+        if (a > 0 && b > a) return (a, b);
+      }
+      return (lo, hi);
+    }
+
+    final (zMin, zMax) = range(j?['zoomRangeMm'], d.zoomMinMm, d.zoomMaxMm);
+    final (fMin, fMax) = range(j?['focusRangeM'], d.focusMinM, d.focusMaxM);
+    final focus = (j?['focusM'] as num?)?.toDouble();
+    return Lens(
+      zoomMm: ((j?['zoomMm'] as num?)?.toDouble() ?? zMin).clamp(zMin, zMax),
+      zoomMinMm: zMin,
+      zoomMaxMm: zMax,
+      focusM: focus == null || focus <= 0 ? null : focus.clamp(fMin, fMax),
+      focusMinM: fMin,
+      focusMaxM: fMax,
+    );
+  }
 }
 
 /// One of the signed-in person's clips: in the cloud library (from any

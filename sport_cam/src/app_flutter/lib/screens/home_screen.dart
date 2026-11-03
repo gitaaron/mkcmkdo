@@ -9,6 +9,7 @@ import '../theme.dart';
 import '../widgets/connection_badge.dart';
 import '../widgets/control_bar.dart';
 import '../widgets/joystick.dart';
+import '../widgets/lens_controls.dart';
 import '../widgets/mjpeg_view.dart';
 import '../widgets/person_boxes.dart';
 import '../widgets/status_ring.dart';
@@ -17,8 +18,8 @@ import 'library_screen.dart';
 
 /// The single screen: live video, connection badge (top-left), camera-state
 /// ring (top-right) with the account menu under it, state-dependent controls
-/// at the bottom, and in awake a joystick (bottom-right) to aim the camera by
-/// hand.
+/// at the bottom, and in awake pan and tilt sticks to aim the camera by hand,
+/// with zoom and focus sliders above them.
 ///
 /// Opening the app starts streaming — discovery runs on launch and the
 /// video view attaches as soon as a camera answers.
@@ -267,6 +268,19 @@ class _HomeScreenState extends State<HomeScreen> {
               right: 18,
               bottom: 96 + MediaQuery.of(context).padding.bottom,
               child: AimSticks(onMove: client.aim),
+            ),
+
+          // …and zoom and focus it, just above the sticks
+          if (client.canAim && client.foreground)
+            Positioned(
+              left: 18,
+              right: 18,
+              bottom: 96 + 132 + 12 + MediaQuery.of(context).padding.bottom,
+              child: LensControls(
+                lens: client.telemetry.lens,
+                onZoom: (mm) => client.setLens(zoomMm: mm),
+                onFocus: (m) => client.setLens(focusM: m),
+              ),
             ),
 
           Align(

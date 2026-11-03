@@ -598,6 +598,22 @@ class CameraClient extends ChangeNotifier {
     ws.sink.add(jsonEncode({'type': 'jog', 'pan': r(pan), 'tilt': r(tilt)}));
   }
 
+  /// Zoom (focal length, mm) and focus (subject distance, m) by hand, from
+  /// the lens sliders ([LensControls]); either may be left out. When [canAim]
+  /// only, on the WebSocket like [aim]. The camera clamps both to its lens,
+  /// and puts the lens back to wide when it leaves awake.
+  void setLens({double? zoomMm, double? focusM}) {
+    final ws = _ws;
+    if (ws == null || _link != LinkMode.direct) return;
+    if (zoomMm == null && focusM == null) return;
+    double r(double v) => (v * 1000).roundToDouble() / 1000;
+    ws.sink.add(jsonEncode({
+      'type': 'lens',
+      if (zoomMm != null) 'zoomMm': r(zoomMm),
+      if (focusM != null) 'focusM': r(focusM),
+    }));
+  }
+
   /// The signed-in person's clips: the backend's library, and, connected
   /// directly, those of theirs still on the camera's card (until they
   /// upload). `announce`: a new newest recording shows the "saved" toast.

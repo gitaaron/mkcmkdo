@@ -19,6 +19,7 @@ protocol** as the Firebase function:
 | Live state | Firestore document | `WS /ws` |
 | Live person boxes | with each preview frame | `WS /ws` `boxes` message, each detection |
 | Joystick (aim by hand) | — | the app sends `WS /ws` `jog` messages ([below](#aiming-by-hand)) |
+| Zoom and focus by hand | — | the app sends `WS /ws` `lens` messages ([below](#zoom-and-focus-by-hand)) |
 | Works at the gym | needs internet | ✅ **needs nothing** |
 
 - Same protocol, so the app's calls are identical; only the base URL changes.
@@ -94,6 +95,7 @@ One screen (requirement F5 in [01](../product/01-requirements.md#functional-requ
 | **Below the badge** | recordings button with clip-count badge; under it, **Boxes on / off** for the live view (remembered on the phone, separately from the player's) |
 | **Live view** | the MJPEG stream (direct) or the preview (Firebase), with the camera's [person boxes](08-recordings-and-cloud.md#in-the-live-view) painted over it (`widgets/person_boxes.dart`). Only in `awake`, `tracking` and `recording`; in `sleep` the sensor is off and the screen says the camera is asleep |
 | **Bottom — pan and tilt sticks** (`widgets/joystick.dart`) | in `awake` over the direct connection only: two knobs in rings, pan under the left thumb and tilt under the right, to aim the camera by hand ([below](#aiming-by-hand)) |
+| **Above the sticks — zoom and focus** (`widgets/lens_controls.dart`) | with the sticks: a **Zoom** slider (wide → tele, read as 1.0× … 3.8×) and a **Focus** slider (near → far, read in metres) ([below](#zoom-and-focus-by-hand)) |
 | **Top right — status ring** (`widgets/status_ring.dart`) | the camera's state in the LED colours ([01 — State machine](../product/01-requirements.md#state-machine)); hollow while the camera is offline |
 | **Under the ring — account menu** | who is signed in; <!--with_uwb-->**Pair my tag**; <!--/--><!--both-->with UWB, **Pair my tag**; <!--/-->for admins, **People** (`lib/screens/admin_screen.dart`: everyone who can sign in, and **Add person**); **Sign out** |
 | **Bottom buttons** (`widgets/control_bar.dart`) | swap with the state, with the labels in [01 — State machine](../product/01-requirements.md#state-machine). In `sleep`: **Wake up** and **Record** |
@@ -121,6 +123,21 @@ springs back and that axis eases to a stop where it is.
 | Dead man | the camera moves only within `JOG_TIMEOUT_S` (0.3 s) of the last message, so a dropped Wi-Fi link or a backgrounded app can't leave it turning |
 | Where it runs | `LocalApi._on_jog` checks and clamps each message; `Head.jog` notes it; `Head.manual_aim` turns the head once per control tick (`Ptz.jog`), so it moves smoothly however unevenly messages arrive. Using it keeps the camera awake |
 | Then | a session started afterwards begins from where you aimed it: <!--with_uwb-->the camera turns from there to the tag<!--/--><!--both--> (with UWB), or <!--/--><!--without_uwb-->the sweep starts from there, and with a person in frame it skips the sweep<!--/--><!--both--> (without)<!--/-->. Going to sleep, and a session ending, re-centre the head |
+
+## Zoom and focus by hand
+
+Two sliders sit just above the sticks: **Zoom**, from the widest view to full
+tele, shown as a multiple of the widest (1.0× … 3.8×), and **Focus**, from
+near to far, shown as the distance it is focused for.
+
+| | |
+| --- | --- |
+| When | as the sticks: `awake` only, over the direct connection. Tracking and recording drive the lens themselves, starting from wide |
+| Message | while a slider moves, the app sends `{"type": "lens", "zoomMm": z}` or `{"type": "lens", "focusM": d}` on the WebSocket, at most every 120 ms, and once more where it is let go. `z` is the focal length in mm, `d` the subject distance in m. The camera clamps both to its lens (`ZOOM_MIN_MM`…`ZOOM_MAX_MM`, `LENS_FOCUS_MIN_M`…`LENS_FOCUS_MAX_M`) and drops anything malformed |
+| Focus scale | the focus slider is even in 1/distance, as the lens moves: halfway along is about 1 m, so the near end, where a small move matters, gets most of the slider |
+| Where it runs | `LocalApi._on_lens` checks and clamps; `Head.lens` notes it (ignored outside awake); `Head.manual_lens` moves the lens on the next control tick, focus first so the zoom move refocuses for it. Both skip `ZOOM_RATE_LIMIT_S` / `FOCUS_RATE_LIMIT_S` (those stop the tracker's lens breathing), but not the deadbands. While the app holds a zoom, awake stops forcing the lens wide. Using them keeps the camera awake |
+| Feedback | telemetry carries `zoomMm`, `focusM` and the ranges `zoomRangeMm` / `focusRangeM`; the slider stays where the finger left it for 1.5 s, then follows the camera |
+| Then | any state change clears the app's zoom and focus: woken again, the lens is back to wide |
 
 ## Running and testing it
 
