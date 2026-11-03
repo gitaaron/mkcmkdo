@@ -119,6 +119,20 @@ def main() -> None:
     check("a zoom move refocuses for the last ranged distance",
           focus_after == focus_raw(10.6, 4.0, GRID), f"{focus_after}")
 
+    # ---- the app's focus slider skips the rate limit, not the deadband -------
+    config.FOCUS_RATE_LIMIT_S = 2.0
+    f = Ptz()
+    f.focuser = RecordingFocuser()
+    f.set_focus(10.0)
+    f.set_focus(3.0)
+    check("a second focus inside FOCUS_RATE_LIMIT_S is dropped", f.focus_m == 10.0, f"{f.focus_m}")
+    f.set_focus(3.0, urgent=True)
+    check("…but the app's goes at once", f.focus_m == 3.0, f"{f.focus_m}")
+    n = len(f.focuser.writes)
+    f.set_focus(3.05, urgent=True)
+    check("…and still inside the deadband does nothing", len(f.focuser.writes) == n)
+    config.FOCUS_RATE_LIMIT_S = 0.0
+
     # ---- zooming out for a lost person skips the rate limit ----------------
     config.ZOOM_RATE_LIMIT_S = 2.0                 # section 4 turned it off
     p = Ptz()

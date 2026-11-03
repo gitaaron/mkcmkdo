@@ -82,9 +82,26 @@ password.
 
 From the repo's root, on your Mac:
 
+<!--pigpio-->
+
 ```bash
 ./scripts/pi/install.sh without_uwb
 ```
+
+<!--/servo-->
+
+<!--arducam-->
+
+```bash
+./scripts/pi/install.sh without_uwb --servos arducam
+```
+
+`--servos arducam` is for the servos left on the PTZ controller
+([wiring, Servos](12-wiring.md#servos)): it sets `SERVO_DRIVER = "arducam"`
+and skips pigpio. Keep it on every run: without it, the script sets
+`"pigpio"` back.
+
+<!--/servo-->
 
 It logs in to `pi@sportcam.local` and does the rest; 20–30 minutes the
 first time, most of it the OS upgrade. The Pi reboots near the end. The
@@ -95,21 +112,18 @@ what you have.
 | --- | --- |
 | Interfaces | I2C (PTZ controller, battery gauge) and SPI (LED ring) turned on |
 | OS | upgraded; `python3-picamera2`, `python3-opencv`, `i2c-tools` and `pip` installed |
-| Pan and tilt | pigpio (from apt, or built from [source](https://github.com/joan2937/pigpio) if apt has none), with `pigpiod` enabled: the servos run off the Pi's hardware PWM through it (`SERVO_DRIVER = "pigpio"`, [04 — Servo drive](../../design/04-electronics.md#servo-drive)), and the service talks to it over a local socket, so it doesn't run as root. Analog audio off: it shares the PWM block |
+| Pan and tilt <!--pigpio row--> | pigpio (from apt, or built from [source](https://github.com/joan2937/pigpio) if apt has none), with `pigpiod` enabled: the servos run off the Pi's hardware PWM through it (`SERVO_DRIVER = "pigpio"`, [04 — Servo drive](../../design/04-electronics.md#servo-drive)), and the service talks to it over a local socket, so it doesn't run as root. Analog audio off: it shares the PWM block |
+| Pan and tilt <!--arducam row--> | `--servos arducam`: no pigpio. The PTZ controller drives the servos from its I2C registers, in whole degrees (`SERVO_DRIVER = "arducam"`, [04 — Servo drive](../../design/04-electronics.md#servo-drive)) |
 | Code | `src/without_uwb/device` → `~/sportcam/src/without_uwb/device`. A `config.py` already there is kept, with your calibration; `--reset-config` replaces it |
 | Python packages | `requirements.txt`, system-wide: both services use the system `python3`, the Wi-Fi portal runs as root, and Picamera2 is apt-only |
 | Tests | the offline tests, before anything is put in place |
 | Person detector | MobileNet-SSD's weights (`getmodel`, ≈ 48 MB download, 19 MB kept). HOG works out of the box; MobileNet-SSD finds climbers in poses HOG misses ([06 — The two detectors](../../design/06-device-software.md#the-two-detectors)), and the comparison in [verification](15-verification.md) needs it |
-| Checks, after the reboot | the camera is found (if not, it adds `dtoverlay=imx477` and reboots once more); `0c` (PTZ) and `40` (gauge) on I2C; `pigpiod` answers |
+| Checks, after the reboot | the camera is found (if not, it adds `dtoverlay=imx477` and reboots once more); `0c` (PTZ) and `40` (gauge) on I2C<!--pigpio:; `pigpiod` answers--> |
 
 **Done when:** it ends with `All set`. A failed check names the connection
 to look at: fix it and run the script again. Every part of it is safe to
 repeat, and running it again is also how you update the Pi after changing
 the code on your Mac.
-
-A head still wired as the Arducam kit came, with the servo leads on the PTZ
-controller, doesn't use pigpio: set `SERVO_DRIVER = "arducam"` in
-`config.py` (whole-degree steps).
 
 ## 3. Connect it to Firebase (optional)
 
@@ -196,10 +210,22 @@ test photo on your Mac. If it does not, see step 2's checks.
 Sweeps each axis to its soft limits and back, then creeps the pan 0° → 3°
 in tenths of a degree. Adjust in `config.py`:
 
+<!--pigpio-->
+
 - the creep should be smooth. Ticks of about a degree mean the pan servo is
   still on the PTZ controller, not GPIO12 ([wiring, M1–M6](12-wiring.md#servos));
 - if a commanded ±45° measures short or long (phone level on the camera),
   widen or narrow `SERVO_US_AT_0` / `SERVO_US_AT_180` evenly about 1500 µs;
+
+<!--/servo-->
+
+<!--arducam-->
+
+- the creep moves in whole-degree ticks: expected with the servos on the
+  PTZ controller, which takes whole degrees
+  ([wiring, Servos](12-wiring.md#servos));
+
+<!--/servo-->
 
 - narrow `PAN_MIN/MAX_DEG` or `TILT_MIN/MAX_DEG` if anything binds. The
   search sweeps the whole pan range, so the ends of it matter more than they
@@ -414,7 +440,7 @@ All in `src/without_uwb/device/sportcam/config.py`:
 | Setting | From |
 | --- | --- |
 | `DETECTOR` | `"hog"` until `detectbench` ([15](15-verification.md)) shows `"ssd"` finding the climber more often at 3 fps or better |
-| `SERVO_DRIVER` | step 2: `"pigpio"` once the servo leads are on GPIO12/13, `"arducam"` if not |
+| `SERVO_DRIVER` | step 2, `install.sh --servos`: `"pigpio"` with the servo leads on GPIO12/13 (the default), `"arducam"` with them on the PTZ controller |
 | `PAN_SIGN`, `TILT_SIGN`, soft limits (`PAN_MIN/MAX_DEG`, `TILT_MIN/MAX_DEG`), `SERVO_US_AT_0/180` | step 4b, `ptzcheck`, then step 8 |
 | `ZOOM_CURVE` | step 5a, by hand |
 | `FOCUS_GRID` | step 5b, `focuscal` |

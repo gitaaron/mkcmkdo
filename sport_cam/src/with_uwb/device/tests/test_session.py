@@ -446,6 +446,8 @@ async def full_flow() -> None:
     head._tasks = set()
     head._boxes_sent_at = None
     head._jog, head._jog_at = (0.0, 0.0), float("-inf")
+    head._lens_zoom = head._lens_focus = None
+    head._lens_new = False
     head._awake_since = time.monotonic()
     head.boxlog = BoxLog()
 
@@ -497,6 +499,22 @@ async def full_flow() -> None:
     head.ptz.set_tilt(0.0)
     check("awake sub-state: person in frame; the ring breathes",
           head.phase == "person-in-frame" and head.led.awake_person, f"{head.phase}")
+
+    # the app's zoom and focus sliders hold the lens in awake…
+    head.lens(8.0, 3.0)
+    await tick_for(0.5)
+    check("lens: awake, the app's zoom and focus hold (awake no longer forces wide)",
+          head.ptz.zoom_mm == 8.0 and head.ptz.focus_dist == 3.0,
+          f"zoom {head.ptz.zoom_mm}, focus {head.ptz.focus_dist}")
+    check("…and the app sees them", head.telemetry()["zoomMm"] == 8.0
+          and head.telemetry()["focusM"] == 3.0, f"{head.telemetry()}")
+    await head.apply_state("sleep")
+    head.lens(5.0, None)
+    check("…asleep, the sliders are ignored", head._lens_zoom is None)
+    await head.apply_state("awake")
+    await tick_for(config.ZOOM_RATE_LIMIT_S + 0.2)
+    check("…and woken again the lens is back to wide", head.ptz.zoom_mm == config.ZOOM_MIN_MM,
+          f"{head.ptz.zoom_mm}")
     bbox, head.camera._bbox = head.camera._bbox, None
     await tick_for(config.AWAKE_PERSON_HOLD_S + 0.5)
     check("awake sub-state: no person in frame once they have gone for AWAKE_PERSON_HOLD_S; ring solid",

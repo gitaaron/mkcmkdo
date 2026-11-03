@@ -7,8 +7,11 @@
 <!--
   Interactive block-level wiring schematic rendered with d3-hwschematic.
   All libraries are vendored in ./vendor/ (same-origin — the ELK layout
-  engine cannot run from a CDN), so this works offline. Serve it with the
-  docs viewer:
+  engine cannot run from a CDN), so this works offline. Drawn for the servo
+  drive chosen in the docs viewer's settings (localStorage
+  "sportcam-docs-servos", or ?servos=pigpio|arducam): the servos on the Pi's
+  PWM through the shifter, or on the PTZ controller. The header's switch
+  changes it. Serve it with the docs viewer:
 
       npm run docs        → http://localhost:8090/schematics/interactive/index.html
 
@@ -21,15 +24,43 @@
 <link rel="stylesheet" href="vendor/d3-hwschematic.css" />
 <style>
   html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; overflow: hidden; }
-  header { padding: 10px 16px; background: #1a2233; color: #fff; height: 24px; }
-  header h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  header { padding: 10px 16px; background: #1a2233; color: #fff; height: 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; flex: 1; }
+  header .switch { display: flex; gap: 2px; padding: 2px; border: 1px solid #56607a; border-radius: 7px; }
+  header .switch button { font: inherit; font-size: 12.5px; padding: 2px 9px; border: 0; border-radius: 5px;
+                          background: none; color: #c5cbe0; cursor: pointer; }
+  header .switch button[aria-pressed="true"] { background: #2f6fed; color: #fff; }
   #scheme { width: 100vw; height: calc(100vh - 44px); display: block; }
 </style>
 </head>
 <body>
-<header><h1>SportCam wiring — base · head · wearable (drag to pan, wheel to zoom)</h1></header>
+<header><h1>SportCam wiring — base · head · wearable<span id="drive"></span> (drag to pan, wheel to zoom)</h1>
+  <div class="switch" role="group" aria-label="Servos driven by">
+    <button type="button" data-servos="pigpio">Servos on the Pi</button>
+    <button type="button" data-servos="arducam">On the PTZ controller</button>
+  </div></header>
 <svg id="scheme"></svg>
 <script>
+// The servo drive: ?servos=…, else the docs viewer's setting, else the Pi
+const SERVO_KEY = "sportcam-docs-servos";
+const DRIVES = ["pigpio", "arducam"];
+let servos = new URLSearchParams(location.search).get("servos");
+if (!DRIVES.includes(servos)) {
+  try { servos = localStorage.getItem(SERVO_KEY); } catch {}
+}
+if (!DRIVES.includes(servos)) servos = "pigpio";
+const onPi = servos === "pigpio";
+for (const btn of document.querySelectorAll("[data-servos]")) {
+  btn.setAttribute("aria-pressed", String(btn.dataset.servos === servos));
+  btn.addEventListener("click", () => {
+    try { localStorage.setItem(SERVO_KEY, btn.dataset.servos); } catch {}
+    const url = new URL(location.href);
+    url.searchParams.set("servos", btn.dataset.servos);
+    location.replace(url);
+  });
+}
+document.getElementById("drive").textContent = onPi ? ", servos on the Pi" : ", servos on the PTZ controller";
+
 const port = (id, name, side) => ({
   id, hwMeta: { name }, direction: side, properties: { side: side === "OUTPUT" ? "EAST" : "WEST" },
 });
@@ -65,20 +96,28 @@ const graph = {
       port("pi_csi", "CSI", "OUTPUT"), port("pi_i2c", "I2C G2/G3", "OUTPUT"),
       port("pi_i2c_in", "I2C gauge", "INPUT"),
       port("pi_spi", "SPI0 MOSI G10", "OUTPUT"),
-      port("pi_pwm_pan", "PWM0 G12", "OUTPUT"), port("pi_pwm_tilt", "PWM1 G13", "OUTPUT"),
+      ...(onPi ? [port("pi_pwm_pan", "PWM0 G12", "OUTPUT"), port("pi_pwm_tilt", "PWM1 G13", "OUTPUT")] : []),
       port("pi_hold", "HOLD G17", "OUTPUT"), port("pi_sense", "SENSE G27", "INPUT"),
     ]),
-    node("ptz", "Arducam PTZ ctrl (0x0C) — lens", [
+    node("ptz", onPi ? "Arducam PTZ ctrl (0x0C) — lens" : "Arducam PTZ ctrl (0x0C) — lens, servos", [
       port("ptz_i2c", "I2C", "INPUT"), port("ptz_5v", "5V", "INPUT"),
       port("ptz_zoom", "zoom motor", "OUTPUT"), port("ptz_focus", "focus motor", "OUTPUT"),
+      ...(onPi ? [] : [port("ptz_svcc", "servo VCC", "INPUT"),
+                       port("ptz_pan", "PAN socket", "OUTPUT"), port("ptz_tilt", "TILT socket", "OUTPUT")]),
     ]),
     node("cam", "Arducam IMX477 + zoom lens", [port("cam_csi", "CSI", "INPUT")]),
-    node("pan", "Pan servo ±80°", [port("pan_in", "signal", "INPUT"), port("pan_5v", "5V", "INPUT")]),
-    node("tilt", "Tilt servo −45…+85°", [port("tilt_in", "signal", "INPUT"), port("tilt_5v", "5V", "INPUT")]),
+    node("pan", "Pan servo ±80°", onPi
+      ? [port("pan_in", "signal", "INPUT"), port("pan_5v", "5V", "INPUT")]
+      : [port("pan_in", "3-wire lead", "INPUT")]),
+    node("tilt", "Tilt servo −45…+85°", onPi
+      ? [port("tilt_in", "signal", "INPUT"), port("tilt_5v", "5V", "INPUT")]
+      : [port("tilt_in", "3-wire lead", "INPUT")]),
     node("shift", "74AHCT125 3.3→5 V", [
       port("sh_in", "1A", "INPUT"), port("sh_out", "1Y", "OUTPUT"),
-      port("sh_in2", "2A", "INPUT"), port("sh_out2", "2Y", "OUTPUT"),
-      port("sh_in3", "3A", "INPUT"), port("sh_out3", "3Y", "OUTPUT"),
+      ...(onPi ? [
+        port("sh_in2", "2A", "INPUT"), port("sh_out2", "2Y", "OUTPUT"),
+        port("sh_in3", "3A", "INPUT"), port("sh_out3", "3Y", "OUTPUT"),
+      ] : []),
     ]),
     node("ring", "WS2812B ×16", [port("ring_din", "DIN", "INPUT"), port("ring_5v", "5V", "INPUT")]),
     node("a1", "ULA1 anchor A1 (data)", [port("a1_usb", "USB", "OUTPUT")]),
@@ -105,15 +144,23 @@ graph.edges = [
   edge("ina", "ina_i2c", "pi", "pi_i2c_in", "battery I2C"),
   edge("buck", "bk_out", "pi", "pi_5v", "5V 5A"),
   edge("buck", "bk_out", "ptz", "ptz_5v", "5V lens motors"),
-  edge("buck", "bk_out", "pan", "pan_5v", "5V"),
-  edge("buck", "bk_out", "tilt", "tilt_5v", "5V"),
+  ...(onPi ? [
+    edge("buck", "bk_out", "pan", "pan_5v", "5V"),
+    edge("buck", "bk_out", "tilt", "tilt_5v", "5V"),
+  ] : [
+    edge("buck", "bk_out", "ptz", "ptz_svcc", "5V servos"),
+    edge("ptz", "ptz_pan", "pan", "pan_in", "as the kit came"),
+    edge("ptz", "ptz_tilt", "tilt", "tilt_in", "as the kit came"),
+  ]),
   edge("buck", "bk_out", "ring", "ring_5v", "5V"),
   edge("pi", "pi_csi", "cam", "cam_csi", "CSI-2"),
-  edge("pi", "pi_i2c", "ptz", "ptz_i2c", "zoom/focus"),
-  edge("pi", "pi_pwm_pan", "shift", "sh_in2", "pan PWM 3.3 V"),
-  edge("shift", "sh_out2", "pan", "pan_in", "pan PWM 5 V"),
-  edge("pi", "pi_pwm_tilt", "shift", "sh_in3", "tilt PWM 3.3 V"),
-  edge("shift", "sh_out3", "tilt", "tilt_in", "tilt PWM 5 V"),
+  edge("pi", "pi_i2c", "ptz", "ptz_i2c", onPi ? "zoom/focus" : "zoom/focus/pan/tilt"),
+  ...(onPi ? [
+    edge("pi", "pi_pwm_pan", "shift", "sh_in2", "pan PWM 3.3 V"),
+    edge("shift", "sh_out2", "pan", "pan_in", "pan PWM 5 V"),
+    edge("pi", "pi_pwm_tilt", "shift", "sh_in3", "tilt PWM 3.3 V"),
+    edge("shift", "sh_out3", "tilt", "tilt_in", "tilt PWM 5 V"),
+  ] : []),
   edge("pi", "pi_spi", "shift", "sh_in", "SPI MOSI"),
   edge("shift", "sh_out", "ring", "ring_din", "WS2812 data"),
   edge("a1", "a1_usb", "pi", "pi_usb1", "serial: all 3 ranges"),

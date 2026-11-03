@@ -6,6 +6,13 @@
 #
 #   ./scripts/pi/install.sh with_uwb                 full build
 #   ./scripts/pi/install.sh without_uwb --bench      bench test
+#   ./scripts/pi/install.sh without_uwb --bench --servos pigpio
+#                                                    bench, servos on the Pi's GPIO12/13
+#
+# --servos: what drives pan and tilt. pigpio, the Pi's hardware PWM (the
+# servo leads on GPIO12/13); arducam, the PTZ controller (the leads in its
+# sockets, as the kit came). The full build defaults to pigpio, the bench
+# to arducam: docs/<build>/setup/12-wiring.md and bench/12-wiring.md.
 #   ./scripts/pi/install.sh with_uwb --host 192.168.1.42
 #
 # Needs: the Pi imaged as in step 1 (user pi, SSH with your public key), on
@@ -15,36 +22,46 @@
 # On the Pi it:
 #   - turns on I2C (and SPI for the LED ring, full build)
 #   - upgrades the OS and installs the camera's apt packages
-#   - full build: pigpio (pan/tilt PWM), analog audio off, the MobileNet-SSD
-#     weights (getmodel)
+#   - with --servos pigpio: pigpio (pan/tilt PWM) and analog audio off
+#   - full build: the MobileNet-SSD weights (getmodel)
 #   - copies src/<build>/device from this checkout, installs its Python
 #     requirements and runs its offline tests
 #   - puts it in ~/sportcam/src/<build>/device, keeping a config.py already
 #     there (your calibration) unless --reset-config, plus any settings new
 #     since, at their defaults
-#   - bench: sets SERVO_DRIVER, POWER_MONITOR (and UWB_ANCHORS) for the bench
+#   - sets SERVO_DRIVER to --servos; bench: POWER_MONITOR (and UWB_ANCHORS)
+#     for the bench
 #   - reboots, and checks the camera, the I2C devices (and pigpiod)
 # Safe to run again: each step skips or repeats harmlessly.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-usage() { echo "usage: scripts/pi/install.sh with_uwb|without_uwb [--bench] [--host <host>] [--reset-config]"; exit 1; }
+usage() { echo "usage: scripts/pi/install.sh with_uwb|without_uwb [--bench] [--servos pigpio|arducam] [--host <host>] [--reset-config]"; exit 1; }
 
 BUILD="${1:-}"
 [[ "$BUILD" == with_uwb || "$BUILD" == without_uwb ]] || usage
 shift
 BENCH=0
+SERVOS=""
 HOST="sportcam"
 RESET_CONFIG=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --bench) BENCH=1 ;;
+    --servos) SERVOS="${2:?--servos needs pigpio or arducam}"; shift ;;
     --host) HOST="${2:?--host needs a value}"; shift ;;
     --reset-config) RESET_CONFIG=1 ;;
     *) usage ;;
   esac
   shift
 done
+# The full build moves the servo leads to the Pi; the bench leaves them on
+# the PTZ controller, as the kit came, unless told otherwise
+if [[ -z $SERVOS ]]; then
+  if [[ $BENCH == 1 ]]; then SERVOS=arducam; else SERVOS=pigpio; fi
+fi
+[[ $SERVOS == pigpio || $SERVOS == arducam ]] || usage
+if [[ $SERVOS == pigpio ]]; then PI_SERVOS=1; else PI_SERVOS=0; fi
 
 PI="pi@${HOST}"
 DEVICE="src/${BUILD}/device"
@@ -72,11 +89,12 @@ EOF
   exit 1
 fi
 if [[ $BENCH == 1 ]]; then MODE="bench test"; else MODE="full build"; fi
+if [[ $SERVOS == pigpio ]]; then MODE="${MODE}, servos on the Pi"; else MODE="${MODE}, servos on the PTZ controller"; fi
 echo "connected: $(on_pi 'grep PRETTY_NAME /etc/os-release | cut -d\" -f2; uname -m')"
 echo "installing the ${BUILD} ${MODE}"
 
 step "System: interfaces, OS upgrade, packages (10-20 min the first time)"
-on_pi "sudo BENCH=${BENCH} bash -s" <<'REMOTE'
+on_pi "sudo BENCH=${BENCH} PI_SERVOS=${PI_SERVOS} bash -s" <<'REMOTE'
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 CONFIG_TXT=/boot/firmware/config.txt
@@ -91,7 +109,7 @@ $APT full-upgrade
 # package) from source on 64-bit Pi OS, which piwheels has no wheels for
 $APT install python3-pip python3-dev build-essential python3-picamera2 python3-opencv python3-numpy libzbar0 i2c-tools
 
-if [[ $BENCH == 0 ]]; then
+if [[ $PI_SERVOS == 1 ]]; then
   # Pan and tilt on the Pi's hardware PWM, through pigpiod
   if ! command -v pigpiod >/dev/null; then
     if apt-cache show pigpio >/dev/null 2>&1; then
@@ -134,7 +152,7 @@ done | COPYFILE_DISABLE=1 tar -cf - --no-xattrs --null -T - \
      | on_pi "tar -xf - -C ~/.sportcam-staging --warning=no-unknown-keyword"
 
 step "Python packages, offline tests, camera settings"
-on_pi "BUILD=${BUILD} BENCH=${BENCH} RESET_CONFIG=${RESET_CONFIG} bash -s" <<'REMOTE'
+on_pi "BUILD=${BUILD} BENCH=${BENCH} SERVOS=${SERVOS} RESET_CONFIG=${RESET_CONFIG} bash -s" <<'REMOTE'
 set -euo pipefail
 STAGED=~/.sportcam-staging/src/$BUILD/device
 DEST=~/sportcam/src/$BUILD/device
@@ -210,16 +228,16 @@ fi
 rm -rf ~/.sportcam-staging
 cd "$DEST"
 
+sed -i -e "s/^SERVO_DRIVER = .*/SERVO_DRIVER = \"$SERVOS\"/" sportcam/config.py
 if [[ $BENCH == 1 ]]; then
-  # What the bench lacks: servos stay on the PTZ controller, no gauge, no A3
-  sed -i -e 's/^SERVO_DRIVER = .*/SERVO_DRIVER = "arducam"/' \
-         -e 's/^POWER_MONITOR = .*/POWER_MONITOR = "none"/' sportcam/config.py
+  # What the bench lacks: no gauge, no A3
+  sed -i -e 's/^POWER_MONITOR = .*/POWER_MONITOR = "none"/' sportcam/config.py
   [[ $BUILD == without_uwb ]] || sed -i -e 's/^UWB_ANCHORS = .*/UWB_ANCHORS = 2/' sportcam/config.py
 else
   python3 -m sportcam.getmodel      # MobileNet-SSD weights; skips if already there
 fi
 grep -E '^(SERVO_DRIVER|POWER_MONITOR|UWB_ANCHORS) = ' sportcam/config.py | sed 's/^/  config.py: /'
-if [[ $BENCH == 0 ]] && grep -qE '^(SERVO_DRIVER = "arducam"|POWER_MONITOR = "none"|UWB_ANCHORS = 2)' sportcam/config.py; then
+if [[ $BENCH == 0 ]] && grep -qE '^(POWER_MONITOR = "none"|UWB_ANCHORS = 2)' sportcam/config.py; then
   echo "  note: the kept config.py has bench values above. For the full build, set them back"
   echo "        in $DEST/sportcam/config.py, or run again with --reset-config (loses calibration)"
 fi
@@ -255,6 +273,8 @@ check "PTZ controller at 0x0c" "grep -qE '^00:.* 0c( |$)' <<<\"\$I2C\"" \
 if [[ $BENCH == 0 ]]; then
   check "battery gauge at 0x40" "grep -qE '^40: 40( |$)' <<<\"\$I2C\"" \
     "the gauge's I2C (wiring guide, I1-I4)"
+fi
+if [[ $PI_SERVOS == 1 ]]; then
   check "pigpiod running" "on_pi 'pigs hwver' >/dev/null 2>&1" \
     "on the Pi: sudo systemctl status pigpiod"
 fi

@@ -6,6 +6,10 @@ cable to the PTZ controller, the servo and lens leads, the camera and the
 anchors, each lead labelled with its
 number in docs/with_uwb/bench/12-wiring.md. Not to scale.
 
+Drawn once per servo drive: bench-wiring.png with the servos on the PTZ
+controller, as the kit came (SERVO_DRIVER = "arducam"), and
+bench-wiring-pigpio.png with them on the Pi's header (K1, K2, K4–K6; J3 off).
+
 Usage:  python3 with_uwb/schematics/render_bench.py
 """
 import os
@@ -227,7 +231,10 @@ def anchor(ax, x, y, name, sub):
 # ----------------------------------------------------------------------------
 # The rig
 # ----------------------------------------------------------------------------
-def render():
+def render(servos="arducam"):
+    """The rig with the servos on the PTZ controller ("arducam") or on the
+    Pi's header ("pigpio")."""
+    on_pi = servos == "pigpio"
     yb = 15 if UWB else 4  # room along the bottom for the anchor bar
     W, H = 205, yb + 152
     fig, ax = plt.subplots(figsize=(W / 12.5, H / 12.5), dpi=150)
@@ -237,7 +244,8 @@ def render():
     ax.axis("off")
     fig.patch.set_facecolor("white")
 
-    title = "SportCam bench rig, " + ("with UWB" if UWB else "without UWB") + ": everything wired up"
+    title = ("SportCam bench rig, " + ("with UWB" if UWB else "without UWB") + ": everything wired up"
+             + (", servos on the Pi" if on_pi else ""))
     ax.text(4, H - 3, title, fontsize=15, fontweight="bold", color=INK, va="top")
     ax.text(4, H - 10, f"Tags are the connection numbers in docs/{BUILD}/bench/12-wiring.md. "
             "Top-down, not to scale. Wire with the adapter unplugged.",
@@ -262,16 +270,23 @@ def render():
     lanes = {n: 78.5 + (n - 1) * 2.5 for n in to_pi}   # rightmost pin, highest lane: no crossings at the controller
     for n, name, colour in CABLE:
         num, lab = to_pi[n]
-        px, py = pins[num]
         tx, ty = pz[n]
+        if on_pi and n == 1:
+            # J3, servo VCC: off the Pi, its end taped
+            wire(ax, [(tx, ty), (tx, ty - 7)], colour, lw=1.8)
+            ax.add_patch(Rectangle((tx - 1.4, ty - 9.5), 2.8, 2.6, fc="#d9d4c3", ec=GREY, lw=0.6, zorder=7))
+            tag(ax, (tx - 4.5, ty - 6), lab, colour)
+            continue
+        px, py = pins[num]
         lane = yb + lanes[n]
         dx = {5: -0.9, 6: 0.9}.get(num, 0)   # pins 5 and 6 share a column
         top = pins[2][1] + 1.6
         wire(ax, [(px, py), (px + dx, top), (px + dx, lane), (tx, lane), (tx, ty)], colour, lw=1.8)
         pin_end(ax, (px, py), colour)
         tag(ax, (41 if n % 2 else 45, lane), lab, colour)
-    note(ax, 66, yb + 88, "The kit's 6-wire cable, by position (colours as\nArducam draws them; yours may differ):\n"
-         "1 servo VCC (red) → pin 2 (5V)   2 GND (black) → pin 14\n"
+    note(ax, 92 if on_pi else 66, yb + 88, "The kit's 6-wire cable, by position (colours as\nArducam draws them; yours may differ):\n"
+         + ("1 servo VCC (red): off, taped   2 GND (black) → pin 14\n" if on_pi else
+            "1 servo VCC (red) → pin 2 (5V)   2 GND (black) → pin 14\n") +
          "3 5V (white) → pin 4   4 GND (brown) → pin 6\n"
          "5 SCL (yellow) → pin 5   6 SDA (orange) → pin 3\n"
          "Its female ends go straight onto the Pi's pins.",
@@ -284,24 +299,35 @@ def render():
     tag(ax, (rx, yb + 70), "C1", RIBBON)
     note(ax, cx + 4, yb + 9.5, "15-pin ribbon: silver contacts toward the HDMI ports", fs=7, va="bottom")
 
-    # K1, K2: the servos' 3-wire plugs in the controller's sockets, as the kit
-    # came (pan left, tilt right); K3: the lens cable (zoom, focus), factory-fitted
-    for name, lab, lane in (("PAN", "K1", yb + 134), ("TILT", "K2", yb + 130.5)):
-        end_pt = cam[name.lower()]
-        for k, (sx, sy) in enumerate(pz[name]):
-            off = (k - 1) * 0.8
-            ex = end_pt[0] + off
-            wire(ax, [(sx, sy), (sx, lane - off), (ex, lane - off), (ex, end_pt[1])],
-                 SERVO_LEAD[k], lw=1.0, z=5, outline=False)
-        tag(ax, (pz[name][1][0] + 30, lane), lab, SERVO_LEAD[0])
+    if on_pi:
+        servo_leads_to_pi(ax, pins, cam, yb)
+    else:
+        # K1, K2: the servos' 3-wire plugs in the controller's sockets, as the
+        # kit came (pan left, tilt right)
+        for name, lab, lane in (("PAN", "K1", yb + 134), ("TILT", "K2", yb + 130.5)):
+            end_pt = cam[name.lower()]
+            for k, (sx, sy) in enumerate(pz[name]):
+                off = (k - 1) * 0.8
+                ex = end_pt[0] + off
+                wire(ax, [(sx, sy), (sx, lane - off), (ex, lane - off), (ex, end_pt[1])],
+                     SERVO_LEAD[k], lw=1.0, z=5, outline=False)
+            tag(ax, (pz[name][1][0] + 30, lane), lab, SERVO_LEAD[0])
+    # K3: the lens cable (zoom, focus), factory-fitted
     lx, ly = pz["LENS"]
     lane = yb + 124
     wire(ax, [(lx, ly), (lx, lane), (131, lane), (131, cam["lens"][1]), cam["lens"]], "#7a7f8a",
          lw=2.2, z=5, outline=False)
     tag(ax, (lx + 30, lane), "K3", "#7a7f8a")
-    note(ax, 168, yb + 103, "K1 pan, K2 tilt: each servo's\n3-wire plug (brown GND, red V+,\n"
-         "yellow signal), in the controller's\nsockets as the kit came.\n"
-         "K3: the lens-motor and IR-cut\ncables, factory-fitted.", fs=6.5, color=GREY)
+    if on_pi:
+        note(ax, 168, yb + 103, "Servo plugs off the controller,\non male-to-female jumpers:\n"
+             "K1, K2: pan and tilt signal\n(yellow) → pins 32 and 33.\n"
+             "K4: both reds, on a Y → pin 2.\nK5, K6: the browns → pins 30, 34.\n"
+             "J3: off pin 2, its end taped.\n"
+             "K3: the lens-motor and IR-cut\ncables, factory-fitted.", fs=6.5, color=GREY)
+    else:
+        note(ax, 168, yb + 103, "K1 pan, K2 tilt: each servo's\n3-wire plug (brown GND, red V+,\n"
+             "yellow signal), in the controller's\nsockets as the kit came.\n"
+             "K3: the lens-motor and IR-cut\ncables, factory-fitted.", fs=6.5, color=GREY)
 
     # --- Anchors and tag ------------------------------------------------------
     if UWB:
@@ -322,9 +348,10 @@ def render():
         wire(ax, [(168, 6), (174, 6)], USB, lw=2.4, label="W1", at=0.5)
 
     # --- Legend ---------------------------------------------------------------
-    legend = [(K_RED, "servo VCC, 5 V"), (K_WHITE, "controller 5 V"), (K_BLACK, "GND, adapter cable"),
-              (K_BROWN, "GND"), (K_ORANGE, "I2C SDA"), (K_YELLOW, "I2C SCL"),
-              (RIBBON, "camera ribbon")] + ([(USB, "USB")] if UWB else [])
+    legend = ([(K_RED, "servo VCC, 5 V"), (K_WHITE, "controller 5 V"), (K_BLACK, "GND, adapter cable"),
+               (K_BROWN, "GND"), (K_ORANGE, "I2C SDA"), (K_YELLOW, "I2C SCL")]
+              + ([(SERVO_LEAD[2], "servo signal")] if on_pi else [])
+              + [(RIBBON, "camera ribbon")] + ([(USB, "USB")] if UWB else []))
     lx, ly = 166, yb + 72
     ax.add_patch(FancyBboxPatch((lx, ly - len(legend) * 4.2 - 1), 34, len(legend) * 4.2 + 5.5,
                                 boxstyle="round,pad=0,rounding_size=1.2", fc=BGBOX, ec=GREY, lw=0.8, zorder=1))
@@ -334,11 +361,43 @@ def render():
         ax.plot([lx + 2, lx + 8], [yy, yy], color=c, lw=2.8 if c != RIBBON else 5, solid_capstyle="round")
         ax.text(lx + 10, yy, t, fontsize=7.5, color=INK, va="center")
 
-    out = os.path.join(OUT, "bench-wiring.png")
+    out = os.path.join(OUT, "bench-wiring-pigpio.png" if on_pi else "bench-wiring.png")
     fig.savefig(out, facecolor="white", bbox_inches="tight", pad_inches=0.15)
     plt.close(fig)
     print("wrote", os.path.relpath(out))
 
 
+def servo_leads_to_pi(ax, pins, cam, yb):
+    """K1, K2, K4–K6: each servo's plug off the controller, its three wires on
+    jumpers to the Pi's header. Up from the plugs to lanes over the head,
+    left, then down onto the pins: the signals on 32 and 33, the browns on
+    30 and 34, and both reds joined (K4) onto pin 2."""
+    brown, red, signal = SERVO_LEAD
+    pan, tilt = cam["pan"], cam["tilt"]
+    # (servo end, its wire's offset in the plug, colour, header pin, x of the
+    # drop to it, lane height): pan on the lower lanes, tilt on the higher
+    runs = [(pan, -0.8, brown, 30, None, 127.5), (pan, 0.8, signal, 32, None, 129),
+            (tilt, -0.8, brown, 34, 0.9, 132), (tilt, 0.8, signal, 33, -0.9, 133.5)]
+    for end_pt, off, colour, num, dx, lane in runs:
+        px, py = pins[num]
+        x = px + (dx or 0)
+        ex = end_pt[0] + off
+        wire(ax, [(ex, end_pt[1]), (ex, yb + lane), (x, yb + lane), (x, py)], colour, lw=1.4, z=6)
+        pin_end(ax, (px, py), colour)
+    # the two reds, joined on a Y, then one wire round the header to pin 2
+    jx = 79
+    for end_pt, lane in ((pan, 130.5), (tilt, 135)):
+        wire(ax, [(end_pt[0], end_pt[1]), (end_pt[0], yb + lane), (jx, yb + lane)], red, lw=1.4, z=6)
+    p2 = pins[2]
+    wire(ax, [(jx, yb + 135), (jx, yb + 76.5), (p2[0], yb + 76.5), p2], red, lw=1.6, z=6)
+    ax.add_patch(Circle((jx, yb + 130.5), 0.9, fc=red, ec="white", lw=0.6, zorder=7.5))
+    pin_end(ax, p2, red)
+    for xy, lab, colour in (((100, yb + 127.5), "K5", brown), ((108, yb + 129), "K1", signal),
+                            ((116, yb + 132), "K6", brown), ((124, yb + 133.5), "K2", signal),
+                            ((jx, yb + 108), "K4", red)):
+        tag(ax, xy, lab, colour)
+
+
 if __name__ == "__main__":
-    render()
+    render("arducam")
+    render("pigpio")

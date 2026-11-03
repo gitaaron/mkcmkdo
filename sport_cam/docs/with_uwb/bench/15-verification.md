@@ -45,5 +45,5 @@ three `--dart-define`s (14, step 5). Phone 1 signs in as
 
 All of B passing is the end-to-end test: the phone app, the camera and the
 backend agree. What's left for the full build is the hardware the bench left
-out — battery, latch, gauge, ring, Pi-driven servos, the third anchor — and
+out — battery, latch, gauge, ring<!--arducam:, Pi-driven servos-->, the third anchor — and
 calibration: the [UWB build's verification checklist](../setup/15-verification.md).

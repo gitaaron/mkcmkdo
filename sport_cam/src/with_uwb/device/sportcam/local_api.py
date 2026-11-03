@@ -12,7 +12,9 @@ API speaks (src/backend/functions), so the app talks to both identically:
                                    (`X-Session-Secrets` header)
     WS   /ws                       state, "recordingsChanged" and live person-box broadcasts;
                                    the app sends {"type":"jog","pan":x,"tilt":y}
-                                   (each −1…1) while its joystick is held
+                                   (each −1…1) while its joystick is held, and
+                                   {"type":"lens","zoomMm":z,"focusM":d}
+                                   (either one) as its lens sliders move
     GET  /api/health               {"ok":true,"backend":"device", …}
 
 Why the camera serves its own API: on gym Wi-Fi (or the camera's own
@@ -235,6 +237,25 @@ class LocalApi:
             return
         self.head.jog(max(-1.0, min(1.0, pan)), max(-1.0, min(1.0, tilt)))
 
+    def _on_lens(self, data: dict) -> None:
+        """The zoom and focus sliders, on the socket like the joystick. Each
+        is optional and clamped to the lens's range; anything malformed drops
+        the whole message."""
+        def value(key: str, lo: float, hi: float) -> float | None:
+            v = data.get(key)
+            if v is None:
+                return None
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+                raise ValueError(key)
+            return max(lo, min(hi, float(v)))
+        try:
+            zoom = value("zoomMm", config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
+            focus = value("focusM", config.LENS_FOCUS_MIN_M, config.LENS_FOCUS_MAX_M)
+        except ValueError:
+            return
+        if zoom is not None or focus is not None:
+            self.head.lens(zoom, focus)
+
     # ---- HTTP handlers ----------------------------------------------------
     async def _handle_call(self, req: web.Request) -> web.Response:
         name = req.match_info["name"]
@@ -317,6 +338,8 @@ class LocalApi:
                         await ws.send_json({"type": "pong"})
                     elif data.get("type") == "jog":
                         self._on_jog(data)
+                    elif data.get("type") == "lens":
+                        self._on_lens(data)
         finally:
             self._ws_clients.discard(ws)
         return ws

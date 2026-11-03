@@ -16,7 +16,7 @@ list is the [UWB build's](../setup/10-bill-of-materials.md);
 | battery gauge (12) | no battery to measure | `POWER_MONITOR = "none"`: no battery warnings |
 | rocker switch and power latch (13, 13a) | you unplug the adapter | the Pi isn't told to shut down: stop the software first ([14](14-software-setup.md)) |
 | LED ring and level shifter (7, 8) | the app shows the same state | the ring code finds nothing to drive and carries on |
-| Pi-driven servos: extension leads and headers (part of 18) | the kit's own servo drive works | `SERVO_DRIVER = "arducam"`: whole-degree steps, a little less smooth |
+| Pi-driven servos: extension leads and headers (part of 18) <!--arducam row--> | the kit's own servo drive works | `SERVO_DRIVER = "arducam"`: whole-degree steps, a little less smooth |
 | the third anchor, A3, and its mast (one of the four item 6 radios, 27a) | it only adds elevation: the bearing, and whose tag it is, come from A1 and A2 | `UWB_ANCHORS = 2`: tilt follows the person detector alone |
 | the tag's armband (17) | you hold the tag, or put it in a pocket | — |
 | panel barrel jack, standoffs, screws, inserts, tripod, filament, strap, epoxy (18, 21–27) | no enclosure | the head stands on the bench on its own metal base, and the anchors are taped to a stick (B3) |
@@ -27,7 +27,7 @@ Prices: approximate CAD street prices, Oct 2026, ±15 %.
 
 | # | Status | Part | Qty | ≈ CAD | Source | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | A | **Arducam IMX477 12 MP PTZ camera with metal pan-tilt base (B0167B12)** | 1 | — | as the full build | used as it comes: the servo leads stay on the PTZ controller |
+| 1 | A | **Arducam IMX477 12 MP PTZ camera with metal pan-tilt base (B0167B12)** | 1 | — | as the full build | used as it comes: <!--both-->the servo leads stay on the PTZ controller, or go onto the Pi's header on B4 ([servo drive](12-wiring.md#servo-drive))<!--/--><!--arducam: the servo leads stay on the PTZ controller--><!--pigpio: the servo leads come off the PTZ controller onto the Pi's header, on B4--> |
 
 ## Compute
 
@@ -55,6 +55,7 @@ Prices: approximate CAD street prices, Oct 2026, ±15 %.
 | # | Status | Part | Qty | ≈ CAD | Source | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | B2 |  | Female-to-female jumper wires (Dupont), 20 cm (optional) | 6 | $5 (pack) | [Amazon.ca](https://www.amazon.ca/s?k=female+to+female+dupont+jumper+wires) | spares only. The Arducam kit's 6-wire cable runs from the PTZ controller straight onto the Pi's header ([wiring](12-wiring.md#connections)); these stand in for it if a wire is too short or its end is a bare lead |
+| B4 <!--pigpio row--> |  | Male-to-female jumper wires (Dupont), 20 cm, and a Y (1-to-2) jumper | 6 + 1 | $6 (pack) | [Amazon.ca](https://www.amazon.ca/s?k=male+to+female+dupont+jumper+wires) | <!--both-->servos on the Pi: <!--/-->the servos onto the Pi's header: one jumper per servo wire, the Y joining their two reds onto pin 2 ([wiring, K1–K6](12-wiring.md#connections)). A small lever connector does instead of the Y |
 | 20 | | USB-A male-to-female extension cables, 50 cm | 2 | — | as the full build (item 20) | A1 and A2 into the Pi's USB-A ports, so the boards can sit 40 cm apart |
 | B3 | | **Anchor bar:** a straight stick of wood, ≥ 50 cm (a wooden ruler, a dowel or a slat), and masking tape | 1 | — | owned | holds A1 and A2 **400 mm apart** (`UWB_BASELINE_M`), level, in front of the camera. **Wood, not metal**: metal near an antenna detunes it |
 
@@ -65,7 +66,8 @@ something doesn't work. A computer with the Arduino IDE, to flash the radios.
 
 | | ≈ CAD |
 | --- | --- |
-| New for the bench (B1), if you don't already have it; B2 only if the kit's cable won't do | **≈ $15** |
+| New for the bench (B1), if you don't already have it; B2 only if the kit's cable won't do <!--arducam row--> | **≈ $15** |
+| New for the bench (B1, B4), if you don't already have them; B2 only if the kit's cable won't do <!--pigpio row--> | **≈ $21** |
 | Already owned (items 1–4, 6, 15, 20, a stick) | — |
 
 The radios, the tag bank and the extensions go on into the full build as

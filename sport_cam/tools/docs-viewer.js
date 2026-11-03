@@ -2,14 +2,24 @@
 //
 // Renders the markdown docs with marked, keeps .md cross-links inside the
 // viewer, and shows the docs for one build at a time. The build toggle
-// (With UWB / Without UWB) is remembered in localStorage.
+// (With UWB / Without UWB) is remembered in localStorage. It and the two
+// switches below live in a settings popup, off the gear by the title; the
+// line under the title says what is showing.
 //
-// Below it, a Full build / Bench test switch, remembered too. Each build has
+// A Full build / Bench test switch, remembered too. Each build has
 // a bench rig (docs/<build>/bench/): the camera and the Pi off a mains
 // supply, to test the app end to end. Bench test shows the build's bench
 // docs in place of its setup docs, and leaves out the shared setup docs
 // (printing), the assembly guide, the full build's schematic (the bench has
 // its own) and the docs about the enclosure (03, appendices A and B).
+//
+// A servo drive switch, remembered too: the servos on the Pi's hardware PWM
+// (SERVO_DRIVER = "pigpio") or left on the PTZ controller ("arducam"), in
+// the full build and on the bench alike. It shows the text marked for one
+// drive (below), and swaps a picture or page for its variant when the
+// server lists one: bench-wiring.png → bench-wiring-pigpio.png,
+// wiring.html → wiring-arducam.html (named <file>-<drive>.<ext>). The
+// interactive schematics read the same setting themselves.
 //
 // What the toggle hides, in the build you are not viewing:
 //   - sidebar entries for that build's own docs
@@ -31,20 +41,38 @@
 //     raw HTML, so a marker never starts a line inside a paragraph: a
 //     whole-paragraph passage puts each marker on a line of its own, with
 //     blank lines around. Markers inside code are left alone.
+//   - the same for the servo drive, with its own closer, so a drive's
+//     passage can sit inside a build's (or the other way round):
+//       <!--pigpio-->…<!--/servo-->   on GitHub, and in the viewer with that drive
+//       <!--arducam-->…<!--/servo-->
+//       <!--pigpio: …-->              in the viewer with that drive only
+//       <!--arducam: …-->
+//     and, since a comment can't start a line inside a table, a table row
+//     with <!--pigpio row--> or <!--arducam row--> in a cell is one drive's.
 //     tools/check-build-markers.py checks all of this.
 
 const BUILDS = {
   with_uwb: "With UWB",
   without_uwb: "Without UWB",
 };
+const SERVOS = {
+  pigpio: "The Pi",
+  arducam: "PTZ controller",
+};
 const STORE_KEY = "sportcam-docs-build";
 const BENCH_KEY = "sportcam-docs-bench";
+const SERVO_KEY = "sportcam-docs-servos"; // the interactive schematics read it too
 
 const toc = document.getElementById("toc");
 const content = document.getElementById("content");
 const toggle = document.getElementById("build-toggle");
 const benchToggle = document.getElementById("bench-toggle");
+const servoToggle = document.getElementById("servo-toggle");
+const settingsBtn = document.getElementById("settings-btn");
+const settings = document.getElementById("settings");
+const showing = document.getElementById("showing");
 let docs = [];
+let variants = new Set(); // <file>-<drive>.<ext> pictures and pages, from the server
 let source = null; // the current doc's markdown, for re-rendering on toggle
 let pendingAnchor = null;
 
@@ -71,6 +99,15 @@ function loadBench() {
   }
 }
 let bench = loadBench();
+
+function loadServos() {
+  try {
+    const saved = localStorage.getItem(SERVO_KEY);
+    if (saved in SERVOS) return saved;
+  } catch {}
+  return "pigpio";
+}
+let servos = loadServos();
 
 function currentDoc() {
   return decodeURIComponent(location.hash.slice(1)) || "README.md";
@@ -123,7 +160,33 @@ function renderToggle() {
   ]
     .map(([on, label]) => `<button type="button" data-bench="${on}" aria-pressed="${on === bench}">${label}</button>`)
     .join("");
+  servoToggle.innerHTML = Object.entries(SERVOS)
+    .map(([key, label]) => `<button type="button" data-servos="${key}" aria-pressed="${key === servos}">${label}</button>`)
+    .join("");
+  showing.textContent = [
+    BUILDS[build],
+    bench ? "Bench test" : "Full build",
+    servos === "pigpio" ? "servos on the Pi" : "servos on the PTZ controller",
+  ].join(" · ");
 }
+
+// The settings popup: the gear opens and closes it; Escape or a click
+// outside closes it.
+function openSettings(open) {
+  settings.hidden = !open;
+  settingsBtn.setAttribute("aria-expanded", String(open));
+  if (open) settings.querySelector("button[aria-pressed='true']")?.focus();
+}
+settingsBtn.addEventListener("click", () => openSettings(settings.hidden));
+document.addEventListener("click", (ev) => {
+  if (!settings.hidden && !settings.contains(ev.target) && !settingsBtn.contains(ev.target)) openSettings(false);
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && !settings.hidden) {
+    openSettings(false);
+    settingsBtn.focus();
+  }
+});
 
 toggle.addEventListener("click", (ev) => {
   const btn = ev.target.closest("button[data-build]");
@@ -135,6 +198,11 @@ benchToggle.addEventListener("click", (ev) => {
   if (btn) setBench(btn.dataset.bench === "true", { follow: true });
 });
 
+servoToggle.addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button[data-servos]");
+  if (btn) setServos(btn.dataset.servos);
+});
+
 function renderToc() {
   toc.innerHTML = docs
     .filter(visible)
@@ -143,7 +211,7 @@ function renderToc() {
         ? "<h2>" + d.section + "</h2>"
         : d.path.endsWith(".md")
         ? '<a href="#' + d.path + '" data-path="' + d.path + '">' + d.title + "</a>"
-        : '<a href="/' + d.path + '" target="_blank">' + d.title + " ↗</a>",
+        : '<a href="/' + servoVariant(d.path) + '" target="_blank">' + d.title + " ↗</a>",
     )
     .join("");
   markActive();
@@ -197,6 +265,30 @@ function setBench(next, { follow = false } = {}) {
   location.hash = docs.some((d) => d.path === twin && visible(d)) ? twin : "README.md";
 }
 
+// Switch the servo drive: every doc can mention it, so the current one
+// re-renders in place, staying at the same section where it still exists.
+function setServos(next) {
+  if (next === servos) return;
+  servos = next;
+  try {
+    localStorage.setItem(SERVO_KEY, servos);
+  } catch {}
+  renderToggle();
+  renderToc();
+  if (source !== null) {
+    const keep = firstVisibleHeading();
+    render(currentDoc(), source);
+    if (keep && document.getElementById(keep)) document.getElementById(keep).scrollIntoView();
+  }
+}
+
+// A picture or page's variant for the servo drive on show, when there is one.
+function servoVariant(path) {
+  const m = /^(.*)(\.[a-z]+)$/.exec(path);
+  const twin = m && `${m[1]}-${servos}${m[2]}`;
+  return twin && variants.has(twin) ? twin : path;
+}
+
 function firstVisibleHeading() {
   let last = null;
   for (const h of content.querySelectorAll("h1,h2,h3,h4")) {
@@ -216,8 +308,14 @@ function applyMarkers(md) {
     .replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, hide)
     .replace(/`[^`\n]+`/g, hide)
     .replace(/<!--(with_uwb|without_uwb):([\s\S]*?)-->/g, (_, tag, body) => (tag === build ? body.replace(/^ /, "") : ""))
+    .replace(/<!--(pigpio|arducam):([\s\S]*?)-->/g, (_, tag, body) => (tag === servos ? body.replace(/^ /, "") : ""))
     .replace(/<!--\s*(with_uwb|without_uwb|both)\s*-->([\s\S]*?)<!--\s*\/\s*-->/g, (_, tag, body) =>
     tag === build ? body : "",
+    )
+    .replace(/<!--\s*(pigpio|arducam)\s*-->([\s\S]*?)<!--\s*\/servo\s*-->/g, (_, tag, body) => (tag === servos ? body : ""))
+    // a table row with <!--pigpio row--> / <!--arducam row--> in it: one drive's
+    .replace(/^\|.*<!--\s*(pigpio|arducam) row\s*-->.*\n?/gm, (line, tag) =>
+      tag === servos ? line.replace(/\s*<!--\s*\w+ row\s*-->/, "") : "",
     )
     .replace(/\u0000(\d+)\u0000/g, (_, i) => code[i]);
 }
@@ -238,7 +336,8 @@ function render(path, md) {
   // resolve relative images against the doc's directory
   for (const img of content.querySelectorAll("img")) {
     const src = img.getAttribute("src");
-    if (src && !src.startsWith("http") && !src.startsWith("/")) img.src = "/" + base + src;
+    if (src && !src.startsWith("http") && !src.startsWith("/"))
+      img.src = "/" + servoVariant(new URL(src, "http://x/" + base).pathname.slice(1));
   }
   // .md cross-links stay inside the viewer; in-page anchors scroll;
   // everything else opens normally. From a shared doc, a link into the other
@@ -293,7 +392,7 @@ function render(path, md) {
         location.hash = resolved;
       });
     } else {
-      a.href = "/" + resolved;
+      a.href = "/" + servoVariant(resolved);
       a.target = "_blank";
     }
   }
@@ -398,10 +497,10 @@ async function loadDoc() {
 
 window.addEventListener("hashchange", loadDoc);
 renderToggle();
-fetch("/api/docs")
-  .then((r) => r.json())
-  .then((list) => {
+Promise.all([fetch("/api/docs").then((r) => r.json()), fetch("/api/variants").then((r) => r.json())])
+  .then(([list, files]) => {
     docs = list;
+    variants = new Set(files);
     renderToc();
   })
   .then(loadDoc);

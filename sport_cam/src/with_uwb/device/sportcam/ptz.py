@@ -359,8 +359,16 @@ class Ptz:
         # last known distance, ignoring the focus rate limit.
         self._apply_focus(self._want_dist_m or self._focus_dist_m or 10.0)
 
-    def set_focus(self, dist_m: float) -> None:
+    @property
+    def focus_m(self) -> float | None:
+        """The subject distance the focus is set for; None until first set."""
+        return self._focus_dist_m
+
+    def set_focus(self, dist_m: float, urgent: bool = False) -> None:
         """Focus for a subject `dist_m` away, at the current focal length.
+
+        `urgent` skips FOCUS_RATE_LIMIT_S, as for zoom: the app's focus
+        slider is a person waiting to see the picture sharpen.
 
         Rate-limited, and changes smaller than FOCUS_DEADBAND_DIOPTRE in 1/d
         are ignored: at 10 m that is about ±2 m, well inside the depth of
@@ -371,7 +379,7 @@ class Ptz:
         now = time.monotonic()
         if self._focus_dist_m is not None:
             if (abs(1.0 / dist_m - 1.0 / self._focus_dist_m) < config.FOCUS_DEADBAND_DIOPTRE
-                    or now - self._last_focus_at < config.FOCUS_RATE_LIMIT_S):
+                    or (not urgent and now - self._last_focus_at < config.FOCUS_RATE_LIMIT_S)):
                 return
         self._apply_focus(dist_m)
 

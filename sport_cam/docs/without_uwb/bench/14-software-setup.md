@@ -13,7 +13,7 @@ bench doesn't have left out; where a step is the same, it links there.
 | Left out of the full setup | Why |
 | --- | --- |
 | SPI, the LED ring | no ring on the bench |
-| pigpio and the servo PWM | the servos stay on the PTZ controller (`SERVO_DRIVER = "arducam"`) |
+| pigpio and the servo PWM <!--arducam row--> | the servos stay on the PTZ controller (`SERVO_DRIVER = "arducam"`, [12 — Servo drive](12-wiring.md#servo-drive)) |
 | the person-detector download (`getmodel`) | HOG, built in, finds a person standing in front of the camera |
 | calibration (zoom curve, focus grid) | not needed to test the app; tracking works on the defaults, a little soft |
 | the services and the Wi-Fi portal | run the camera in a terminal instead; Wi-Fi comes from the Pi Imager settings |
@@ -34,19 +34,36 @@ for a password.
 
 From the repo's root, on your Mac:
 
+<!--arducam-->
+
 ```bash
 ./scripts/pi/install.sh without_uwb --bench
 ```
 
+<!--/servo-->
+
+<!--pigpio-->
+
+```bash
+./scripts/pi/install.sh without_uwb --bench --servos pigpio
+```
+
+`--servos pigpio` is for the servos on the Pi's header ([12 — Servo drive](12-wiring.md#servo-drive)):
+it installs pigpio as the full build does and sets `SERVO_DRIVER = "pigpio"`.
+Keep it on every run: without it, the script sets `"arducam"` back.
+
+<!--/servo-->
+
 As [the full build's step 2](../setup/14-software-setup.md#2-install-the-camera-software-from-your-mac)
 (OS upgrade, packages, the code, its Python packages, the offline tests, a
-reboot, checks), less what the bench leaves out: no SPI, pigpio or
+reboot, checks), less what the bench leaves out: no SPI<!--both-->, pigpio (unless `--servos pigpio`)<!--/--><!--arducam:, pigpio--> or
 `getmodel`. 15–25 minutes the first time. It also tells the camera what the
 bench lacks, in `sportcam/config.py`:
 
 | Setting | Set to | Because |
 | --- | --- | --- |
-| `SERVO_DRIVER` | `"arducam"` | the servos stay on the PTZ controller |
+| `SERVO_DRIVER` <!--arducam row--> | `"arducam"` | the servos stay on the PTZ controller |
+| `SERVO_DRIVER` <!--pigpio row--> | `"pigpio"` (`--servos pigpio`) | the servos on the Pi's GPIO12 and GPIO13 |
 | `POWER_MONITOR` | `"none"` | no battery gauge: no battery warnings |
 
 **Done when:** it ends with `All set`: the camera found, and `0c` (the PTZ
@@ -63,13 +80,31 @@ through `./scripts/pi/run`: it logs in and runs the command in
 `./scripts/pi/run` alone opens a shell there.
 
 ```bash
-./scripts/pi/run ptzcheck                 # sweeps both axes; the pan creeps in whole-degree ticks, as expected here
+./scripts/pi/run ptzcheck                 # sweeps both axes, then creeps the pan in 0.1° steps
 ./scripts/pi/run vcgencmd get_throttled   # throttled=0x0: the adapter held 5 V while the motors ran (12, step 3)
 ```
 
 If a positive pan turns the lens the wrong way, or a positive tilt doesn't
 point it up, flip `PAN_SIGN` / `TILT_SIGN`
 ([full build, step 4b](../setup/14-software-setup.md#4-bench-checks-camera-and-motion)).
+
+<!--arducam-->
+
+The creep moves in whole-degree ticks: expected with the servos on the PTZ
+controller, which takes whole degrees.
+
+<!--/servo-->
+
+<!--pigpio-->
+
+The creep should be smooth. Ticks of about a degree mean the pan servo is
+still on the PTZ controller, or `SERVO_DRIVER` is still `"arducam"` (install
+again with `--servos pigpio`). With the lens centred, check it points straight
+ahead: the Pi's pulse widths can put centre a degree or two off where the
+controller had it. Correct it with `PAN_CENTER_RAW` and `TILT_CENTER_RAW`,
+which take fractions of a degree here.
+
+<!--/servo-->
 
 **Done when:** both axes sweep.
 

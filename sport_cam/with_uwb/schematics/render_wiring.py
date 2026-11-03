@@ -7,8 +7,12 @@
                                                         to light up its wire
 
 Each lead is tagged with its number in docs/with_uwb/setup/12-wiring.md, and
-the table below (CONNECTIONS) is that guide's connection list. Not to scale;
+the table below (connections()) is that guide's connection list. Not to scale;
 parts are placed for clear wiring, not where they sit in the enclosure.
+
+Drawn once per servo drive: as above with the servos on the Pi's PWM through
+the shifter (SERVO_DRIVER = "pigpio"), and full-wiring-arducam.png and
+wiring-arducam.html with them left on the PTZ controller ("arducam").
 
 Usage:  python3 with_uwb/schematics/render_wiring.py
 """
@@ -33,8 +37,9 @@ BUILD = "with_uwb"
 UWB = True
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PNG = os.path.join(HERE, "..", "..", "docs", BUILD, "images", "full-wiring.png")
-PAGE = os.path.join(HERE, "interactive", "wiring.html")
+PNG = os.path.join(HERE, "..", "..", "docs", BUILD, "images", "full-wiring{}.png")
+PAGE = os.path.join(HERE, "interactive", "wiring{}.html")
+SUFFIX = {"pigpio": "", "arducam": "-arducam"}
 
 V12 = "#c0392b"      # 12 V side, before the buck
 SIGNAL = "#7d3cbd"   # latch and Pi control lines
@@ -50,6 +55,28 @@ plt.rcParams["svg.hashsalt"] = "sportcam"
 # ----------------------------------------------------------------------------
 # The connection list: docs/<build>/setup/12-wiring.md, one row per lead.
 # ----------------------------------------------------------------------------
+def connections(servos):
+    """The list for one servo drive: on the PTZ controller ("arducam") R7
+    feeds its servo VCC pair, L4 grounds three idle gates, and there is no
+    M1–M7."""
+    on_pi = servos == "pigpio"
+    out = []
+    for title, rows in CONNECTIONS:
+        if title == "Servos" and not on_pi:
+            continue
+        rows = [ARDUCAM_ROWS.get(r[0], r) if not on_pi else r for r in rows]
+        out.append((title, rows))
+    return out
+
+
+ARDUCAM_ROWS = {
+    "R7": ("R7", "buck OUT+ / OUT−", "PTZ controller servo VCC / GND",
+           "20–22 AWG. Pins 1 and 2 of its 6-pin connector: the servos, through its sockets"),
+    "L4": ("L4", "74AHCT125 2A, 2OE, 3A, 3OE, 4A, 4OE", "GND", "the three unused gates: a floating input oscillates"),
+    "C2": ("C2", "PTZ controller lens and servo leads", "zoom and focus motors, pan and tilt servos",
+           "factory-wired, as the kit came"),
+}
+
 CONNECTIONS = [
     ("Power, 12 V side", [
         ("P1", "Power bank USB-C", "PD trigger USB-C", "30 cm C-to-C cable (BOM 14). A charge-only or A-to-C cable leaves the trigger at 5 V"),
@@ -150,14 +177,18 @@ def pad(ax, xy, name, side="left", fs=5.5, color="white"):
 # ----------------------------------------------------------------------------
 # Parts
 # ----------------------------------------------------------------------------
-def ptz_ctrl(ax, x, y):
+def ptz_ctrl(ax, x, y, servos="pigpio"):
     """The PTZ controller: 5V, GND, SDA, SCL along the bottom edge (match yours
-    by its labels), the lens and servo sockets along the top."""
+    by its labels), the lens and servo sockets along the top. With the servos
+    on it ("arducam"), its servo VCC pair too."""
     w, h = 40, 24
     board(ax, x, y, w, h, PCB_DARK, "Arducam PTZ controller", "I2C 0x0C", fs=8.5)
     pins = {}
-    for i, n in enumerate(["5V", "GND", "SDA", "SCL"]):
-        px = x + 6 + i * 4
+    names, x0, step = ["5V", "GND", "SDA", "SCL"], 6, 4
+    if servos == "arducam":
+        names, x0, step = ["SV+", "SV−", "5V", "GND", "SDA", "SCL"], 4, 3.6
+    for i, n in enumerate(names):
+        px = x + x0 + i * step
         ax.add_patch(Rectangle((px - 0.6, y + 2), 1.2, 1.2, fc=GOLD, ec="none", zorder=3))
         ax.text(px, y + 4, n, ha="center", va="bottom", fontsize=5.5, color="white", zorder=3, rotation=90)
         pins[n] = (px, y + 2.6)
@@ -167,7 +198,8 @@ def ptz_ctrl(ax, x, y):
         ax.add_patch(Rectangle((px - 2.2, y + h - 3.6), 4.4, 2.6, fc=fc, ec=INK, lw=0.6, zorder=3))
         ax.text(px, y + h - 4.3, n, ha="center", va="top", fontsize=5.5, color="white", zorder=3)
         pins[n] = (px, y + h - 1)
-    note(ax, x + 8, y + h + 2.5, "PAN, TILT: empty (M7)", fs=6, color=GREY, va="bottom")
+    if servos == "pigpio":
+        note(ax, x + 8, y + h + 2.5, "PAN, TILT: empty (M7)", fs=6, color=GREY, va="bottom")
     return pins
 
 
@@ -248,8 +280,9 @@ def barrel(ax, x, y):
     return {"+": (x + 4, y), "-": (x + 10, y)}
 
 
-def shifter(ax, x, y):
-    """The 74AHCT125 on its perfboard, with the two servo headers.
+def shifter(ax, x, y, headers=True):
+    """The 74AHCT125 on its perfboard, with the two servo headers (unless the
+    servos stay on the PTZ controller).
     Pins 1–7 along the bottom row (pin 1 at the left, by the notch),
     14–8 along the top row, so pin 14 sits over pin 1."""
     w, h = 76, 42
@@ -278,7 +311,7 @@ def shifter(ax, x, y):
     p["gb"], p["gt"] = gb, gt
     # Servo headers: three pins each, S at the bottom (labelled in render())
     hdr = {}
-    for name, hx in (("tilt", x + 50), ("pan", x + 62)):
+    for name, hx in (("tilt", x + 50), ("pan", x + 62)) if headers else ():
         ax.add_patch(Rectangle((hx - 1.8, y + 13), 3.6, 14, fc="#14181f", ec=INK, lw=0.6, zorder=3))
         for pn, py in (("S", y + 16), ("+", y + 20), ("-", y + 24)):
             ax.add_patch(Rectangle((hx - 0.6, py - 0.6), 1.2, 1.2, fc=GOLD, ec="none", zorder=3.2))
@@ -333,6 +366,7 @@ PAGE_HTML = """<!DOCTYPE html>
   html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; color: var(--ink); background: #fff; }
   header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #1a2233; color: #fff; }
   header h1 { margin: 0; font-size: 16px; font-weight: 600; flex: 1; }
+  header a.other { color: #c5cbe0; font-size: 13px; }
   header button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 6px; border: 1px solid #56607a;
                   background: #2b3550; color: #fff; cursor: pointer; }
   main { display: grid; grid-template-columns: minmax(0, 1fr) 440px; height: calc(100% - 46px); }
@@ -368,7 +402,7 @@ PAGE_HTML = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-<header><h1>SportCam full build, __LABEL__: wiring</h1><button id="fit" type="button">Fit</button></header>
+<header><h1>SportCam full build, __LABEL__: wiring</h1>__OTHER__<button id="fit" type="button">Fit</button></header>
 <main>
   <div id="pic">__SVG__<div id="hint">Click a row or a wire. Drag to pan, wheel to zoom, Esc to clear.</div></div>
   <aside>
@@ -377,6 +411,10 @@ PAGE_HTML = """<!DOCTYPE html>
   </aside>
 </main>
 <script>
+// The other servo drive's page: the docs viewer remembers the choice
+document.querySelector("a.other").addEventListener("click", (e) => {
+  try { localStorage.setItem("sportcam-docs-servos", e.currentTarget.dataset.servos); } catch {}
+});
 const SECTIONS = __DATA__;
 const svg = document.querySelector("#pic svg");
 const rows = document.getElementById("rows");
@@ -486,16 +524,24 @@ pic.addEventListener("pointerup", (e) => {
 """
 
 
-def write_page(svg_text, chips):
+def write_page(svg_text, chips, servos):
     """Inline the picture's SVG, its wires tagged by connection, beside the table."""
     svg_text = svg_text[svg_text.index("<svg"):]
     svg_text = re.sub(r'id="w-([A-Z]\d+)"', r'class="wire" data-c="\1"', svg_text)
-    data = [[t, [[html.escape(c) for c in row] + [chips.get(row[0], INK)] for row in rows]] for t, rows in CONNECTIONS]
+    data = [[t, [[html.escape(c) for c in row] + [chips.get(row[0], INK)] for row in rows]]
+            for t, rows in connections(servos)]
+    label = "with UWB" if UWB else "without UWB"
+    if servos == "arducam":
+        label += ", servos on the PTZ controller"
+        other = '<a class="other" data-servos="pigpio" href="wiring.html">Servos on the Pi instead</a>'
+    else:
+        other = '<a class="other" data-servos="arducam" href="wiring-arducam.html">Servos on the PTZ controller instead</a>'
     out = (PAGE_HTML.replace("__SVG__", svg_text).replace("__DATA__", json.dumps(data, ensure_ascii=False))
-           .replace("__BUILD__", BUILD).replace("__LABEL__", "with UWB" if UWB else "without UWB"))
-    with open(PAGE, "w") as f:
+           .replace("__BUILD__", BUILD).replace("__LABEL__", label).replace("__OTHER__", other))
+    page = PAGE.format(SUFFIX[servos])
+    with open(page, "w") as f:
         f.write(out)
-    print("wrote", os.path.relpath(PAGE))
+    print("wrote", os.path.relpath(page))
 
 
 # ----------------------------------------------------------------------------
@@ -506,7 +552,10 @@ LEGEND = [(V12, "+12 V"), (RED, "+5 V"), (BLACK, "GND"), ("#e67e7e", "+3.3 V (I3
           ("#8d5524", "servo lead"), (RIBBON, "camera ribbon"), (USB, "USB")]
 
 
-def render():
+def render(servos="pigpio"):
+    """The full build with the servos on the Pi's PWM ("pigpio") or left on the
+    PTZ controller ("arducam")."""
+    on_pi = servos == "pigpio"
     W, H = (334 if UWB else 334), 250
     fig, ax = plt.subplots(figsize=(W / 12.5, H / 12.5), dpi=150)
     ax.set_xlim(0, W)
@@ -515,7 +564,8 @@ def render():
     ax.axis("off")
     fig.patch.set_facecolor("white")
 
-    title = "SportCam full build, " + ("with UWB" if UWB else "without UWB") + ": everything wired up"
+    title = ("SportCam full build, " + ("with UWB" if UWB else "without UWB") + ": everything wired up"
+             + ("" if on_pi else ", servos on the PTZ controller"))
     ax.text(4, H - 3, title, fontsize=15, fontweight="bold", color=INK, va="top")
     ax.text(4, H - 10, f"Tags are the connection numbers in docs/{BUILD}/setup/12-wiring.md. "
             "Top-down, not to scale, and not where the parts sit in the enclosure.\nPin orders on the "
@@ -531,9 +581,9 @@ def render():
     gau = gauge(ax, 140, 18)
     bk = buck(ax, 178, 12)
     bj = barrel(ax, 236, 49)
-    pz = ptz_ctrl(ax, 24, 140)
+    pz = ptz_ctrl(ax, 24, 140, servos)
     cam = camera(ax, 45, 204)
-    sh = shifter(ax, 168, 142)
+    sh = shifter(ax, 168, 142, headers=on_pi)
     rg = ring(ax, (300, 216))
     rx = W - 8   # the 5 V leads' run up the right-hand edge
 
@@ -610,9 +660,15 @@ def render():
         pair(ax, [(224, 46.5), (243, 46.5), (243, 47.5)], d=(-0.9, 0.9), head=heads, tail=((bj["+"],), (bj["-"],)))
         tag(ax, (232, 46.5), "R6", RED)
     with conn(ax, "R7"):
-        hp, hm = sh[("pan", "+")], sh[("pan", "-")]
-        pair(ax, [(224, 43), (rx - 8, 43), (rx - 8, 164), (hp[0] + 4, 164)], d=(0.9, -0.9),
-             head=heads, tail=((hp,), (hm,)), label="R7", at=0.62)
+        if on_pi:
+            hp, hm = sh[("pan", "+")], sh[("pan", "-")]
+            pair(ax, [(224, 43), (rx - 8, 43), (rx - 8, 164), (hp[0] + 4, 164)], d=(0.9, -0.9),
+                 head=heads, tail=((hp,), (hm,)), label="R7", at=0.62)
+        else:
+            # to the controller's servo VCC pair, round the outside of R3
+            sx = (pz["SV+"][0] + pz["SV−"][0]) / 2
+            pair(ax, [(206, 44), (206, 60), (10.5, 60), (10.5, 133.5), (sx, 133.5), (sx, 137)], d=(-0.9, 0.9),
+                 head=heads, tail=((pz["SV+"],), (pz["SV−"],)), label="R7", at=0.45)
     with conn(ax, "R5"):
         p14 = sh[14]
         pair(ax, [(224, 39.5), (rx - 4, 39.5), (rx - 4, 190), (p14[0] - 4, 190), (p14[0] - 4, 168)],
@@ -634,9 +690,70 @@ def render():
         wire(ax, [sh[1], (sh[1][0], sh["gb"])], BLACK, lw=1.4)
         tag(ax, (sh[1][0] - 3.5, sh["gb"] + 3), "L3", BLACK)
     with conn(ax, "L4"):
-        for n in (12, 13):
-            wire(ax, [sh[n], (sh[n][0], sh["gt"])], BLACK, lw=1.4)
+        # the idle gates' inputs and enables: gate 4, and 2 and 3 with no servos
+        for n in (12, 13) if on_pi else (4, 5, 9, 10, 12, 13):
+            wire(ax, [sh[n], (sh[n][0], sh["gb"] if n < 8 else sh["gt"])], BLACK, lw=1.4)
         tag(ax, (sh[13][0] + 2, sh["gt"] + 5.5), "L4", BLACK)
+    if not on_pi:
+        servo_leads_on_ptz(ax, pz, sh)
+    else:
+        servos_on_pi(ax, pins, sh)
+    note(ax, 247, 186, "Shifter perfboard:\ngrey strips are GND,\njoined to pin 7." +
+         ("\nServo headers, bottom\nto top: S, +, −" if on_pi else ""), fs=5.5, color=GREY)
+
+    # --- Camera ------------------------------------------------------------------
+    with conn(ax, "C1"):
+        cx, cy = ports["csi"]
+        r = cam["ribbon"]
+        wire(ax, [(cx, cy), (cx, 58), (8, 58), (8, r[1] - 2), (r[0], r[1] - 2)], RIBBON, lw=7, z=4)
+        tag(ax, (8, 100), "C1", RIBBON)
+        note(ax, 10, 56, "15-pin ribbon: silver contacts toward the HDMI ports", fs=6, va="top")
+    with conn(ax, "C2"):
+        for n, c, x2 in (("ZOOM", "#7a7f8a", 47), ("FOCUS", "#7a7f8a", 51)):
+            s = pz[n]
+            wire(ax, [s, (s[0], 176), (x2, 176), (x2, 189)], c, lw=1.1, outline=False)
+        tag(ax, (pz["FOCUS"][0] + 4, 172), "C2", "#7a7f8a")
+    if on_pi:
+        with conn(ax, "M7"):
+            for name, lane, start in (("pan", 210, (59, 210)), ("tilt", 205, (60, 205))):
+                hx = sh[(name, "-")][0]
+                wire(ax, [start, (hx, lane), (hx, sh[(name, "-")][1] + 4)], "#8d5524", lw=2.4)
+                ax.add_patch(Rectangle((hx - 2.2, sh[(name, "S")][1] - 1.6), 4.4, 13, fc="none", ec="#8d5524", lw=1.4, zorder=7))
+                note(ax, hx + 2.6, sh[(name, "-")][1] + 6, name, fs=6, va="center")
+            tag(ax, (120, 210), "M7", "#8d5524")
+            note(ax, 63, 200, "servo leads, off the PTZ controller", fs=6, color=GREY)
+
+    anchors_and_legend(ax, ports, servos)
+
+    os.makedirs(os.path.dirname(PNG), exist_ok=True)
+    png = PNG.format(SUFFIX[servos])
+    fig.savefig(png, facecolor="white", bbox_inches="tight", pad_inches=0.15)
+    print("wrote", os.path.relpath(png))
+    # each connection's tag colour, for the table's number chips
+    chips = {}
+    for t in ax.texts:
+        gid, box = t.get_gid(), t.get_bbox_patch()
+        if gid and box is not None:
+            chips.setdefault(gid[2:], matplotlib.colors.to_hex(box.get_facecolor()))
+    buf = io.StringIO()
+    fig.savefig(buf, format="svg", facecolor="white", bbox_inches="tight", pad_inches=0.15,
+                metadata={"Date": None})
+    plt.close(fig)
+    write_page(buf.getvalue(), chips, servos)
+
+
+def servo_leads_on_ptz(ax, pz, sh):
+    """The servos left on the PTZ controller: their leads in its PAN and TILT
+    sockets, as the kit came."""
+    for name, end in (("PAN", (32, 193.5)), ("TILT", (40, 189))):
+        s = pz[name]
+        wire(ax, [s, (s[0], end[1])], "#8d5524", lw=2.4)
+    note(ax, 67, 158, "PAN, TILT: the servo leads,\nin their sockets as the kit came", fs=6, color=GREY, va="bottom")
+
+
+def servos_on_pi(ax, pins, sh):
+    """M1–M6: the Pi's PWM through the shifter's gates 2 and 3 to the servo
+    headers."""
     with conn(ax, "M3"):
         wire(ax, [sh[4], (sh[4][0], sh["gb"])], BLACK, lw=1.4)
         wire(ax, [sh[10], (sh[10][0], sh["gt"])], BLACK, lw=1.4)
@@ -662,29 +779,10 @@ def render():
         for k, c in (("+", RED), ("-", BLACK)):
             wire(ax, [sh[("tilt", k)], sh[("pan", k)]], c, lw=1.4)
         tag(ax, (224, 169), "M6", RED)
-    note(ax, 247, 186, "Shifter perfboard:\ngrey strips are GND,\njoined to pin 7.\nServo headers, bottom\nto top: S, +, −", fs=5.5, color=GREY)
 
-    # --- Camera ------------------------------------------------------------------
-    with conn(ax, "C1"):
-        cx, cy = ports["csi"]
-        r = cam["ribbon"]
-        wire(ax, [(cx, cy), (cx, 58), (8, 58), (8, r[1] - 2), (r[0], r[1] - 2)], RIBBON, lw=7, z=4)
-        tag(ax, (8, 100), "C1", RIBBON)
-        note(ax, 10, 56, "15-pin ribbon: silver contacts toward the HDMI ports", fs=6, va="top")
-    with conn(ax, "C2"):
-        for n, c, x2 in (("ZOOM", "#7a7f8a", 47), ("FOCUS", "#7a7f8a", 51)):
-            s = pz[n]
-            wire(ax, [s, (s[0], 176), (x2, 176), (x2, 189)], c, lw=1.1, outline=False)
-        tag(ax, (pz["FOCUS"][0] + 4, 172), "C2", "#7a7f8a")
-    with conn(ax, "M7"):
-        for name, lane, start in (("pan", 210, (59, 210)), ("tilt", 205, (60, 205))):
-            hx = sh[(name, "-")][0]
-            wire(ax, [start, (hx, lane), (hx, sh[(name, "-")][1] + 4)], "#8d5524", lw=2.4)
-            ax.add_patch(Rectangle((hx - 2.2, sh[(name, "S")][1] - 1.6), 4.4, 13, fc="none", ec="#8d5524", lw=1.4, zorder=7))
-            note(ax, hx + 2.6, sh[(name, "-")][1] + 6, name, fs=6, va="center")
-        tag(ax, (120, 210), "M7", "#8d5524")
-        note(ax, 63, 200, "servo leads, off the PTZ controller", fs=6, color=GREY)
 
+def anchors_and_legend(ax, ports, servos):
+    """The UWB build's anchors and tag, and the wire colours' key."""
     # --- Anchors and the tag -----------------------------------------------------
     if UWB:
         ux = ports["usbA1"][0]
@@ -703,30 +801,17 @@ def render():
         note(ax, 262, 20, "the wearable tag", fs=6, color=GREY)
 
     # --- Legend --------------------------------------------------------------------
+    legend = LEGEND if servos == "pigpio" else [e for e in LEGEND if e[0] != PWM]
     lx, ly = 24, 114
-    ax.add_patch(FancyBboxPatch((lx, ly - len(LEGEND) * 3.6 - 1), 48, len(LEGEND) * 3.6 + 5.5,
+    ax.add_patch(FancyBboxPatch((lx, ly - len(legend) * 3.6 - 1), 48, len(legend) * 3.6 + 5.5,
                                 boxstyle="round,pad=0,rounding_size=1.2", fc=BGBOX, ec=GREY, lw=0.8, zorder=1))
     ax.text(lx + 2, ly + 2.3, "Wires", fontsize=7.5, fontweight="bold", color=INK, va="center")
-    for i, (c, t) in enumerate(LEGEND):
+    for i, (c, t) in enumerate(legend):
         yy = ly - 1.8 - i * 3.6
         ax.plot([lx + 2, lx + 8], [yy, yy], color=c, lw=2.6 if c != RIBBON else 5, solid_capstyle="round")
         ax.text(lx + 10, yy, t, fontsize=6.5, color=INK, va="center")
 
-    os.makedirs(os.path.dirname(PNG), exist_ok=True)
-    fig.savefig(PNG, facecolor="white", bbox_inches="tight", pad_inches=0.15)
-    print("wrote", os.path.relpath(PNG))
-    # each connection's tag colour, for the table's number chips
-    chips = {}
-    for t in ax.texts:
-        gid, box = t.get_gid(), t.get_bbox_patch()
-        if gid and box is not None:
-            chips.setdefault(gid[2:], matplotlib.colors.to_hex(box.get_facecolor()))
-    buf = io.StringIO()
-    fig.savefig(buf, format="svg", facecolor="white", bbox_inches="tight", pad_inches=0.15,
-                metadata={"Date": None})
-    plt.close(fig)
-    write_page(buf.getvalue(), chips)
-
 
 if __name__ == "__main__":
-    render()
+    render("pigpio")
+    render("arducam")

@@ -19,6 +19,7 @@
   html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; color: var(--ink); background: #fff; }
   header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #1a2233; color: #fff; }
   header h1 { margin: 0; font-size: 16px; font-weight: 600; flex: 1; }
+  header a.other { color: #c5cbe0; font-size: 13px; }
   header button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 6px; border: 1px solid #56607a;
                   background: #2b3550; color: #fff; cursor: pointer; }
   main { display: grid; grid-template-columns: minmax(0, 1fr) 440px; height: calc(100% - 46px); }
@@ -54,7 +55,7 @@
 </style>
 </head>
 <body>
-<header><h1>SportCam full build, without UWB: wiring</h1><button id="fit" type="button">Fit</button></header>
+<header><h1>SportCam full build, without UWB: wiring</h1><a class="other" data-servos="arducam" href="wiring-arducam.html">Servos on the PTZ controller instead</a><button id="fit" type="button">Fit</button></header>
 <main>
   <div id="pic"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1502.9568pt" height="1130.4pt" viewBox="0 0 1502.9568 1130.4" xmlns="http://www.w3.org/2000/svg" version="1.1">
  <metadata>
@@ -3399,6 +3400,10 @@ z
   </aside>
 </main>
 <script>
+// The other servo drive's page: the docs viewer remembers the choice
+document.querySelector("a.other").addEventListener("click", (e) => {
+  try { localStorage.setItem("sportcam-docs-servos", e.currentTarget.dataset.servos); } catch {}
+});
 const SECTIONS = [["Power, 12 V side", [["P1", "Power bank USB-C", "PD trigger USB-C", "30 cm C-to-C cable (BOM 14). A charge-only or A-to-C cable leaves the trigger at 5 V", "#5b6475"], ["P2", "PD trigger +12 V", "power latch IN", "18 AWG. The latch switches the positive line only", "#c0392b"], ["P3", "power latch OUT", "gauge VIN+ (IN+ on an INA226)", "18 AWG. The gauge sits in series on the positive line", "#c0392b"], ["P4", "gauge VIN− (IN−)", "buck IN+", "18 AWG", "#c0392b"], ["P5", "PD trigger GND", "buck IN−", "18 AWG", "#222222"], ["P6", "power latch GND", "buck IN−", "22 AWG. The latch only references its transistors to it", "#222222"]]], ["Switch and Pi signals", [["S1", "latch IN (+12 V, always live)", "rocker terminal 1", "22 AWG, signal only: under 1 mA", "#c0392b"], ["S2", "rocker terminal 2", "latch SW", "22 AWG", "#c0392b"], ["S3", "latch HOLD", "Pi pin 11 (GPIO17)", "Dupont. The Pi&#x27;s &quot;keep the power on&quot; line", "#7d3cbd"], ["S4", "latch SENSE", "Pi pin 13 (GPIO27)", "Dupont. 2.8 V: check it&#x27;s under 3.3 V before plugging it in", "#7d3cbd"]]], ["Power, 5 V rail", [["R1", "buck OUT+ / OUT−", "470 µF capacitor", "across the output, stripe (−) to OUT−", "#d64541"], ["R2", "buck OUT+ / OUT−", "USB-C pigtail → Pi USB-C", "18 AWG, short. ≈ 1.2 A average, 2 A peaks", "#d64541"], ["R3", "buck OUT+ / OUT−", "PTZ controller 5V / GND", "18–22 AWG. Not the Pi&#x27;s 5 V pin", "#d64541"], ["R4", "buck OUT+ / OUT−", "LED ring 5V / GND", "22 AWG", "#d64541"], ["R5", "buck OUT+ / OUT−", "74AHCT125 VCC (pin 14) / GND (pin 7)", "22 AWG", "#d64541"], ["R6", "buck OUT+ / OUT−", "panel barrel jack", "22 AWG. Optional 5 V service tap, centre positive", "#d64541"], ["R7", "buck OUT+ / OUT−", "servo headers + / −", "20–22 AWG. ≈ 0.7 A when both servos stall", "#d64541"]]], ["I2C bus", [["I1", "Pi pin 3 (GPIO2, SDA)", "PTZ controller SDA and gauge SDA", "PTZ controller 0x0C, gauge 0x40", "#2f6fed"], ["I2", "Pi pin 5 (GPIO3, SCL)", "PTZ controller SCL and gauge SCL", "", "#e0a100"], ["I3", "Pi pin 1 (3.3 V)", "gauge VCC", "3.3 V, not 5 V: the gauge&#x27;s pull-ups go to its VCC", "#e67e7e"], ["I4", "Pi pin 9 (GND)", "gauge GND", "", "#222222"]]], ["LED ring", [["L1", "Pi pin 19 (GPIO10, SPI0 MOSI)", "74AHCT125 1A (pin 2)", "3.3 V data in", "#16a085"], ["L2", "74AHCT125 1Y (pin 3)", "ring DIN", "5 V data out. Keep it short. DIN, not DOUT", "#16a085"], ["L3", "74AHCT125 1OE (pin 1)", "GND", "active-low enable, tied low", "#222222"], ["L4", "74AHCT125 4A (pin 12) and 4OE (pin 13)", "GND", "the unused gate: a floating input oscillates", "#222222"]]], ["Servos", [["M1", "Pi pin 32 (GPIO12, PWM0)", "74AHCT125 2A (pin 5)", "pan signal, 3.3 V", "#e67e22"], ["M2", "Pi pin 33 (GPIO13, PWM1)", "74AHCT125 3A (pin 9)", "tilt signal, 3.3 V", "#e67e22"], ["M3", "74AHCT125 2OE (pin 4) and 3OE (pin 10)", "GND", "active-low enables, tied low", "#222222"], ["M4", "74AHCT125 2Y (pin 6)", "pan header S", "5 V pulses", "#e67e22"], ["M5", "74AHCT125 3Y (pin 8)", "tilt header S", "", "#e67e22"], ["M6", "both headers + and −", "the 5 V rail (R7)", "links the second header to the first", "#d64541"], ["M7", "pan and tilt servo leads", "pan and tilt headers", "off the PTZ controller. Brown/black = GND, red = +5 V", "#8d5524"]]], ["Camera and PTZ", [["C1", "camera ribbon (15-pin)", "Pi CSI connector", "silver contacts toward the HDMI ports", "#b8bec9"], ["C2", "PTZ controller lens leads", "zoom and focus motors", "factory-wired, as the kit came", "#7a7f8a"]]]];
 const svg = document.querySelector("#pic svg");
 const rows = document.getElementById("rows");

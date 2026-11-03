@@ -95,6 +95,9 @@ class StubHead:
     def jog(self, pan: float, tilt: float) -> None:
         print(f"[stub] jog pan {pan:+.2f} tilt {tilt:+.2f}")
 
+    def lens(self, zoom_mm: float | None, focus_m: float | None) -> None:
+        print(f"[stub] lens zoom {zoom_mm} mm focus {focus_m} m")
+
     async def apply_state(self, new: str) -> None:
         if new not in ("tracking", "recording"):
             self.session_hash = None

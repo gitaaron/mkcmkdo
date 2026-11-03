@@ -8,7 +8,10 @@
   Interactive block-level schematic of the bench rig
   (docs/without_uwb/bench/12-wiring.md), rendered with d3-hwschematic from the
   same vendored libraries as index.html. Edge labels carry the wiring
-  guide's connection numbers (A1, P1, R2, I1, …). Serve it with the docs
+  guide's connection numbers (A1, P1, R2, I1, …). Drawn for the servo drive
+  chosen in the docs viewer's settings (localStorage "sportcam-docs-servos",
+  or ?servos=pigpio|arducam): the servos in the PTZ controller's sockets, or
+  on the Pi's header. The header's switch changes it. Serve it with the docs
   viewer:
 
       npm run docs        → http://localhost:8090/without_uwb/schematics/interactive/bench.html
@@ -19,15 +22,43 @@
 <link rel="stylesheet" href="vendor/d3-hwschematic.css" />
 <style>
   html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; overflow: hidden; }
-  header { padding: 10px 16px; background: #1a2233; color: #fff; height: 24px; }
-  header h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  header { padding: 10px 16px; background: #1a2233; color: #fff; height: 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; flex: 1; }
+  header .switch { display: flex; gap: 2px; padding: 2px; border: 1px solid #56607a; border-radius: 7px; }
+  header .switch button { font: inherit; font-size: 12.5px; padding: 2px 9px; border: 0; border-radius: 5px;
+                          background: none; color: #c5cbe0; cursor: pointer; }
+  header .switch button[aria-pressed="true"] { background: #2f6fed; color: #fff; }
   #scheme { width: 100vw; height: calc(100vh - 44px); display: block; }
 </style>
 </head>
 <body>
-<header><h1>SportCam bench rig wiring, without UWB (drag to pan, wheel to zoom)</h1></header>
+<header><h1>SportCam bench rig wiring, without UWB<span id="drive"></span> (drag to pan, wheel to zoom)</h1>
+  <div class="switch" role="group" aria-label="Servos driven by">
+    <button type="button" data-servos="pigpio">Servos on the Pi</button>
+    <button type="button" data-servos="arducam">On the PTZ controller</button>
+  </div></header>
 <svg id="scheme"></svg>
 <script>
+// The servo drive: ?servos=…, else the docs viewer's setting, else the Pi
+const SERVO_KEY = "sportcam-docs-servos";
+const DRIVES = ["pigpio", "arducam"];
+let servos = new URLSearchParams(location.search).get("servos");
+if (!DRIVES.includes(servos)) {
+  try { servos = localStorage.getItem(SERVO_KEY); } catch {}
+}
+if (!DRIVES.includes(servos)) servos = "pigpio";
+const onPi = servos === "pigpio";
+for (const btn of document.querySelectorAll("[data-servos]")) {
+  btn.setAttribute("aria-pressed", String(btn.dataset.servos === servos));
+  btn.addEventListener("click", () => {
+    try { localStorage.setItem(SERVO_KEY, btn.dataset.servos); } catch {}
+    const url = new URL(location.href);
+    url.searchParams.set("servos", btn.dataset.servos);
+    location.replace(url);
+  });
+}
+document.getElementById("drive").textContent = onPi ? ", servos on the Pi" : ", servos on the PTZ controller";
+
 const port = (id, name, side) => ({
   id, hwMeta: { name }, direction: side, properties: { side: side === "OUTPUT" ? "EAST" : "WEST" },
 });
@@ -56,21 +87,26 @@ const graph = {
       port("pi_p2", "pin 2 5V", "OUTPUT"), port("pi_p14", "pin 14 GND", "OUTPUT"),
       port("pi_p4", "pin 4 5V", "OUTPUT"), port("pi_p6", "pin 6 GND", "OUTPUT"),
       port("pi_sda", "pin 3 SDA G2", "OUTPUT"), port("pi_scl", "pin 5 SCL G3", "OUTPUT"),
+      ...(onPi ? [
+        port("pi_p30", "pin 30 GND", "OUTPUT"), port("pi_pwm_pan", "pin 32 PWM0 G12", "OUTPUT"),
+        port("pi_pwm_tilt", "pin 33 PWM1 G13", "OUTPUT"), port("pi_p34", "pin 34 GND", "OUTPUT"),
+      ] : []),
       port("pi_csi", "CSI", "OUTPUT"),
     ]),
     // The controller's 6-pin cable connector, in pin order (Arducam's quick start)
     node("ptz", "Arducam PTZ ctrl (0x0C)", [
-      port("ptz_svcc", "1 servo VCC", "INPUT"), port("ptz_gnd2", "2 GND", "INPUT"),
+      port("ptz_svcc", onPi ? "1 servo VCC (off, taped)" : "1 servo VCC", "INPUT"), port("ptz_gnd2", "2 GND", "INPUT"),
       port("ptz_5v", "3 5V", "INPUT"), port("ptz_gnd", "4 GND", "INPUT"),
       port("ptz_scl", "5 SCL", "INPUT"), port("ptz_sda", "6 SDA", "INPUT"),
       port("ptz_lens", "lens motors + IR-cut", "OUTPUT"),
-      port("ptz_pan", "PAN socket", "OUTPUT"), port("ptz_tilt", "TILT socket", "OUTPUT"),
+      ...(onPi ? [] : [port("ptz_pan", "PAN socket", "OUTPUT"), port("ptz_tilt", "TILT socket", "OUTPUT")]),
     ]),
     node("cam", "IMX477 + zoom lens", [
       port("cam_csi", "CSI", "INPUT"), port("cam_lens", "lens motors + IR-cut", "INPUT"),
     ]),
-    node("pan", "Pan servo", [port("pan_in", "3-wire plug", "INPUT")]),
-    node("tilt", "Tilt servo", [port("tilt_in", "3-wire plug", "INPUT")]),
+    ...["pan", "tilt"].map((s) => node(s, s === "pan" ? "Pan servo" : "Tilt servo", onPi
+      ? [port(s + "_sig", "signal (yellow)", "INPUT"), port(s + "_5v", "V+ (red)", "INPUT"), port(s + "_gnd", "GND (brown)", "INPUT")]
+      : [port(s + "_in", "3-wire plug", "INPUT")])),
   ],
 };
 
@@ -83,7 +119,7 @@ graph.edges = [
   edge("wall", "w_ac", "psu", "psu_ac", "mains"),
   edge("psu", "psu_out", "pi", "pi_5v", "P1 5.1 V 3 A"),
   // The kit's 6-wire cable (colours as Arducam draws them)
-  edge("pi", "pi_p2", "ptz", "ptz_svcc", "J3 red: servo VCC"),
+  ...(onPi ? [] : [edge("pi", "pi_p2", "ptz", "ptz_svcc", "J3 red: servo VCC")]),
   edge("pi", "pi_p14", "ptz", "ptz_gnd2", "J4 black: GND"),
   edge("pi", "pi_p4", "ptz", "ptz_5v", "J1 white: 5V"),
   edge("pi", "pi_p6", "ptz", "ptz_gnd", "J2 brown: GND"),
@@ -91,8 +127,18 @@ graph.edges = [
   edge("pi", "pi_sda", "ptz", "ptz_sda", "I1 orange: SDA"),
   edge("pi", "pi_csi", "cam", "cam_csi", "C1 15-pin FFC"),
   edge("ptz", "ptz_lens", "cam", "cam_lens", "K3 factory-fitted"),
-  edge("ptz", "ptz_pan", "pan", "pan_in", "K1 as the kit came"),
-  edge("ptz", "ptz_tilt", "tilt", "tilt_in", "K2 as the kit came"),
+  ...(onPi ? [
+    // each servo's plug off the controller, on jumpers to the Pi's header
+    edge("pi", "pi_pwm_pan", "pan", "pan_sig", "K1 pan signal"),
+    edge("pi", "pi_pwm_tilt", "tilt", "tilt_sig", "K2 tilt signal"),
+    edge("pi", "pi_p2", "pan", "pan_5v", "K4 red, on a Y"),
+    edge("pi", "pi_p2", "tilt", "tilt_5v", "K4 red, on a Y"),
+    edge("pi", "pi_p30", "pan", "pan_gnd", "K5 brown"),
+    edge("pi", "pi_p34", "tilt", "tilt_gnd", "K6 brown"),
+  ] : [
+    edge("ptz", "ptz_pan", "pan", "pan_in", "K1 as the kit came"),
+    edge("ptz", "ptz_tilt", "tilt", "tilt_in", "K2 as the kit came"),
+  ]),
 ];
 
 const svg = d3.select("#scheme")

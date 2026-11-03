@@ -116,8 +116,12 @@ class FakePtz:
     def set_zoom_mm(self, mm, urgent=False):
         self.zoom_mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, mm))
 
-    def set_focus(self, dist):
+    def set_focus(self, dist, urgent=False):
         self.focus_dist = dist
+
+    @property
+    def focus_m(self):
+        return self.focus_dist
 
 
 def run(tr, n, pause=0.0):

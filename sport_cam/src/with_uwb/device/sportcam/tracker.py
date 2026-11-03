@@ -116,8 +116,11 @@ class Tracker:
         self.mode = TRACK
 
     # ---- awake --------------------------------------------------------------
-    def watch_awake(self) -> None:
+    def watch_awake(self, wide: bool = True) -> None:
         """One awake tick: keep the lens wide and note whether anyone is in frame.
+
+        `wide` False: the app has set the zoom, so leave it. Anyone in frame
+        then counts only once the lens is back at wide.
 
         Detection runs at DETECT_FPS_AWAKE here. A person counts as in frame
         until AWAKE_PERSON_HOLD_S passes with no detection, so one missed frame
@@ -126,7 +129,8 @@ class Tracker:
         Every box is labelled UNSURE for the live view: with no session
         running, nobody has been picked as the climber yet.
         """
-        self.ptz.set_zoom_mm(config.ZOOM_MIN_MM)    # retried: zoom is rate-limited
+        if wide:
+            self.ptz.set_zoom_mm(config.ZOOM_MIN_MM)    # retried: zoom is rate-limited
         boxes, fresh = self.camera.person_boxes()
         if fresh:
             self.labelled_at = time.monotonic()

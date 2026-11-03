@@ -17,6 +17,12 @@ each one happens, and links back here.
 
 ![The full build with every part wired up](../images/full-wiring.png)
 
+<!--both-->
+
+With the servos left on the PTZ controller instead ([servos](#servos)): [that picture](../images/full-wiring-arducam.png).
+
+<!--/-->
+
 The design reasons behind each connection are in
 [04 — Electronics](../../design/04-electronics.md).
 
@@ -128,7 +134,8 @@ wire of their own.
 | R4 | buck OUT+ / OUT− | WS2812B ring **5V / GND** | 22 AWG | ≈ 1 A at full white; ≈ 0.45 A at the `LED_BRIGHTNESS = 0.45` the code uses |
 | R5 | buck OUT+ / OUT− | 74AHCT125 **VCC (pin 14) / GND (pin 7)** | 22 AWG | |
 | R6 | buck OUT+ / OUT− | panel barrel jack (in the wall, low) | 22 AWG | optional 5 V service tap, centre positive |
-| R7 | buck OUT+ / OUT− | servo headers **+ / −** on the shifter's perfboard ([below](#servos)) | 20–22 AWG | the two servos: ≈ 0.7 A when both stall. Not the Pi's 5 V pin |
+| R7 <!--pigpio row--> | buck OUT+ / OUT− | servo headers **+ / −** on the shifter's perfboard ([below](#servos)) | 20–22 AWG | the two servos: ≈ 0.7 A when both stall. Not the Pi's 5 V pin |
+| R7 <!--arducam row--> | buck OUT+ / OUT− | PTZ controller **servo VCC / GND**: pins 1 and 2 of its 6-pin connector (Arducam's red and black) ([below](#servos)) | 20–22 AWG | the two servos, through the controller's sockets: ≈ 0.7 A when both stall. Not the Pi's 5 V pin |
 
 The pigtail (R2) carries ground into the Pi, so the Pi's GPIO ground and the
 rail are already one net. No separate ground wire to the header is needed.
@@ -155,12 +162,21 @@ No gauge? Leave out I1–I4 at the gauge end, wire the 12 V straight through
 | L1 | Pi **pin 19** (GPIO10, SPI0 MOSI) | 74AHCT125 **1A (pin 2)** | 3.3 V data in |
 | L2 | 74AHCT125 **1Y (pin 3)** | ring **DIN** | 5 V data out. Keep it short |
 | L3 | 74AHCT125 **1OE (pin 1)** | GND | the enable is active-low: tied low, the gate is always on |
-| L4 | 74AHCT125 **4A** (pin 12) and **4OE** (pin 13) | GND | the one unused gate; a floating input oscillates. Gates 2 and 3 drive the servos ([below](#servos)) |
+| L4 <!--pigpio row--> | 74AHCT125 **4A** (pin 12) and **4OE** (pin 13) | GND | the one unused gate; a floating input oscillates. Gates 2 and 3 drive the servos ([below](#servos)) |
+| L4 <!--arducam row--> | 74AHCT125 **2A, 2OE, 3A, 3OE, 4A, 4OE** (pins 5, 4, 9, 10, 12, 13) | GND | the three unused gates; a floating input oscillates. With the servos on the Pi, gates 2 and 3 drive them ([below](#servos)) |
 
 Use the ring's **DIN** pad, not DOUT. The arrows printed on the ring point
 away from DIN.
 
 ### Servos
+
+Two ways to drive them; the docs viewer shows one (pick it in its settings,
+the gear by the title). On the Pi's PWM through the shifter
+(`SERVO_DRIVER = "pigpio"`): smooth, sub-degree steps. Or left on the PTZ
+controller (`"arducam"`): no extra wiring, whole-degree steps.
+
+<!--pigpio-->
+
 
 The Pi drives the two servos itself, from its two hardware PWM pins, through
 the shifter's spare gates: sub-degree steps instead of the PTZ controller's
@@ -181,18 +197,26 @@ signal pin.
 | M6 | both headers **+** and **−** | the 5 V rail (R7) | |
 | M7 | pan servo lead, tilt servo lead | pan header, tilt header | unplugged from the PTZ controller's servo sockets. Add a 30 cm servo extension (BOM 18) if a lead won't reach through the lid |
 
-Still on the controller as the kit came? Leave M1–M7 out and set
-`SERVO_DRIVER = "arducam"`. The servos then take their power from the
-controller's servo VCC pair, pins 1 and 2 of its 6-pin connector (Arducam's
-red and black wires): run that pair to the 5 V rail as well, beside R3.
-Everything works, in whole-degree steps.
+<!--/servo-->
+
+<!--arducam-->
+
+The servos stay plugged into the PTZ controller's **PAN** and **TILT**
+sockets, as the kit came, and the controller drives them from its I2C
+registers in whole degrees (`SERVO_DRIVER = "arducam"`). They take their
+power from its servo VCC pair (R7). There is nothing else to wire: no
+M1–M7, no headers on the shifter's perfboard. A slow pan moves in visible
+≈ 1° steps; [the servos on the Pi](../../design/04-electronics.md#servo-drive)
+step by a fraction of a degree.
+
+<!--/servo-->
 
 ### Camera, PTZ and anchors — plug-in connections
 
 | # | From | To | Notes |
 | --- | --- | --- | --- |
 | C1 | camera ribbon (15-pin, from the Arducam kit) | Pi **CSI** connector | silver contacts **toward the HDMI ports**; lift the latch, insert fully, press the latch down. Leave ≈ 80 mm of slack coiled under the lid |
-| C2 | PTZ controller's lens leads | as fitted in the Arducam kit | factory-wired. The two servo leads move to the shifter's headers ([M7](#servos)) |
+| C2 | PTZ controller's lens leads | as fitted in the Arducam kit | factory-wired. The two servo leads <!--both-->move to the shifter's headers or stay in the controller ([servos](#servos))<!--/--><!--pigpio: move to the shifter's headers ([M7](#servos))--><!--arducam: stay in its PAN and TILT sockets ([servos](#servos))--> |
 | U1 | anchor **A1** (arm, +Y) | Pi USB-A, via a 50 cm extension | the **data** anchor: shows up as `/dev/ttyUSB0` |
 | U2 | anchor **A2** (arm, −Y) | Pi USB-A, via a 50 cm extension | power only |
 | U3 | anchor **A3** (mast) | Pi USB-A, via a 50 cm extension | power only. Tie it down the dowel with slack at the foot so the mast can be pulled |
@@ -210,6 +234,8 @@ one on USB prints it (ULA1 manual §5–6, "monitoring mode"). Confirm it stream
 
 ## Pi header, pins used
 
+<!--pigpio-->
+
 ```
   I3 gauge VCC    3.3V  [ 1] [ 2]  5V     ← 5 V pins: not used, nothing is powered from the header
   I1 SDA         GPIO2  [ 3] [ 4]  5V
@@ -225,6 +251,26 @@ one on USB prints it (ULA1 manual §5–6, "monitoring mode"). Confirm it stream
                         [31] [32]  GPIO12  M1 pan PWM
   M2 tilt PWM   GPIO13  [33] [34]  GND
 ```
+
+<!--/servo-->
+
+<!--arducam-->
+
+```
+  I3 gauge VCC    3.3V  [ 1] [ 2]  5V     ← 5 V pins: not used, nothing is powered from the header
+  I1 SDA         GPIO2  [ 3] [ 4]  5V
+  I2 SCL         GPIO3  [ 5] [ 6]  GND
+                        [ 7] [ 8]
+  I4 gauge GND     GND  [ 9] [10]
+  S3 latch HOLD GPIO17  [11] [12]
+  S4 latch SENSE GPIO27 [13] [14]
+                        ...
+                        [17] [18]
+  L1 ring data  GPIO10  [19] [20]  GND
+                        ...
+```
+
+<!--/servo-->
 
 ## Wiring order, with checks
 
@@ -257,12 +303,29 @@ Each step points at the assembly-guide step it belongs to.
    ([assembly: LED](assembly/index.html#led)). **Check:** the ring cycles
    blue, green and red. A ring that stays dark usually has its data on DOUT
    or a floating 1OE.
+
+<!--pigpio-->
+
 7. **PTZ controller, servos and camera** (R3, R7, I1, I2, M1–M7, C1, C2) — when the lid goes on
    ([assembly: lid on](assembly/index.html#lid-on)). **Check:**
    `i2cdetect -y 1` shows **0c** and **40**; `rpicam-hello -t 2000` shows a
    picture. Before powering on, check each servo header with a meter: **5.0–5.1 V**
    between + and −, and nothing between S and + (a backwards lead). The servos
    are checked in the software setup (`ptzcheck`).
+
+<!--/servo-->
+
+<!--arducam-->
+
+7. **PTZ controller, servos and camera** (R3, R7, I1, I2, C1, C2) — when the lid goes on
+   ([assembly: lid on](assembly/index.html#lid-on)). **Check:**
+   `i2cdetect -y 1` shows **0c** and **40**; `rpicam-hello -t 2000` shows a
+   picture. Before powering on, check R7 with a meter at the controller's
+   connector: **5.0–5.1 V** between pins 1 and 2. The servos are checked in
+   the software setup (`ptzcheck`).
+
+<!--/servo-->
+
 8. **Anchors** (U1–U3)
    ([assembly: arms](assembly/index.html#arms),
    [mast](assembly/index.html#mast)). **Check:**
@@ -283,9 +346,11 @@ Then carry on with the [software setup](14-software-setup.md).
 | `40` missing | I1–I4 | gauge VCC or GND, or swapped SDA/SCL. Or run without it: `POWER_MONITOR = "none"` |
 | Ring dark | L1–L4, R4, R5 | data on DOUT, 1OE not grounded, or the shifter unpowered |
 | Ring flickers random colours | L2, L4 | long data lead, or unused shifter inputs left floating |
-| Pan or tilt doesn't move at all | M1–M7, R7, or the Pi setup | pigpiod not running (`pigs hwver`), 2OE/3OE not grounded, header unpowered, or the lead backwards |
-| Servo buzzes or twitches at rest | M4–M6 | long signal lead, or the header's − not on the camera's one ground |
-| Pan moves in ≈ 1° ticks | M7, or `config.py` | the lead is still on the PTZ controller, or `SERVO_DRIVER = "arducam"` |
+| Pan or tilt doesn't move at all <!--pigpio row--> | M1–M7, R7, or the Pi setup | pigpiod not running (`pigs hwver`), 2OE/3OE not grounded, header unpowered, or the lead backwards |
+| Pan or tilt doesn't move at all <!--arducam row--> | R7, or `config.py` | the servo VCC pair unpowered, a servo plug out of its socket, or `SERVO_DRIVER` not `"arducam"` |
+| Servo buzzes or twitches at rest <!--pigpio row--> | M4–M6 | long signal lead, or the header's − not on the camera's one ground |
+| Pan moves in ≈ 1° ticks <!--pigpio row--> | M7, or `config.py` | the lead is still on the PTZ controller, or `SERVO_DRIVER = "arducam"` |
+| Pan moves in ≈ 1° ticks <!--arducam row--> | — | expected with the servos on the controller: it takes whole degrees. Smoother: [the servos on the Pi](#servos) |
 | No `/dev/ttyUSB0` | U1 | the data anchor is not plugged into the Pi, or its extension is not seated |
 | Camera dies the instant you switch off | S3, or the Pi setup | HOLD isn't reaching Q2: check S3 is on pin 11, and that `gpio=17=op,dh` is in `config.txt` |
 | Camera never turns off after switching off | S4, or the Pi setup | SENSE isn't reaching the Pi (pin 13, `gpio-shutdown` overlay), or `POWER_OFF_ON_HALT` isn't set, so the halted Pi keeps HOLD high |

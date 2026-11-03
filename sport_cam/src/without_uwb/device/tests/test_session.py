@@ -148,6 +148,8 @@ async def full_flow() -> None:
     head._tasks = set()
     head._boxes_sent_at = None
     head._jog, head._jog_at = (0.0, 0.0), float("-inf")
+    head._lens_zoom = head._lens_focus = None
+    head._lens_new = False
     head.session_hash = None
     owner = "c0" * 32                   # the hash of the secret the app was handed
     if os.path.exists("/tmp/sportcam-test.owner"):
@@ -364,6 +366,22 @@ async def full_flow() -> None:
     await tick_for(0.3)
     check("…and stops JOG_TIMEOUT_S after the last message", head.ptz.jogs == held,
           f"{head.ptz.jogs - held} more moves")
+
+    # the app's zoom and focus sliders hold the lens in awake…
+    head.lens(8.0, 3.0)
+    await tick_for(0.5)
+    check("lens: awake, the app's zoom and focus hold (awake no longer forces wide)",
+          head.ptz.zoom_mm == 8.0 and head.ptz.focus_dist == 3.0,
+          f"zoom {head.ptz.zoom_mm}, focus {head.ptz.focus_dist}")
+    check("…and the app sees them", head.telemetry()["zoomMm"] == 8.0
+          and head.telemetry()["focusM"] == 3.0, f"{head.telemetry()}")
+    await head.apply_state("sleep")
+    head.lens(5.0, None)
+    check("…asleep, the sliders are ignored", head._lens_zoom is None)
+    await head.apply_state("awake")
+    await tick_for(config.ZOOM_RATE_LIMIT_S + 0.2)
+    check("…and woken again the lens is back to wide", head.ptz.zoom_mm == config.ZOOM_MIN_MM,
+          f"{head.ptz.zoom_mm}")
 
 
 def ring_animation() -> None:

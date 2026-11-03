@@ -83,11 +83,15 @@ class StubHead:
         self.tilt_deg = 0.0
         self.recorded: list[str] = []
         self.jogs: list[tuple[float, float]] = []
+        self.lenses: list[tuple[float | None, float | None]] = []
         self.session_hash = None
         self.local = LocalApi(self)
 
     def jog(self, pan: float, tilt: float) -> None:
         self.jogs.append((pan, tilt))
+
+    def lens(self, zoom_mm: float | None, focus_m: float | None) -> None:
+        self.lenses.append((zoom_mm, focus_m))
 
     async def apply_state(self, new: str) -> None:
         if new not in ("tracking", "recording"):
@@ -246,6 +250,19 @@ async def main() -> None:
                 await ws.receive(timeout=5)            # the pong: the jogs before it are in
                 check("WS jog reaches the head, clamped to −1…1, malformed dropped",
                       head.jogs == [(-0.4, 0.25), (1.0, -1.0)], str(head.jogs))
+
+                # …and its zoom and focus sliders
+                await ws.send_json({"type": "lens", "zoomMm": 6.0})
+                await ws.send_json({"type": "lens", "focusM": 4})
+                await ws.send_json({"type": "lens", "zoomMm": 99, "focusM": 0.1})
+                await ws.send_json({"type": "lens", "zoomMm": "tele"})
+                await ws.send_json({"type": "lens"})
+                await ws.send_json({"type": "ping"})
+                await ws.receive(timeout=5)
+                check("WS lens reaches the head, clamped to the lens, malformed dropped",
+                      head.lenses == [(6.0, None), (None, 4.0),
+                                      (config.ZOOM_MAX_MM, config.LENS_FOCUS_MIN_M)],
+                      str(head.lenses))
 
         # --- mDNS -------------------------------------------------------
         await mdns.start("awake")

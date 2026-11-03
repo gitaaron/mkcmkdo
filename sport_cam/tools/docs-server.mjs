@@ -8,8 +8,10 @@
  * Serves the repo statically and renders the markdown docs in a browser with
  * a sidebar, working images, .md cross-links, a With UWB / Without UWB
  * toggle that shows one build's docs at a time (tools/docs-viewer.js says
- * what it hides), and a Full build / Bench test switch that swaps each
- * build's setup docs for its bench rig's (docs/<build>/bench/). Markdown is
+ * what it hides), a Full build / Bench test switch that swaps each build's
+ * setup docs for its bench rig's (docs/<build>/bench/), and a servo drive
+ * switch (the Pi's PWM or the PTZ controller), all in a settings popup off
+ * the gear by the sidebar's title. Markdown is
  * rendered client-side with marked, vendored in
  * tools/vendor/ so the viewer works offline (re-fetch with
  * tools/update-vendor.sh to upgrade).
@@ -52,7 +54,19 @@ const PAGE = `<!doctype html>
          font:15px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif; }
   nav { width:270px; flex:none; background:var(--panel); border-right:1px solid var(--border);
         padding:18px 14px; position:sticky; top:0; height:100vh; overflow-y:auto; }
-  nav h1 { font-size:15px; margin:0 0 12px; color:var(--acc); }
+  .brand { display:flex; align-items:center; gap:8px; margin:0 0 4px; position:relative; }
+  nav h1 { font-size:15px; margin:0; color:var(--acc); flex:1; }
+  #settings-btn { border:1px solid var(--border); background:var(--bg); color:var(--muted); border-radius:8px;
+                  width:30px; height:30px; display:grid; place-items:center; cursor:pointer; padding:0; }
+  #settings-btn:hover, #settings-btn[aria-expanded="true"] { color:var(--ink); border-color:var(--acc); }
+  #settings-btn:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+  #settings-btn svg { width:17px; height:17px; }
+  #showing { font-size:12px; color:var(--muted); margin:0 0 12px; line-height:1.4; }
+  #settings { position:absolute; top:38px; right:0; z-index:10; width:250px; padding:12px; background:var(--panel);
+              border:1px solid var(--border); border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.45); }
+  #settings[hidden] { display:none; }
+  #settings .build-label { margin:10px 2px 6px; }
+  #settings .build-label:first-child { margin-top:0; }
   nav a { display:block; color:var(--ink); text-decoration:none; padding:7px 10px; border-radius:8px;
           font-size:13.5px; margin-bottom:2px; }
   nav a:hover { background:#1b2740; }
@@ -75,7 +89,7 @@ const PAGE = `<!doctype html>
   .err { color:#d64541; }
   .build-label { font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
                  margin:0 10px 6px; }
-  .toggle { display:flex; gap:2px; padding:3px; margin-bottom:6px; background:var(--bg);
+  .toggle { display:flex; gap:2px; padding:3px; background:var(--bg);
             border:1px solid var(--border); border-radius:10px; }
   .toggle button { flex:1; border:0; border-radius:7px; padding:7px 4px; background:none; color:var(--muted);
                    font:600 13px/1.2 inherit; font-family:inherit; cursor:pointer; }
@@ -86,10 +100,29 @@ const PAGE = `<!doctype html>
 </head>
 <body>
 <nav>
-  <h1>📷 SportCam</h1>
-  <div class="build-label" id="build-label">Showing the build</div>
-  <div id="build-toggle" class="toggle" role="group" aria-labelledby="build-label"></div>
-  <div id="bench-toggle" class="toggle" role="group" aria-label="Full build or bench test"></div>
+  <div class="brand">
+    <h1>📷 SportCam</h1>
+    <button id="settings-btn" type="button" aria-label="Doc settings" aria-haspopup="dialog" aria-expanded="false"
+            aria-controls="settings" title="Doc settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0
+           .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4
+           0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0
+           4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2
+           2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1
+           1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0
+           1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+    <div id="settings" role="dialog" aria-label="Doc settings" hidden>
+      <div class="build-label" id="build-label">Build</div>
+      <div id="build-toggle" class="toggle" role="group" aria-labelledby="build-label"></div>
+      <div class="build-label" id="bench-label">Rig</div>
+      <div id="bench-toggle" class="toggle" role="group" aria-labelledby="bench-label"></div>
+      <div class="build-label" id="servo-label">Servos driven by</div>
+      <div id="servo-toggle" class="toggle" role="group" aria-labelledby="servo-label"></div>
+    </div>
+  </div>
+  <div id="showing"></div>
   <div id="toc">loading…</div>
 </nav>
 <main id="content"></main>
@@ -165,11 +198,30 @@ async function listDocs() {
   return entries;
 }
 
+// Pictures and pages drawn once per servo drive, named <file>-<drive>.<ext>:
+// the viewer shows the one for the drive chosen in its settings.
+async function listVariants() {
+  const out = [];
+  for (const b of BUILDS)
+    for (const dir of [`docs/${b}/images`, `${b}/schematics/interactive`]) {
+      let files = [];
+      try {
+        files = await readdir(join(ROOT, dir));
+      } catch {}
+      out.push(...files.filter((f) => /-(pigpio|arducam)\.\w+$/.test(f)).map((f) => `${dir}/${f}`));
+    }
+  return out;
+}
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://x");
     if (url.pathname === "/") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }).end(PAGE);
+      return;
+    }
+    if (url.pathname === "/api/variants") {
+      res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(await listVariants()));
       return;
     }
     if (url.pathname === "/api/docs") {

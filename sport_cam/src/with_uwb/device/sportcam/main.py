@@ -99,6 +99,11 @@ class Head:
         self._boxes_sent_at: float | None = None   # tracker.labelled_at last sent live
         self._jog = (0.0, 0.0)              # the app's joystick: pan, tilt in −1…1
         self._jog_at = float("-inf")        # when it last sent one
+        # The app's zoom (mm) and focus (m) sliders, awake only. None: not
+        # touched since the camera woke — the lens stays wide, as for tracking.
+        self._lens_zoom: float | None = None
+        self._lens_focus: float | None = None
+        self._lens_new = False              # set since the last control tick
 
     # convenience for local_api/telemetry — pan and tilt are commanded angles
     @property
@@ -198,6 +203,9 @@ class Head:
             new = "awake"                  # stopping a recording ends the session
 
         old, self.state = self.state, new
+        if new != old:
+            self._lens_zoom = self._lens_focus = None   # the app's lens is awake's alone
+            self._lens_new = False
         self.camera.set_awake(new != "sleep")
         if new == "awake":
             self._awake_since = time.monotonic()
@@ -305,7 +313,8 @@ class Head:
         else:
             if self.state == "awake":
                 self.manual_aim()
-                self.tracker.watch_awake()     # person in frame? (LED and app only: sessions start in SEARCH)
+                self.manual_lens()
+                self.tracker.watch_awake(wide=self._lens_zoom is None)     # person in frame? (LED and app only: sessions start in SEARCH)
             self.led.lost = False
         # The tag switching on (or the person found for FOUND_CONFIRM_S) can move the
         # state, through the same apply_state() as any other command.
@@ -356,6 +365,32 @@ class Head:
             self.ptz.jog(pan, tilt, 1.0 / config.UWB_RATE_HZ)
         if pan or tilt:
             self._awake_since = time.monotonic()   # someone is using it
+
+    def lens(self, zoom_mm: float | None, focus_m: float | None) -> None:
+        """The app's zoom and focus sliders: either may be left out. Awake
+        only; control_tick moves the lens (manual_lens)."""
+        if self.state != "awake":
+            return
+        if zoom_mm is not None:
+            self._lens_zoom = zoom_mm
+        if focus_m is not None:
+            self._lens_focus = focus_m
+        self._lens_new = True
+
+    def manual_lens(self) -> None:
+        """Awake: move the lens to the app's latest zoom and focus.
+
+        Focus first, so the zoom move refocuses for the distance just asked
+        for (set_zoom_mm refocuses for the latest one it was told).
+        """
+        if not self._lens_new:
+            return
+        self._lens_new = False
+        if self._lens_focus is not None:
+            self.ptz.set_focus(self._lens_focus, urgent=True)
+        if self._lens_zoom is not None:
+            self.ptz.set_zoom_mm(self._lens_zoom, urgent=True)
+        self._awake_since = time.monotonic()      # someone is using it
 
     async def health_loop(self) -> None:
         """Watch the two things that run out: charge and card space.
@@ -488,6 +523,9 @@ class Head:
             "pan": round(self.ptz.pan_deg, 1),
             "tilt": round(self.ptz.tilt_deg, 1),
             "zoomMm": round(self.ptz.zoom_mm, 1),
+            "zoomRangeMm": [config.ZOOM_MIN_MM, config.ZOOM_MAX_MM],
+            "focusM": round(self.ptz.focus_m, 2) if self.ptz.focus_m else None,
+            "focusRangeM": [config.LENS_FOCUS_MIN_M, config.LENS_FOCUS_MAX_M],
             "dist": round(self.tracker.dist_m, 2) if self.tracker.dist_m else None,
             "phase": self.phase,
             "countdown": self.tracker.countdown if self.state == "tracking" else 0,
