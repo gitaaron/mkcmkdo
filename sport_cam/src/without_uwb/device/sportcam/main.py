@@ -503,6 +503,7 @@ class Head:
             "zoomRangeMm": [config.ZOOM_MIN_MM, config.ZOOM_MAX_MM],
             "focusM": round(self.ptz.focus_m, 2) if self.ptz.focus_m else None,
             "focusRangeM": [config.LENS_FOCUS_MIN_M, config.LENS_FOCUS_MAX_M],
+            "view": {"rotateDeg": config.VIEW_ROTATE_DEG, "mirror": config.VIEW_MIRROR},
             "dist": round(self.tracker.dist_m, 2) if self.tracker.dist_m else None,
             "phase": self.phase,
             "countdown": self.tracker.countdown if self.state == "tracking" else 0,

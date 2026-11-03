@@ -126,6 +126,7 @@ class Telemetry {
     this.countdown = 0,
     this.acquireStalled = false,
     this.lens = const Lens(),
+    this.view = const ViewOrientation(),
   });
 
   final double? pan;
@@ -148,6 +149,9 @@ class Telemetry {
   /// Where the zoom and focus are, for the lens sliders.
   final Lens lens;
 
+  /// How to turn the live view to show it upright.
+  final ViewOrientation view;
+
   factory Telemetry.fromJson(Map<String, dynamic>? j) => Telemetry(
     pan: (j?['pan'] as num?)?.toDouble(),
     tilt: (j?['tilt'] as num?)?.toDouble(),
@@ -156,7 +160,38 @@ class Telemetry {
     countdown: (j?['countdown'] as num?)?.toInt() ?? 0,
     acquireStalled: j?['acquireStalled'] as bool? ?? false,
     lens: Lens.fromJson(j),
+    view: ViewOrientation.fromJson(j?['view']),
   );
+}
+
+/// How the camera says its live view should be turned to stand upright
+/// (VIEW_ROTATE_DEG / VIEW_MIRROR in its config.py): [quarterTurns]
+/// clockwise, then mirrored left-right if [mirror]. A camera that doesn't
+/// say is shown as it comes.
+class ViewOrientation {
+  const ViewOrientation({this.quarterTurns = 0, this.mirror = false});
+
+  final int quarterTurns;
+  final bool mirror;
+
+  /// From telemetry `view`: `{"rotateDeg": 270, "mirror": true}`.
+  factory ViewOrientation.fromJson(Object? j) {
+    if (j is! Map) return const ViewOrientation();
+    final deg = (j['rotateDeg'] as num?)?.round() ?? 0;
+    return ViewOrientation(
+      quarterTurns: (deg ~/ 90) % 4,
+      mirror: j['mirror'] == true,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is ViewOrientation &&
+      other.quarterTurns == quarterTurns &&
+      other.mirror == mirror;
+
+  @override
+  int get hashCode => Object.hash(quarterTurns, mirror);
 }
 
 /// The camera's zoom (focal length, mm) and focus (subject distance it is

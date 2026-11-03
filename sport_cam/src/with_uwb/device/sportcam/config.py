@@ -410,6 +410,14 @@ LED_BRIGHTNESS = 0.45
 
 # --- video ----------------------------------------------------------------
 PREVIEW_SIZE = (1280, 720)
+# How the apps should turn the live view to show it upright: on the Arducam
+# PTZ base the camera board sits a quarter turn round on the tilt bracket,
+# and the picture comes out on its side and mirrored. The app turns it
+# VIEW_ROTATE_DEG clockwise (0, 90, 180 or 270), then mirrors it left-right if
+# VIEW_MIRROR, with the person boxes. Only the view: detection, the tracker
+# and recordings see the sensor's own frame.
+VIEW_ROTATE_DEG = 270
+VIEW_MIRROR = True
 RECORD_SIZE = (1920, 1080)
 RECORD_BITRATE = 12_000_000    # 1080p H.264, ≈ 5.4 GB/h. The storage maths in
                                # storage.py reads this, so the two cannot drift.

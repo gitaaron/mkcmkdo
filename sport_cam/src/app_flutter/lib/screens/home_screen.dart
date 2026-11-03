@@ -11,6 +11,7 @@ import '../widgets/control_bar.dart';
 import '../widgets/joystick.dart';
 import '../widgets/lens_controls.dart';
 import '../widgets/mjpeg_view.dart';
+import '../widgets/oriented_view.dart';
 import '../widgets/person_boxes.dart';
 import '../widgets/status_ring.dart';
 import 'admin_screen.dart';
@@ -132,31 +133,41 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Direct: the camera's full-rate MJPEG. Through Firebase: the
-          // low-rate preview it posts while someone is watching.
-          if (client.link == LinkMode.relay)
-            ColoredBox(
-              color: Colors.black,
-              child: client.preview == null || !live
-                  ? const SizedBox.shrink()
-                  : Image.memory(
-                      client.preview!,
-                      fit: BoxFit.contain,
-                      gaplessPlayback: true,
-                    ),
-            )
-          else
-            MjpegView(
-              streamUrl: client.streamUrl,
-              // in the background: no stream, so the camera can sleep
-              active: live && client.foreground,
-            ),
+          // The picture and its person boxes, turned together to stand
+          // upright (the camera says how: telemetry `view`).
+          OrientedView(
+            view: client.telemetry.view,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Direct: the camera's full-rate MJPEG. Through Firebase: the
+                // low-rate preview it posts while someone is watching.
+                if (client.link == LinkMode.relay)
+                  ColoredBox(
+                    color: Colors.black,
+                    child: client.preview == null || !live
+                        ? const SizedBox.shrink()
+                        : Image.memory(
+                            client.preview!,
+                            fit: BoxFit.contain,
+                            gaplessPlayback: true,
+                          ),
+                  )
+                else
+                  MjpegView(
+                    streamUrl: client.streamUrl,
+                    // in the background: no stream, so the camera can sleep
+                    active: live && client.foreground,
+                  ),
 
-          // person boxes from the camera's last detection
-          if (boxes != null && _showBoxes)
-            IgnorePointer(
-              child: CustomPaint(painter: LiveBoxesPainter(boxes)),
+                // person boxes from the camera's last detection
+                if (boxes != null && _showBoxes)
+                  IgnorePointer(
+                    child: CustomPaint(painter: LiveBoxesPainter(boxes)),
+                  ),
+              ],
             ),
+          ),
 
           if (client.isConnected && client.state == CamState.sleep)
             const Center(
