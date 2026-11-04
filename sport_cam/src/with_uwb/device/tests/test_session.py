@@ -649,6 +649,9 @@ async def full_flow() -> None:
     check("awake AWAKE_TIMEOUT_S with no session → sleep: camera off, no sub-state",
           head.state == "sleep" and not head.camera.awake and head.phase is None
           and head.led.state == "sleep", f"{head.state} {head.phase}")
+    check("…the head looking straight up (park itself is a no-op in this test)",
+          head.ptz.tilt_deg == config.SLEEP_TILT_DEG,
+          f"pan {head.ptz.pan_deg} tilt {head.ptz.tilt_deg}")
     check("…and no live view while asleep", head.live_boxes() == [])
     head.uwb.on_since, head.uwb.off_at = None, time.monotonic()
     await tick_for(config.LOST_END_S + 0.2)

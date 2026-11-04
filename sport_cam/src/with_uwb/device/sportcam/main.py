@@ -242,8 +242,11 @@ class Head:
         self.camera.set_detect_fps(
             config.DETECT_FPS_TRACKING if new in ("tracking", "recording")
             else config.DETECT_FPS_AWAKE)
-        if new in ("awake", "sleep", *BOOT_STATES):
+        if new in ("awake", *BOOT_STATES) or (old == "sleep" and new != "sleep"):
+            self.ptz.park()                         # level and straight ahead
+        elif new == "sleep":
             self.ptz.park()
+            self.ptz.set_tilt(config.SLEEP_TILT_DEG)   # asleep: looking straight up
         if new == "pairing" and not self._near_focus:
             self.ptz.set_focus(config.QR_FOCUS_M)   # a phone held up to the lens
             self._near_focus = True

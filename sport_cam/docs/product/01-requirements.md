@@ -54,7 +54,7 @@ view; camera-only for lower cost, size and power.
 | F8 | **Direct connection.** On the camera's Wi-Fi, a phone discovers and controls it with no server or internet | [09](../design/09-direct-connection-and-app.md) |
 | F9 | **Person boxes in recordings and the live view.** A box round every person the camera detects: **green** round the climber, **yellow** round anyone else, and **red** round everyone while it can't tell which is the climber (in `awake` nobody has been picked yet, so every box is red). Each recording keeps its boxes and the app's player draws them over the video; its live view draws them over the picture as the camera detects. The player and the live view each have a **Boxes on / off** button, remembered on that phone | [08](../design/08-recordings-and-cloud.md#person-boxes) |
 | F10 | **Wi-Fi setup at a new gym.** With no saved network in range, the camera enters [pairing](#pairing) on its own; the phone shows its Wi-Fi share QR code to the lens, so the password is never retyped. The network is remembered for next time | [Pairing](#pairing); [08](../design/08-recordings-and-cloud.md#connecting-the-camera-to-gym-wi-fi-from-your-phone) |
-| F11 | **Sleep to save the battery.** Awake 30 s with no session started and nobody watching the live view, the camera sleeps: its sensor stops and the head parks, while the Pi stays reachable. From sleep the app offers **Wake up** and **Track**; Track goes straight to the search. No live view in sleep | [State machine](#state-machine) |
+| F11 | **Sleep to save the battery.** Awake 30 s with no session started and nobody watching the live view, the camera sleeps: its sensor stops and the head turns to look straight up, while the Pi stays reachable. From sleep the app offers **Wake up** and **Track**; Track goes straight to the search. No live view in sleep | [State machine](#state-machine) |
 | F12 | **On/off switch.** A rocker switch in the enclosure wall turns the camera on and off; no unplugging. Off is a clean shutdown from any state: a recording in progress is saved (and uploads at the next boot), the head parks and the ring goes dark, then the camera cuts its own power. Nothing draws from the bank while it is off | [04 — Power switch](../design/04-electronics.md#power-switch) |
 | F13 | **Aim by hand.** In `awake`, the phone app shows two sticks over the live view, one under each thumb: pan on the left, tilt on the right. Pull the pan knob left and the camera pans left, right pans right; the tilt knob up tilts up, down tilts down; both at once for a diagonal. The further from the centre, the faster (up to 60°/s pan, 45°/s tilt at the end). Let go and it eases to a stop. Only over the direct connection, where it responds at once; not in `tracking` or `recording`, where the tracker drives the head, and not through Firebase (lag) | [09](../design/09-direct-connection-and-app.md#aiming-by-hand) |
 | F14 | **Zoom out to find a lost person.** Recording, and the person out of sight for 2 s (they climbed or stepped out of a tight shot): the lens zooms straight out to its widest, still pointing where they were<!--with_uwb--> and still turning with the tag<!--/-->, and the detector searches the whole frame. Seen again, tracking carries on and the zoom closes back in<!--without_uwb-->. Still not found at 6 s: the camera sweeps the room, still wide<!--/--> | [State machine](#state-machine) |
@@ -91,7 +91,8 @@ library. Deviations (dropouts, loss, manual control): <!--both-->[with UWB](#sta
 1. **Power on.** State `connecting` (white light chasing round the ring):
    the Pi joins a saved Wi-Fi network (at a new gym, [pairing](#pairing)
    first), then connects to Firebase. State `awake`
-   (solid blue): head parked, lens wide. The app opens into the live view;
+   (solid blue): head parked level and straight ahead, lens wide and
+   focused for the room. The app opens into the live view;
    the status ring reads "Awake — no one in frame", then "Awake — person in frame"
    once the climber walks into view, and the LED ring and the app's ring
    start breathing slowly. Left awake 30 s without a session starting
@@ -143,8 +144,8 @@ library. Deviations (dropouts, loss, manual control): <!--both-->[with UWB](#sta
 7. **Upload.** The clip uploads to Firebase and appears in the app's library
    ([08](../design/08-recordings-and-cloud.md)).
 8. **Sleep.** **Sleep** in the app works from `awake` and `tracking` (a
-   recording is stopped first, back to `tracking`): both axes centre and the
-   sensor stops. The same happens on its own after 30 s in `awake` with
+   recording is stopped first, back to `tracking`): the head turns to look
+   straight up (`SLEEP_TILT_DEG`) and the sensor stops. The same happens on its own after 30 s in `awake` with
    nobody watching the live view, and at
    7 % battery. To power off, switch it off at the rocker
    ([F12](#functional-requirements)): it saves any recording, parks, and
@@ -181,7 +182,8 @@ Where two labels are given: with UWB / without UWB.
 Rules:
 
 - `sleep`: the camera's sensor is stopped (no preview, detector or live
-  view), the head is parked, and the ring shows one dim pixel; the Pi keeps
+  view), the head looks straight up (`SLEEP_TILT_DEG`), and the ring shows
+  one dim pixel; leaving sleep it parks level and straight ahead. The Pi keeps
   its local API, Firebase link and mDNS up. **Wake up** → `awake`;
   **Track** → `tracking`, skipping `awake`. With UWB the radios keep
   ranging, so switching the tag on also starts a session from `sleep`.
@@ -193,7 +195,7 @@ Rules:
   and the 30 s count starts when the viewer leaves. The phone app stops
   watching while it is in the background. Through Firebase that
   can take up to ≈ 1½ min after the app closes.
-- `awake` sub-state: the head is parked (centred, lens wide) and the person
+- `awake` sub-state: the head is parked (level, straight ahead, lens wide) and the person
   detector runs at 0.5 fps (`DETECT_FPS_AWAKE`). **Person in frame** from a
   detection until 4 s (`AWAKE_PERSON_HOLD_S`) pass without one; otherwise
   **no person in frame**. Telemetry `phase`: `person-in-frame` /

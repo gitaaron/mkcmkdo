@@ -362,6 +362,9 @@ async def full_flow() -> None:
     check("awake AWAKE_TIMEOUT_S with no session → sleep: camera off, parked",
           head.state == "sleep" and not head.camera.awake and head.ptz.pan_deg == 0.0
           and head.led.state == "sleep" and head.phase is None, f"{head.state} {head.phase}")
+    check("…the head parked looking straight up",
+          head.ptz.pan_deg == 0.0 and head.ptz.tilt_deg == config.SLEEP_TILT_DEG,
+          f"pan {head.ptz.pan_deg} tilt {head.ptz.tilt_deg}")
     person.visible, person.bearing = True, 5.0
     looks = head.camera.detections
     await tick_for(3.0)
@@ -381,6 +384,8 @@ async def full_flow() -> None:
     await head.apply_state("tracking")
     check("Track from sleep → tracking, search, skipping awake; camera on",
           head.state == "tracking" and head.phase == "search" and head.camera.awake, f"{head.phase}")
+    check("…and the head is back level, looking at the room, not the ceiling",
+          head.ptz.tilt_deg == 0.0, f"tilt {head.ptz.tilt_deg}")
     pans = []
     await tick_for(10, until=lambda: (pans.append(head.ptz.pan_deg), head.phase == "found")[1])
     check("…holds still until its first look, then finds them without sweeping",
