@@ -460,6 +460,15 @@ class CamWarning {
       "The camera's card is nearly full",
     ),
     'battery-low' => const CamWarning('battery-low', 'Camera battery low'),
+    'no-recorder' => const CamWarning(
+      'no-recorder',
+      "Can't record: ffmpeg isn't installed on the camera "
+          '(sudo apt install ffmpeg, or run deploy.sh again)',
+    ),
+    'record-failed' => const CamWarning(
+      'record-failed',
+      "Couldn't start recording on the camera — its log says why",
+    ),
     _ => null,
   };
 }

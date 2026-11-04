@@ -107,7 +107,8 @@ apt-get update
 $APT full-upgrade
 # python3-dev and build-essential: pip builds rpi_ws281x (a Blinka platform
 # package) from source on 64-bit Pi OS, which piwheels has no wheels for
-$APT install python3-pip python3-dev build-essential python3-picamera2 python3-opencv python3-numpy libzbar0 i2c-tools
+# ffmpeg: recordings are written through it (picamera2's FfmpegOutput)
+$APT install python3-pip python3-dev build-essential python3-picamera2 python3-opencv python3-numpy libzbar0 i2c-tools ffmpeg
 
 if [[ $PI_SERVOS == 1 ]]; then
   # Pan and tilt on the Pi's hardware PWM, through pigpiod

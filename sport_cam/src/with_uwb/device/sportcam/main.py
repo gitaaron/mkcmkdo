@@ -203,6 +203,23 @@ class Head:
             await self.warn("storage-full", **self.storage.telemetry())
             new = self.state               # stay tracking, following
 
+        # Start the encoder before becoming `recording`: if it can't, stay
+        # where we are and say why, rather than show a recording that writes
+        # nothing (no ffmpeg did exactly that)
+        rec_path = None
+        if new == "recording" and self.state != "recording":
+            why = getattr(self.camera, "no_recorder", None)
+            if why:
+                print(f"[rec] refusing to record — {why}")
+                await self.warn("no-recorder", reason=why)
+                return
+            try:
+                rec_path = self.camera.start_recording()
+            except Exception as err:               # noqa: BLE001 — any reason: stay put
+                print(f"[rec] couldn't start recording — {err}")
+                await self.warn("record-failed", reason=str(err))
+                return
+
         old, self.state = self.state, new
         if new != old:
             self._lens_zoom = None          # the app's lens is awake's alone
@@ -221,7 +238,7 @@ class Head:
             if old in ("tracking", "recording"):
                 self.uwb.follow(None)
         if old != "recording" and new == "recording":
-            self._rec_path = self.camera.start_recording()
+            self._rec_path = rec_path
             self._rec_started = time.monotonic()
             owners.stamp(self._rec_path, self.session_hash)
             self.boxlog.start(self._rec_path, self._rec_started)

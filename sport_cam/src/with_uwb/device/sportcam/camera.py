@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import os
+import shutil
 import threading
 import time
 
@@ -63,6 +64,12 @@ class Camera:
         # The head refuses to start a session and the app says why, rather
         # than tracking blind.
         self._detector, self.no_detector = make_detector()
+        # Recording writes the H.264 through ffmpeg (FfmpegOutput): without
+        # it every recording "starts" and writes nothing. Why it can't, or None.
+        self.no_recorder = (None if not self._cam or shutil.which("ffmpeg")
+                            else "ffmpeg is not installed on the camera (sudo apt install ffmpeg)")
+        if self.no_recorder:
+            print(f"[camera] can't record: {self.no_recorder}")
         if self.no_detector:
             print(f"[camera] no person detector: {self.no_detector} — tracking sessions disabled")
         # Detection is the biggest CPU cost on this board, so it is

@@ -254,6 +254,26 @@ async def full_flow() -> None:
     head.ptz.lens_moving = False
     person.visible = True
     await tick_for(0.5)
+    # Record with no way to write the video: stay tracking, say why
+    head.camera.no_recorder = "ffmpeg is not installed on the camera"
+    head.local.sent.clear()
+    await head.apply_state("recording")
+    check("no ffmpeg: Record refused, still tracking, and the apps are told why",
+          head.state == "tracking" and not head.camera.recording
+          and any(m.get("type") == "warning" and m.get("code") == "no-recorder"
+                  for m in head.local.sent), f"{head.state} {head.local.sent}")
+    head.camera.no_recorder = None
+    start = head.camera.start_recording
+
+    def broken():
+        raise FileNotFoundError("ffmpeg")
+    head.camera.start_recording = broken
+    head.local.sent.clear()
+    await head.apply_state("recording")
+    check("the encoder failing to start: still tracking, and the apps are told",
+          head.state == "tracking" and any(m.get("code") == "record-failed" for m in head.local.sent),
+          f"{head.state}")
+    head.camera.start_recording = start
     await head.apply_state("recording")          # the app's Record
     await tick_for(0.2)
     check("Record → recording, still following",

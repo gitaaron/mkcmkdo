@@ -96,6 +96,13 @@ rm -rf ~/.sportcam-staging
 # Without them (no internet) the camera falls back to HOG and says so.
 cd "$DEST"
 python3 -m sportcam.getmodel || echo "  couldn't fetch the SSD weights: the camera will use HOG until it can"
+# Recordings are written through ffmpeg; an install from before it was in
+# install.sh doesn't have it, and every recording would write nothing
+if ! command -v ffmpeg >/dev/null; then
+  echo "  installing ffmpeg (recordings are written through it)…"
+  sudo apt-get install -y -q ffmpeg >/dev/null \
+    || echo "  couldn't install ffmpeg: the camera will refuse to record until it is"
+fi
 REMOTE
 
 step "Restarting the camera"
