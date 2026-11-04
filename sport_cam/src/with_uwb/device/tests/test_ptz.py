@@ -287,8 +287,10 @@ def main() -> None:
           abs(us(pi, config.PAN_GPIO) - (centre + 0.1 * per_deg * config.PAN_SIGN)) < 0.05,
           f"{us(pi, config.PAN_GPIO):.2f} µs")
     p.set_tilt(30.0)
-    check("pigpio: tilt follows TILT_SIGN",
-          abs(us(pi, config.TILT_GPIO) - (centre + 30 * per_deg * config.TILT_SIGN)) < 0.05)
+    tilt_centre = config.SERVO_US_AT_0 + config.TILT_CENTER_RAW / 180 * (
+        config.SERVO_US_AT_180 - config.SERVO_US_AT_0)
+    check("pigpio: tilt follows TILT_CENTER_RAW and TILT_SIGN",
+          abs(us(pi, config.TILT_GPIO) - (tilt_centre + 30 * per_deg * config.TILT_SIGN)) < 0.05)
     p.set_pan(500.0)
     check("pigpio: the soft limit still holds",
           abs(us(pi, config.PAN_GPIO)
@@ -302,11 +304,11 @@ def main() -> None:
     p = Ptz()
     p.servos = ArducamServos(RecordingFocuser())
     p.set_pan(10.4)
-    p.set_tilt(-5.6)
+    p.set_tilt(30.6)
     writes = dict(p.servos.focuser.writes)
     check("arducam: pan and tilt go to the registers in whole degrees",
           writes.get(OPT_MOTOR_X) == round(config.PAN_CENTER_RAW + 10.4 * config.PAN_SIGN)
-          and writes.get(OPT_MOTOR_Y) == round(config.TILT_CENTER_RAW - 5.6 * config.TILT_SIGN),
+          and writes.get(OPT_MOTOR_Y) == round(config.TILT_CENTER_RAW + 30.6 * config.TILT_SIGN),
           f"{writes}")
 
     # ---- the IMX477 kit's controller (firmware 0x0104) ---------------------

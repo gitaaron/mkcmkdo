@@ -332,7 +332,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 open: _showAim,
                 lens: client.telemetry.lens,
                 onZoom: (mm) => client.setLens(zoomMm: mm),
-                onAim: client.aim,
+                // The view is mirrored like a selfie camera: a stick pushed
+                // right should move the picture as it looks, so pan flips
+                onAim: (pan, tilt) => client.aim(
+                  client.telemetry.view.mirror ? -pan : pan,
+                  tilt,
+                ),
               ),
             ),
 
