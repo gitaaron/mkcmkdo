@@ -36,7 +36,7 @@ fi
 if ssh "${SSH_OPTS[@]}" "$PI" 'command -v rsync >/dev/null' && command -v rsync >/dev/null; then
   extra=()
   [[ $MOVE == 1 ]] && extra=(--remove-source-files)
-  rsync -a --ignore-existing "${extra[@]}" -e "ssh ${SSH_OPTS[*]}" "${PI}:samples/" samples/ || exit 1
+  rsync -a --ignore-existing ${extra[@]+"${extra[@]}"} -e "ssh ${SSH_OPTS[*]}" "${PI}:samples/" samples/ || exit 1
 else
   # no rsync: the whole folder over tar, keeping what is here already
   ssh "${SSH_OPTS[@]}" "$PI" 'cd ~/samples && tar -cf - .' | tar -xkf - -C samples 2>/dev/null
