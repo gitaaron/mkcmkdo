@@ -92,6 +92,10 @@ tar -C "$STAGED" --exclude=./sportcam/config.py -cf - . | tar -C "$DEST" -xf -
 python3 ~/.sportcam-staging/scripts/pi/config_merge.py \
   "$STAGED/sportcam/config.py" "$DEST/sportcam/config.py" "$TAKE"
 rm -rf ~/.sportcam-staging
+# The SSD person detector's weights (not in git): skipped if already there.
+# Without them (no internet) the camera falls back to HOG and says so.
+cd "$DEST"
+python3 -m sportcam.getmodel || echo "  couldn't fetch the SSD weights: the camera will use HOG until it can"
 REMOTE
 
 step "Restarting the camera"

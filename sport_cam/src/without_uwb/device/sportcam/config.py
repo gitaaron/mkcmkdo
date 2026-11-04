@@ -214,7 +214,9 @@ ACQUIRE_STALLED_S = 15.0       # searching this long → the app says "can't see
 # `python3 -m sportcam.getmodel`. If the chosen one cannot load, the other is
 # used; with neither, sessions are refused and the app says why. Compare the
 # two on your own wall with `python3 -m sportcam.detectbench` (docs 15).
-DETECTOR = "hog"
+# SSD: on bench samples of a person framed head to hips, close to the lens,
+# HOG found nobody in 4 of 4 frames and SSD found them in all 4 (71-92 %).
+DETECTOR = "ssd"
 SSD_CONFIDENCE = 0.5           # higher = fewer false people, more misses
 SSD_INPUT = 300                # the network's input size; it was trained at 300
 SSD_SWAP_RB = False            # the preview is handed over as RGB, which the model wants
