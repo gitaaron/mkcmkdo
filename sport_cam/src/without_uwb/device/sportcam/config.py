@@ -276,10 +276,10 @@ ZOOM_MIN_STEP_MM = 0.15        # ignore smaller changes — stops the lens breat
 ZOOM_RATE_LIMIT_S = 2.0
 
 # (focal length mm, raw motor value). Straight lines between the stops until
-# you measure yours; the raw ranges are the controller's own limits. The zoom
-# register's low end is wide, its high end tele (lenscheck: the framing
-# tightens as it rises).
-ZOOM_CURVE = [(2.8, 3000), (10.6, 20000)]
+# you measure yours; the raw ranges are the controller's own limits. On the
+# bench kit the zoom register's high end is wide and its low end tele: the
+# app's slider zoomed out as it rose with them the other way round.
+ZOOM_CURVE = [(2.8, 20000), (10.6, 3000)]
 
 # How long the lens motors take. Ptz.wait_lens goes by the controller's busy
 # flag (a 16-bit word: lenscheck sees it set on every move); these are its
@@ -302,16 +302,17 @@ LENS_SETTLE_S = 0.15
 # old focal-length-only behaviour exactly — nothing gets worse, and nothing
 # gets better either.
 # Until calibrated, flat in distance and measured by lenscheck on the bench
-# kit for a room-sized scene (two to four metres): sharp at focus 1050 with
-# the zoom at 210 (≈ 3.6 mm), and at 1575 with it at 1050 (6.7 mm), on the
-# controller's 0-2100 scale. The ends follow the same slope (0.625 focus per
-# zoom step), the tele end clamped at the focus stop. Autofocus starts its
-# search here, so a good grid makes it quick; focuscal measures one properly.
+# kit for a room-sized scene (two to four metres): sharp at focus 1575 with
+# the zoom register at 1050 (6.7 mm), and at 1050 with it at 210 (≈ 9.8 mm),
+# on the controller's 0-2100 scale. The ends follow the same slope, the wide
+# end clamped at the focus stop (an earlier sweep found it sharp at ≈ 95 %
+# there). Autofocus starts its search here, so a good grid makes it quick;
+# focuscal measures one properly.
 FOCUS_GRID = {
-    2.8:  [(2.0, 8760), (5.0, 8760), (10.0, 8760), (30.0, 8760)],
-    3.6:  [(2.0, 10000), (5.0, 10000), (10.0, 10000), (30.0, 10000)],
+    2.8:  [(2.0, 20000), (5.0, 20000), (10.0, 20000), (30.0, 20000)],
     6.7:  [(2.0, 15000), (5.0, 15000), (10.0, 15000), (30.0, 15000)],
-    10.6: [(2.0, 20000), (5.0, 20000), (10.0, 20000), (30.0, 20000)],
+    9.8:  [(2.0, 10000), (5.0, 10000), (10.0, 10000), (30.0, 10000)],
+    10.6: [(2.0, 8710), (5.0, 8710), (10.0, 8710), (30.0, 8710)],
 }
 FOCUS_DEADBAND_DIOPTRE = 0.02  # ignore changes smaller than this in 1/d
 FOCUS_RATE_LIMIT_S = 0.5
