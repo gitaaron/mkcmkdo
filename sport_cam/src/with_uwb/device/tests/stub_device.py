@@ -90,6 +90,7 @@ class StubHead:
         self.session_hash = None
         self.uwb = StubUwb()
         self.pairings = Pairings(os.path.join(config.RECORD_DIR, "pairings.json"))
+        self.can_record = True
         self.local = LocalApi(self)
 
     def telemetry(self) -> dict:

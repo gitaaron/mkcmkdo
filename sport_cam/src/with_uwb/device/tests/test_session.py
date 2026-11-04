@@ -43,11 +43,11 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 GONE = float("inf")
 
 
-def run_session(s: AutoSession, steps, state="awake", ready=False):
+def run_session(s: AutoSession, steps, state="awake"):
     """Feed (now, frame_age) pairs; return the states it asked for."""
     asked = []
     for now, age in steps:
-        want = s.update(now, age, state, ready)
+        want = s.update(now, age, state)
         if want:
             asked.append(want)
             state = want
@@ -68,16 +68,15 @@ def session_rules() -> None:
     asked, state = run_session(s, [(present + t / 20, 0.05) for t in range(5)])
     check("tag on → tracking", asked == ["tracking"] and s.active, f"{asked}")
 
-    check("search / found: no recording before FOUND_CONFIRM_S",
-          s.update(2.0, 0.05, "tracking", False) is None)
-    check("found for FOUND_CONFIRM_S → recording", s.update(2.1, 0.05, "tracking", True) == "recording")
+    check("tracking: never a recording by itself (Record is the app's)",
+          s.update(2.0, 0.05, "tracking") is None and s.update(9.0, 0.05, "tracking") is None)
 
     # a body in the way for a few seconds changes nothing
     check("a short gap does not end or restart anything",
-          s.update(5.0, config.LOST_END_S * 0.8, "recording", True) is None and s.active)
+          s.update(5.0, config.LOST_END_S * 0.8, "recording") is None and s.active)
 
     # tag switched off: the control loop drops to awake after LOST_END_S
-    s.update(40.0, config.LOST_END_S + 1, "awake", False)
+    s.update(40.0, config.LOST_END_S + 1, "awake")
     check("tag off → session over", not s.active and not s.tag_present)
     asked, _ = run_session(s, [(60 + t / 20, 0.05) for t in range(40)])
     check("tag back on → a new session", asked == ["tracking"], f"{asked}")
@@ -91,22 +90,19 @@ def session_rules() -> None:
     run_session(s, [(10 + t / 10, short * t / 5) for t in range(6)], state="awake")
     asked, _ = run_session(s, [(20 + t / 20, 0.05) for t in range(40)])
     check("…and a short off/on does not restart it", asked == [])
-    s.update(60.0, config.LOST_END_S, "awake", False)
+    s.update(60.0, config.LOST_END_S, "awake")
     asked, _ = run_session(s, [(70 + t / 20, 0.05) for t in range(40)])
     check("…but off for LOST_END_S and on again does", asked == ["tracking"])
 
-    # manual sessions: the tag starts nothing, but found → record still applies
+    # manual sessions: the tag starts nothing
     s = AutoSession()
     asked, _ = run_session(s, [(t / 20, 0.05) for t in range(40)], state="tracking")
     check("tag on during a manual session → no change", asked == [])
-    check("…and a manual session records once found for FOUND_CONFIRM_S",
-          s.update(3.0, 0.05, "tracking", True) == "recording")
 
     config.AUTO_SESSION = False
     s = AutoSession()
     asked, _ = run_session(s, [(t / 20, 0.05) for t in range(40)])
     check("AUTO_SESSION = False → the tag starts nothing", asked == [])
-    check("…but found still records", s.update(3.0, 0.05, "tracking", True) == "recording")
     config.AUTO_SESSION = True
 
 
@@ -574,12 +570,16 @@ async def full_flow() -> None:
           head.state == "tracking" and head.phase == "found" and head.led.found is not None
           and not head.led.searching, f"{seen}")
 
+    check("…someone seen: Record is allowed", head.can_record and head.telemetry()["canRecord"])
     await tick_for(config.FOUND_CONFIRM_S + 1.0)
-    check("found for FOUND_CONFIRM_S → recording",
-          head.state == "recording" and head.camera.recording and head.phase == "track",
+    check("found for FOUND_CONFIRM_S → locked on and followed, not recording",
+          head.state == "tracking" and not head.camera.recording and head.phase == "track",
           f"{seen}")
-    check("the app heard 3, 2, 1 (one beep each)", countdown_heard(countdown_sent) == [3, 2, 1],
-          f"{countdown_sent}")
+    check("the app heard no countdown", countdown_heard(countdown_sent) == [], f"{countdown_sent}")
+    await head.apply_state("recording")          # the app's Record
+    await tick_for(0.3)
+    check("Record → recording, still following",
+          head.state == "recording" and head.camera.recording and head.phase == "track")
     check("the clip is stamped as the tag's owner's",
           owners.owner_of("/tmp/sportcam-test.mp4") == owners.hash_secret(pairing))
     msg = head.local.last_boxes()
@@ -603,9 +603,9 @@ async def full_flow() -> None:
     dedup = [s for i, s in enumerate(order) if i == 0 or order[i - 1] != s]
     check("states ran awake → tracking → recording → awake",
           dedup == ["awake", "tracking", "recording", "awake"], f"{dedup}")
-    check("awake reports its sub-state; tracking search/found; recording track",
+    check("awake reports its sub-state; tracking search/found/track; recording track",
           all(p in ("person-in-frame", "no-person-in-frame") for s, p in seen if s == "awake")
-          and all(p in ("search", "found") for s, p in seen if s == "tracking")
+          and all(p in ("search", "found", "track") for s, p in seen if s == "tracking")
           and all(p == "track" for s, p in seen if s == "recording"), f"{seen}")
 
     # --- nobody in frame when the tag goes on: SEARCH, turning to the tag ---------
@@ -619,12 +619,17 @@ async def full_flow() -> None:
           head.tracker.mode)
     head.camera._bbox = bbox
     await tick_for(config.FOUND_CONFIRM_S + 1.5)
-    check("…turns to the tag, finds them, and records 3 s later",
-          head.state == "recording" and head.phase == "track", f"{head.state} {head.phase}")
+    check("…turns to the tag, finds them, and locks on 3 s later (no recording)",
+          head.state == "tracking" and head.phase == "track" and not head.camera.recording,
+          f"{head.state} {head.phase}")
+    await head.apply_state("recording")          # the app's Record
 
-    # --- stop recording from the app: the session ends --------------------------
-    await head.apply_state("tracking")          # what an older app sends
-    check("stop recording → awake", head.state == "awake" and not head.camera.recording)
+    # --- stop recording from the app: back to tracking; stop tracking ends it ---------
+    await head.apply_state("tracking")          # the app's Stop
+    check("stop recording → tracking, still following",
+          head.state == "tracking" and not head.camera.recording and head.phase == "track")
+    await head.apply_state("awake")             # Stop tracking
+    check("stop tracking → awake", head.state == "awake" and head.session_hash is None)
     await tick_for(0.5)
     check("…and stays awake while the tag stays on", head.state == "awake")
 

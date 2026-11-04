@@ -87,6 +87,7 @@ class FakeClient:
 
 
 class FakeHead:
+    can_record = True     # someone seen lately (Record allowed)
     def __init__(self) -> None:
         self.state = "awake"
         self.applied: list[str] = []
@@ -142,6 +143,13 @@ async def main() -> None:
     check("writes back what it did, and whose session it is",
           doc().get("state") == "tracking" and doc().get("stateBy") == "device"
           and doc().get("sessionHash") == owner, str(doc()))
+    head.can_record = False
+    the_doc.update({"state": "recording", "stateBy": "app"})
+    await asyncio.sleep(0.1)
+    check("Record through Firebase with nobody seen lately: not recorded, the document put back",
+          head.applied == ["tracking"] and doc().get("state") == "tracking"
+          and doc().get("stateBy") == "device", str(doc()))
+    head.can_record = True
     head.refuse_recording = True
     the_doc.update({"state": "recording", "stateBy": "app"})
     await asyncio.sleep(0.1)

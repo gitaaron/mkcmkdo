@@ -60,10 +60,10 @@ HTTP_BY_CODE = {
 TRANSITIONS = {
     "connecting": [],              # getting on a network: reported as "off"
     "pairing": [],
-    "sleep": ["awake", "tracking"],    # record from sleep skips awake
+    "sleep": ["awake", "tracking"],    # Track from sleep skips awake
     "awake": ["sleep", "tracking"],
-    "tracking": ["sleep", "awake", "recording"],
-    "recording": ["sleep", "awake"],
+    "tracking": ["sleep", "awake", "recording"],   # recording only ever from here
+    "recording": ["tracking"],       # Stop: back to following, still the same session
 }
 
 
@@ -96,7 +96,7 @@ class LocalApi:
             "startTracking": lambda d: self._transition("tracking", d),
             "stopTracking": lambda d: self._transition("awake", d),
             "startRecording": lambda d: self._transition("recording", d),
-            "stopRecording": lambda d: self._transition("awake", d),
+            "stopRecording": lambda d: self._transition("tracking", d),
             "getRecordings": self._get_recordings,
             "takeSample": self._take_sample,
             "pairTag": self._pair_tag,
@@ -171,6 +171,9 @@ class LocalApi:
         owner = self.head.session_hash
         if state in session and owner and not owners.holds(owners.secrets_of(data), owner):
             raise FnError("permission-denied", "only the phone that started this recording can stop it")
+        if target == "recording" and not self.head.can_record:
+            raise FnError("failed-precondition",
+                          "nobody in frame: Record once the camera has seen someone")
         secret = None
         if state not in session and target in session:
             pairing = data.get("pairing") if isinstance(data, dict) else None

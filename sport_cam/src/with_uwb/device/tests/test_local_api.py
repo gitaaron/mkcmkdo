@@ -98,6 +98,7 @@ class StubHead:
         self.session_hash = None
         self.uwb = StubUwb()
         self.pairings = Pairings(os.path.join(config.RECORD_DIR, "pairings.json"))
+        self.can_record = True
         self.local = LocalApi(self)
 
     def telemetry(self) -> dict:
@@ -189,6 +190,12 @@ async def main() -> None:
             st, body = await call(s, "startRecording")
             check("another phone can't advance someone's session (403)",
                   st == 403 and body["error"]["code"] == "permission-denied", str(body))
+            head.can_record = False
+            st, body = await call(s, "startRecording", mine)
+            check("Record with nobody seen lately: refused, saying why (412)",
+                  st == 412 and "nobody" in body["error"]["message"] and not head.recorded,
+                  str(body))
+            head.can_record = True
             st, body = await call(s, "startRecording", mine)
             check("startRecording → recording",
                   st == 200 and body["result"]["state"] == "recording", str(body))
@@ -200,11 +207,17 @@ async def main() -> None:
             check("illegal transition rejected (412)",
                   st == 412 and body["error"]["code"] == "failed-precondition", str(body))
 
-            for fn, data in (("stopRecording", {}), ("stopTracking", {}), ("setPower", {"on": False})):
-                st, body = await call(s, fn, {**data, "secrets": ["someone-elses-secret-0123"]})
-                check(f"nobody else can stop it: {fn} (403)", st == 403, str(body))
+            st, body = await call(s, "stopRecording", {"secrets": ["someone-elses-secret-0123"]})
+            check("nobody else can stop it (403)", st == 403, str(body))
+            for fn, data in (("stopTracking", {}), ("setPower", {"on": False})):
+                st, body = await call(s, fn, {**data, **mine})
+                check(f"recording only stops to tracking: {fn} refused (412)", st == 412, str(body))
             st, body = await call(s, "stopRecording", {"secrets": ["another-of-mine-0123456", secret]})
-            check("stopRecording with its secret → awake (the session ends)",
+            check("stopRecording with its secret → tracking, the same session",
+                  st == 200 and body["result"]["state"] == "tracking"
+                  and body["result"]["sessionHash"] == owners.hash_secret(secret), str(body))
+            st, body = await call(s, "stopTracking", mine)
+            check("stopTracking → awake (the session ends)",
                   st == 200 and body["result"]["state"] == "awake"
                   and body["result"]["sessionHash"] is None, str(body))
 
@@ -213,7 +226,7 @@ async def main() -> None:
             st, body = await call(s, "startRecording")
             check("sleep: no recording without a session (412)", st == 412, str(body))
             st, body = await call(s, "startTracking")
-            check("startTracking from sleep → tracking, skipping awake (Record)",
+            check("startTracking from sleep → tracking, skipping awake (Track)",
                   st == 200 and body["result"]["state"] == "tracking", str(body))
             second = {"secrets": [body["result"]["sessionSecret"]]}
             st, body = await call(s, "setPower", {"on": False})

@@ -249,7 +249,10 @@ PAIRINGS_FILE = "/home/pi/sportcam-pairings.json"   # tag number → pairing has
 # struggles later, and nothing mid-climb depends on it.
 ACQUIRE_POINT_TOL_DEG = 4.0    # pan (and tilt, with A3) within this of the target
 ACQUIRE_SETTLE_S = 0.5         # ...for this long
-FOUND_CONFIRM_S = 3.0          # FOUND this long, the person still in frame → record
+FOUND_CONFIRM_S = 3.0          # FOUND this long, the person still in frame → locked on, followed
+# Recording starts only on the app's Record, from tracking, and only with
+# someone seen by the detector within this long: no clips of an empty room.
+RECORD_NEEDS_PERSON_S = 3.0
 FOUND_LOST_S = 1.0             # FOUND without the tag wearer seen this long → back to SEARCH
 ACQUIRE_STALLED_S = 15.0       # acquiring this long → the app says "can't see you"
 

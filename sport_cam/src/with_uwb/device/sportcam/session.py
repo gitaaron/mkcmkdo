@@ -1,7 +1,10 @@
 """Tag-driven sessions: switching the tag on is the start button.
 
-    tag on ─► awake or sleep → tracking (search → found, 3 s) ─► recording
-    tag off ─► … LOST_END_S later … ─► awake (the recording is saved)
+    tag on ─► awake or sleep → tracking (search → found → following)
+    tag off ─► … LOST_END_S later … ─► awake (a recording is saved)
+
+Recording is never started here: only the app's Record, from tracking,
+starts one, and its Stop goes back to tracking.
 
 The camera ranges all the time, even in standby, so it notices the tag the
 moment the wearer powers it. This module decides only *when* to change state.
@@ -18,9 +21,8 @@ Rules, in the order they are checked:
 * **It starts only from awake or sleep.** The radios keep ranging in sleep,
   so the tag wakes the camera straight into a session. If you are already
   tracking or recording by hand, turning the tag on changes nothing.
-* **It records once the person has been found for FOUND_CONFIRM_S**,
-  however the session started (tag or app). Stopping the recording ends the
-  session: the camera goes back to awake.
+* **It never records by itself.** Found for FOUND_CONFIRM_S, the person is
+  locked on and followed; recording waits for the app's Record.
 * **It ends the way every session ends:** no ranges for LOST_END_S, and the
   control loop drops to awake (5 s by default). A tag switched off and a tag
   hidden behind a body look the same, so a long enough dropout ends the
@@ -49,13 +51,12 @@ class AutoSession:
         self._disarmed: set[int | None] = set()     # tags whose arrival is used up
         self._ranging_since: dict[int | None, float] = {}
 
-    def update(self, now: float, ages: dict[int, float] | float, state: str,
-               ready: bool) -> str | None:
+    def update(self, now: float, ages: dict[int, float] | float, state: str) -> str | None:
         """One tick. Returns a state to apply, or None to leave things alone.
 
         `ages` is how long since each tag's last ranging frame, whatever the
         camera state (`UwbArray.tag_ages()`); a bare number is one unnamed
-        tag. `ready` is the tracker's `ready_to_record`.
+        tag.
         """
         if not isinstance(ages, dict):
             ages = {None: ages}
@@ -75,10 +76,6 @@ class AutoSession:
         if state in ("awake", "sleep"):
             self.active = False
             self.tag = None
-
-        # --- found for FOUND_CONFIRM_S → record ----------------------------
-        if state == "tracking" and ready:
-            return "recording"
 
         if not config.AUTO_SESSION:
             return None

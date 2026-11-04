@@ -518,7 +518,7 @@ class CameraClient extends ChangeNotifier {
   // The UI never assumes success — it waits for the state broadcast, so the
   // app, the LED ring, and any second phone stay in lock-step.
 
-  /// Track & record / Record: starts a session that is this person's. A
+  /// Start tracking / Track: starts a session that is this person's. A
   /// phone with a paired tag starts it with that pairing (UWB: the camera
   /// follows that tag).
   Future<void> startTracking() async {

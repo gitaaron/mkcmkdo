@@ -10,10 +10,11 @@ import 'package:sportcam/widgets/control_bar.dart';
 
 void main() {
   group('control bar', () {
-    Future<List<String>> tapBoth(
+    Future<List<String>> tapAll(
       WidgetTester tester,
       CamState state, {
       required bool locked,
+      bool canRecord = true,
     }) async {
       final pressed = <String>[];
       await tester.pumpWidget(MaterialApp(
@@ -22,31 +23,49 @@ void main() {
             state: state,
             enabled: true,
             locked: locked,
+            canRecord: canRecord,
             onSetPower: (on) => pressed.add(on ? 'wake' : 'sleep'),
             onStartTracking: () => pressed.add('start'),
             onStopTracking: () => pressed.add('stopTracking'),
+            onStartRecording: () => pressed.add('record'),
             onStopRecording: () => pressed.add('stopRecording'),
           ),
         ),
       ));
-      for (final label in ['Sleep', 'Stop recording', 'Stop tracking', 'Track & record', 'Start tracking']) {
+      for (final label in [
+        'Wake up', 'Track', 'Sleep', 'Start tracking', 'Stop tracking', 'Record', 'Stop recording',
+      ]) {
         final f = find.text(label);
         if (f.evaluate().isNotEmpty) await tester.tap(f);
       }
       return pressed;
     }
 
-    testWidgets("someone else's recording: neither Stop nor Sleep does anything", (tester) async {
-      expect(await tapBoth(tester, CamState.recording, locked: true), isEmpty);
-      expect(await tapBoth(tester, CamState.tracking, locked: true), isEmpty);
+    List<String> labels(WidgetTester tester) =>
+        tester.widgetList<Text>(find.byType(Text)).map((t) => t.data ?? '').toList();
+
+    testWidgets('each state offers only its own moves', (tester) async {
+      expect(await tapAll(tester, CamState.sleep, locked: false), ['wake', 'start']);
+      expect(await tapAll(tester, CamState.awake, locked: false), ['sleep', 'start']);
+      expect(await tapAll(tester, CamState.tracking, locked: false),
+          ['sleep', 'stopTracking', 'record']);
+      expect(await tapAll(tester, CamState.recording, locked: false), ['stopRecording'],
+          reason: 'a recording only stops, back to tracking');
+      expect(labels(tester), ['Stop recording']);
     });
 
-    testWidgets('your own recording: both work', (tester) async {
-      expect(await tapBoth(tester, CamState.recording, locked: false), ['sleep', 'stopRecording']);
+    testWidgets('Record is off until the camera has seen someone lately', (tester) async {
+      expect(await tapAll(tester, CamState.tracking, locked: false, canRecord: false),
+          ['sleep', 'stopTracking']);
+    });
+
+    testWidgets("someone else's session: nothing in it does anything", (tester) async {
+      expect(await tapAll(tester, CamState.recording, locked: true), isEmpty);
+      expect(await tapAll(tester, CamState.tracking, locked: true), isEmpty);
     });
 
     testWidgets('outside a session there is nothing to lock: anyone can start one', (tester) async {
-      expect(await tapBoth(tester, CamState.awake, locked: true), ['sleep', 'start']);
+      expect(await tapAll(tester, CamState.awake, locked: true), ['sleep', 'start']);
     });
   });
 

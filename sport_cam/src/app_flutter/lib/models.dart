@@ -46,7 +46,7 @@ class ModeText {
   /// Status label while tracking, in search.
   final String searching;
 
-  /// Hint when tracking has gone on too long without recording.
+  /// Hint when tracking has gone on a long while without finding anyone.
   final String stalled;
 
   static const withUwb = ModeText._(
@@ -56,7 +56,7 @@ class ModeText {
   );
 
   static const withoutUwb = ModeText._(
-    startTracking: 'Track & record',
+    startTracking: 'Start tracking',
     searching: 'Looking for a person',
     stalled: "Can't find anyone — step into the room, facing the camera",
   );
@@ -128,6 +128,7 @@ class Telemetry {
     this.lens = const Lens(),
     this.view = const ViewOrientation(),
     this.focusing = false,
+    this.canRecord = true,
     this.frameWidth = 1280,
     this.frameHeight = 720,
   });
@@ -158,6 +159,10 @@ class Telemetry {
   /// The camera is autofocusing (a tap on the live view, or the zoom at rest).
   final bool focusing;
 
+  /// Tracking, with someone seen lately: Record is allowed. A camera that
+  /// doesn't say (older software) is taken as allowing it.
+  final bool canRecord;
+
   /// The camera's own frame, px, which a tap to focus is a share of.
   /// (Plain numbers: this file stays pure Dart for tool/verify_models.dart.)
   final double frameWidth;
@@ -173,6 +178,7 @@ class Telemetry {
     lens: Lens.fromJson(j),
     view: ViewOrientation.fromJson(j?['view']),
     focusing: j?['focusing'] as bool? ?? false,
+    canRecord: j?['canRecord'] as bool? ?? true,
     frameWidth: _frame(j?['frameSize'], 0) ?? 1280,
     frameHeight: _frame(j?['frameSize'], 1) ?? 720,
   );

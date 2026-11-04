@@ -143,6 +143,10 @@ class CloudLink:
         if want not in ("sleep", "awake", "tracking", "recording"):
             return                       # "off" is a boot state, never a request
         print(f"[cloud] app asked for {want}")
+        if want == "recording" and not self.head.can_record:
+            print("[cloud] …but nobody has been seen lately: not recording")
+            await self.head.report_state()   # puts the document back to the camera's state
+            return
         session = ("tracking", "recording")
         if want in session and self.head.state not in session:
             # a new session, owned by whoever the API gave its secret to

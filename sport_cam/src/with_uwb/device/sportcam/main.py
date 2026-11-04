@@ -97,8 +97,8 @@ class Head:
         self._awake_since = time.monotonic()   # awake this long untouched → sleep
         self._warned = ""          # which warning we last announced
         self._tasks: set[asyncio.Task] = set()   # background uploads, kept alive
-        self._countdown_sent = 0   # tracker.countdown as last sent to the app
         self._boxes_sent_at: float | None = None   # tracker.labelled_at last sent live
+        self._person_seen_at: float | None = None   # the detector last saw anyone (Record)
         self._jog = (0.0, 0.0)              # the app's joystick: pan, tilt in −1…1
         self._jog_at = float("-inf")        # when it last sent one
         # The app's zoom slider (mm), awake only. None: not touched since the
@@ -201,9 +201,7 @@ class Head:
         if new == "recording" and not self.storage.can_record():
             print(f"[storage] refusing to record — {self.storage.minutes_left:.0f} min left")
             await self.warn("storage-full", **self.storage.telemetry())
-            new = "awake" if self.state == "tracking" else self.state
-        if self.state == "recording" and new == "tracking":
-            new = "awake"                  # stopping a recording ends the session
+            new = self.state               # stay tracking, following
 
         old, self.state = self.state, new
         if new != old:
@@ -310,7 +308,8 @@ class Head:
             self.tracker.step()
             if self.state == "recording":
                 self.boxlog.note(self.tracker.labelled_at, self.tracker.labelled)
-            await self.announce_countdown()
+            if self.state == "tracking" and self.tracker.ready_to_record:
+                self.tracker.confirm()        # locked on: follow them; Record starts the recording
             self.led.lost = self.tracker.lost_for() > config.LOST_HOLD_S
             if self.tracker.lost_for() > config.LOST_END_S:
                 await self.apply_state("awake")
@@ -323,8 +322,7 @@ class Head:
             self.led.lost = False
         # The tag switching on (or the person found for FOUND_CONFIRM_S) can move the
         # state, through the same apply_state() as any other command.
-        want = self.session.update(now, self.uwb.tag_ages(), self.state,
-                                   self.tracker.ready_to_record)
+        want = self.session.update(now, self.uwb.tag_ages(), self.state)
         if want == "tracking" and want != self.state:
             # a tag switched on: its session, its owner's (pairing.py)
             tag = self.session.tag
@@ -342,6 +340,8 @@ class Head:
             print(f"[sleep] awake {config.AWAKE_TIMEOUT_S:.0f} s with no session → sleep")
             await self.apply_state("sleep")
             await self.report_state()
+        if self.tracker.labelled and self.tracker.labelled_at is not None:
+            self._person_seen_at = self.tracker.labelled_at
         await self.send_boxes()
         self.led.awake_person = self.phase == "person-in-frame"
         self.led.searching = self.state == "tracking" and self.phase == "search"
@@ -517,6 +517,15 @@ class Head:
         event loop."""
         return samples.save(self)
 
+    @property
+    def can_record(self) -> bool:
+        """Record is allowed: tracking, with the detector having seen someone
+        within RECORD_NEEDS_PERSON_S. The app greys Record out otherwise, and
+        local_api refuses it."""
+        seen = getattr(self, "_person_seen_at", None)
+        return (self.state == "tracking" and seen is not None
+                and time.monotonic() - seen <= config.RECORD_NEEDS_PERSON_S)
+
     def live_boxes(self) -> list[list]:
         """The last detection's labelled boxes for the live view, `[[x, y, w,
         h, label], …]` in PREVIEW_SIZE pixels; none once stale or not up."""
@@ -546,7 +555,8 @@ class Head:
             "view": {"rotateDeg": config.VIEW_ROTATE_DEG, "mirror": config.VIEW_MIRROR},
             "dist": round(self.tracker.dist_m, 2) if self.tracker.dist_m else None,
             "phase": self.phase,
-            "countdown": self.tracker.countdown if self.state == "tracking" else 0,
+            "countdown": 0,                 # none: recording starts on the app's Record
+            "canRecord": self.can_record,
             "acquireStalled": self.acquire_stalled,
             "tagPresent": self.session.tag_present,
             **self.power.telemetry(),
@@ -556,19 +566,6 @@ class Head:
     async def send_telemetry(self) -> None:
         await self.cloud.telemetry({"type": "telemetry", **self.telemetry()})
         await self.local.broadcast(self.local.state_payload())
-
-    async def announce_countdown(self) -> None:
-        """Each second of the FOUND countdown goes to the app at once, so it
-        can beep for it.
-
-        The app beeps once per second counted (3, 2, 1), then chimes when
-        recording starts. Telemetry otherwise goes out once a second, out of
-        step with the count.
-        """
-        countdown = self.tracker.countdown if self.state == "tracking" else 0
-        if countdown != self._countdown_sent:
-            self._countdown_sent = countdown
-            await self.send_telemetry()
 
     async def telemetry_loop(self) -> None:
         while True:

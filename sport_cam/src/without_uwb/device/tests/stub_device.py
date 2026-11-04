@@ -76,6 +76,7 @@ class StubHead:
         self.pan_deg = 0.0
         self.tilt_deg = 0.0
         self.session_hash = None
+        self.can_record = True
         self.local = LocalApi(self)
 
     def telemetry(self) -> dict:

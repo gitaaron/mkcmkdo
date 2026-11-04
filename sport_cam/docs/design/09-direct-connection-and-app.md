@@ -78,13 +78,13 @@ background audio and notifications.
 
 <!--both-->
 
-![App UI (with UWB wording; the camera-only build shows "Track & record")](../with_uwb/images/app-ui.png)
+![App UI (an older picture: before Record moved into tracking)](../with_uwb/images/app-ui.png)
 
 <!--/-->
 
 <!--with_uwb: ![App UI](../with_uwb/images/app-ui.png)-->
 
-<!--without_uwb: ![App UI (with UWB wording; this build shows "Track & record")](../with_uwb/images/app-ui.png)-->
+<!--without_uwb: ![App UI (an older picture: before Record moved into tracking)](../with_uwb/images/app-ui.png)-->
 
 One screen (requirement F5 in [01](../product/01-requirements.md#functional-requirements)). It opens into the live view, with no play button:
 
@@ -99,7 +99,7 @@ One screen (requirement F5 in [01](../product/01-requirements.md#functional-requ
 | **Sample** (camera button, under Boxes) | in `awake`, `tracking` and `recording`, over the direct connection: the camera saves the frame it sees now — full size, the frame detection saw, and a `.json` of what it made of it (the detector on that frame, the tracker's labelled boxes, zoom, focus, aim) — in `SAMPLE_DIR` on its card, for improving person detection (`samples.py`, callable `takeSample`). `scripts/pi/samples.sh` copies them into `samples/`, which git ignores. They are photos of people: they never go to the cloud backend |
 | **Top right — status ring** (`widgets/status_ring.dart`) | the camera's state in the LED colours ([01 — State machine](../product/01-requirements.md#state-machine)); hollow while the camera is offline |
 | **Under the ring — account menu** | who is signed in; <!--with_uwb-->**Pair my tag**; <!--/--><!--both-->with UWB, **Pair my tag**; <!--/-->for admins, **People** (`lib/screens/admin_screen.dart`: everyone who can sign in, and **Add person**); **Sign out** |
-| **Bottom buttons** (`widgets/control_bar.dart`) | swap with the state, with the labels in [01 — State machine](../product/01-requirements.md#state-machine). In `sleep`: **Wake up** and **Record** |
+| **Bottom buttons** (`widgets/control_bar.dart`) | swap with the state, with the labels in [01 — State machine](../product/01-requirements.md#state-machine). In `sleep`: **Wake up** and **Track**; in `tracking`: **Sleep**, **Stop tracking** and **Record**, Record greyed out until the camera has seen someone in the last 3 s (telemetry `canRecord`); in `recording`: **Stop recording** only, back to `tracking` |
 | **Stalled-tracking pill** | if tracking stalls: <!--with_uwb-->"Can't pick you out — step into view, away from anyone else"<!--/--><!--both--> (with UWB) or<!--/--><!--without_uwb--> "Can't find anyone — step into the room, facing the camera" (<!--/--><!--both-->without UWB, <!--/--><!--without_uwb-->after 15 s with nobody found)<!--/--> |
 | **Someone else's session** | while a session another phone started runs, **Sleep** and **Stop** are greyed out under *"Someone else is recording — only their phone can stop it"*. The app knows from the state's `sessionHash`, compared with the hashes of the secrets it holds (`lib/keys.dart`) |
 | **No optimistic UI** | a button calls the API, and the screen changes only when the camera reports its new state, so the app, the LED ring and other phones stay consistent |

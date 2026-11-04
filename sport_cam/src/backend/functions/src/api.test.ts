@@ -102,13 +102,14 @@ beforeEach(async () => {
 });
 
 describe("state machine", () => {
-  it("full happy path awake → tracking → recording → awake", async () => {
+  it("full happy path awake → tracking → recording → tracking → awake", async () => {
     const start = await call("startTracking");
     expect(start.body.result.state).toBe("tracking");
     const secrets = [start.body.result.sessionSecret];
     for (const [fn, want] of [
       ["startRecording", "recording"],
-      ["stopRecording", "awake"],
+      ["stopRecording", "tracking"],
+      ["stopTracking", "awake"],
     ] as const) {
       const r = await call(fn, { secrets });
       expect(r.status).toBe(200);
@@ -134,14 +135,25 @@ describe("state machine", () => {
     expect((await call("startRecording")).status).toBe(412);
   });
 
-  it("stopTracking while recording stops both", async () => {
+  it("a recording only stops back to tracking: Stop tracking and Sleep are refused", async () => {
     await camera("recording");
-    expect((await call("stopTracking")).body.result.state).toBe("awake");
+    expect((await call("stopTracking")).status).toBe(412);
+    expect((await call("setPower", { on: false })).status).toBe(412);
   });
 
-  it("there is no way back from recording to tracking: stopping ends the session", async () => {
+  it("stopping a recording goes back to tracking", async () => {
     await camera("recording");
-    expect((await call("stopRecording")).body.result.state).toBe("awake");
+    expect((await call("stopRecording")).body.result.state).toBe("tracking");
+  });
+
+  it("Record needs someone seen lately: refused when the camera says nobody", async () => {
+    await camera("tracking");
+    await cam().update({ "telemetry.canRecord": false });
+    const r = await call("startRecording");
+    expect(r.status).toBe(412);
+    expect(r.body.error.message).toMatch(/nobody in frame/);
+    await cam().update({ "telemetry.canRecord": true });
+    expect((await call("startRecording")).body.result.state).toBe("recording");
   });
 
   it("setPower validates its input and is idempotent", async () => {
@@ -151,12 +163,12 @@ describe("state machine", () => {
     expect((await call("setPower", { on: true })).body.result.state).toBe("awake");
   });
 
-  it("record from sleep goes straight to tracking, skipping awake", async () => {
+  it("Track from sleep goes straight to tracking, skipping awake", async () => {
     await camera("sleep");
     expect((await call("startTracking")).body.result.state).toBe("tracking");
   });
 
-  it("sleep only wakes or records", async () => {
+  it("sleep only wakes or tracks", async () => {
     await camera("sleep");
     expect((await call("startRecording")).status).toBe(412);
     expect((await call("stopTracking")).body.result.state).toBe("awake");   // = wake up
@@ -219,7 +231,10 @@ describe("who started it stops it", () => {
     expect((await call("stopRecording")).status).toBe(403);   // alice too, without the secret
     // anyone holding the secret may (it is alice's phone); one among others is enough
     const stop = await call("stopRecording", { secrets: ["another-secret-xxxxxx", sessionSecret] });
-    expect(stop.body.result).toMatchObject({ state: "awake", sessionHash: null });
+    expect(stop.body.result).toMatchObject({ state: "tracking" });
+    expect(stop.body.result.sessionHash).not.toBeNull();             // the same session goes on
+    const end = await call("stopTracking", { secrets: [sessionSecret] });
+    expect(end.body.result).toMatchObject({ state: "awake", sessionHash: null });
     expect((await cam().get()).data()!.sessionHash).toBeNull();
   });
 
@@ -233,7 +248,7 @@ describe("who started it stops it", () => {
 
   it("a session nobody owns (an unpaired tag's) can be stopped by anyone", async () => {
     await camera("recording");
-    expect((await call("stopRecording", {}, key, bob)).body.result.state).toBe("awake");
+    expect((await call("stopRecording", {}, key, bob)).body.result.state).toBe("tracking");
   });
 
   it("a paired tag's secret starts the session as its own", async () => {

@@ -52,7 +52,12 @@ void main() {
   check(
     'without_uwb mode parses and picks its wording',
     trackingModeFrom('without_uwb') == TrackingMode.withoutUwb &&
-        ModeText.of(TrackingMode.withoutUwb).startTracking == 'Track & record',
+        ModeText.of(TrackingMode.withoutUwb).searching == 'Looking for a person',
+  );
+  check(
+    'canRecord parses, and an older camera that does not say allows Record',
+    Telemetry.fromJson({'canRecord': false}).canRecord == false &&
+        Telemetry.fromJson({}).canRecord == true,
   );
 
   final t = Telemetry.fromJson(state['telemetry'] as Map<String, dynamic>?);

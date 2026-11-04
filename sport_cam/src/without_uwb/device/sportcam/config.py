@@ -197,7 +197,10 @@ TRACK_GATE_FRACTION = 0.45
 # (FOUND); they need not be centred. Still in frame FOUND_CONFIRM_S later, it
 # records. One-frame false positives (a coat stand, a chair) therefore cost a
 # short pause, not a recording of furniture.
-FOUND_CONFIRM_S = 3.0          # FOUND this long, the person still in frame → record
+FOUND_CONFIRM_S = 3.0          # FOUND this long, the person still in frame → locked on, followed
+# Recording starts only on the app's Record, from tracking, and only with
+# someone seen by the detector within this long: no clips of an empty room.
+RECORD_NEEDS_PERSON_S = 3.0
 FOUND_LOST_S = 1.0             # FOUND with nobody seen this long → resume the sweep
 ACQUIRE_STALLED_S = 15.0       # searching this long → the app says "can't see anyone"
 

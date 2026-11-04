@@ -5,13 +5,17 @@ import '../theme.dart';
 
 /// Bottom buttons (the awake label depends on the build, see [ModeText]):
 ///   off       → none (the camera is still booting)
-///   sleep     → Wake up · Record (skips awake: straight into the search)
-///   awake     → Sleep · Start tracking | Track & record
-///   tracking  → Sleep · Stop tracking (search → found → recording runs by itself)
-///   recording → Sleep · Stop recording (saves the clip, back to awake)
+///   sleep     → Wake up · Track (skips awake: straight into the search)
+///   awake     → Sleep · Start tracking
+///   tracking  → Sleep · Stop tracking · Record (follows the person; Record
+///               only once the camera has seen someone lately, [canRecord])
+///   recording → Stop recording (saves the clip, back to tracking)
+///
+/// A recording starts only from tracking, and stops only back to it.
 ///
 /// [locked]: the session running is someone else's — only the phone that
-/// started it can stop it (or put the camera to sleep), so both are off.
+/// started it can advance or stop it (or put the camera to sleep), so all
+/// its buttons are off.
 class ControlBar extends StatelessWidget {
   const ControlBar({
     super.key,
@@ -19,9 +23,11 @@ class ControlBar extends StatelessWidget {
     this.text = ModeText.withUwb,
     required this.enabled,
     this.locked = false,
+    this.canRecord = true,
     required this.onSetPower,
     required this.onStartTracking,
     required this.onStopTracking,
+    required this.onStartRecording,
     required this.onStopRecording,
   });
 
@@ -29,28 +35,64 @@ class ControlBar extends StatelessWidget {
   final ModeText text;
   final bool enabled;
   final bool locked;
+  final bool canRecord;
   final void Function(bool on) onSetPower;
   final VoidCallback onStartTracking;
   final VoidCallback onStopTracking;
+  final VoidCallback onStartRecording;
   final VoidCallback onStopRecording;
 
   @override
   Widget build(BuildContext context) {
     final inSession = state == CamState.tracking || state == CamState.recording;
     final active = enabled && !(locked && inSession);
-    final (String? leftLabel, VoidCallback? leftAction) = switch (state) {
-      CamState.off => (null, null),
-      CamState.sleep => ('Wake up', () => onSetPower(true)),
-      CamState.awake => ('Sleep', () => onSetPower(false)),
-      CamState.tracking => ('Sleep', () => onSetPower(false)),
-      CamState.recording => ('Sleep', () => onSetPower(false)),
-    };
-    final (String? rightLabel, VoidCallback? rightAction) = switch (state) {
-      CamState.off => (null, null),
-      CamState.sleep => ('Record', onStartTracking),
-      CamState.awake => (text.startTracking, onStartTracking),
-      CamState.tracking => ('Stop tracking', onStopTracking),
-      CamState.recording => ('Stop recording', onStopRecording),
+    VoidCallback? on(VoidCallback f, [bool allowed = true]) =>
+        active && allowed ? f : null;
+    _Btn quiet(String label, VoidCallback? onTap) => _Btn(
+      label: label,
+      onTap: onTap,
+      background: SportColors.panel,
+      foreground: SportColors.ink,
+      border: SportColors.border,
+    );
+    final buttons = switch (state) {
+      CamState.off => const <_Btn>[],
+      CamState.sleep => [
+        quiet('Wake up', on(() => onSetPower(true))),
+        _Btn(
+          label: 'Track',
+          onTap: on(onStartTracking),
+          background: SportColors.tracking,
+          foreground: Colors.white,
+        ),
+      ],
+      CamState.awake => [
+        quiet('Sleep', on(() => onSetPower(false))),
+        _Btn(
+          label: text.startTracking,
+          onTap: on(onStartTracking),
+          background: SportColors.tracking,
+          foreground: Colors.white,
+        ),
+      ],
+      CamState.tracking => [
+        quiet('Sleep', on(() => onSetPower(false))),
+        quiet('Stop tracking', on(onStopTracking)),
+        _Btn(
+          label: 'Record',
+          onTap: on(onStartRecording, canRecord),
+          background: SportColors.recording,
+          foreground: Colors.white,
+        ),
+      ],
+      CamState.recording => [
+        _Btn(
+          label: 'Stop recording',
+          onTap: on(onStopRecording),
+          background: SportColors.recording,
+          foreground: Colors.white,
+        ),
+      ],
     };
 
     return Container(
@@ -69,29 +111,9 @@ class ControlBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (leftLabel != null)
-            Expanded(
-              child: _Btn(
-                label: leftLabel,
-                onTap: active ? leftAction : null,
-                background: SportColors.panel,
-                foreground: SportColors.ink,
-                border: SportColors.border,
-              ),
-            ),
-          if (rightLabel != null) ...[
-            const SizedBox(width: 10),
-            Expanded(
-              child: _Btn(
-                label: rightLabel,
-                onTap: active ? rightAction : null,
-                // Record from sleep starts a recording session: red
-                background: state == CamState.sleep
-                    ? SportColors.recording
-                    : SportColors.forState(state),
-                foreground: Colors.white,
-              ),
-            ),
+          for (final (i, b) in buttons.indexed) ...[
+            if (i > 0) const SizedBox(width: 10),
+            Expanded(child: b),
           ],
         ],
       ),

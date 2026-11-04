@@ -17,14 +17,12 @@ class StatusRing extends StatefulWidget {
     required this.connected,
     this.searchingLabel = 'Looking for a person',
     this.phase,
-    this.countdown = 0,
   });
 
   final CamState state;
   final bool connected;
   final String searchingLabel;
   final String? phase;
-  final int countdown; // found: seconds left before recording
 
   bool get searching => state == CamState.tracking && phase == 'search';
   bool get found => state == CamState.tracking && phase == 'found';
@@ -86,10 +84,7 @@ class _StatusRingState extends State<StatusRing>
   String get _stateLabel {
     if (widget.state == CamState.awake) return awakeLabel(widget.phase);
     if (widget.searching) return widget.searchingLabel;
-    if (widget.found) {
-      final n = widget.countdown > 0 ? widget.countdown : 1;
-      return 'Found you — recording in $n';
-    }
+    if (widget.found) return 'Found you — locking on';
     return stateLabel(widget.state);
   }
 

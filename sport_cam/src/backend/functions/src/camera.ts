@@ -42,9 +42,10 @@ export interface Telemetry {
   tilt?: number;
   zoomMm?: number;
   dist?: number | null;  // with_uwb: from ranging; without_uwb: from the person's size in frame
-  /** awake: is a person in frame? tracking: search, then found; recording: track (without_uwb: search if lost) */
+  /** awake: is a person in frame? tracking: search, found, then track (locked on); recording: track (without_uwb: search if lost) */
   phase?: "person-in-frame" | "no-person-in-frame" | "search" | "found" | "track" | null;
-  countdown?: number;        // tracking, found: whole seconds left before recording (3, 2, 1); else 0
+  countdown?: number;        // always 0 now: recording starts on Record, never by itself
+  canRecord?: boolean;       // tracking, with someone seen within RECORD_NEEDS_PERSON_S: Record allowed
   acquireStalled?: boolean;  // tracking a long time: nobody found / vision cannot see the subject
   tagPresent?: boolean;      // with_uwb only: the wearable is switched on and ranging
   battery?: number;          // fraction of the pack remaining, 0-1
@@ -117,10 +118,10 @@ export function snapshot(d: CameraDoc): StateSnapshot {
 
 const TRANSITIONS: Record<CamState, CamState[]> = {
   off: [],                         // booting: nothing to ask yet
-  sleep: ["awake", "tracking"],    // record from sleep skips awake
+  sleep: ["awake", "tracking"],    // Track from sleep skips awake
   awake: ["sleep", "tracking"],
-  tracking: ["sleep", "awake", "recording"],
-  recording: ["sleep", "awake"],   // stopping a recording ends the session
+  tracking: ["sleep", "awake", "recording"],   // recording only ever from here
+  recording: ["tracking"],         // Stop: back to following, the same session
 };
 
 export function assertTransition(from: CamState, to: CamState): void {
@@ -172,6 +173,10 @@ export async function requestState(
     assertTransition(d.state, to);   // includes "already there", as on the camera's own API
     if (!isOnline(d)) throw new FnError("failed-precondition", "the camera is offline");
     if (inSession(d.state) && d.sessionHash && !holds(asker.secrets, d.sessionHash)) throw permissionDenied();
+    // Record needs someone seen lately; a camera that doesn't say is let through
+    if (to === "recording" && d.telemetry?.canRecord === false) {
+      throw new FnError("failed-precondition", "nobody in frame: Record once the camera has seen someone");
+    }
 
     let sessionHash = inSession(to) ? d.sessionHash ?? null : null;
     let sessionSecret: string | undefined;
