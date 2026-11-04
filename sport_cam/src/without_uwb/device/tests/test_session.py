@@ -115,6 +115,20 @@ def countdown_heard(sent: list[int]) -> list[int]:
     return [c for i, c in enumerate(sent) if c and (i == 0 or sent[i - 1] != c)]
 
 
+
+class FakeAutoFocus:
+    """Notes what autofocus was asked for; the sweep itself is test_autofocus's."""
+    def __init__(self) -> None:
+        self.started: list[tuple[float, float]] = []
+        self.cancelled = 0
+        self.busy = False
+
+    def start(self, x: float, y: float) -> None:
+        self.started.append((x, y))
+
+    def cancel(self) -> None:
+        self.cancelled += 1
+
 async def full_flow() -> None:
     print("\nfull flow through Head")
     import sportcam.main as main_mod
@@ -148,8 +162,10 @@ async def full_flow() -> None:
     head._tasks = set()
     head._boxes_sent_at = None
     head._jog, head._jog_at = (0.0, 0.0), float("-inf")
-    head._lens_zoom = head._lens_focus = None
+    head._lens_zoom = None
     head._lens_new = False
+    head._af_point, head._af_due = (0.5, 0.5), None
+    head.autofocus = FakeAutoFocus()
     head.session_hash = None
     owner = "c0" * 32                   # the hash of the secret the app was handed
     if os.path.exists("/tmp/sportcam-test.owner"):
@@ -367,17 +383,29 @@ async def full_flow() -> None:
     check("…and stops JOG_TIMEOUT_S after the last message", head.ptz.jogs == held,
           f"{head.ptz.jogs - held} more moves")
 
-    # the app's zoom and focus sliders hold the lens in awake…
-    head.lens(8.0, 0.3)
-    await tick_for(0.5)
-    check("lens: awake, the app's zoom and focus hold (awake no longer forces wide)",
-          head.ptz.zoom_mm == 8.0 and head.ptz.focus_pos == 0.3,
-          f"zoom {head.ptz.zoom_mm}, focus {head.ptz.focus_pos}")
-    check("…and the app sees them", head.telemetry()["zoomMm"] == 8.0
-          and head.telemetry()["focusPos"] == 0.3, f"{head.telemetry()}")
+    # the app's zoom slider holds the lens in awake, and the lens refocuses once it rests…
+    head.lens(8.0)
+    await tick_for(0.2)
+    check("zoom: awake, the app's zoom holds (awake no longer forces wide)",
+          head.ptz.zoom_mm == 8.0 and head.telemetry()["zoomMm"] == 8.0, f"{head.ptz.zoom_mm}")
+    check("…not refocusing while it may still be moving", head.autofocus.started == [])
+    await tick_for(config.AF_AFTER_ZOOM_S)
+    check("…then autofocus, on the centre", head.autofocus.started == [(0.5, 0.5)],
+          f"{head.autofocus.started}")
+    # a tap on the live view focuses there, and later zooms refocus there too
+    head.focus_at(0.2, 0.7)
+    check("tap to focus: autofocus on the tapped point",
+          head.autofocus.started[-1] == (0.2, 0.7))
+    head.lens(6.0)
+    await tick_for(config.AF_AFTER_ZOOM_S + 0.2)
+    check("…and the next zoom refocuses on it", head.autofocus.started[-1] == (0.2, 0.7),
+          f"{head.autofocus.started}")
     await head.apply_state("sleep")
-    head.lens(5.0, None)
-    check("…asleep, the sliders are ignored", head._lens_zoom is None)
+    head.lens(5.0)
+    head.focus_at(0.1, 0.1)
+    check("…asleep, the zoom and taps are ignored",
+          head._lens_zoom is None and head.autofocus.started[-1] == (0.2, 0.7)
+          and head.autofocus.cancelled > 0)
     await head.apply_state("awake")
     await tick_for(config.ZOOM_RATE_LIMIT_S + 0.2)
     check("…and woken again the lens is back to wide", head.ptz.zoom_mm == config.ZOOM_MIN_MM,
@@ -430,6 +458,7 @@ async def switched_off() -> None:
     head.cloud, head.mdns = Stub("report_state"), Stub("update_state", "stop")
     head._rec_path, head._rec_started = "/tmp/sportcam-test.mp4", main_mod.time.monotonic()
     head._near_focus = False
+    head.autofocus = FakeAutoFocus()
     head._tasks = set()
     head.session_hash = None
 

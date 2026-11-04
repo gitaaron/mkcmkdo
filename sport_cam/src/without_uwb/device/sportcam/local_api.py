@@ -13,8 +13,9 @@ API speaks (src/backend/functions), so the app talks to both identically:
     WS   /ws                       state, "recordingsChanged" and live person-box broadcasts;
                                    the app sends {"type":"jog","pan":x,"tilt":y}
                                    (each −1…1) while its joystick is held, and
-                                   {"type":"lens","zoomMm":z,"focusPos":f}
-                                   (either one) as its lens sliders move
+                                   {"type":"lens","zoomMm":z} as its zoom
+                                   slider moves, {"type":"focus","x":x,"y":y}
+                                   (each 0…1 of the frame) on a tap to focus
     GET  /api/health               {"ok":true,"backend":"device", …}
 
 Why the camera serves its own API: on gym Wi-Fi (or the camera's own
@@ -217,24 +218,27 @@ class LocalApi:
             return
         self.head.jog(max(-1.0, min(1.0, pan)), max(-1.0, min(1.0, tilt)))
 
+    @staticmethod
+    def _number(data: dict, key: str, lo: float, hi: float) -> float | None:
+        """data[key] clamped to lo…hi; None if missing or not a finite number."""
+        v = data.get(key)
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+            return None
+        return max(lo, min(hi, float(v)))
+
     def _on_lens(self, data: dict) -> None:
-        """The zoom and focus sliders, on the socket like the joystick. Each
-        is optional and clamped to the lens's range; anything malformed drops
-        the whole message."""
-        def value(key: str, lo: float, hi: float) -> float | None:
-            v = data.get(key)
-            if v is None:
-                return None
-            if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
-                raise ValueError(key)
-            return max(lo, min(hi, float(v)))
-        try:
-            zoom = value("zoomMm", config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
-            focus = value("focusPos", 0.0, 1.0)
-        except ValueError:
-            return
-        if zoom is not None or focus is not None:
-            self.head.lens(zoom, focus)
+        """The zoom slider, on the socket like the joystick: clamped to the
+        lens, anything malformed dropped."""
+        zoom = self._number(data, "zoomMm", config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
+        if zoom is not None:
+            self.head.lens(zoom)
+
+    def _on_focus(self, data: dict) -> None:
+        """A tap on the live view: focus there. Malformed is dropped."""
+        x = self._number(data, "x", 0.0, 1.0)
+        y = self._number(data, "y", 0.0, 1.0)
+        if x is not None and y is not None:
+            self.head.focus_at(x, y)
 
     # ---- HTTP handlers ----------------------------------------------------
     async def _handle_call(self, req: web.Request) -> web.Response:
@@ -320,6 +324,8 @@ class LocalApi:
                         self._on_jog(data)
                     elif data.get("type") == "lens":
                         self._on_lens(data)
+                    elif data.get("type") == "focus":
+                        self._on_focus(data)
         finally:
             self._ws_clients.discard(ws)
         return ws

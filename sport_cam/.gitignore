@@ -19,3 +19,6 @@ sportcam-firebase.json
 
 # MobileNet-SSD weights: fetched by `python3 -m sportcam.getmodel`, not committed
 src/*/device/models/*.pb
+
+# lens diagnostics fetched from the Pi (scripts/pi/lenscheck.sh)
+logs/

@@ -598,20 +598,26 @@ class CameraClient extends ChangeNotifier {
     ws.sink.add(jsonEncode({'type': 'jog', 'pan': r(pan), 'tilt': r(tilt)}));
   }
 
-  /// Zoom (focal length, mm) and focus (motor position, 0…1) by hand, from
-  /// the lens sliders ([LensControls]); either may be left out. When [canAim]
-  /// only, on the WebSocket like [aim]. The camera clamps both to its lens,
-  /// and puts the lens back to wide when it leaves awake.
-  void setLens({double? zoomMm, double? focusPos}) {
+  /// Zoom (focal length, mm) by hand, from the zoom slider ([LensControls]).
+  /// When [canAim] only, on the WebSocket like [aim]. The camera clamps it to
+  /// its lens, refocuses once it is still, and puts the lens back to wide
+  /// when it leaves awake.
+  void setLens({required double zoomMm}) {
     final ws = _ws;
     if (ws == null || _link != LinkMode.direct) return;
-    if (zoomMm == null && focusPos == null) return;
-    double r(double v) => (v * 1000).roundToDouble() / 1000;
     ws.sink.add(jsonEncode({
       'type': 'lens',
-      if (zoomMm != null) 'zoomMm': r(zoomMm),
-      if (focusPos != null) 'focusPos': r(focusPos.clamp(0.0, 1.0)),
+      'zoomMm': (zoomMm * 1000).roundToDouble() / 1000,
     }));
+  }
+
+  /// Autofocus on a point of the camera's frame (each 0…1): a tap on the
+  /// live view ([TapToFocus]). When [canAim] only, on the WebSocket.
+  void focusAt(double x, double y) {
+    final ws = _ws;
+    if (ws == null || _link != LinkMode.direct) return;
+    double r(double v) => (v.clamp(0.0, 1.0) * 1000).roundToDouble() / 1000;
+    ws.sink.add(jsonEncode({'type': 'focus', 'x': r(x), 'y': r(y)}));
   }
 
   /// The signed-in person's clips: the backend's library, and, connected

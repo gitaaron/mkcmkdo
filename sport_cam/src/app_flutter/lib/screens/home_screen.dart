@@ -8,12 +8,12 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets/connection_badge.dart';
 import '../widgets/control_bar.dart';
-import '../widgets/joystick.dart';
-import '../widgets/lens_controls.dart';
+import '../widgets/aim_panel.dart';
 import '../widgets/mjpeg_view.dart';
 import '../widgets/oriented_view.dart';
 import '../widgets/person_boxes.dart';
 import '../widgets/status_ring.dart';
+import '../widgets/tap_focus.dart';
 import 'admin_screen.dart';
 import 'library_screen.dart';
 
@@ -37,9 +37,12 @@ class _HomeScreenState extends State<HomeScreen> {
   // The live view's own Boxes on / off, remembered on the phone (the
   // recording player has another).
   static const _showBoxesKey = 'showLiveBoxes';
+  // The aim and zoom controls up or tucked away, remembered on the phone.
+  static const _showAimKey = 'showAimControls';
 
   CameraClient get client => widget.client;
   bool _showBoxes = true;
+  bool _showAim = false;
 
   @override
   void initState() {
@@ -48,8 +51,20 @@ class _HomeScreenState extends State<HomeScreen> {
     client.connect();
     SharedPreferences.getInstance().then((prefs) {
       final show = prefs.getBool(_showBoxesKey) ?? true;
-      if (mounted) setState(() => _showBoxes = show);
+      final aim = prefs.getBool(_showAimKey) ?? false;
+      if (mounted) {
+        setState(() {
+          _showBoxes = show;
+          _showAim = aim;
+        });
+      }
     });
+  }
+
+  Future<void> _toggleAim() async {
+    setState(() => _showAim = !_showAim);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_showAimKey, _showAim);
   }
 
   Future<void> _toggleBoxes() async {
@@ -165,6 +180,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   IgnorePointer(
                     child: CustomPaint(painter: LiveBoxesPainter(boxes)),
                   ),
+
+                // tap the picture to focus there (awake, direct)
+                if (client.canAim && client.foreground)
+                  TapToFocus(
+                    frameSize: Size(
+                      client.telemetry.frameWidth,
+                      client.telemetry.frameHeight,
+                    ),
+                    focusing: client.telemetry.focusing,
+                    onFocus: client.focusAt,
+                  ),
               ],
             ),
           ),
@@ -271,26 +297,19 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: _openLibrary,
             ),
 
-          // awake, on the camera's own Wi-Fi link: aim it by hand, pan under the
-          // left thumb and tilt under the right
+          // awake, on the camera's own Wi-Fi link: zoom, and aim by hand with
+          // pan under the left thumb and tilt under the right. They rise out
+          // of the bottom bar on the arrow, and tuck back into it.
           if (client.canAim && client.foreground)
             Positioned(
               left: 18,
               right: 18,
               bottom: 96 + MediaQuery.of(context).padding.bottom,
-              child: AimSticks(onMove: client.aim),
-            ),
-
-          // …and zoom and focus it, just above the sticks
-          if (client.canAim && client.foreground)
-            Positioned(
-              left: 18,
-              right: 18,
-              bottom: 96 + 132 + 12 + MediaQuery.of(context).padding.bottom,
-              child: LensControls(
+              child: AimPanel(
+                open: _showAim,
                 lens: client.telemetry.lens,
                 onZoom: (mm) => client.setLens(zoomMm: mm),
-                onFocus: (f) => client.setLens(focusPos: f),
+                onAim: client.aim,
               ),
             ),
 
@@ -307,6 +326,17 @@ class _HomeScreenState extends State<HomeScreen> {
               onStopRecording: client.stopRecording,
             ),
           ),
+
+          // shows / hides the aim and zoom controls, between the sticks
+          if (client.canAim && client.foreground)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 84 + MediaQuery.of(context).padding.bottom,
+              child: Center(
+                child: AimToggle(open: _showAim, onTap: _toggleAim),
+              ),
+            ),
         ],
       ),
     );

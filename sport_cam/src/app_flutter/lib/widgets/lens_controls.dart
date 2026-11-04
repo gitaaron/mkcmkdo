@@ -5,14 +5,12 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 
-/// Zoom and focus by hand: two sliders above the aim sticks, awake only.
+/// Zoom by hand: a slider above the aim sticks, awake only. It runs wide →
+/// tele and reads as a multiple of the widest view. Focus is the camera's:
+/// it autofocuses once the zoom is still, and where you tap the live view
+/// ([TapToFocus]).
 ///
-/// Zoom runs wide → tele and reads as a multiple of the widest view. Focus
-/// moves the focus motor across its travel (0–100 %): you focus by eye,
-/// watching the picture. Until the camera's focus is calibrated
-/// (`focuscal`), a distance would mean nothing to it.
-///
-/// While a slider moves it reports at most once per [period], and once more
+/// While the slider moves it reports at most once per [period], and once more
 /// where it was let go. The camera reports the lens back about once a
 /// second; until then the slider stays where the finger left it.
 class LensControls extends StatelessWidget {
@@ -20,13 +18,11 @@ class LensControls extends StatelessWidget {
     super.key,
     required this.lens,
     required this.onZoom,
-    required this.onFocus,
     this.period = const Duration(milliseconds: 120),
   });
 
   final Lens lens;
   final void Function(double zoomMm) onZoom;
-  final void Function(double focusPos) onFocus;
   final Duration period;
 
   @override
@@ -52,19 +48,6 @@ class LensControls extends StatelessWidget {
             label: (mm) => '${(mm / l.zoomMinMm).toStringAsFixed(1)}×',
             period: period,
             onSend: onZoom,
-          ),
-          LensSlider(
-            key: const ValueKey('focus'),
-            icon: Icons.center_focus_strong,
-            name: 'Focus',
-            // unknown until the camera has moved it: at its low stop, where
-            // waking the lens leaves it
-            value: l.focusPos ?? 0,
-            min: 0,
-            max: 1,
-            label: (t) => '${(t * 100).round()}%',
-            period: period,
-            onSend: onFocus,
           ),
         ],
       ),

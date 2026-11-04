@@ -83,21 +83,25 @@ class StubHead:
         self.tilt_deg = 0.0
         self.recorded: list[str] = []
         self.jogs: list[tuple[float, float]] = []
-        self.lenses: list[tuple[float | None, float | None]] = []
+        self.lenses: list[float] = []
+        self.focuses: list[tuple[float, float]] = []
         self.session_hash = None
         self.local = LocalApi(self)
 
     def telemetry(self) -> dict:
         return {"pan": self.pan_deg, "tilt": self.tilt_deg, "zoomMm": 2.8,
-                "focusPos": None, "phase": self.phase,
+                "focusing": False, "frameSize": [1280, 720], "phase": self.phase,
                 "acquireStalled": self.acquire_stalled,
                 **self.power.telemetry(), **self.storage.telemetry()}
 
     def jog(self, pan: float, tilt: float) -> None:
         self.jogs.append((pan, tilt))
 
-    def lens(self, zoom_mm: float | None, focus_pos: float | None) -> None:
-        self.lenses.append((zoom_mm, focus_pos))
+    def lens(self, zoom_mm: float) -> None:
+        self.lenses.append(zoom_mm)
+
+    def focus_at(self, x: float, y: float) -> None:
+        self.focuses.append((x, y))
 
     async def apply_state(self, new: str) -> None:
         if new not in ("tracking", "recording"):
@@ -244,7 +248,7 @@ async def main() -> None:
                 first = json.loads((await ws.receive(timeout=5)).data)
                 check("WS pushes state on connect", first["type"] == "state", str(first)[:80])
                 check("…with the head's whole telemetry: the lens too",
-                      "zoomMm" in first["telemetry"] and "focusPos" in first["telemetry"],
+                      "zoomMm" in first["telemetry"] and "focusing" in first["telemetry"],
                       str(first["telemetry"]))
                 await call(s, "startTracking")
                 third = json.loads((await ws.receive(timeout=5)).data)
@@ -260,17 +264,21 @@ async def main() -> None:
                 check("WS jog reaches the head, clamped to −1…1, malformed dropped",
                       head.jogs == [(-0.4, 0.25), (1.0, -1.0)], str(head.jogs))
 
-                # …and its zoom and focus sliders
+                # …its zoom slider, and a tap to focus
                 await ws.send_json({"type": "lens", "zoomMm": 6.0})
-                await ws.send_json({"type": "lens", "focusPos": 0.4})
-                await ws.send_json({"type": "lens", "zoomMm": 99, "focusPos": -2})
+                await ws.send_json({"type": "lens", "zoomMm": 99})
                 await ws.send_json({"type": "lens", "zoomMm": "tele"})
                 await ws.send_json({"type": "lens"})
+                await ws.send_json({"type": "focus", "x": 0.25, "y": 0.75})
+                await ws.send_json({"type": "focus", "x": 2, "y": -1})
+                await ws.send_json({"type": "focus", "x": 0.5})
+                await ws.send_json({"type": "focus", "x": "left", "y": 0.5})
                 await ws.send_json({"type": "ping"})
                 await ws.receive(timeout=5)
                 check("WS lens reaches the head, clamped to the lens, malformed dropped",
-                      head.lenses == [(6.0, None), (None, 0.4), (config.ZOOM_MAX_MM, 0.0)],
-                      str(head.lenses))
+                      head.lenses == [6.0, config.ZOOM_MAX_MM], str(head.lenses))
+                check("WS focus taps reach the head, clamped to the frame, malformed dropped",
+                      head.focuses == [(0.25, 0.75), (1.0, 0.0)], str(head.focuses))
 
         # --- mDNS -------------------------------------------------------
         await mdns.start("awake")

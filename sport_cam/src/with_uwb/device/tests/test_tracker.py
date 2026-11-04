@@ -128,6 +128,9 @@ class FakePtz:
     def set_focus_pos(self, pos):
         self.focus_pos = pos
 
+    def wait_lens(self, timeout_s=5.0):
+        pass
+
 
 def run(tr, n, pause=0.0):
     for _ in range(n):

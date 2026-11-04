@@ -127,6 +127,9 @@ class Telemetry {
     this.acquireStalled = false,
     this.lens = const Lens(),
     this.view = const ViewOrientation(),
+    this.focusing = false,
+    this.frameWidth = 1280,
+    this.frameHeight = 720,
   });
 
   final double? pan;
@@ -152,6 +155,14 @@ class Telemetry {
   /// How to turn the live view to show it upright.
   final ViewOrientation view;
 
+  /// The camera is autofocusing (a tap on the live view, or the zoom at rest).
+  final bool focusing;
+
+  /// The camera's own frame, px, which a tap to focus is a share of.
+  /// (Plain numbers: this file stays pure Dart for tool/verify_models.dart.)
+  final double frameWidth;
+  final double frameHeight;
+
   factory Telemetry.fromJson(Map<String, dynamic>? j) => Telemetry(
     pan: (j?['pan'] as num?)?.toDouble(),
     tilt: (j?['tilt'] as num?)?.toDouble(),
@@ -161,7 +172,17 @@ class Telemetry {
     acquireStalled: j?['acquireStalled'] as bool? ?? false,
     lens: Lens.fromJson(j),
     view: ViewOrientation.fromJson(j?['view']),
+    focusing: j?['focusing'] as bool? ?? false,
+    frameWidth: _frame(j?['frameSize'], 0) ?? 1280,
+    frameHeight: _frame(j?['frameSize'], 1) ?? 720,
   );
+
+  /// One side of telemetry `frameSize` ([width, height]), if it makes sense.
+  static double? _frame(Object? s, int i) =>
+      s is List && s.length == 2 && s[0] is num && s[1] is num &&
+              (s[0] as num) > 0 && (s[1] as num) > 0
+          ? (s[i] as num).toDouble()
+          : null;
 }
 
 /// How the camera says its live view should be turned to stand upright
@@ -194,27 +215,21 @@ class ViewOrientation {
   int get hashCode => Object.hash(quarterTurns, mirror);
 }
 
-/// The camera's zoom (focal length, mm, with its range) and where its focus
-/// motor is ([focusPos], 0…1 of its travel), for the lens sliders. The zoom
-/// range defaults to the Arducam PTZ lens's (config.py), for a camera that
-/// doesn't send it.
+/// The camera's zoom (focal length, mm) with its range, for the zoom slider.
+/// The range defaults to the Arducam PTZ lens's (config.py), for a camera
+/// that doesn't send it.
 class Lens {
   const Lens({
     this.zoomMm = 2.8,
     this.zoomMinMm = 2.8,
     this.zoomMaxMm = 10.6,
-    this.focusPos,
   });
 
   final double zoomMm;
   final double zoomMinMm;
   final double zoomMaxMm;
 
-  /// The focus motor's position, 0 at one stop and 1 at the other; null
-  /// until the camera has moved it since it started.
-  final double? focusPos;
-
-  /// From the telemetry: `zoomMm`, `zoomRangeMm`, `focusPos`.
+  /// From the telemetry: `zoomMm`, `zoomRangeMm`.
   factory Lens.fromJson(Map<String, dynamic>? j) {
     const d = Lens();
     var (zMin, zMax) = (d.zoomMinMm, d.zoomMaxMm);
@@ -223,12 +238,10 @@ class Lens {
       final lo = (r[0] as num).toDouble(), hi = (r[1] as num).toDouble();
       if (lo > 0 && hi > lo) (zMin, zMax) = (lo, hi);
     }
-    final focus = (j?['focusPos'] as num?)?.toDouble();
     return Lens(
       zoomMm: ((j?['zoomMm'] as num?)?.toDouble() ?? zMin).clamp(zMin, zMax),
       zoomMinMm: zMin,
       zoomMaxMm: zMax,
-      focusPos: focus?.clamp(0.0, 1.0),
     );
   }
 }

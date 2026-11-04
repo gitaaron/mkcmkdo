@@ -67,10 +67,19 @@ def main() -> None:
         creep(ptz)
         print("\nHoming zoom and focus.")
         ptz.home()
+        print("Zoom: the framing should close in and open out again "
+              "(the sharpness may drift; that is fine).")
         for mm in (config.ZOOM_MIN_MM, config.ZOOM_MAX_MM, config.ZOOM_MIN_MM):
-            ptz.set_zoom_mm(mm)
+            ptz.set_zoom_mm(mm, urgent=True)
             print(f"  zoom → {mm:.1f} mm")
             time.sleep(2.5)
+        print("Focus: the framing should stay put while the picture goes soft and sharp.")
+        for pos in (0.0, 0.5, 1.0, 0.5):
+            ptz.set_focus_pos(pos)
+            print(f"  focus motor → {pos:.0%} of its travel")
+            time.sleep(2.0)
+        print(f"  (LENS_SWAP_ZOOM_FOCUS = {config.LENS_SWAP_ZOOM_FOCUS}: if zoom and focus "
+              "did each other's job, flip it in config.py)")
     except KeyboardInterrupt:
         pass
     finally:

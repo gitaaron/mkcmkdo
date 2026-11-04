@@ -44,8 +44,10 @@ def sharpness(cam: Camera) -> float:
 def sweep(ptz: Ptz, cam: Camera, lo: int, hi: int, step: int) -> tuple[int, float]:
     best = (lo, -1.0)
     for raw in range(lo, hi + 1, step):
-        ptz.focuser.set(OPT_FOCUS, raw)
+        ptz._lens_set(OPT_FOCUS, raw)
+        ptz.wait_lens()                    # the controller never says when it is done
         time.sleep(SETTLE_S)
+        cam._capture()                     # the frame already under way
         score = sharpness(cam)
         if score > best[1]:
             best = (raw, score)
@@ -75,7 +77,7 @@ def main() -> None:
     config.ZOOM_RATE_LIMIT_S = 0.0                 # we are stepping on purpose
     for efl in stops:
         ptz.set_zoom_mm(efl)
-        time.sleep(2.0)
+        ptz.wait_lens()
         coarse, _ = sweep(ptz, cam, f_lo, f_hi, 400)
         raw, score = sweep(ptz, cam, max(f_lo, coarse - 400), min(f_hi, coarse + 400), 40)
         print(f"  {efl:5.2f} mm @ {dist:5.1f} m → focus {raw:5d}   (score {score:.0f})")

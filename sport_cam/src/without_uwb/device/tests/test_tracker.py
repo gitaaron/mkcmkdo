@@ -109,6 +109,9 @@ class FakePtz:
     def set_focus_pos(self, pos):
         self.focus_pos = pos
 
+    def wait_lens(self, timeout_s=5.0):
+        pass
+
     def park(self) -> None:
         pass
 

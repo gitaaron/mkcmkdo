@@ -42,6 +42,7 @@ import time
 
 from . import config, owners, wifi_link
 from .boxlog import BoxLog
+from .autofocus import AutoFocus
 from .camera import Camera
 from .cloud import CloudLink
 from .discovery import Advertiser
@@ -77,6 +78,7 @@ class Head:
         self.camera = Camera()
         self.ptz = Ptz()
         self.tracker = Tracker(self.camera, self.ptz)
+        self.autofocus = AutoFocus(self.camera, self.ptz)
         self.session = AutoSession()
         self.led = StatusRing()
         self.power = PowerMonitor()
@@ -95,12 +97,12 @@ class Head:
         self._boxes_sent_at: float | None = None   # tracker.labelled_at last sent live
         self._jog = (0.0, 0.0)              # the app's joystick: pan, tilt in −1…1
         self._jog_at = float("-inf")        # when it last sent one
-        # The app's zoom (mm) and focus (0…1 of the motor's travel) sliders,
-        # awake only. None: not touched since the camera woke — the lens stays
-        # wide, focused for the zoom, as for tracking.
+        # The app's zoom slider (mm), awake only. None: not touched since the
+        # camera woke — the lens stays wide, as for tracking.
         self._lens_zoom: float | None = None
-        self._lens_focus: float | None = None
         self._lens_new = False              # set since the last control tick
+        self._af_point = (0.5, 0.5)         # where the app last tapped to focus
+        self._af_due: float | None = None   # autofocus then: the zoom has come to rest
 
     # convenience for local_api/telemetry — pan and tilt are commanded angles
     @property
@@ -201,8 +203,10 @@ class Head:
 
         old, self.state = self.state, new
         if new != old:
-            self._lens_zoom = self._lens_focus = None   # the app's lens is awake's alone
+            self._lens_zoom = None          # the app's lens is awake's alone
             self._lens_new = False
+            self._af_point, self._af_due = (0.5, 0.5), None
+            self.autofocus.cancel()
         self.camera.set_awake(new != "sleep")
         if new == "awake":
             self._awake_since = time.monotonic()
@@ -344,31 +348,37 @@ class Head:
         if pan or tilt:
             self._awake_since = time.monotonic()   # someone is using it
 
-    def lens(self, zoom_mm: float | None, focus_pos: float | None) -> None:
-        """The app's zoom and focus sliders: either may be left out. Awake
-        only; control_tick moves the lens (manual_lens)."""
+    def lens(self, zoom_mm: float) -> None:
+        """The app's zoom slider. Awake only; control_tick moves the lens
+        (manual_lens)."""
         if self.state != "awake":
             return
-        if zoom_mm is not None:
-            self._lens_zoom = zoom_mm
-        if focus_pos is not None:
-            self._lens_focus = focus_pos
+        self._lens_zoom = zoom_mm
         self._lens_new = True
 
-    def manual_lens(self) -> None:
-        """Awake: move the lens to the app's latest zoom and focus.
-
-        Zoom first: a zoom move refocuses from FOCUS_GRID, so a focus the
-        app has set goes back on after it.
-        """
-        if not self._lens_new:
+    def focus_at(self, x: float, y: float) -> None:
+        """The app's tap on the live view: autofocus on that point of the
+        frame (each 0…1). Awake only."""
+        if self.state != "awake":
             return
-        self._lens_new = False
-        if self._lens_zoom is not None:
-            self.ptz.set_zoom_mm(self._lens_zoom, urgent=True)
-        if self._lens_focus is not None:
-            self.ptz.set_focus_pos(self._lens_focus)
+        self._af_point, self._af_due = (x, y), None
+        self.autofocus.start(x, y)
         self._awake_since = time.monotonic()      # someone is using it
+
+    def manual_lens(self) -> None:
+        """Awake: zoom to the app's latest setting, and once the zoom has
+        been still AF_AFTER_ZOOM_S, autofocus on the last point tapped."""
+        now = time.monotonic()
+        if self._lens_new:
+            self._lens_new = False
+            if self._lens_zoom is not None:
+                self.ptz.set_zoom_mm(self._lens_zoom, urgent=True)
+                self.autofocus.cancel()            # the picture is changing under it
+                self._af_due = now + config.AF_AFTER_ZOOM_S
+            self._awake_since = now                # someone is using it
+        if self._af_due is not None and now >= self._af_due:
+            self._af_due = None
+            self.autofocus.start(*self._af_point)
 
     async def health_loop(self) -> None:
         """Watch the two things that run out: charge and card space.
@@ -502,8 +512,8 @@ class Head:
             "tilt": round(self.ptz.tilt_deg, 1),
             "zoomMm": round(self.ptz.zoom_mm, 1),
             "zoomRangeMm": [config.ZOOM_MIN_MM, config.ZOOM_MAX_MM],
-            "focusPos": (round(self.ptz.focus_pos, 3)
-                         if self.ptz.focus_pos is not None else None),
+            "focusing": self.autofocus.busy,
+            "frameSize": list(config.PREVIEW_SIZE),     # what focus taps are a share of
             "view": {"rotateDeg": config.VIEW_ROTATE_DEG, "mirror": config.VIEW_MIRROR},
             "dist": round(self.tracker.dist_m, 2) if self.tracker.dist_m else None,
             "phase": self.phase,

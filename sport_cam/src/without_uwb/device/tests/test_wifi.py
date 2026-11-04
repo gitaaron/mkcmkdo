@@ -182,6 +182,7 @@ def make_head():
     head.state = "connecting"
     head._boot_at = asyncio.get_event_loop().time()
     head._qr_sent, head._near_focus = {}, False
+    head.autofocus = type("NoAutoFocus", (), {"cancel": lambda self: None})()
     head.camera, head.ptz, head.led = FakeCamera(), FakePtz(), FakeRing()
     head.storage = FakeStorage()
     head.cloud = head.mdns = head.local = FakeReporter()

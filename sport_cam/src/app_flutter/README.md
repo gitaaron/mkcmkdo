@@ -60,7 +60,10 @@ lib/
     mjpeg_view.dart            native MJPEG decoder with auto-reconnect
     control_bar.dart           state-dependent bottom buttons
     joystick.dart              awake: pan and tilt sticks to aim the camera by hand, faster the further you pull
-    lens_controls.dart         awake: zoom and focus sliders, above the sticks
+    lens_controls.dart         awake: the zoom slider, above the sticks
+    aim_panel.dart             awake: zoom and sticks, rising from the bottom bar on an arrow
+    tap_focus.dart             awake: tap the picture to autofocus there
+    oriented_view.dart         turns and mirrors the live view as the camera says
 assets/sounds/                 rec_start.wav, rec_stop.wav, silence.wav
 tool/
   make_chimes.py               renders assets/sounds/ (same notes as the web chime)
@@ -83,7 +86,7 @@ dart run tool/verify_against_device.dart \
 ```
 
 With a Flutter SDK, `flutter test` adds the widget and unit tests in
-`test/` (the sticks; the lens sliders; the locked control bar, the secrets store, token
+`test/` (the sticks; the zoom slider, the aim panel and tap to focus; the locked control bar, the secrets store, token
 claims).
 
 The contract check is the one that matters: it drives the real Python camera

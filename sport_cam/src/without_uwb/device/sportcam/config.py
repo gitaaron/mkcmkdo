@@ -88,6 +88,12 @@ SERVO_US_AT_0, SERVO_US_AT_180 = 500, 2500
 # flips if your base is assembled mirrored. CENTER_RAW may be fractional with
 # the pigpio driver. Verify both on the bench with
 # `python -m sportcam.ptzcheck` before the first tracking run.
+# Which of the PTZ controller's two lens registers drives which motor.
+# Arducam's Focuser.py for the IMX477 kit has focus on 0x00 and zoom on 0x01,
+# but on the bench kit it is the other way round: lenscheck, writing each
+# register alone, found 0x00 changing the framing and 0x01 the sharpness
+# (one sharp peak, the framing still). True swaps the two.
+LENS_SWAP_ZOOM_FOCUS = True
 I2C_BUS = 1                     # PTZ controller (zoom, focus; and pan/tilt on "arducam")
 PAN_CENTER_RAW, PAN_SIGN = 90, 1
 TILT_CENTER_RAW, TILT_SIGN = 90, 1
@@ -123,10 +129,27 @@ JOG_PAN_ACCEL_DPS2 = 240.0
 JOG_TILT_ACCEL_DPS2 = 180.0
 JOG_TIMEOUT_S = 0.3            # no joystick message this long: stop. A dropped
                                # connection can't leave the head turning
-# …and the app's zoom and focus sliders. The lens goes where they say at once,
-# past ZOOM_RATE_LIMIT_S (that stops the tracker's lens breathing; the app
-# sends a few a second at most while a slider moves). The focus slider moves
-# the focus motor itself, across its whole travel: you focus by eye.
+# …and the app's zoom slider. The lens goes where it says at once, past
+# ZOOM_RATE_LIMIT_S (that stops the tracker's lens breathing; the app sends a
+# few a second at most while the slider moves).
+#
+# Autofocus in awake (autofocus.py): tapping the live view focuses on what is
+# under the tap, and the lens refocuses by itself once the zoom has been still
+# AF_AFTER_ZOOM_S, on the last point tapped. Contrast autofocus, focuscal's
+# measure. The focus motor is slow (LENS_TRAVEL_S end to end) and sharp only
+# in a narrow band, so it searches outward from where the lens already is —
+# the focus FOCUS_GRID gives for the zoom, or the last autofocus — in steps of
+# AF_SCAN_STEP over windows of ± each AF_WINDOWS, stopping at the first window
+# with a clear peak (AF_PEAK_RATIO × the median score); then it refines round
+# it in AF_FINE_PASSES of (step, ± range).
+AF_SCAN_STEP = 0.025           # of the focus motor's travel: 52 steps; a sharp band is < 105 wide
+AF_WINDOWS = (0.15, 0.4, 1.0)
+AF_PEAK_RATIO = 3.0
+AF_FINE_PASSES = ((0.01, 0.03), (0.0025, 0.01))
+AF_BACKLASH = 0.02             # every measured move, and the last, comes from this far below
+AF_EXTRA_SETTLE_S = 0.03       # after the busy flag clears and LENS_SETTLE_S
+AF_REGION = 0.3                # side of the square scored, of the frame's short side
+AF_AFTER_ZOOM_S = 0.8
 
 CONTROL_RATE_HZ = 20            # tracker / state-machine tick
 
@@ -253,8 +276,18 @@ ZOOM_MIN_STEP_MM = 0.15        # ignore smaller changes — stops the lens breat
 ZOOM_RATE_LIMIT_S = 2.0
 
 # (focal length mm, raw motor value). Straight lines between the stops until
-# you measure yours; the raw ranges are the controller's own limits.
+# you measure yours; the raw ranges are the controller's own limits. The zoom
+# register's low end is wide, its high end tele (lenscheck: the framing
+# tightens as it rises).
 ZOOM_CURVE = [(2.8, 3000), (10.6, 20000)]
+
+# How long the lens motors take. Ptz.wait_lens goes by the controller's busy
+# flag (a 16-bit word: lenscheck sees it set on every move); these are its
+# fallback for a controller that never sets it — LENS_SETTLE_S, plus
+# LENS_TRAVEL_S for a move across the whole travel, in proportion. Measured:
+# a quarter of the travel (525) in 1.35 s, so ≈ 5.4 s end to end.
+LENS_TRAVEL_S = 6.0
+LENS_SETTLE_S = 0.15
 
 # Focus depends on subject distance as well as focal length. Depth of field
 # is deep at the wide end and shallow at the tele end (roughly 6-20 m when
@@ -268,9 +301,17 @@ ZOOM_CURVE = [(2.8, 3000), (10.6, 20000)]
 # sharpest position. UNTIL YOU DO, every row is flat, which reproduces the
 # old focal-length-only behaviour exactly — nothing gets worse, and nothing
 # gets better either.
+# Until calibrated, flat in distance and measured by lenscheck on the bench
+# kit for a room-sized scene (two to four metres): sharp at focus 1050 with
+# the zoom at 210 (≈ 3.6 mm), and at 1575 with it at 1050 (6.7 mm), on the
+# controller's 0-2100 scale. The ends follow the same slope (0.625 focus per
+# zoom step), the tele end clamped at the focus stop. Autofocus starts its
+# search here, so a good grid makes it quick; focuscal measures one properly.
 FOCUS_GRID = {
-    2.8:  [(2.0, 2000), (5.0, 2000), (10.0, 2000), (30.0, 2000)],
-    10.6: [(2.0, 16000), (5.0, 16000), (10.0, 16000), (30.0, 16000)],
+    2.8:  [(2.0, 8760), (5.0, 8760), (10.0, 8760), (30.0, 8760)],
+    3.6:  [(2.0, 10000), (5.0, 10000), (10.0, 10000), (30.0, 10000)],
+    6.7:  [(2.0, 15000), (5.0, 15000), (10.0, 15000), (30.0, 15000)],
+    10.6: [(2.0, 20000), (5.0, 20000), (10.0, 20000), (30.0, 20000)],
 }
 FOCUS_DEADBAND_DIOPTRE = 0.02  # ignore changes smaller than this in 1/d
 FOCUS_RATE_LIMIT_S = 0.5
@@ -314,7 +355,7 @@ PREVIEW_SIZE = (1280, 720)
 # VIEW_ROTATE_DEG clockwise (0, 90, 180 or 270), then mirrors it left-right if
 # VIEW_MIRROR, with the person boxes. Only the view: detection, the tracker
 # and recordings see the sensor's own frame.
-VIEW_ROTATE_DEG = 270
+VIEW_ROTATE_DEG = 90
 VIEW_MIRROR = True
 RECORD_SIZE = (1920, 1080)
 RECORD_BITRATE = 12_000_000    # 1080p H.264, ≈ 5.4 GB/h. The storage maths in

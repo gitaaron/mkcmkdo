@@ -94,15 +94,18 @@ class StubHead:
 
     def telemetry(self) -> dict:
         return {"pan": self.pan_deg, "tilt": self.tilt_deg, "zoomMm": 2.8,
-                "focusPos": None, "phase": self.phase,
+                "focusing": False, "frameSize": [1280, 720], "phase": self.phase,
                 "acquireStalled": self.acquire_stalled,
                 **self.power.telemetry(), **self.storage.telemetry()}
 
     def jog(self, pan: float, tilt: float) -> None:
         print(f"[stub] jog pan {pan:+.2f} tilt {tilt:+.2f}")
 
-    def lens(self, zoom_mm: float | None, focus_pos: float | None) -> None:
-        print(f"[stub] lens zoom {zoom_mm} mm focus {focus_pos}")
+    def lens(self, zoom_mm: float) -> None:
+        print(f"[stub] lens zoom {zoom_mm} mm")
+
+    def focus_at(self, x: float, y: float) -> None:
+        print(f"[stub] focus at {x:.2f}, {y:.2f}")
 
     async def apply_state(self, new: str) -> None:
         if new not in ("tracking", "recording"):

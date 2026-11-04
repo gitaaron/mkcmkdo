@@ -94,8 +94,8 @@ def main() -> None:
     check("inside the near end clamps", focus_raw(10.6, 0.6, GRID) == 19000)
     check("past the tele end clamps", focus_raw(14.0, 10.0, GRID) == 16600)
 
-    # ---- 4. the shipped grid reproduces the old focal-length-only curve ---
-    for efl, old in ((2.8, 2000), (10.6, 16000), (6.7, 9000)):
+    # ---- 4. the shipped (uncalibrated) grid depends on focal length only ---
+    for efl, old in ((2.8, 8760), (6.7, 15000), (10.6, 20000)):
         flat = {focus_raw(efl, d) for d in (1.0, 3.0, 8.0, 40.0)}
         check(f"uncalibrated grid is distance-independent at {efl} mm",
               flat == {old}, f"{flat}")
@@ -132,6 +132,25 @@ def main() -> None:
     f.set_focus(3.05, urgent=True)
     check("…and still inside the deadband does nothing", len(f.focuser.writes) == n)
     config.FOCUS_RATE_LIMIT_S = 0.0
+
+    # ---- lens moves are waited out by time: the controller never says ------
+    import time as _t
+    w = Ptz()
+    w.focuser = RecordingFocuser()
+    w.set_focus_pos(0.0)
+    w.set_focus_pos(1.0)
+    full = w._lens_until - _t.monotonic()
+    w.set_focus_pos(0.95)
+    short = w._lens_until - _t.monotonic()
+    check("a move across the whole focus travel is waited out for LENS_TRAVEL_S",
+          abs(full - (config.LENS_SETTLE_S + config.LENS_TRAVEL_S)) < 0.05, f"{full:.2f} s")
+    check("…a short one for a share of it (the longer wait still stands)",
+          short <= full and abs(full - short) < 0.1, f"{short:.2f} s")
+    w.home()
+    zoom_writes = [v for ch, v in w.focuser.writes if ch == OPT_ZOOM]
+    check("home zooms to the curve's wide end, whichever way the motor runs",
+          zoom_writes[-1] == ptz_mod._interp(config.ZOOM_MIN_MM, config.ZOOM_CURVE)
+          and w.zoom_mm == config.ZOOM_MIN_MM, f"{zoom_writes}")
 
     # ---- the app's focus slider moves the motor itself ----------------------
     f = Ptz()
@@ -253,6 +272,8 @@ def main() -> None:
           f"{writes}")
 
     # ---- the IMX477 kit's controller (firmware 0x0104) ---------------------
+    swap = config.LENS_SWAP_ZOOM_FOCUS
+    config.LENS_SWAP_ZOOM_FOCUS = False            # Arducam's own map first
     bus = FakeBus(0x0104)
     f = focuser_on(bus)
     f.set(OPT_ZOOM, 20000)
@@ -277,6 +298,33 @@ def main() -> None:
     f.wake()
     check("older controller: zoom on 0x00 as is, and no wake writes",
           bus.writes == [(0x00, 20000)], f"{bus.writes}")
+
+    # ---- the busy flag is the low byte of a 16-bit word ----------------------
+    bus = FakeBus(0x0104)
+    f = focuser_on(bus)
+    bus.regs[0x04] = 0x0001
+    check("busy: a word of 1 (flag in the low byte) reads as busy", f.busy() is True)
+    bus.regs[0x04] = 0
+    check("…and 0 as idle", f.busy() is False)
+
+    # ---- LENS_SWAP_ZOOM_FOCUS: the two lens motors the other way round ------
+    config.LENS_SWAP_ZOOM_FOCUS = True
+    bus = FakeBus(0x0104)
+    f = focuser_on(bus)
+    f.set(OPT_ZOOM, 20000)
+    f.set(OPT_FOCUS, 10000)
+    f.set(OPT_MOTOR_X, 120)
+    check("swapped, imx477: zoom on 0x00, focus on 0x01, each scaled as itself; pan unchanged",
+          bus.writes == [(0x00, 2100), (0x01, 1050), (0x05, 120)], f"{bus.writes}")
+    check("swapped, imx477: reads come from the same registers",
+          f.get(OPT_ZOOM) == 20000 and f.get(OPT_FOCUS) == 10000)
+    bus = FakeBus(0x0101)
+    f = focuser_on(bus)
+    f.set(OPT_ZOOM, 20000)
+    f.set(OPT_FOCUS, 7000)
+    check("swapped, older controller: zoom on 0x01, focus on 0x00",
+          bus.writes == [(0x01, 20000), (0x00, 7000)], f"{bus.writes}")
+    config.LENS_SWAP_ZOOM_FOCUS = swap
 
     print()
     if failures:
