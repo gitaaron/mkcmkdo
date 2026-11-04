@@ -15,10 +15,10 @@ A7–A8.
 | A1 | **Discovery** | open the app | the badge goes from **Searching…** to **SportCam · Direct · <address>** within a few seconds |
 | A2 | **Live view** | look at the screen | the camera's picture, smooth (15 fps). A box round you when you stand in front of it, red in awake |
 | A3 | **Aim by hand** | camera awake: drag the left (pan) stick left and let go, then the right (tilt) stick up and let go | it pans left, tilts up, and eases to a stop each time you let go |
-| A4 | **A session** | stand 2–4 m in front, facing it; **Track & record** | "Looking for a person", pings; then found, beeps 3, 2, 1, a chime, the ring top right turns red: recording |
+| A4 | **A session** | stand 2–4 m in front, facing it; **Start tracking**; once locked on, **Record** | "Looking for a person", pings; then "Found you — locking on", and it keeps you centred; **Record** greyed out until it has seen you. **Record**: a chime, the ring top right turns red. **Stop recording**: back to tracking, still following |
 | A5 | **Stop** | **Stop recording** | a falling chime; back to awake |
 | A6 | **The library** | the recordings button | the clip, *"on the camera, uploading soon"*; it plays, with the boxes drawn on it. No backend, so it stays on the card |
-| A7 | **Someone else's recording** | on phone 1, **Track & record**; on phone 2, watch | phone 2 shows *"Someone else is recording — only their phone can stop it"*, and its **Stop** and **Sleep** do nothing. Phone 1 can stop it |
+| A7 | **Someone else's recording** | on phone 1, **Start tracking** then **Record**; on phone 2, watch | phone 2 shows *"Someone else is recording — only their phone can stop it"*, and its **Stop** and **Sleep** do nothing. Phone 1 can stop it |
 | A8 | **Someone else's clip** | phone 2's recordings button | phone 1's clip isn't there |
 | A9 | **Sleep** | close the live view (background the app) for 30 s | the camera sleeps: the app says so; **Wake up** brings the picture back |
 
@@ -35,7 +35,7 @@ three `--dart-define`s (14, step 5). Phone 1 signs in as
 | B2 | **No sign-up** | look for one | there isn't one: *"No account? Ask an admin to add you."* |
 | B3 | **Add a person** | phone 2 (admin): account menu → **People** → **Add person**, any email, an 8-character password | they appear in the list; that email and password sign in on phone 1 (sign out first). Back to the climber after |
 | B4 | **Not an admin** | phone 1 (climber): account menu | no **People** |
-| B5 | **Record, upload, library** | phone 1: **Track & record**, record 10 s, **Stop recording** | *"Uploading… n %"*, then *"Recording saved — watch now"*; the clip plays from the library |
+| B5 | **Record, upload, library** | phone 1: **Start tracking**, **Record**, 10 s, **Stop recording** | *"Uploading… n %"*, then *"Recording saved — watch now"*; the clip plays from the library |
 | B6 | **Only yours** | phone 2's library | the admin's sample clip, and not the climber's. Phone 1's has the climber's, not the sample |
 | B7 | **Owner-only stop** | phone 2 starts a recording; phone 1 tries to stop it | as A7: only phone 2 can |
 | B8 | **Through Firebase** | wake the camera (**Wake up**, then close the app so nothing else drives it); within 30 s, on the computer: `cd src/app_flutter && dart run tool/verify_against_device.dart http://127.0.0.1:5001/demo-sportcam/us-central1/api bench-camera-key` | `all contract checks passed`: the real camera driven through the backend — sign-in, a session stopped only with its secret, the clip uploaded into the climber's library, the preview |

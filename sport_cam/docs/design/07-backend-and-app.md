@@ -157,9 +157,9 @@ Every call needs a signed-in person, except the camera's own two.
 | Call | Does |
 | --- | --- |
 | `getState` | the camera's snapshot: `mode`, `state`, `sessionHash`, `telemetry`, `deviceOnline`, `whepUrl`, `upload`, `updatedAt` |
-| `setPower({on})` | `sleep` ↔ `awake` (**Wake up** / **Sleep**); sleeping from any state stops a recording with it. Nothing while `off` (booting) |
-| `startTracking` / `stopTracking` | `awake` or `sleep` → `tracking` (**Record** from sleep skips `awake`); `tracking`/`recording` → `awake` (stopping and saving a recording) |
-| `startRecording` / `stopRecording` | `tracking` → `recording` → `tracking` |
+| `setPower({on})` | `sleep` ↔ `awake` (**Wake up** / **Sleep**); **Sleep** also from `tracking`, not from `recording` (stop it first). Nothing while `off` (booting) |
+| `startTracking` / `stopTracking` | `awake` or `sleep` → `tracking` (**Track** from sleep skips `awake`); `tracking` → `awake` (ends the session) |
+| `startRecording` / `stopRecording` | `tracking` → `recording` (refused while the camera's telemetry says `canRecord: false`: nobody seen in the last 3 s) → `tracking`, the same session, still following. A recording only ever starts from and stops to `tracking` |
 | `watch` | an app is showing the live view: keep previews coming for a minute |
 | `getPreview` | the latest preview frame, base64, with its person boxes (`size`, `boxes`) (for clients that poll) |
 | `createUploadUrl` / `finalizeRecording` | the camera's, with its key alone: the recording library ([08](08-recordings-and-cloud.md)) |

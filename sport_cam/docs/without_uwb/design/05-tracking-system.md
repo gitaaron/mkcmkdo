@@ -3,9 +3,11 @@
 ![Search and track](../images/search-and-track.png)
 
 Subject localisation by **vision only**: no tag, radio or anchors.
-**Track & record** (or **Record** from sleep) starts a pan sweep (skipped if
+**Start tracking** (or **Track** from sleep) starts a pan sweep (skipped if
 the camera already has a person in frame); the person detector finds a person; the camera follows and frames
-them, and records once they have stayed in frame for 3 s. Pan and tilt are
+them, and locks on once they have stayed in frame for 3 s, keeping them
+centred. **Record** then records them; **Stop recording** goes back to
+tracking, still following. Pan and tilt are
 the Pi's own hardware PWM, zoom and focus register writes to one I2C
 controller ([03](../../design/03-mechanical-design.md),
 [04](../../design/04-electronics.md#servo-drive)); the loop runs on the device at
@@ -24,7 +26,7 @@ Comparison with the [UWB build](../../with_uwb/design/05-tracking-system.md)
 | Who gets filmed | the first person the camera sees | whoever wears the tag, even out of sight |
 | Hardware on the head | the camera | camera + 3 radios + arms + mast |
 | Calibration | zoom, focus, servo direction | those, plus range bias per anchor |
-| Starts when | user taps **Track & record** | tag switched on |
+| Starts when | user taps **Start tracking**; **Record** to record | tag switched on (tracking); **Record** to record |
 | Distance | estimated from the person's size | measured |
 | Fails when | pose or light defeats the detector; person hidden | body shadows the radio; tag switched off or flat |
 | Power | ≈ 3 W less at 5 V | |
@@ -35,39 +37,40 @@ camera films the first person it finds ([limitations](#limitations)).
 ## The state machine
 
 ```
-   sleep ───────────────────────Record──────►  SEARCH   hold still until the first look
+   sleep ────────────────────────Track──────►  SEARCH   hold still until the first look
                                                    │      (after CAMERA_WARMUP_S); a
                                                    │      person in it → FOUND
-   awake, no person in frame ──Track & record──►  SEARCH   sweep pan ±80° at 25°/s,
+   awake, no person in frame ──Start tracking──►  SEARCH   sweep pan ±80° at 25°/s,
                                                    │      step tilt row at each turn,
                                                    │      zoom wide, focus 5 m
                                                    │ person seen
                                                    ▼
-   awake, person in frame ───Track & record──────►  FOUND    follow and frame them, as when recording
+   awake, person in frame ───Start tracking──────►  FOUND    follow and frame them, as when recording
              (skips the sweep)                     │        (nobody seen for 1 s → SEARCH)
                                                    │ still in frame 3 s later
                                                    ▼
-                                                 TRACK ── recording
-                                                   │
+                                                 TRACK ── locked on, centred (tracking);
+                                                   │       Record ⇄ Stop recording
                           missing 2 s: ring flashes; hold the aim, zoom out to wide,
                                        look everywhere
                           missing 6 s: ─────────────► SEARCH (toward the side they left;
-                                                      still recording, next person found → TRACK)
+                                                      still recording if it was, next person found → TRACK)
 ```
 
 | Mode | Behaviour | Exit |
 | --- | --- | --- |
-| **awake**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_AWAKE` (0.5 fps). Person in frame from a detection until `AWAKE_PERSON_HOLD_S` (4 s) pass without one | **Track & record** → SEARCH (no person in frame) or FOUND on the last detected person (person in frame); `AWAKE_TIMEOUT_S` with no session and no live viewer → sleep |
-| **sleep** | sensor off, head parked; nothing is seen. `AWAKE_TIMEOUT_S` (30 s) in awake with no session and nobody watching the live view → sleep | **Wake up** → awake; **Record** → SEARCH |
+| **awake**, no person in frame / person in frame | head parked level and straight ahead, zoom wide; boxes drawn, the head never moved for them; detector at `DETECT_FPS_AWAKE` (0.5 fps). Person in frame from a detection until `AWAKE_PERSON_HOLD_S` (4 s) pass without one | **Start tracking** → SEARCH (no person in frame) or FOUND on the last detected person (person in frame); `AWAKE_TIMEOUT_S` with no session and no live viewer → sleep |
+| **sleep** | sensor off, head looking straight up (`SLEEP_TILT_DEG`); nothing is seen. `AWAKE_TIMEOUT_S` (30 s) in awake with no session and nobody watching the live view → sleep | **Wake up** → awake; **Track** → SEARCH (head level first) |
 | **SEARCH** | zoom wide; focus at `SEARCH_FOCUS_M` (5 m). A new session holds still until the detector's first look, since the person may already be in front of the camera (always unknown when it was just asleep); a person in that look → FOUND, nobody → the sweep. Then pan sweeps end to end at `SEARCH_PAN_DPS` (25°/s); steps to the next of `SEARCH_TILT_ROWS_DEG` (5°, 22°) at each end | person detected → FOUND (or straight back to TRACK while recording). In `tracking`, `SEARCH_GIVE_UP_S` (180 s) of sweeping → `awake` |
-| **FOUND** | sweep stops (or never ran); follow the largest person with the same pan, tilt, zoom and focus routine as TRACK. They need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) → recording (TRACK); nobody seen for `FOUND_LOST_S` (1 s) → SEARCH |
-| **TRACK** | recording: follow and frame the person; estimate distance for focus. Missing `LOST_ZOOM_OUT_S` (2 s): zoom out to wide, holding the aim | missing for `RESEARCH_AFTER_S` (6 s) → SEARCH |
+| **FOUND** | sweep stops (or never ran); follow the largest person with the same pan, tilt, zoom and focus routine as TRACK. They need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) → TRACK (locked on; autofocus on them); nobody seen for `FOUND_LOST_S` (1 s) → SEARCH |
+| **TRACK** | locked on, in `tracking` or `recording`: follow and frame the person, centred; estimate distance for focus. **Record** (only with someone seen in the last 3 s) records; **Stop recording** comes back here. Missing `LOST_ZOOM_OUT_S` (2 s): zoom out to wide, holding the aim | missing for `RESEARCH_AFTER_S` (6 s) → SEARCH |
 
 Mapping to app states (telemetry `phase`): awake = `awake`/`no-person-in-frame`
 or `awake`/`person-in-frame`; SEARCH = `tracking`/`search` (or
 `recording`/`search` after a loss), and the app pings every 3 s; FOUND =
-`tracking`/`found`, with telemetry `countdown` (3, 2, 1) and a beep on each;
-TRACK = `recording`/`track`.
+`tracking`/`found` ("Found you — locking on"); TRACK = `tracking`/`track`
+(locked on) or `recording`/`track`. Telemetry `canRecord` says when Record is
+allowed.
 
 Sweep timing:
 
@@ -82,8 +85,8 @@ Sweep timing:
 | Rule | Detail |
 | --- | --- |
 | **First person found wins** | at first sighting with several people in view, the largest detection is taken |
-| **3 s in frame to record** | a single-frame false positive (coat stand, chair) causes a ≈ 1 s pause, then the sweep resumes; it can't start a recording. Telemetry `countdown` carries the seconds left; the app beeps on each, then chimes when recording starts |
-| **Recording always follows found** | no manual record button. **Stop recording** saves the clip and ends the session (`awake`) |
+| **3 s in frame to lock on** | a single-frame false positive (coat stand, chair) causes a ≈ 1 s pause, then the sweep resumes; it is never followed for long |
+| **Recording only on Record** | from `tracking`, with someone seen by the detector in the last 3 s (`RECORD_NEEDS_PERSON_S`; the app greys the button otherwise). **Stop recording** saves the clip and goes back to `tracking`, still following; **Stop tracking** ends the session (`awake`) |
 | **Nearest, not largest, once found** | each detection is matched to the one nearest the last position, within `TRACK_GATE_FRACTION` (45 % of frame width). Detections outside the gate are ignored (bystanders) |
 | **Missing target** | `LOST_ZOOM_OUT_S` (2 s), recording: zoom straight out to wide (past the zoom rate limit), still pointing where they were, and search the whole frame rather than their strip. Most losses are a step or a reach out of a tight shot, and the wide shot still has them; the follow gate is scaled to the new zoom, so the same person is picked up, and the fill loop closes back in. `LOST_HOLD_S` (2 s), at the same moment: ring flashes at 2 Hz (stays solid red while recording). `RESEARCH_AFTER_S` (6 s): sweep toward the last direction of travel, still wide. Recording continues throughout |
 | **Empty room** | `tracking`, nobody found for 180 s of sweeping → `awake`. Never applied to a recording |
@@ -140,7 +143,7 @@ before switching.
 | **HOG blind spots** | best on upright, side- or front-on people in good light. Weak on unusual poses (overhangs, horizontal body, crouching), back views in bulky clothing, partial occlusion, poor or high-contrast light. False positives on coat stands and similar | `DETECTOR = "ssd"`; the 3 s found wait turns false positives into a pause; `DETECT_HIT_THRESHOLD` trades misses against false positives |
 | **Pan ±80°** | can't look behind; the sweep covers the front 160° only | aim the tripod at the area of interest |
 | **Distance is estimated** | zoom from apparent size; focus from an assumed 1.7 m body. Biased by children, crouching, long reaches | — |
-| **Recording starts 3 s after found** | the wrong person may be recorded | **Stop tracking** during the countdown, or stop and restart |
+| **Locks on 3 s after found** | the wrong person may be followed | check the live view's boxes before **Record**; **Stop tracking** and start again |
 | **Latency** | lags fast movers; gains tuned for stability, not sprinting | — |
 
 ## Camera placement envelope

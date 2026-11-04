@@ -41,10 +41,11 @@ here: [with UWB](docs/with_uwb/bench/README.md) ·
 
 ### Without UWB
 
-- **Sensing:** vision only. **Track & record** starts a pan sweep (skipped if
-  a person is already in frame); the first person detected is followed
-  and, still in frame 3 s later, recorded. Re-sweeps after 6 s
-  without a detection.
+- **Sensing:** vision only. **Start tracking** starts a pan sweep (skipped
+  if a person is already in frame); the first person detected is followed
+  and, still in frame 3 s later, locked on and kept centred. **Record**
+  records them, **Stop recording** goes back to tracking. Re-sweeps after
+  6 s without a detection.
 - **Session control:** app buttons.
 - **Use when:** cost, size and runtime matter more than identity. Versus the
   UWB build: ≈ C$360 cheaper, ≈ 2 h more runtime, 5 printed parts instead of

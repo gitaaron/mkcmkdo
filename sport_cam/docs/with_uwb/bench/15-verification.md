@@ -16,7 +16,7 @@ App built with plain `flutter run`, and the tag paired to phone 1
 | A2 | **Live view** | look at the screen | the camera's picture, smooth (15 fps). A box round you when you stand in front of it |
 | A3 | **Aim by hand** | camera awake: drag the left (pan) stick left and let go, then the right (tilt) stick up and let go | it pans left, tilts up, and eases to a stop each time you let go |
 | A4 | **Pairing needs one tag on** | tag off: account menu → **Pair my tag** | *"switch on your tag, and only yours"*; nothing changes. Tag on again, pair again: *"Tag T0 is yours"* |
-| A5 | **The tag starts a session** | tag off for 5 s. Stand 3–5 m out in front of the camera, facing it, and switch the tag on | within about a second the camera turns to you and the app pings; once it has seen you, beeps 3, 2, 1, a chime: recording |
+| A5 | **The tag starts a session** | tag off for 5 s. Stand 3–5 m out in front of the camera, facing it, and switch the tag on | within about a second the camera turns to you and the app pings; once it has seen you, "Found you — locking on", then it keeps you centred (tracking). Nothing records until **Record** in the app |
 | A6 | **The tag ends it** | switch the tag off | 5 s later a falling chime; back to awake, the clip saved |
 | A7 | **The library** | the recordings button | the clip, *"on the camera, uploading soon"*; it plays, with the boxes drawn on it. No backend, so it stays on the card |
 | A8 | **Someone else's recording** | start one with the tag (A5); on phone 2, watch | phone 2 shows *"Someone else is recording — only their phone can stop it"*, and its **Stop** and **Sleep** do nothing. Phone 1's **Stop recording** stops it. Then tag off |

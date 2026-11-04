@@ -193,28 +193,29 @@ anyone, so unlike the camera-only build it never skips straight to FOUND.
 | **awake**, no person in frame / person in frame | head parked (centred), zoom wide; detector at `DETECT_FPS_AWAKE` (0.5 fps). Person in frame from a detection of anyone until `AWAKE_PERSON_HOLD_S` (4 s) pass without one; it drives the LED and app only | session start (tag on, or **Start tracking**) → SEARCH; `AWAKE_TIMEOUT_S` with no session and no live viewer → sleep |
 | **sleep** | sensor off, head parked; the radios keep ranging. `AWAKE_TIMEOUT_S` (30 s) in awake with no session and nobody watching the live view → sleep | **Wake up** → awake; tag on, or **Record** → SEARCH |
 | **SEARCH** | pan (and tilt, with A3) eases to the ranged position | within `ACQUIRE_POINT_TOL_DEG` (4°) for `ACQUIRE_SETTLE_S` (0.5 s) and the tag wearer detected (below) → FOUND |
-| **FOUND** | the full tracking loop, as in recording: ranged pan and tilt, vision trim, zoom and focus, all from the tag wearer's box. The person need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) and nobody else as near the tag → recording (TRACK); tag wearer unseen for `FOUND_LOST_S` (1 s) → SEARCH |
-| **TRACK** | recording, for the rest of the session; a hidden tag or a missed detection is ordinary tracking. Wearer unseen 2 s: zoom out to wide until seen again | session end |
+| **FOUND** | the full tracking loop, as in recording: ranged pan and tilt, vision trim, zoom and focus, all from the tag wearer's box. The person need not be centred | seen throughout `FOUND_CONFIRM_S` (3 s) and nobody else as near the tag → TRACK (locked on; autofocus on them); tag wearer unseen for `FOUND_LOST_S` (1 s) → SEARCH |
+| **TRACK** | locked on, in `tracking` or `recording`, for the rest of the session; a hidden tag or a missed detection is ordinary tracking. Wearer unseen 2 s: zoom out to wide until seen again. **Record** (only with someone seen in the last 3 s) records; **Stop recording** comes back here | session end |
 
 Mapping to app states (telemetry `phase`): awake = `awake`/`no-person-in-frame`
 or `awake`/`person-in-frame`; SEARCH = `tracking`/`search` (the app pings
-every 3 s); FOUND = `tracking`/`found`; TRACK = `recording`/`track`.
-Telemetry `countdown` carries the seconds left in FOUND (3, 2, 1); the app
-beeps on each, then chimes when recording starts. Not recording after
+every 3 s); FOUND = `tracking`/`found` ("Found you — locking on"); TRACK =
+`tracking`/`track` (locked on) or `recording`/`track`. Not locked on after
 `ACQUIRE_STALLED_S` (15 s): the app reports "Can't pick you out — step
 into view, away from anyone else".
 
-- **Ranging alone never records.** A sign or calibration error shows as a
-  ring that keeps chasing, not a recording of a wall. Session start is
+- **Nothing records by itself**: only the app's **Record**, from
+  `tracking`. **Ranging alone never locks on.** A sign or calibration error
+  shows as a ring that keeps chasing, not a camera following a wall. Session start is
   usually an upright climber at the wall base, HOG's best case.
-- **Vision alone never records either**: a person only counts if they are
+- **Vision alone never locks on either**: a person only counts if they are
   where the tag is (next section).
 - Once recording, nothing depends on vision; detector loss mid-route doesn't
   stop the clip.
 - A subject beyond a soft limit is found from the limit.
-- Every session records after found, whether the tag or **Start tracking**
-  started it ([01](../../product/01-requirements.md#state-machine-with-uwb)).
-  **Stop recording** ends the session.
+- Every session locks on after found, whether the tag or **Start tracking**
+  started it ([01](../../product/01-requirements.md#state-machine-with-uwb)),
+  and records on **Record**. **Stop recording** goes back to tracking;
+  **Stop tracking** or the tag switched off ends the session.
 
 ### Telling the tag wearer from everyone else
 
@@ -227,7 +228,7 @@ decided in `Tracker._match_tag` in three steps:
 | --- | --- | --- |
 | **Gate** | a new box is admitted only if its bearing (pan angle + its position in the frame at the current zoom) is within `TAG_MATCH_BEARING_DEG` (14°, ≈ 2σ of the filtered bearing) of the tag's, and the distance its height implies (thin lens, `SUBJECT_HEIGHT_M`) is within ×/÷ `TAG_MATCH_RANGE_RATIO` (2) of the ranged distance. A box clipped at the top or bottom can only fail as too near | anyone off to the side; anyone much nearer or farther than the tag, such as a person walking past the lens |
 | **Follow** | the gate only admits. Each person admitted is followed from detection to detection by bearing (moved < `TAG_FOLLOW_DEG`, 6°), averaged on every detection, and forgotten only after `TAG_FORGET_S` (5 s) out of view | a second person taking over between detections; a rival dropping out of the comparison because bearing noise briefly pushed them outside the gate |
-| **Average** | each person keeps the running mean of (box bearing − tag bearing). SEARCH takes whoever is nearest on average. FOUND records only once everyone else is further from the tag by `TAG_MATCH_Z` (3) standard errors of those averages, and at least `TAG_MATCH_MARGIN_DEG` (4°). The standard error is `TAG_BEARING_SIGMA_DEG` (7°) over √(seconds watched / `TAG_BEARING_CORR_S`), where 0.35 s is the Kalman filter's memory. Both are estimates until `bearingcal` measures them ([Calibration](#calibration)). Until then the countdown holds at 1. If someone else earns that lead instead, FOUND switches to them and the countdown starts again | someone standing beside the wearer |
+| **Average** | each person keeps the running mean of (box bearing − tag bearing). SEARCH takes whoever is nearest on average. FOUND locks on only once everyone else is further from the tag by `TAG_MATCH_Z` (3) standard errors of those averages, and at least `TAG_MATCH_MARGIN_DEG` (4°). The standard error is `TAG_BEARING_SIGMA_DEG` (7°) over √(seconds watched / `TAG_BEARING_CORR_S`), where 0.35 s is the Kalman filter's memory. Both are estimates until `bearingcal` measures them ([Calibration](#calibration)). Until then the countdown holds at 1. If someone else earns that lead instead, FOUND switches to them and the countdown starts again | someone standing beside the wearer |
 
 The average is what makes this work. One bearing is ≈ 7° RMS, too noisy to
 split a climber from a belayer standing 1 m away at 10 m (≈ 6°). But the

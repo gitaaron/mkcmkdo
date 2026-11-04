@@ -375,18 +375,20 @@ With the service running, the ring is blue (breathing slowly while it sees you; 
 tuning steps only mean something once the signs are right.
 
 1. **First run.** Stand 3–5 m from the camera, in the room you will film in,
-   upright and facing it. In the app press **Track & record**. The status
+   upright and facing it. In the app press **Start tracking**. The status
    reads "Looking for a person…" and the ring shows a green light chasing
    round while the camera zooms wide and sweeps left and right, stepping to the
    next tilt row at each end; the app pings every 3 s while it searches. When it sees you it stops and follows you;
-   the ring fills with green over 3 s and the app beeps 3, 2, 1. Still in
-   frame at the end, the ring turns solid red, recording starts and the
-   app chimes. The
-   zoom then settles with you filling about two-thirds of the frame.
+   the ring fills with green over 3 s ("Found you — locking on"). Still in
+   frame at the end it is locked on: it keeps you centred, autofocuses on
+   you, and **Record** lights up. The zoom then settles with you filling
+   about two-thirds of the frame. Press **Record**: the ring turns solid
+   red and the app chimes; **Stop recording** saves the clip and goes back
+   to tracking, still following you.
 2. **Sign checks.** Walk slowly to one side while it follows. If it turns
    *away* from you, flip `PAN_SIGN`; if it tilts away when you crouch or
    stand, flip `TILT_SIGN` (step 4b). Restart the service after each change.
-3. **Sweep coverage.** Stand still out of view and press **Track & record**
+3. **Sweep coverage.** Stand still out of view and press **Start tracking**
    again from awake; watch one full sweep. The lens should pass over every
    part of the room you care about, without binding at either end of the pan.
    If the lens can't see your usual spot, adjust `SEARCH_TILT_ROWS_DEG`

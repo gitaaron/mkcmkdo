@@ -421,9 +421,10 @@ elevation are right.
    switch it on, standing upright and facing the camera. Within about a second
    the ring shows a green light chasing round (search) while the camera
    turns to you (the app pings while it searches). Once it has settled on
-   you **and seen you** it fills with green over 3 s (found; the app beeps
-   3, 2, 1), then turns solid red, starts recording, and the app chimes.
+   you **and seen you** it fills with green over 3 s (found, "Found you —
+   locking on"), then locks on: it keeps you centred and autofocuses on you.
    The zoom then settles with you filling about two-thirds of the frame.
+   Press **Record** in the app: the ring turns solid red and the app chimes.
    Switch the tag off: 5 s later the ring returns to solid blue and the clip
    is saved. If nothing happens, check `AUTO_SESSION = True` and that ranging
    works (step 5b). If it keeps chasing and the app says "Can't pick you out", either
