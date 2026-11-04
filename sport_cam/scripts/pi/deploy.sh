@@ -44,6 +44,18 @@ if ! on_pi true; then
 fi
 on_pi "test -d ~/sportcam/src/${BUILD}/device" \
   || { echo "No ${BUILD} install on the Pi yet: run scripts/pi/install.sh first"; exit 1; }
+# The offline tests serve the local API on its port: the camera running
+# (`run main`, or its service) holds it, and they would fail
+if on_pi "ss -ltn 2>/dev/null | grep -q ':8787 '"; then
+  if on_pi "systemctl is-active --quiet sportcam-head 2>/dev/null"; then
+    on_pi "sudo systemctl stop sportcam-head"     # restarted at the end, or on failure:
+    trap 'on_pi "sudo systemctl start sportcam-head" >/dev/null 2>&1' EXIT
+  else
+    echo "The camera software is running on the Pi (port 8787 is in use)."
+    echo "Stop ./scripts/pi/run main (Ctrl-C in its terminal), then deploy again."
+    exit 1
+  fi
+fi
 
 step "Copying ${DEVICE} to the Pi"
 on_pi "rm -rf ~/.sportcam-staging && mkdir -p ~/.sportcam-staging"
@@ -88,6 +100,7 @@ if ! on_pi "systemctl list-unit-files sportcam-head.service | grep -q sportcam-h
   echo "  (./scripts/pi/run main), stop that (Ctrl-C) and start it again"
   exit 0
 fi
+trap - EXIT
 on_pi "sudo systemctl restart sportcam-head"
 sleep 4
 if on_pi "systemctl is-active --quiet sportcam-head"; then
