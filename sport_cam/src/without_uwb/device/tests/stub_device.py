@@ -84,6 +84,10 @@ class StubHead:
                 "acquireStalled": self.acquire_stalled,
                 **self.power.telemetry(), **self.storage.telemetry()}
 
+    def take_sample(self) -> dict:
+        print("[stub] sample taken")
+        return {"name": "stub-sample", "count": 1}
+
     def jog(self, pan: float, tilt: float) -> None:
         print(f"[stub] jog pan {pan:+.2f} tilt {tilt:+.2f}")
 

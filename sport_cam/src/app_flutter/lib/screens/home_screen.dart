@@ -61,6 +61,22 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  bool _sampling = false;
+
+  Future<void> _takeSample() async {
+    if (_sampling) return;
+    setState(() => _sampling = true);
+    final said = await client.takeSample();
+    if (!mounted) return;
+    setState(() => _sampling = false);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(said),
+        duration: const Duration(seconds: 2),
+      ));
+  }
+
   Future<void> _toggleAim() async {
     setState(() => _showAim = !_showAim);
     final prefs = await SharedPreferences.getInstance();
@@ -260,6 +276,14 @@ class _HomeScreenState extends State<HomeScreen> {
               top: top + 110,
               left: 14,
               child: _BoxesButton(show: _showBoxes, onTap: _toggleBoxes),
+            ),
+
+          // a sample of what the camera sees, for improving its detection
+          if (picture && client.link == LinkMode.direct)
+            Positioned(
+              top: top + 158,
+              left: 14,
+              child: _SampleButton(busy: _sampling, onTap: _takeSample),
             ),
 
           // tracking for a while and still not recording: nobody found / vision cannot see the climber
@@ -472,6 +496,49 @@ class _BoxesButton extends StatelessWidget {
               size: 20,
               color: show ? boxColours[BoxLabel.climber] : SportColors.muted,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SampleButton extends StatelessWidget {
+  const _SampleButton({required this.busy, required this.onTap});
+
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Take a sample for improving person detection',
+      child: Tooltip(
+        message: 'Sample: save this frame on the camera, to improve detection',
+        child: GestureDetector(
+          onTap: busy ? null : onTap,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: SportColors.panel.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: SportColors.border),
+            ),
+            child: busy
+                ? const Padding(
+                    padding: EdgeInsets.all(11),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: SportColors.ink,
+                    ),
+                  )
+                : const Icon(
+                    Icons.camera_alt_outlined,
+                    size: 20,
+                    color: SportColors.ink,
+                  ),
           ),
         ),
       ),

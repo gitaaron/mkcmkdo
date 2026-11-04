@@ -22,3 +22,6 @@ src/*/device/models/*.pb
 
 # lens diagnostics fetched from the Pi (scripts/pi/lenscheck.sh)
 logs/
+
+# detection samples from the camera (scripts/pi/samples.sh): photos of people
+samples/

@@ -568,6 +568,26 @@ class CameraClient extends ChangeNotifier {
     }
   }
 
+  /// The Sample button: the camera saves the frame it sees now, and what
+  /// its person detection made of it, on its card for improving detection
+  /// (its samples.py; scripts/pi/samples.sh copies them off). On the
+  /// camera's own connection only: samples never go to the backend.
+  /// Returns what to tell the person.
+  Future<String> takeSample() async {
+    if (_link != LinkMode.direct) {
+      return "Samples are taken on the camera's Wi-Fi";
+    }
+    final b = base;
+    if (b == null) return 'Not connected';
+    try {
+      final r = await _post(b, 'takeSample', null, relay: false);
+      final count = (r?['count'] as num?)?.toInt();
+      return count == null ? 'Sample saved' : 'Sample $count saved on the camera';
+    } on ApiException catch (err) {
+      return err.message;
+    }
+  }
+
   /// Register the secrets this phone holds with the backend, under the
   /// person signed in: their clips — uploaded already or later — become
   /// theirs. Quietly does nothing until it can.

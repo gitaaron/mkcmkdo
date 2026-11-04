@@ -92,6 +92,7 @@ class StubHead:
         self.tilt_deg = 0.0
         self.recorded: list[str] = []
         self.jogs: list[tuple[float, float]] = []
+        self.samples_taken = 0
         self.lenses: list[float] = []
         self.focuses: list[tuple[float, float]] = []
         self.session_hash = None
@@ -104,6 +105,10 @@ class StubHead:
                 "focusing": False, "frameSize": [1280, 720], "phase": self.phase,
                 "acquireStalled": self.acquire_stalled,
                 **self.power.telemetry(), **self.storage.telemetry()}
+
+    def take_sample(self) -> dict:
+        self.samples_taken += 1
+        return {"name": f"sample-{self.samples_taken}", "count": self.samples_taken}
 
     def jog(self, pan: float, tilt: float) -> None:
         self.jogs.append((pan, tilt))
@@ -154,6 +159,17 @@ async def main() -> None:
             async with s.get(f"{BASE}/api/health") as r:
                 body = await r.json()
             check("health reports device backend", body.get("backend") == "device", str(body))
+
+            # --- the app's Sample button ---------------------------------
+            st, body = await call(s, "takeSample")
+            check("takeSample, awake: the camera saves one and says which",
+                  st == 200 and body["result"]["name"] == "sample-1", str(body))
+            head.state = "sleep"
+            st, body = await call(s, "takeSample")
+            check("…asleep: refused, saying why",
+                  st == 412 and "asleep" in body["error"]["message"] and head.samples_taken == 1,
+                  str(body))
+            head.state = "awake"
 
             # --- state machine over the direct connection ---------------
             st, body = await call(s, "getState")

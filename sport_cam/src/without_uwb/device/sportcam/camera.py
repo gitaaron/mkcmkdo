@@ -84,6 +84,10 @@ class Camera:
         # the servos for that long every detection. OpenCV releases the GIL
         # while it works, so the control loop keeps easing meanwhile.
         self._lock = threading.Lock()
+        # Held around every detect(): the detector thread's and a sample's
+        # (detect_frame) — OpenCV's networks aren't safe to share across
+        # threads at once.
+        self._detect_lock = threading.Lock()
         # Held for every capture and for starting/stopping the sensor: a
         # capture waiting on a frame from a sensor stopped under it (sleep)
         # would wait for good. Captures are one frame, so it is held briefly.
@@ -201,7 +205,30 @@ class Camera:
             x0 = int(max(0, min(pw - 2 * half, strip_cx - half)))
             rgb = rgb[:, x0:x0 + int(2 * half)]
 
-        return [(x + x0, y, w, h) for x, y, w, h in self._detector.detect(rgb)]
+        return [(x + x0, y, w, h) for x, y, w, h in self.detect_frame(rgb)]
+
+    def detect_frame(self, rgb) -> list:
+        """The person detector on `rgb`, now: [(x, y, w, h), …]; none
+        without a detector."""
+        if self._detector is None:
+            return []
+        with self._detect_lock:
+            return list(self._detector.detect(rgb))
+
+    def snapshot(self):
+        """(full frame, preview frame), RGB, from one capture: the same
+        instant at RECORD_SIZE and at PREVIEW_SIZE. None while asleep."""
+        with self._cam_lock:
+            if not (self._cam and self.awake):
+                return None
+            request = self._cam.capture_request()
+            try:
+                main = request.make_array("main")
+                lores = request.make_array("lores")
+            finally:
+                request.release()
+        return (cv2.cvtColor(main, cv2.COLOR_YUV2RGB_I420),
+                cv2.cvtColor(lores, cv2.COLOR_YUV2RGB_I420))
 
     def qr_text(self) -> str | None:
         """Whatever QR code is in front of the lens, or None.

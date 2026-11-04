@@ -45,7 +45,7 @@ from aiohttp import WSMsgType, web
 
 from . import config, owners
 from .boxlog import sidecar
-from .wifi_link import public_state
+from .wifi_link import LIVE_STATES, public_state
 
 CallableFn = Callable[[Any], Awaitable[Any]]
 
@@ -98,6 +98,7 @@ class LocalApi:
             "startRecording": lambda d: self._transition("recording", d),
             "stopRecording": lambda d: self._transition("awake", d),
             "getRecordings": self._get_recordings,
+            "takeSample": self._take_sample,
         }
 
     # ---- lifecycle --------------------------------------------------------
@@ -239,6 +240,17 @@ class LocalApi:
         y = self._number(data, "y", 0.0, 1.0)
         if x is not None and y is not None:
             self.head.focus_at(x, y)
+
+    async def _take_sample(self, _data: Any) -> dict:
+        """The app's Sample button: the camera saves this frame, and what
+        detection made of it, for improving detection (samples.py)."""
+        from .samples import NoPicture
+        if self.head.state not in LIVE_STATES:
+            raise FnError("failed-precondition", "the camera is asleep: wake it to take a sample")
+        try:
+            return await asyncio.to_thread(self.head.take_sample)
+        except NoPicture as err:
+            raise FnError("failed-precondition", str(err)) from err
 
     # ---- HTTP handlers ----------------------------------------------------
     async def _handle_call(self, req: web.Request) -> web.Response:

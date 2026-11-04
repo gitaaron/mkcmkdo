@@ -38,7 +38,7 @@ import asyncio
 import signal
 import time
 
-from . import config, owners, wifi_link
+from . import config, owners, samples, wifi_link
 from .boxlog import BoxLog
 from .autofocus import AutoFocus
 from .camera import Camera
@@ -510,6 +510,12 @@ class Head:
     def watched(self) -> bool:
         """An app has the live view open: the stream here, or through Firebase."""
         return self.local.viewers > 0 or self.cloud.watched
+
+    def take_sample(self) -> dict:
+        """The app's Sample button: the frame and what detection made of it,
+        saved for improving detection (samples.py). Blocking: call it off the
+        event loop."""
+        return samples.save(self)
 
     def live_boxes(self) -> list[list]:
         """The last detection's labelled boxes for the live view, `[[x, y, w,

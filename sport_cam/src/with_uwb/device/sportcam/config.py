@@ -464,6 +464,9 @@ RECORD_BITRATE = 12_000_000    # 1080p H.264, ≈ 5.4 GB/h. The storage maths in
                                # storage.py reads this, so the two cannot drift.
 MJPEG_FPS = 15
 RECORD_DIR = "/home/pi/recordings"
+# The app's Sample button (samples.py): frames and what detection made of
+# them, for improving it. Copied to the Mac by scripts/pi/samples.sh.
+SAMPLE_DIR = "/home/pi/samples"
 
 # --- SD card --------------------------------------------------------------
 # The card is a buffer: clips are deleted once the backend confirms them. When
