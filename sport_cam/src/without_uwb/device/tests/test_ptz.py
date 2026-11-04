@@ -133,6 +133,44 @@ def main() -> None:
     check("…and still inside the deadband does nothing", len(f.focuser.writes) == n)
     config.FOCUS_RATE_LIMIT_S = 0.0
 
+    # ---- waking: homing leaves the lens blurred, refocus puts it back --------
+    r = Ptz()
+    r.focuser = RecordingFocuser()
+    r.set_focus(config.AWAKE_FOCUS_M)
+    r.home()
+    n = len(r.focuser.writes)
+    r.set_focus(config.AWAKE_FOCUS_M)
+    check("homing forgets the distance focused for: the same request moves the motor again",
+          len(r.focuser.writes) == n + 1, f"{r.focuser.writes[n:]}")
+    r.home()
+    n = len(r.focuser.writes)
+    r.refocus()
+    check("refocus() always moves it, deadband or not",
+          len(r.focuser.writes) == n + 1 and r.focuser.writes[-1][0] == OPT_FOCUS)
+
+    # ---- what autofocus learns carries over to other zooms -------------------
+    config.ZOOM_RATE_LIMIT_S = 0.0
+    a = Ptz()
+    a.focuser = RecordingFocuser()
+    a.set_zoom_mm(6.7, urgent=True)
+    a.refocus(5.0)
+    grid = a._focus_raw
+    a.learn_focus(0.6)                      # autofocus: sharp at 60 %, not the grid's
+    trim = round(0.6 * 20000) - grid
+    a.set_zoom_mm(9.8, urgent=True)
+    check("after autofocus, a zoom move refocuses at the grid's position plus its trim",
+          a._focus_raw == ptz_mod.focus_raw(9.8, 5.0) + trim, f"{a._focus_raw} vs {ptz_mod.focus_raw(9.8, 5.0)} + {trim}")
+
+    # ---- autofocus running: nobody else moves zoom or focus ---------------------
+    a.af_active = True
+    n = len(a.focuser.writes)
+    a.set_zoom_mm(4.0, urgent=True)
+    a.set_focus(1.0)
+    a.refocus(2.0)
+    check("autofocus running: zoom and focus requests wait", len(a.focuser.writes) == n
+          and a.lens_moving, f"{a.focuser.writes[n:]}")
+    a.af_active = False
+
     # ---- lens moves are waited out by time: the controller never says ------
     import time as _t
     w = Ptz()

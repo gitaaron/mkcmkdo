@@ -2,34 +2,33 @@
 
 The same measure focuscal calibrates FOCUS_GRID with — the variance of the
 Laplacian, here over a square around a point of the frame rather than its
-centre. The focus motor is slow (about a tenth of its travel a second) and a
-scene is sharp in a narrow band of it, so a sweep starts where the lens is
-already — FOCUS_GRID's focus for the zoom, or the last autofocus — and looks
-outward in widening windows (AF_WINDOWS), stopping at the first with a clear
-peak, then refines round it (AF_FINE_PASSES).
+centre. The focus motor is slow (≈ 5 s end to end) and a scene is sharp in a
+narrow band of it, so a sweep:
 
-Two things a sweep must get right, or it passes through focus and stops
-somewhere else:
+  1. runs the motor down through a window around where it already is
+     (FOCUS_GRID's focus for the zoom, corrected by the last autofocus) in
+     one continuous move, scoring every frame on the way — downward, so it
+     ends below the peak, where the fine pass starts. Each frame's position is read off
+     the clock: the move runs at a steady speed between the write and the
+     controller's busy flag clearing, and a frame shows the lens AF_FRAME_LAG_S
+     before it is handed over. No clear peak: once more over the whole travel
+     (AF_SWEEP_HALVES);
+  2. refines round the peak in short steps (AF_FINE), each move upward and
+     the last one onto the best from below, as the gears have backlash;
+  3. keeps where it ended, relative to FOCUS_GRID, as the focus trim
+     (Ptz.learn_focus): later zoom moves and sweeps stay near focus.
 
-  * the frame scored is one taken with the lens where it was sent: each step
-    waits out the move by time (Ptz.wait_lens: the controller's busy flag is
-    never set), then throws away the frame already being exposed, and
-    scores the next;
-  * the lens gears have backlash, so the same motor position is a different
-    focus coming from above or from below. Every measured move goes upward
-    (each pass starts AF_BACKLASH below its first position), and so does the
-    last move onto the best one.
+While it runs, Ptz.af_active holds off everyone else's zoom and focus moves,
+and the trackers don't count frames it blurs as their person lost.
 
-Awake only (main.py): when the app taps the live view, focusing on what is
-under the tap, and after the app's zoom comes to rest, on the last point
-tapped (the centre until then). Never while tracking or recording: the
-search would show in the clip. Those focus from FOCUS_GRID by distance.
+Awake: on a tap on the live view, once the zoom has come to rest, and on
+waking. Tracking: once, as the camera locks on to its person. Never while
+recording: the search would show in the clip.
 
-It runs on its own thread, like detection: each step waits on the motor and
-for frames, which the 20 Hz control loop can't. A newer request, or
-`cancel()`, makes a running sweep stop at its next step. Each sweep prints a
-line — the scores, and how sharp it is where it stopped — to tell a bad
-sweep from a soft scene.
+It runs on its own thread, like detection. A newer request, or `cancel()`,
+makes a running sweep stop at its next step. Each sweep prints a line — where
+it started and stopped, how sharp, how long — to tell a bad sweep from a soft
+scene.
 """
 from __future__ import annotations
 
@@ -55,11 +54,13 @@ def sharpness(rgb, x: float, y: float, region: float) -> float:
 class AutoFocus:
     def __init__(self, camera, ptz,
                  score: Callable[..., float] = sharpness,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep,
+                 clock: Callable[[], float] = time.monotonic) -> None:
         self.camera = camera
         self.ptz = ptz
         self._score = score
         self._sleep = sleep
+        self._clock = clock
         self._lock = threading.Lock()
         self._gen = 0          # bumped by every start/cancel: older sweeps stop
         self.busy = False      # a sweep is running (telemetry `focusing`)
@@ -77,49 +78,52 @@ class AutoFocus:
         with self._lock:
             self._gen += 1
             self.busy = False
+            self.ptz.af_active = False
 
     def focus(self, x: float, y: float, gen: int | None = None) -> float | None:
-        """One sweep, here and now; the motor position chosen (0…1), or None
-        if it was cancelled or there is no picture."""
+        """One autofocus, here and now; the motor position chosen (0…1), or
+        None if it was cancelled or there is no picture."""
         if gen is None:
             with self._lock:
                 self._gen += 1
                 gen = self._gen
                 self.busy = True
-        t0 = time.monotonic()
+        t0 = self._clock()
+        self.ptz.af_active = True
         try:
             self.ptz.wait_lens()                # a zoom still travelling
             start = self.ptz.focus_pos
             start = 0.5 if start is None else start
-            scores: dict[float, float] = {}
-            step = config.AF_SCAN_STEP
-            for half in config.AF_WINDOWS:
-                lo = max(0.0, start - half)
-                hi = min(1.0, start + half)
-                grid = [round(k * step, 6) for k in range(int(lo / step + 0.999), int(hi / step + 1e-6) + 1)]
-                todo = [p for p in grid if p not in scores]
-                if todo:
-                    self._scan(gen, x, y, todo, scores)
-                best = max(scores, key=scores.get)
-                at_edge = (best in (min(grid), max(grid))) and 0.0 < best < 1.0 and half < 1.0
-                ranked = sorted(scores.values())
-                if scores[best] >= config.AF_PEAK_RATIO * ranked[len(ranked) // 2] and not at_edge:
+            peak = None
+            for half in config.AF_SWEEP_HALVES:
+                lo, hi = max(0.0, start - half), min(1.0, start + half)
+                curve = self._sweep(gen, x, y, hi, lo)
+                if not curve:
+                    continue
+                best_pos, best = max(curve, key=lambda c: c[1])
+                ranked = sorted(v for _p, v in curve)
+                at_edge = half < 1.0 and (best_pos <= lo + 0.01 or best_pos >= hi - 0.01)
+                peak = best_pos
+                if best >= config.AF_PEAK_RATIO * ranked[len(ranked) // 2] and not at_edge:
                     break
-            scan = dict(sorted(scores.items()))
-            for fine_step, fine_half in config.AF_FINE_PASSES:
-                fine: dict[float, float] = {}
-                self._scan(gen, x, y, _steps(best - fine_half, best + fine_half, fine_step), fine)
-                best = max(fine, key=fine.get)
-                best_score = fine[best]
+            if peak is None:
+                return None
+            step, half = config.AF_FINE
+            fine: dict[float, float] = {}
+            self._scan(gen, x, y, _steps(peak - half, peak + half, step), fine)
+            best = max(fine, key=fine.get)
             # onto the best from below, as every measured move came
             self._move(gen, best - config.AF_BACKLASH)
             self._move(gen, best)
             at_rest = self._score(self._frame(), x, y, config.AF_REGION)
+            with self._lock:
+                if gen != self._gen:
+                    return None
+                self.ptz.learn_focus(best)
             print(f"[af] ({x:.2f}, {y:.2f}) from {start:.0%} → focus {best:.3f} in "
-                  f"{time.monotonic() - t0:.1f} s: sharpness {best_score:.0f} in the sweep, "
-                  f"{at_rest:.0f} where it stopped"
-                  f"{'  (well short: backlash? raise AF_BACKLASH)' if at_rest < 0.7 * best_score else ''}"
-                  f"\n[af]   scan: " + " ".join(f"{p:.0%}:{v:.0f}" for p, v in scan.items()))
+                  f"{self._clock() - t0:.1f} s: sharpness {fine[best]:.0f}, {at_rest:.0f} "
+                  f"where it stopped"
+                  f"{'  (well short: backlash? raise AF_BACKLASH)' if at_rest < 0.7 * fine[best] else ''}")
             return best
         except _Stop:
             return None
@@ -127,10 +131,39 @@ class AutoFocus:
             with self._lock:
                 if gen == self._gen:
                     self.busy = False
+                    self.ptz.af_active = False
+
+    def _sweep(self, gen: int, x: float, y: float, a: float, b: float) -> list[tuple[float, float]]:
+        """Run the focus motor a → b in one move, scoring each frame on the
+        way: [(position, sharpness), …], the position read off the clock.
+        Rough — backlash and the frame lag blur it by a step or two — which
+        the fine pass after puts right."""
+        self._move(gen, a)
+        with self._lock:
+            if gen != self._gen:
+                raise _Stop
+            self.ptz.set_focus_pos(b)
+        t0 = self._clock()
+        timed: list[tuple[float, float]] = []
+        end = None
+        while self._clock() - t0 < config.LENS_TRAVEL_S + 2.0:
+            rgb = self.camera._capture()
+            if rgb is None:
+                raise _Stop                     # the camera went to sleep
+            t = self._clock()
+            timed.append((t - config.AF_FRAME_LAG_S, self._score(rgb, x, y, config.AF_REGION)))
+            if gen != self._gen:
+                raise _Stop
+            if t - t0 > 0.05 and not self.ptz.lens_busy():
+                end = t
+                break
+        end = end or self._clock()
+        span = max(1e-3, end - t0)
+        return [(a + (b - a) * max(0.0, min(1.0, (t - t0) / span)), v) for t, v in timed]
 
     def _scan(self, gen: int, x: float, y: float, positions: list[float],
               scores: dict[float, float]) -> None:
-        """Score each position into `scores`, all moves upward."""
+        """Score each position into `scores`, stopping at each, all moves upward."""
         positions = sorted(positions)
         self._move(gen, positions[0] - config.AF_BACKLASH)
         for pos in positions:
@@ -143,7 +176,7 @@ class AutoFocus:
             if gen != self._gen:
                 raise _Stop
             self.ptz.set_focus_pos(max(0.0, min(1.0, pos)))
-        self.ptz.wait_lens()                    # by time: the controller never says
+        self.ptz.wait_lens()
         self._sleep(config.AF_EXTRA_SETTLE_S)
 
     def _frame(self):

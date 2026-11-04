@@ -131,6 +131,9 @@ class FakePtz:
     def wait_lens(self, timeout_s=5.0):
         pass
 
+    def refocus(self, dist=None):
+        self.focus_dist = dist or self.focus_dist or config.AWAKE_FOCUS_M
+
 
 def run(tr, n, pause=0.0):
     for _ in range(n):

@@ -343,6 +343,13 @@ class Tracker:
         dt = min(now - self._last_step, 0.25)
         self._last_step = now
         self._poses.append((now, self.ptz.pan_deg, self.ptz.tilt_deg))
+        if getattr(self.ptz, "lens_moving", False):
+            # Zoom, focus or autofocus under way: the picture is blurred, and
+            # a frame without the wearer proves nothing. Hold the clocks.
+            if self._last_seen_at is not None:
+                self._last_seen_at = min(now, self._last_seen_at + dt)
+            if self.mode == FOUND:
+                self._found_seen_at = min(now, self._found_seen_at + dt)
 
         target = self.ptz.pan_deg
         tilt_target: float | None = None

@@ -137,21 +137,24 @@ JOG_TIMEOUT_S = 0.3            # no joystick message this long: stop. A dropped
 #
 # Autofocus in awake (autofocus.py): tapping the live view focuses on what is
 # under the tap, and the lens refocuses by itself once the zoom has been still
-# AF_AFTER_ZOOM_S, on the last point tapped. Contrast autofocus, focuscal's
-# measure. The focus motor is slow (LENS_TRAVEL_S end to end) and sharp only
-# in a narrow band, so it searches outward from where the lens already is —
-# the focus FOCUS_GRID gives for the zoom, or the last autofocus — in steps of
-# AF_SCAN_STEP over windows of ± each AF_WINDOWS, stopping at the first window
-# with a clear peak (AF_PEAK_RATIO × the median score); then it refines round
-# it in AF_FINE_PASSES of (step, ± range).
-AF_SCAN_STEP = 0.025           # of the focus motor's travel: 52 steps; a sharp band is < 105 wide
-AF_WINDOWS = (0.15, 0.4, 1.0)
+# AF_AFTER_ZOOM_S, on the last point tapped; on waking, AF_ON_WAKE_S after;
+# and in tracking, as it locks on to its person. Contrast autofocus,
+# focuscal's measure (autofocus.py): the focus motor run down a window of
+# ± AF_SWEEP_HALVES round where it is, in one continuous move, every frame
+# scored on the way (the whole travel if the first shows no clear peak,
+# AF_PEAK_RATIO × the median), then a short stepped pass round the peak,
+# AF_FINE = (step, ± range). ≈ 3-4 s. What it finds corrects FOCUS_GRID from
+# then on (the focus trim).
+AF_SWEEP_HALVES = (0.15, 1.0)  # of the focus motor's travel
 AF_PEAK_RATIO = 3.0
-AF_FINE_PASSES = ((0.01, 0.03), (0.0025, 0.01))
+AF_FINE = (0.005, 0.015)
+AF_FRAME_LAG_S = 0.05          # a frame shows the lens this long before it is handed over
 AF_BACKLASH = 0.02             # every measured move, and the last, comes from this far below
 AF_EXTRA_SETTLE_S = 0.03       # after the busy flag clears and LENS_SETTLE_S
 AF_REGION = 0.3                # side of the square scored, of the frame's short side
 AF_AFTER_ZOOM_S = 0.8
+AF_ON_WAKE_S = 2.0             # CAMERA_WARMUP_S and some: exposure settled first
+AWAKE_FOCUS_M = 5.0            # focus for a room on booting or waking, until autofocus
 
 # --- tracking -------------------------------------------------------------
 UWB_BASELINE_M = 0.4          # anchor separation (cad/config.scad uwb_half_base × 2)
@@ -393,7 +396,7 @@ ZOOM_CURVE = [(2.8, 20000), (10.6, 3000)]
 # LENS_TRAVEL_S for a move across the whole travel, in proportion. Measured:
 # a quarter of the travel (525) in 1.35 s, so ≈ 5.4 s end to end.
 LENS_TRAVEL_S = 6.0
-LENS_SETTLE_S = 0.15
+LENS_SETTLE_S = 0.05            # after the busy flag clears: the picture catches up
 
 # Focus depends on subject distance as well as focal length. Depth of field
 # is deep at the wide end and shallow at the tele end (roughly 6-20 m when

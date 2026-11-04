@@ -513,6 +513,8 @@ async def full_flow() -> None:
           head.phase == "person-in-frame" and head.led.awake_person, f"{head.phase}")
 
     # the app's zoom slider holds the lens in awake, and the lens refocuses once it rests…
+    head.autofocus.started.clear()              # the wake's and lock-ons' are not this
+    head._af_due = None
     head.lens(8.0)
     await tick_for(0.2)
     check("zoom: awake, the app's zoom holds (awake no longer forces wide)",

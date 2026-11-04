@@ -39,7 +39,7 @@ import signal
 import time
 
 from . import config, owners, samples, wifi_link
-from .boxlog import BoxLog
+from .boxlog import CLIMBER, BoxLog
 from .autofocus import AutoFocus
 from .camera import Camera
 from .cloud import CloudLink
@@ -250,6 +250,11 @@ class Head:
         elif new not in BOOT_STATES and self._near_focus:
             self.ptz.home()                         # back to the boot focus and zoom
             self._near_focus = False
+        if new == "awake" and old != "awake":
+            # Booted (the lens homed far out of focus) or woken: focus now for
+            # a room, then autofocus once the exposure has settled
+            self.ptz.refocus(config.AWAKE_FOCUS_M)
+            self._af_due = time.monotonic() + config.AF_ON_WAKE_S
 
     async def start_session(self, target: str, session_hash: str | None,
                             tag: int | None = None) -> None:
@@ -310,6 +315,7 @@ class Head:
                 self.boxlog.note(self.tracker.labelled_at, self.tracker.labelled)
             if self.state == "tracking" and self.tracker.ready_to_record:
                 self.tracker.confirm()        # locked on: follow them; Record starts the recording
+                self.focus_on_subject()
             self.led.lost = self.tracker.lost_for() > config.LOST_HOLD_S
             if self.tracker.lost_for() > config.LOST_END_S:
                 await self.apply_state("awake")
@@ -387,6 +393,19 @@ class Head:
         self._af_point, self._af_due = (x, y), None
         self.autofocus.start(x, y)
         self._awake_since = time.monotonic()      # someone is using it
+
+    def focus_on_subject(self) -> None:
+        """Tracking has locked on: autofocus on the person followed — on the
+        upper body, where a face and shirt give the detail — so the picture
+        is sharp before Record. The trackers hold their zoom and focus, and
+        don't count the blurred frames, while it runs."""
+        pw, ph = config.PREVIEW_SIZE
+        for (x, y, w, h), label in self.tracker.labelled:
+            if label == CLIMBER:
+                self.autofocus.start(min(1.0, max(0.0, (x + w / 2) / pw)),
+                                     min(1.0, max(0.0, (y + 0.35 * h) / ph)))
+                return
+        self.autofocus.start(0.5, 0.5)
 
     def manual_lens(self) -> None:
         """Awake: zoom to the app's latest setting, and once the zoom has

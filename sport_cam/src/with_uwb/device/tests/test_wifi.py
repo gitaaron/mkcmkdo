@@ -130,6 +130,9 @@ class FakePtz:
     def set_focus(self, d):
         self.calls.append(("focus", d))
 
+    def refocus(self, d=None):
+        self.calls.append(("refocus", d))
+
 
 class FakeRing:
     def __init__(self):
@@ -258,7 +261,8 @@ async def head_flow() -> None:
     check("right password: joins → awake", await until(lambda: head.state == "awake"))
     check("…with the credentials off the code",
           sent[-1] == {"ssid": "Hogtown Guest", "psk": "climb0n", "hidden": False}, f"{sent[-1]}")
-    check("…focus and zoom re-homed for awake", head.ptz.calls[-1] == "home", f"{head.ptz.calls}")
+    check("…focus and zoom re-homed for awake, then focused for a room (homing leaves it blurred)",
+          head.ptz.calls[-2:] == ["home", ("refocus", config.AWAKE_FOCUS_M)], f"{head.ptz.calls}")
     check("…and the apps see awake", head.cloud.states[-1] == "awake")
     await asyncio.wait_for(task, 1.0)
     check("the gate ends once up", task.done())

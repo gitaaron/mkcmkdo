@@ -234,7 +234,11 @@ async def full_flow() -> None:
     check("…and Record is allowed: someone seen just now",
           head.can_record and head.telemetry()["canRecord"] is True)
     t0 = CLOCK.t
+    focuses = len(head.autofocus.started)
     await tick_for(10, until=lambda: head.phase == "track")
+    x, y = head.autofocus.started[-1] if len(head.autofocus.started) > focuses else (None, None)
+    check("…locking on, it autofocuses on the person's upper body",
+          x is not None and 0.0 < x < 1.0 and 0.0 < y < 0.5, f"{x}, {y}")
     check("…still in frame FOUND_CONFIRM_S later → locked on and followed, not recording",
           head.state == "tracking" and head.phase == "track" and not head.camera.recording
           and abs(CLOCK.t - t0 - config.FOUND_CONFIRM_S) < 0.2, f"{CLOCK.t - t0:.2f}s")
@@ -242,6 +246,14 @@ async def full_flow() -> None:
     await tick_for(2.0)
     check("tracking keeps the camera on the person", abs(head.ptz.pan_deg - person.bearing) < 5.0,
           f"pan {head.ptz.pan_deg:.1f}")
+    person.visible = False
+    head.ptz.lens_moving = True                  # autofocus or a zoom: frames blurred
+    await tick_for(config.RESEARCH_AFTER_S + 1.0)
+    check("frames missed while the lens moves don't lose the person",
+          head.phase == "track", f"{head.phase}")
+    head.ptz.lens_moving = False
+    person.visible = True
+    await tick_for(0.5)
     await head.apply_state("recording")          # the app's Record
     await tick_for(0.2)
     check("Record → recording, still following",
@@ -355,6 +367,15 @@ async def full_flow() -> None:
     await tick_for(3.0)
     check("…asleep: nothing is looked at, no live view",
           head.camera.detections == looks and head.live_boxes() == [])
+    head.autofocus.started.clear()
+    head.ptz.focus_dist = None
+    await head.apply_state("awake")
+    check("woken: focused for a room at once", head.ptz.focus_dist == config.AWAKE_FOCUS_M,
+          f"{head.ptz.focus_dist}")
+    await tick_for(config.AF_ON_WAKE_S + 0.2)
+    check("…then an autofocus once the exposure has settled",
+          (0.5, 0.5) in head.autofocus.started, f"{head.autofocus.started}")
+    await head.apply_state("sleep")
 
     # --- the app's Record from sleep, the person already in front -------------------
     await head.apply_state("tracking")
@@ -400,6 +421,8 @@ async def full_flow() -> None:
           f"{head.ptz.jogs - held} more moves")
 
     # the app's zoom slider holds the lens in awake, and the lens refocuses once it rests…
+    head.autofocus.started.clear()              # the wake's and lock-ons' are not this
+    head._af_due = None
     head.lens(8.0)
     await tick_for(0.2)
     check("zoom: awake, the app's zoom holds (awake no longer forces wide)",

@@ -214,6 +214,10 @@ class Tracker:
                     self._sweep(dt)
             return
 
+        if getattr(self.ptz, "lens_moving", False) and self._last_seen_at is not None:
+            # Zoom, focus or autofocus under way: the picture is blurred, and
+            # a frame without them proves nothing. Hold the clock.
+            self._last_seen_at = min(now, self._last_seen_at + dt)
         matched = self._select(boxes) if boxes else None
         if fresh:
             self._label(now, boxes, matched)

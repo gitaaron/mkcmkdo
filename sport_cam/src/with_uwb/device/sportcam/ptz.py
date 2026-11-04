@@ -268,6 +268,13 @@ class Ptz:
         self._lens_until = 0.0                     # when the last lens move should be done
         self._lens_written_at = 0.0                # when the last lens move was sent
         self._busy_seen = False                    # the controller's busy flag has been seen set
+        # What the last autofocus taught: how far (raw focus steps) the sharp
+        # position was from FOCUS_GRID's for that zoom. Added to every grid
+        # lookup after, so zoom changes and sweeps stay near focus.
+        self._focus_trim = 0
+        # Autofocus is sweeping the focus motor: everyone else's zoom and
+        # focus requests wait (they would spoil the sweep, and it them).
+        self.af_active = False
 
     # ---- pan / tilt -------------------------------------------------------
     @property
@@ -358,11 +365,48 @@ class Ptz:
 
     def home(self) -> None:
         """Zoom to wide (ZOOM_CURVE's wide end, whichever way the motor runs)
-        and focus to its low stop."""
+        and focus to its low stop — far out of focus: refocus() after."""
         self._lens_set(OPT_ZOOM, _interp(config.ZOOM_MIN_MM, config.ZOOM_CURVE))
         self._lens_set(OPT_FOCUS, _CHANNELS[OPT_FOCUS][1])
         self._zoom_mm = config.ZOOM_MIN_MM
         self._focus_raw = None
+        # Forget the distance focused for: the motor is not there any more,
+        # and set_focus's deadband would otherwise skip the next request.
+        self._focus_dist_m = None
+
+    def refocus(self, dist_m: float | None = None) -> None:
+        """Focus now, whatever the deadband and rate limit say: for `dist_m`,
+        or the last distance asked for (AWAKE_FOCUS_M before any)."""
+        if self.af_active:
+            return
+        self._apply_focus(dist_m or self._want_dist_m or self._focus_dist_m
+                          or config.AWAKE_FOCUS_M)
+
+    def learn_focus(self, pos: float) -> None:
+        """Autofocus found the focus motor sharp at `pos` (0…1): keep how far
+        that is from FOCUS_GRID's position for this zoom, and apply it to
+        every lookup from now on."""
+        _reg, lo, hi = _CHANNELS[OPT_FOCUS]
+        raw = round(lo + max(0.0, min(1.0, pos)) * (hi - lo))
+        dist = self._want_dist_m or self._focus_dist_m or config.AWAKE_FOCUS_M
+        self._focus_trim = raw - focus_raw(self._zoom_mm, dist)
+
+    @property
+    def lens_moving(self) -> bool:
+        """A zoom or focus move is under way (or autofocus is sweeping): the
+        picture is blurred for a while, and a missed detection means little."""
+        return self.af_active or time.monotonic() < self._lens_until
+
+    def lens_busy(self) -> bool:
+        """The lens motors are moving now: the controller's busy flag, or, from
+        a controller that never sets it, the time a move should take."""
+        b = self.focuser.busy() if self.focuser.available else None
+        if b is None or not self._busy_seen:
+            if b:
+                self._busy_seen = True
+                return True
+            return time.monotonic() < self._lens_until
+        return b
 
     def _lens_set(self, channel: str, raw: int) -> None:
         """Move a lens motor, noting when it should have arrived (wait_lens):
@@ -389,6 +433,8 @@ class Ptz:
         ends, which is close enough to start filming and wrong enough that you
         should measure it once.
         """
+        if self.af_active:
+            return                          # the sweep's picture must hold still
         efl_mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, efl_mm))
         now = time.monotonic()
         if (abs(efl_mm - self._zoom_mm) < config.ZOOM_MIN_STEP_MM
@@ -473,6 +519,8 @@ class Ptz:
         """
         dist_m = max(0.5, dist_m)
         self._want_dist_m = dist_m
+        if self.af_active:
+            return                          # autofocus decides, for now
         now = time.monotonic()
         if self._focus_dist_m is not None:
             if (abs(1.0 / dist_m - 1.0 / self._focus_dist_m) < config.FOCUS_DEADBAND_DIOPTRE
@@ -483,7 +531,8 @@ class Ptz:
     def _apply_focus(self, dist_m: float) -> None:
         self._focus_dist_m = dist_m
         self._last_focus_at = time.monotonic()
-        raw = focus_raw(self._zoom_mm, dist_m)
+        _reg, lo, hi = _CHANNELS[OPT_FOCUS]
+        raw = int(max(lo, min(hi, focus_raw(self._zoom_mm, dist_m) + self._focus_trim)))
         if raw != self._focus_raw:
             self._focus_raw = raw
             self._lens_set(OPT_FOCUS, raw)
