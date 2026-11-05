@@ -54,7 +54,7 @@ from collections import deque
 from . import config
 from .boxlog import CLIMBER, OTHER, UNSURE, Box
 from .camera import Camera
-from .motion import ease_to
+from .motion import ease_to, tilt_error_px
 from .ptz import Ptz
 
 SEARCH, FOUND, TRACK = "search", "found", "track"
@@ -295,7 +295,7 @@ class Tracker:
         cx, cy = x + w / 2, y + h / 2
         self._last_seen_at = now
         self._last_centre = (cx, cy)
-        cx_err, cy_err = cx - pw / 2, cy - ph / 2
+        cx_err, cy_err = cx - pw / 2, tilt_error_px(y, h)
         # Offsets are from where the head pointed when the frame was taken.
         pan, tilt = self._pose_at(getattr(self.camera, "captured_at", None))
         if abs(cx_err) > config.TRACK_DEADBAND_FRACTION * pw:

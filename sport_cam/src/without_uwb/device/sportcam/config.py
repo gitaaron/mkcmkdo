@@ -194,6 +194,7 @@ LOST_HOLD_S = 2.0              # target missing → hold still and flash the rin
 TRACK_PAN_GAIN = 0.6
 TRACK_TILT_GAIN = 0.5
 TRACK_DEADBAND_FRACTION = 0.04  # offsets under this share of the frame are ignored
+TRACK_HEADROOM_FRACTION = 0.12  # a person too tall to centre: top of the body this far down
 # The tracker follows the detection nearest the one it had, not the biggest,
 # so a bystander walking past does not steal the lock. A detection further
 # than this fraction of the frame width from the last one is not "the same

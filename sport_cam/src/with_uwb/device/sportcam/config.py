@@ -262,6 +262,7 @@ FOUND_CONFIRM_S = 3.0          # FOUND this long, the person still in frame → 
 # Recording starts only on the app's Record, from tracking, and only with
 # someone seen by the detector within this long: no clips of an empty room.
 RECORD_NEEDS_PERSON_S = 3.0
+TRACK_HEADROOM_FRACTION = 0.12  # a person too tall to centre: top of the body this far down
 FOUND_LOST_S = 1.0             # FOUND without the tag wearer seen this long → back to SEARCH
 ACQUIRE_STALLED_S = 15.0       # acquiring this long → the app says "can't see you"
 

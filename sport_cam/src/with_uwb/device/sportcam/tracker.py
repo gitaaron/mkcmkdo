@@ -53,7 +53,7 @@ from simple_pid import PID
 from . import config
 from .boxlog import CLIMBER, OTHER, UNSURE, Box
 from .camera import Camera
-from .motion import ease_to
+from .motion import ease_to, tilt_error_px
 from .ptz import Ptz
 from .uwb import UwbArray
 
@@ -389,7 +389,7 @@ class Tracker:
             x, y, w, h = bbox
             self._last_seen_at = now
             cx_err = (x + w / 2) - config.PREVIEW_SIZE[0] / 2
-            cy_err = (y + h / 2) - config.PREVIEW_SIZE[1] / 2
+            cy_err = tilt_error_px(y, h)
             # Horizontal: learn a slow bias rather than jogging the axis, so
             # vision never fights the ranging loop. Not while two people are
             # still being told apart: the bias would lean toward whoever was

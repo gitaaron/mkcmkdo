@@ -34,3 +34,25 @@ def ease_to(pos: float, vel: float, goal: float, dt: float,
     if err * step > 0 and abs(step) >= abs(err):
         return goal, 0.0                       # arriving: land on it, not past it
     return pos + step, vel
+
+
+def tilt_error_px(y: float, h: float) -> float:
+    """How far below where it should be a person's box sits, in pixels of a
+    PREVIEW_SIZE frame (positive: aim lower; negative: aim higher).
+
+    Normally the box's centre from the frame's. But a person too tall for the
+    frame runs off its edges, and the box stops at them: its centre then sits
+    mid-frame however the head is cut off, so the centre alone says nothing is
+    wrong. So when the top of the body is within TRACK_HEADROOM_FRACTION of
+    the frame's top, or the bottom has run off the frame, aim the top of the
+    body at that headroom instead: the head stays in, and the rest falls
+    where it may.
+    """
+    ph = config.PREVIEW_SIZE[1]
+    cy = y + h / 2
+    body = h * config.PERSON_IN_BOX_H
+    top, bottom = cy - body / 2, cy + body / 2
+    headroom = config.TRACK_HEADROOM_FRACTION * ph
+    if top < headroom or bottom >= ph * (1 - config.ZOOM_GUARD_EDGE):
+        return top - headroom
+    return cy - ph / 2

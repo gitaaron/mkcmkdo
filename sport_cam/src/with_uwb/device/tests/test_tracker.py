@@ -355,6 +355,23 @@ def main() -> None:
     check("…seen again: the framing closes back in",
           ptz16.zoom_mm > config.ZOOM_MIN_MM + 1.0, f"{ptz16.zoom_mm:.1f} mm")
 
+    print("\ntilt aim for a person too tall to centre")
+    from sportcam.motion import tilt_error_px
+    headroom = config.TRACK_HEADROOM_FRACTION * config.PREVIEW_SIZE[1]
+    check("someone small in frame: the box's centre, as ever",
+          tilt_error_px(200, 200) == 300 - config.PREVIEW_SIZE[1] / 2)
+    # the bench sample: head cut off, box clipped at both edges, its centre mid-frame
+    err = tilt_error_px(-118, 948)
+    check("head cut off, box centred by the frame's edges: aim higher",
+          err < -0.04 * config.PREVIEW_SIZE[1], f"{err}")
+    check("…and head back in at the headroom: nothing to do",
+          abs(tilt_error_px(-15 + 80, 781)) < 0.04 * config.PREVIEW_SIZE[1]
+          or tilt_error_px(-15 + 80, 781) > 0, f"{tilt_error_px(65, 781)}")
+    top = 200.0                                  # legs off the bottom, head well clear
+    h = (config.PREVIEW_SIZE[1] - top) / config.PERSON_IN_BOX_H
+    check("legs off the bottom with room above: aims lower only as far as the headroom",
+          abs(tilt_error_px(top - (h - h * config.PERSON_IN_BOX_H) / 2, h) - (top - headroom)) < 1e-6)
+
     print()
     if failures:
         print(f"{len(failures)} check(s) failed: " + ", ".join(failures))
