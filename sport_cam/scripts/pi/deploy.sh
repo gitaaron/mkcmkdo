@@ -100,9 +100,15 @@ python3 -m sportcam.getmodel || echo "  couldn't fetch the SSD weights: the came
 # install.sh doesn't have it, and every recording would write nothing
 if ! command -v ffmpeg >/dev/null; then
   echo "  installing ffmpeg (recordings are written through it)…"
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q ffmpeg >/dev/null 2>&1 \
-    || echo "  couldn't install ffmpeg: the camera will refuse to record until it is"
+  # </dev/null: this script is arriving on stdin, and apt must not read it
+  out=$(sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q ffmpeg </dev/null 2>&1) || true
+  if ! command -v ffmpeg >/dev/null; then
+    echo "  couldn't install ffmpeg: the camera will refuse to record until it is. apt said:"
+    echo "$out" | tail -5 | sed 's/^/    /'
+  fi
 fi
+command -v ffmpeg >/dev/null && echo "  ffmpeg: $(command -v ffmpeg)"
+true
 REMOTE
 
 step "Restarting the camera"
