@@ -182,7 +182,8 @@ Where two labels are given: with UWB / without UWB.
 Rules:
 
 - `sleep`: the camera's sensor is stopped (no preview, detector or live
-  view), the head looks straight up (`SLEEP_TILT_DEG`), and the ring shows
+  view), the head turns slowly to look straight up (`SLEEP_TILT_DEG`, eased
+  at `SLEEP_PARK_DPS`, about 8 s), and the ring shows
   one dim pixel; leaving sleep it parks level and straight ahead. The Pi keeps
   its local API, Firebase link and mDNS up. **Wake up** → `awake`;
   **Track** → `tracking`, skipping `awake`. With UWB the radios keep

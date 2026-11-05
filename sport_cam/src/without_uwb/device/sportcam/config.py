@@ -109,6 +109,8 @@ PAN_MIN_DEG, PAN_MAX_DEG = -80.0, 80.0
 TILT_MIN_DEG, TILT_MAX_DEG = -5.0, 85.0    # raw 180 is the servo's end: 5° below level
 SLEEP_TILT_DEG = 85.0          # asleep the head looks straight up (raw 90 on this bracket);
                                # awake, and leaving sleep, it parks level and straight ahead
+SLEEP_PARK_DPS = 15.0          # the slow, eased turn up on going to sleep: about 8 s from level
+SLEEP_PARK_ACCEL_DPS2 = 20.0
 
 PAN_MAX_DPS = 120.0            # slew limit on the pan servo (deg/s)
 TILT_MAX_DPS = 90.0

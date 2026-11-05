@@ -48,6 +48,7 @@ from .cloud import CloudLink
 from .discovery import Advertiser
 from .led import StatusRing
 from .local_api import LocalApi
+from .motion import ease_to
 from .power import PowerMonitor
 from .ptz import Ptz
 from .session import AutoSession
@@ -70,6 +71,9 @@ def boot_state(status: dict | None, waited_s: float) -> str:
 
 
 class Head:
+    _park_vel = (0.0, 0.0)      # the turn up to sleep: pan, tilt speeds now
+    _park_at = 0.0              # …and when that tick was
+
     def __init__(self) -> None:
         self.state = "connecting"     # until the Wi-Fi gate lets it go (wifi_loop)
         self._boot_at = time.monotonic()
@@ -255,9 +259,9 @@ class Head:
             else config.DETECT_FPS_AWAKE)
         if new in ("awake", *BOOT_STATES) or (old == "sleep" and new != "sleep"):
             self.ptz.park()                         # level and straight ahead
-        elif new == "sleep":
-            self.ptz.park()
-            self.ptz.set_tilt(config.SLEEP_TILT_DEG)   # asleep: looking straight up
+        elif new == "sleep" and old != "sleep":
+            # asleep it looks straight up; control_tick eases it there
+            self._park_vel, self._park_at = (0.0, 0.0), time.monotonic()
         if new == "pairing" and not self._near_focus:
             self.ptz.set_focus(config.QR_FOCUS_M)   # a phone held up to the lens
             self._near_focus = True
@@ -323,6 +327,8 @@ class Head:
                 self.focus_on_subject()
             self.led.lost = self.tracker.lost_for() > config.LOST_HOLD_S
         else:
+            if self.state == "sleep":
+                self.ease_to_sleep()
             if self.state == "awake":
                 self.manual_aim()
                 self.manual_lens()
@@ -350,6 +356,28 @@ class Head:
         self.led.searching = self.state == "tracking" and self.phase == "search"
         self.led.found = (self.tracker.found_for() / config.FOUND_CONFIRM_S
                           if self.state == "tracking" and self.phase == "found" else None)
+
+    def ease_to_sleep(self) -> None:
+        """Asleep: turn the head slowly to look straight up, easing in and
+        out (SLEEP_PARK_DPS), a step each control tick. Once there, no more
+        servo writes."""
+        pan, tilt = self.ptz.pan_deg, self.ptz.tilt_deg
+        goal = config.SLEEP_TILT_DEG
+        if pan == 0.0 and tilt == goal:
+            return
+        now = time.monotonic()
+        dt = min(now - self._park_at, 0.25)
+        self._park_at = now
+        pan, pan_vel = ease_to(pan, self._park_vel[0], 0.0, dt,
+                               config.SLEEP_PARK_DPS, config.SLEEP_PARK_ACCEL_DPS2)
+        tilt, tilt_vel = ease_to(tilt, self._park_vel[1], goal, dt,
+                                 config.SLEEP_PARK_DPS, config.SLEEP_PARK_ACCEL_DPS2)
+        # the easing only approaches its goal: land on it
+        pan = 0.0 if abs(pan) < 0.1 else pan
+        tilt = goal if abs(tilt - goal) < 0.1 else tilt
+        self._park_vel = (pan_vel, tilt_vel)
+        self.ptz.set_pan(pan)
+        self.ptz.set_tilt(tilt)
 
     def jog(self, pan: float, tilt: float) -> None:
         """The app's joystick, sent ≈ 20 times a second while it is held.

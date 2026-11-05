@@ -382,9 +382,21 @@ async def full_flow() -> None:
     check("awake AWAKE_TIMEOUT_S with no session → sleep: camera off, parked",
           head.state == "sleep" and not head.camera.awake and head.ptz.pan_deg == 0.0
           and head.led.state == "sleep" and head.phase is None, f"{head.state} {head.phase}")
-    check("…the head parked looking straight up",
+    check("…the head doesn't snap up", head.ptz.tilt_deg < config.SLEEP_TILT_DEG / 4,
+          f"tilt {head.ptz.tilt_deg}")
+    tilts = [head.ptz.tilt_deg]
+    await tick_for(20.0, until=lambda: tilts.append(head.ptz.tilt_deg) or
+                   head.ptz.tilt_deg == config.SLEEP_TILT_DEG)
+    steps = [b - a for a, b in zip(tilts, tilts[1:])]
+    check("…it eases up, no faster than SLEEP_PARK_DPS, slowing at the end",
+          max(steps) <= config.SLEEP_PARK_DPS * 0.05 + 1e-6 and steps[0] < max(steps)
+          and steps[-2] < max(steps), f"{max(steps):.3f} per tick")
+    check("…to looking straight up, pan centred",
           head.ptz.pan_deg == 0.0 and head.ptz.tilt_deg == config.SLEEP_TILT_DEG,
           f"pan {head.ptz.pan_deg} tilt {head.ptz.tilt_deg}")
+    writes = head.ptz.tilt_deg
+    await tick_for(1.0)
+    check("…and stays there", head.ptz.tilt_deg == writes)
     person.visible, person.bearing = True, 5.0
     looks = head.camera.detections
     await tick_for(3.0)
