@@ -25,3 +25,6 @@ logs/
 
 # detection samples from the camera (scripts/pi/samples.sh): photos of people
 samples/
+
+# clips copied from the camera (scripts/pi/samples.sh --recordings): video of people
+/recordings/

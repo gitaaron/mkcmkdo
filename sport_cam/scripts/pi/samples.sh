@@ -8,9 +8,12 @@
 #   ./scripts/pi/samples.sh --host 192.168.4.37
 #   ./scripts/pi/samples.sh --clean          delete every sample, on the Pi and in
 #                                            samples/ here (asks first; --yes doesn't)
+#   ./scripts/pi/samples.sh --recordings     copy the camera's new clips, with their
+#                                            person boxes, into recordings/ here; the
+#                                            Pi keeps them (they are yet to upload)
 #
-# They are photos of people: samples/ is ignored by git, and they never go to
-# the cloud backend.
+# They are photos and video of people: samples/ and recordings/ are ignored by
+# git, and nothing here goes to the cloud backend.
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -18,19 +21,54 @@ HOST="${SPORTCAM_HOST:-sportcam}"
 MOVE=0
 CLEAN=0
 YES=0
+RECORDINGS=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --host) HOST="${2:?--host needs a value}"; shift ;;
     --move) MOVE=1 ;;
     --clean) CLEAN=1 ;;
     --yes) YES=1 ;;
-    *) echo "usage: scripts/pi/samples.sh [--host <host>] [--move | --clean [--yes]]"; exit 1 ;;
+    --recordings) RECORDINGS=1 ;;
+    *) echo "usage: scripts/pi/samples.sh [--host <host>] [--move | --clean [--yes] | --recordings]"; exit 1 ;;
   esac
   shift
 done
 
 PI="pi@${HOST}"
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR)
+
+if [[ $RECORDINGS == 1 ]]; then
+  # Clips, and the .boxes.json beside each; not .owner, which says only whose
+  # session it was. The Pi keeps its copies: a clip gone from there would
+  # leave the phone's library and never upload.
+  if [[ $MOVE == 1 || $CLEAN == 1 ]]; then
+    echo "--recordings only copies: it can't be used with --move or --clean"; exit 1
+  fi
+  if ! ssh "${SSH_OPTS[@]}" "$PI" 'test -d ~/recordings'; then
+    echo "no recordings on the Pi yet"
+    exit 0
+  fi
+  # A clip still being written would be copied cut short, then skipped for
+  # good as already here
+  if ssh "${SSH_OPTS[@]}" "$PI" 'pgrep -x ffmpeg >/dev/null'; then
+    echo "The camera is recording: stop it first, then copy."
+    exit 1
+  fi
+  mkdir -p recordings
+  before=$(ls recordings/*.mp4 2>/dev/null | wc -l | tr -d ' ')
+  if ssh "${SSH_OPTS[@]}" "$PI" 'command -v rsync >/dev/null' && command -v rsync >/dev/null; then
+    rsync -a --ignore-existing --exclude='*.owner' -e "ssh ${SSH_OPTS[*]}" "${PI}:recordings/" recordings/ || exit 1
+  else
+    ssh "${SSH_OPTS[@]}" "$PI" "cd ~/recordings && tar -cf - --exclude='*.owner' ." | tar -xkf - -C recordings 2>/dev/null
+    if [[ ${PIPESTATUS[0]} != 0 ]]; then
+      echo "copying from the Pi failed"; exit 1
+    fi
+  fi
+  after=$(ls recordings/*.mp4 2>/dev/null | wc -l | tr -d ' ')
+  echo "copied $((after - before)) new recording(s) into recordings/ (${after} in all, $(du -sh recordings | cut -f1))"
+  exit 0
+fi
+
 mkdir -p samples
 
 if [[ $CLEAN == 1 ]]; then
