@@ -139,6 +139,7 @@ def main() -> None:
     raw = Raw(ptz)
     print(f"controller firmware 0x{ptz.focuser.firmware or 0:04x}; waking the lens…")
     ptz.start()
+    ptz.wait_lens()                      # the home moves, which queue
     print(f"mode register 0x30 = {raw.read(0x30)}")
 
     rows = []

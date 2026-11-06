@@ -70,6 +70,8 @@ _REG_VERSION = 0x40
 # scripts/pi/ptz-gap-check.sh), so writes are spaced by this much. Pan then
 # tilt in one control tick lost the tilt
 _WRITE_GAP_S = 0.025
+_LENS_MOVE_MAX_S = 8.0     # the longest a lens motor takes end to end, and then some
+_LENS_BUSY_RISE_S = 0.05   # after a write, before the busy flag can be trusted
 _IMX477_FIRMWARE = 0x0104
 # the IMX477 kit's controller: channel -> (register, min, max, lens reset register)
 _IMX477_LENS = {
@@ -94,6 +96,12 @@ class Focuser:
         self._wrote_at = 0.0
         self.available = self._bus is not None
         self.firmware = self._read(_REG_VERSION) if self._bus else None
+        # Lens moves wait their turn behind a moving motor (Ptz turns this on).
+        self.queue_lens = False
+        self._lens_cv = threading.Condition()
+        self._lens_pending: dict[str, int] = {}   # channel → latest value, oldest first
+        self._lens_writing = False
+        self._lens_thread: threading.Thread | None = None
 
     @property
     def imx477(self) -> bool:
@@ -135,11 +143,47 @@ class Focuser:
     def set(self, channel: str, value: int, wait: bool = False) -> int:
         _reg, lo, hi = _CHANNELS[channel]
         value = int(max(lo, min(hi, value)))
-        if self._bus:
+        if self._bus and self.queue_lens and channel in (OPT_ZOOM, OPT_FOCUS):
+            self._queue_lens(channel, value)
+        elif self._bus:
             self._write(*self._register(channel, value))
             if wait:
                 self._wait_idle()
         return value
+
+    def _queue_lens(self, channel: str, value: int) -> None:
+        """Move a lens motor once the controller is free, as Arducam's
+        Focuser.set does: lenscheck, waiting between moves, got the lens's
+        full zoom; zoom then focus 25 ms apart did not. On a thread, as a zoom
+        takes seconds and the control loop mustn't. A newer value for a
+        channel replaces one still waiting."""
+        with self._lens_cv:
+            self._lens_pending[channel] = value
+            if self._lens_thread is None:
+                self._lens_thread = threading.Thread(target=self._lens_loop, name="lens",
+                                                     daemon=True)
+                self._lens_thread.start()
+            self._lens_cv.notify_all()
+
+    def _lens_loop(self) -> None:
+        while True:
+            with self._lens_cv:
+                while not self._lens_pending:
+                    self._lens_writing = False
+                    self._lens_cv.wait()
+                self._lens_writing = True
+            self._wait_idle(_LENS_MOVE_MAX_S)      # …before taking it: a later value may land
+            with self._lens_cv:
+                channel = next(iter(self._lens_pending))
+                value = self._lens_pending.pop(channel)
+            self._write(*self._register(channel, value))
+            time.sleep(_LENS_BUSY_RISE_S)
+
+    @property
+    def lens_pending(self) -> bool:
+        """A lens move is waiting its turn, or was only just written."""
+        with self._lens_cv:
+            return bool(self._lens_pending) or self._lens_writing
 
     def get(self, channel: str) -> int | None:
         if not self._bus:
@@ -252,6 +296,7 @@ class Ptz:
 
     def __init__(self, bus: int = 1) -> None:
         self.focuser = Focuser(bus)
+        self.focuser.queue_lens = True
         self.servos = (PigpioServos() if config.SERVO_DRIVER == "pigpio"
                        else ArducamServos(self.focuser))
         self._pan = 0.0
@@ -400,6 +445,8 @@ class Ptz:
     def lens_busy(self) -> bool:
         """The lens motors are moving now: the controller's busy flag, or, from
         a controller that never sets it, the time a move should take."""
+        if getattr(self.focuser, "lens_pending", False):
+            return True
         b = self.focuser.busy() if self.focuser.available else None
         if b is None or not self._busy_seen:
             if b:
@@ -463,6 +510,9 @@ class Ptz:
             return
         if timeout_s is None:
             timeout_s = config.LENS_SETTLE_S + config.LENS_TRAVEL_S + 1.0
+        deadline = time.monotonic() + timeout_s + _LENS_MOVE_MAX_S
+        while self.focuser.lens_pending and time.monotonic() < deadline:
+            time.sleep(0.01)                    # moves queued ahead of this one
         deadline = time.monotonic() + timeout_s
         seen = False
         while time.monotonic() < deadline:

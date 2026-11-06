@@ -347,6 +347,34 @@ def main() -> None:
     bus.regs[0x04] = 0
     check("…and 0 as idle", f.busy() is False)
 
+    # ---- a lens move waits for the one before ------------------------------
+    import time as _time
+    class BusyBus(FakeBus):
+        """A motor runs after each lens write, until told it has stopped."""
+        def write_i2c_block_data(self, addr, reg, data):
+            super().write_i2c_block_data(addr, reg, data)
+            if reg in (0x00, 0x01):
+                self.regs[0x04] = 1
+
+    swap, config.LENS_SWAP_ZOOM_FOCUS = config.LENS_SWAP_ZOOM_FOCUS, False
+    bus = BusyBus(0x0104)
+    f = focuser_on(bus)
+    f.queue_lens = True
+    f.set(OPT_ZOOM, 20000)
+    f.set(OPT_FOCUS, 10000)
+    _time.sleep(0.15)
+    check("zoom goes first, and focus waits while the zoom motor runs",
+          bus.writes == [(0x01, 2100)] and f.lens_pending, f"{bus.writes}")
+    f.set(OPT_FOCUS, 12000)
+    bus.regs[0x04] = 0
+    _time.sleep(0.2)
+    check("…then focus, at the latest value asked for",
+          bus.writes == [(0x01, 2100), (0x00, 1260)], f"{bus.writes}")
+    bus.regs[0x04] = 0
+    _time.sleep(0.15)
+    check("…and nothing is left waiting", not f.lens_pending)
+    config.LENS_SWAP_ZOOM_FOCUS = swap
+
     # ---- LENS_SWAP_ZOOM_FOCUS: the two lens motors the other way round ------
     config.LENS_SWAP_ZOOM_FOCUS = True
     bus = FakeBus(0x0104)
