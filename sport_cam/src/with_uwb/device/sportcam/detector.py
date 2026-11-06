@@ -30,6 +30,47 @@ from . import config
 
 Box = tuple[int, int, int, int]      # x, y, w, h in the image's pixels
 
+
+class Person(tuple):
+    """A box (x, y, w, h, and still just that to everything that unpacks or
+    compares it) that also carries the detector's `score`, 0…1, and `look`:
+    the colours of the body (`look_of`). HOG has no comparable score, so its
+    boxes keep 1.0 and pass every confidence test."""
+
+    def __new__(cls, box, score: float = 1.0, look=None):
+        self = super().__new__(cls, box)
+        self.score, self.look = score, look
+        return self
+
+
+def score_of(box) -> float:
+    """A box's confidence; 1.0 for a plain tuple."""
+    return getattr(box, "score", 1.0)
+
+
+def look_of(rgb, box):
+    """The body's colours: a hue-saturation histogram of the torso (the
+    middle of the box, away from background and skin), or None if too little
+    of it is in frame."""
+    if cv2 is None:
+        return None
+    x, y, w, h = box
+    fh, fw = rgb.shape[:2]
+    bw, bh = w * config.PERSON_IN_BOX_W, h * config.PERSON_IN_BOX_H
+    cx, top = x + w / 2, y + h / 2 - bh / 2
+    x0, x1 = int(max(0, cx - 0.3 * bw)), int(min(fw, cx + 0.3 * bw))
+    y0, y1 = int(max(0, top + 0.15 * bh)), int(min(fh, top + 0.6 * bh))
+    if x1 - x0 < 8 or y1 - y0 < 8:
+        return None
+    hsv = cv2.cvtColor(rgb[y0:y1, x0:x1], cv2.COLOR_RGB2HSV)
+    hist = cv2.calcHist([hsv], [0, 1], None, [16, 8], [0, 180, 0, 256])
+    return cv2.normalize(hist, None, 1, 0, cv2.NORM_L1)
+
+
+def look_distance(a, b) -> float:
+    """0 for the same colours, 1 for none in common (Bhattacharyya)."""
+    return float(cv2.compareHist(a, b, cv2.HISTCMP_BHATTACHARYYA))
+
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
 SSD_WEIGHTS = os.path.join(MODEL_DIR, "ssdlite_mobilenet_v2_coco.pb")
 SSD_GRAPH = os.path.join(MODEL_DIR, "ssdlite_mobilenet_v2_coco.pbtxt")
@@ -65,9 +106,9 @@ class SsdDetector:
             tw = tile.shape[1]
             edge = 0.03 * tw
             inner_left, inner_right = x0 > 0, x0 + tw < img.shape[1]
-            for _score, (x, y, w, h) in self._people(tile):
+            for score, (x, y, w, h) in self._people(tile):
                 cut = (inner_left and x <= edge) or (inner_right and x + w >= tw - edge)
-                found.append(((x + x0, y, w, h), cut))
+                found.append((Person((x + x0, y, w, h), score), cut))
         return [_pad(b) for b in _merge(found)]
 
     def _people(self, img) -> list[tuple[float, Box]]:
@@ -130,7 +171,8 @@ def _shared_height(a: Box, b: Box) -> float:
 
 def _union(a: Box, b: Box) -> Box:
     x1, y1 = min(a[0], b[0]), min(a[1], b[1])
-    return (x1, y1, max(a[0] + a[2], b[0] + b[2]) - x1, max(a[1] + a[3], b[1] + b[3]) - y1)
+    return Person((x1, y1, max(a[0] + a[2], b[0] + b[2]) - x1, max(a[1] + a[3], b[1] + b[3]) - y1),
+                  max(score_of(a), score_of(b)))
 
 
 def _overlap(a: Box, b: Box) -> float:
@@ -143,8 +185,8 @@ def _pad(box: Box) -> Box:
     """A body-tight box → the padded HOG-convention box around it."""
     x, y, w, h = box
     pw, ph = w / config.PERSON_IN_BOX_W, h / config.PERSON_IN_BOX_H
-    return (int(round(x + w / 2 - pw / 2)), int(round(y + h / 2 - ph / 2)),
-            int(round(pw)), int(round(ph)))
+    return Person((int(round(x + w / 2 - pw / 2)), int(round(y + h / 2 - ph / 2)),
+                   int(round(pw)), int(round(ph))), score_of(box))
 
 
 def make_detector():

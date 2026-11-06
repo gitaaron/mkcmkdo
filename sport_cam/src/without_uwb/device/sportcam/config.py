@@ -201,7 +201,16 @@ TRACK_HEADROOM_FRACTION = 0.12  # a person too tall to centre: top of the body t
 # so a bystander walking past does not steal the lock. A detection further
 # than this fraction of the frame width from the last one is not "the same
 # person" and is ignored.
-TRACK_GATE_FRACTION = 0.45
+TRACK_GATE_FRACTION = 0.2      # was 0.45: a chair 320 px away could take over
+TRACK_RESEEN_S = 1.0           # unseen this long, coming back needs PERSON_LOCK_CONFIDENCE
+# The followed person's colours (detector.look_of) are refreshed on every
+# detection, so they follow the light: the same top scored 0.77 from itself
+# 21 s and a pan apart, in different light, but 0.3 in like light, and 0.71
+# from a chair in the same frame. So they only count while fresh: past
+# TRACK_LOOK_FRESH_S unseen they are ignored rather than lock the person out.
+TRACK_LOOK_MAX_DISTANCE = 0.5  # further than this from the followed colours: not them
+TRACK_LOOK_FRESH_S = 3.0
+TRACK_LOOK_BLEND = 0.3         # share of each new look taken into the memory
 
 # --- finding a person ------------------------------------------------------
 # SEARCH → FOUND → recording. The first detection stops the sweep and the
@@ -230,6 +239,11 @@ ACQUIRE_STALLED_S = 15.0       # searching this long → the app says "can't see
 # HOG found nobody in 4 of 4 frames and SSD found them in all 4 (71-92 %).
 DETECTOR = "ssd"
 SSD_CONFIDENCE = 0.5           # higher = fewer false people, more misses
+# SSD_CONFIDENCE keeps a person being followed; this starts following someone,
+# or switches to them. Bench samples: real people 0.65-0.91 (one small, far
+# figure 0.33), a chair with clothes over it 0.51.
+PERSON_LOCK_CONFIDENCE = 0.6
+DETECT_FULL_EVERY = 6          # every Nth detection searches the whole frame, not the strip
 SSD_INPUT = 300                # the network's input size; it was trained at 300
 SSD_SWAP_RB = False            # the preview is handed over as RGB, which the model wants
 SSD_WIDE_TILES = True          # whole-frame searches run as two overlapping halves:

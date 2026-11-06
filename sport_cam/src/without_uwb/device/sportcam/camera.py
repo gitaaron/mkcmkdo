@@ -40,7 +40,7 @@ except Exception:  # no pyzbar, or no libzbar0 under it
     zbar_decode = None
 
 from . import config
-from .detector import make_detector
+from .detector import Person, look_of, make_detector, score_of
 
 Box = tuple[int, int, int, int]      # x, y, w, h in preview pixels
 
@@ -99,6 +99,7 @@ class Camera:
         # capture waiting on a frame from a sensor stopped under it (sleep)
         # would wait for good. Captures are one frame, so it is held briefly.
         self._cam_lock = threading.Lock()
+        self._detections = 0                     # run so far, for DETECT_FULL_EVERY
         self._seq = 0                            # results published
         self._seq_read = 0                       # results handed to the tracker
         self._gen = 0                            # bumped on sleep/wake: drops in-flight results
@@ -207,12 +208,20 @@ class Camera:
 
         # Crop to a vertical strip around the followed person, when locked on.
         x0 = 0
-        if strip_cx is not None and config.DETECT_STRIP_FRACTION:
+        self._detections += 1
+        # …but every DETECT_FULL_EVERY'th looks everywhere, so the strip can't
+        # hide the real person beside whatever it has settled on
+        full = config.DETECT_FULL_EVERY and self._detections % config.DETECT_FULL_EVERY == 0
+        frame = rgb
+        if strip_cx is not None and config.DETECT_STRIP_FRACTION and not full:
             half = pw * config.DETECT_STRIP_FRACTION / 2
             x0 = int(max(0, min(pw - 2 * half, strip_cx - half)))
             rgb = rgb[:, x0:x0 + int(2 * half)]
 
-        return [(x + x0, y, w, h) for x, y, w, h in self.detect_frame(rgb)]
+        out = [Person((b[0] + x0, b[1], b[2], b[3]), score_of(b)) for b in self.detect_frame(rgb)]
+        for b in out:
+            b.look = look_of(frame, b)
+        return out
 
     def detect_frame(self, rgb) -> list:
         """The person detector on `rgb`, now: [(x, y, w, h), …]; none

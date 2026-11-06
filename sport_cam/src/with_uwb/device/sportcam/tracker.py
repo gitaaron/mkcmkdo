@@ -53,6 +53,7 @@ from simple_pid import PID
 from . import config
 from .boxlog import CLIMBER, OTHER, UNSURE, Box
 from .camera import Camera
+from .detector import score_of
 from .motion import ease_to, tilt_error_px
 from .ptz import Ptz
 from .uwb import UwbArray
@@ -135,7 +136,8 @@ class Tracker:
         if fresh:
             self.labelled_at = time.monotonic()
             self.labelled = [(b, UNSURE) for b in boxes]
-        if fresh and boxes and self.ptz.zoom_mm <= config.ZOOM_MIN_MM:
+        if (fresh and self.ptz.zoom_mm <= config.ZOOM_MIN_MM
+                and any(score_of(b) >= config.PERSON_LOCK_CONFIDENCE for b in boxes)):
             self._awake_seen_at = time.monotonic()
 
     def forget_awake(self) -> None:
@@ -286,6 +288,7 @@ class Tracker:
             p = min(free, key=lambda p: abs(p.deg - deg), default=None)
             if p is None or abs(p.deg - deg) > config.TAG_FOLLOW_DEG:
                 if (tag_deg is None
+                        or score_of(box) < config.PERSON_LOCK_CONFIDENCE
                         or abs(deg - tag_deg) > config.TAG_MATCH_BEARING_DEG
                         or not self._range_agrees(box, dist_m)):
                     continue

@@ -84,11 +84,13 @@ Sweep timing:
 
 | Rule | Detail |
 | --- | --- |
-| **First person found wins** | at first sighting with several people in view, the largest detection is taken |
+| **First person found wins** | at first sighting with several people in view, the largest detection scoring at least `PERSON_LOCK_CONFIDENCE` (0.6) is taken; a weaker box (a chair with clothes on it scored 0.51) is nobody, however large |
 | **3 s in frame to lock on** | a single-frame false positive (coat stand, chair) causes a ≈ 1 s pause, then the sweep resumes; it is never followed for long |
 | **Recording only on Record** | from `tracking`, with someone seen by the detector in the last 3 s (`RECORD_NEEDS_PERSON_S`; the app greys the button otherwise). **Stop recording** saves the clip and goes back to `tracking`, still following; **Stop tracking** ends the session (`awake`) |
 | **Head stays in** | a person too tall for the frame runs off its edges, and the box stops there, so its centre says nothing is wrong. With the top of the body within `TRACK_HEADROOM_FRACTION` (12 %) of the frame's top, or the bottom off the frame, the tilt aims the top of the body at that headroom instead of centring the box |
-| **Nearest, not largest, once found** | each detection is matched to the one nearest the last position, within `TRACK_GATE_FRACTION` (45 % of frame width). Detections outside the gate are ignored (bystanders) |
+| **Nearest, not largest, once found** | each detection is matched to the one nearest the last position, within `TRACK_GATE_FRACTION` (20 % of frame width). Someone being followed stays followed down to `SSD_CONFIDENCE` (0.5); after `TRACK_RESEEN_S` (1 s) unseen they need `PERSON_LOCK_CONFIDENCE` again |
+| **Same colours as a moment ago** | each person's torso colours (`detector.look_of`) are compared with the followed person's, refreshed on every detection (`TRACK_LOOK_BLEND`). Further than `TRACK_LOOK_MAX_DISTANCE`: not them, however close. Someone sure, in their colours, is taken even outside the gate, if nobody good is inside it. The memory counts only while `TRACK_LOOK_FRESH_S` (3 s) old: the same top measured further from itself across a change of light than from a chair, so a stale memory would shut the real person out |
+| **The whole frame now and then** | every `DETECT_FULL_EVERY` (6th) detection ignores the strip, so it can't hide the person beside whatever it settled on |
 | **Missing target** | `LOST_ZOOM_OUT_S` (2 s), recording: zoom straight out to wide (past the zoom rate limit), still pointing where they were, and search the whole frame rather than their strip. Most losses are a step or a reach out of a tight shot, and the wide shot still has them; the follow gate is scaled to the new zoom, so the same person is picked up, and the fill loop closes back in. `LOST_HOLD_S` (2 s), at the same moment: ring flashes at 2 Hz (stays solid red while recording). `RESEARCH_AFTER_S` (6 s): sweep toward the last direction of travel, still wide. Recording continues throughout |
 | **Empty room** | `tracking`, nobody found for 180 s of sweeping → `awake`. Never applied to a recording |
 

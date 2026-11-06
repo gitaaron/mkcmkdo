@@ -329,6 +329,11 @@ DETECT_FPS_TRACKING = 3.0
 # HOG found nobody in 4 of 4 frames and SSD found them in all 4 (71-92 %).
 DETECTOR = "ssd"
 SSD_CONFIDENCE = 0.5           # higher = fewer false people, more misses
+# SSD_CONFIDENCE keeps a person being followed; this starts following someone,
+# or switches to them. Bench samples: real people 0.65-0.91 (one small, far
+# figure 0.33), a chair with clothes over it 0.51.
+PERSON_LOCK_CONFIDENCE = 0.6
+DETECT_FULL_EVERY = 6          # every Nth detection searches the whole frame, not the strip
 SSD_INPUT = 300                # the network's input size; it was trained at 300
 SSD_SWAP_RB = False            # the preview is handed over as RGB, which the model wants
 SSD_WIDE_TILES = True          # whole-frame searches run as two overlapping halves:

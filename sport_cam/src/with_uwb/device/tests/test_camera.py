@@ -59,7 +59,30 @@ def slow_camera() -> Camera:
     return cam
 
 
+def strip_and_full_frame() -> None:
+    """The strip around the followed person, with a whole frame now and then."""
+    import numpy as np
+    from sportcam.detector import score_of
+    from sportcam.detector import Person
+    cam = Camera()
+    cam._detector = object()
+    cam._capture = lambda: np.zeros((720, 1280, 3), np.uint8)
+    seen = []
+
+    def found(rgb):
+        seen.append(rgb.shape[1])
+        return [Person((10, 10, 200, 400), 0.7)]
+    cam.detect_frame = found
+    out = [cam._detect(640.0) for _ in range(config.DETECT_FULL_EVERY)]
+    check("the strip is searched…", seen[0] < 1280 and out[0][0][0] > 10, f"{seen}")
+    check("…with every DETECT_FULL_EVERY'th the whole frame",
+          seen[:-1] == [seen[0]] * (config.DETECT_FULL_EVERY - 1) and seen[-1] == 1280, f"{seen}")
+    check("a box keeps its score through the crop, and gets its colours",
+          score_of(out[0][0]) == 0.7 and out[0][0].look is not None)
+
+
 def main() -> None:
+    strip_and_full_frame()
     print("camera detector thread\n")
     cam = slow_camera()
     worst, fresh_n = 0.0, 0

@@ -149,6 +149,16 @@ def main() -> None:
     else:
         print("  (real model not fetched — python3 -m sportcam.getmodel to check it loads)")
 
+    # ---- a box carries its score, and looks like the tuple it is -------------
+    b = detector.Person((1, 2, 3, 4), 0.7)
+    check("a scored box still is its tuple", b == (1, 2, 3, 4) and tuple(b) == (1, 2, 3, 4))
+    check("…a plain box counts as sure", detector.score_of((1, 2, 3, 4)) == 1.0)
+    check("padding keeps the score", detector.score_of(detector._pad(b)) == 0.7)
+    merged = detector._merge([(detector.Person((0, 0, 50, 100), 0.6), True),
+                              (detector.Person((40, 0, 50, 100), 0.8), True)])
+    check("two halves joined keep the better score",
+          len(merged) == 1 and detector.score_of(merged[0]) == 0.8, f"{merged}")
+
     print()
     if failures:
         print(f"{len(failures)} check(s) failed: " + ", ".join(failures))

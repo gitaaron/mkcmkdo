@@ -494,6 +494,47 @@ def main() -> None:
     check("person in awake frame gone at session start → FOUND times out to SEARCH",
           tr.mode == "search", tr.mode)
 
+    print("\nwho counts as the person")
+    import numpy as np
+    from sportcam.detector import Person as Scored, look_of
+
+    def looks(rgb):
+        return look_of(np.full((720, 1280, 3), rgb, np.uint8), (400, 100, 400, 500))
+
+    blue, orange = looks((30, 60, 200)), looks((220, 120, 20))
+    you = Scored((100, 50, 300, 600), 0.78, blue)
+    chair = Scored((420, 50, 500, 600), 0.51, orange)   # bigger, but barely a person
+    tr, _cam, _ptz = world()
+    t = CLOCK.t
+    check("first sighting: a low score is no one, however large",
+          tr._pick([chair, you], t) == you, f"{tr._pick([chair, you], t)}")
+    check("…and with only the chair, nobody to follow", tr._pick([chair], t) is None)
+
+    tr._seen(t, you)
+    near = Scored((180, 50, 300, 600), 0.9, orange)     # sure, close by, the wrong colours
+    check("a sure box close by in other colours is not them",
+          tr._select([near], t) is None, f"{tr._select([near], t)}")
+    moved = Scored((180, 50, 300, 600), 0.55, blue)
+    check("…the person themselves, doubtful a moment, is kept",
+          tr._select([moved], t) == moved)
+    far = Scored((850, 50, 300, 600), 0.8, blue)
+    check("out of the gate, but sure and in their colours: still them",
+          tr._select([chair, far], t) == far, f"{tr._select([chair, far], t)}")
+    stray = Scored((850, 50, 300, 600), 0.8, None)
+    check("out of the gate with no colours to go by: no", tr._select([stray], t) is None)
+    check("the gate is narrower than a chair's width away",
+          config.TRACK_GATE_FRACTION * config.PREVIEW_SIZE[0] < 320)
+
+    late = t + config.TRACK_LOOK_FRESH_S + 0.5
+    tr._last_seen_at = t
+    back = Scored((180, 50, 300, 600), 0.8, orange)
+    check("colours gone stale don't shut them out: the light may have changed",
+          tr._select([back], late) == back, f"{tr._select([back], late)}")
+    check("…but back after TRACK_RESEEN_S a doubtful box isn't enough",
+          tr._select([Scored((180, 50, 300, 600), 0.55, orange)], late) is None)
+    tr.reset_lock()
+    check("a new session forgets the colours", tr._look is None)
+
     print("\ntilt aim for a person too tall to centre")
     from sportcam.motion import tilt_error_px
     headroom = config.TRACK_HEADROOM_FRACTION * config.PREVIEW_SIZE[1]

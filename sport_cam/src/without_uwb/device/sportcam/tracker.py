@@ -54,6 +54,7 @@ from collections import deque
 from . import config
 from .boxlog import CLIMBER, OTHER, UNSURE, Box
 from .camera import Camera
+from .detector import look_distance, score_of
 from .motion import ease_to, tilt_error_px
 from .ptz import Ptz
 
@@ -67,6 +68,8 @@ class Tracker:
         self.dist_m: float | None = None   # estimated from the person's size
         self.confirmed = False             # recording: found people go straight to TRACK
         self._awake_box: Box | None = None  # largest person seen while awake
+        self._look = None                  # the followed person's colours, recent (_seen)
+        self._look_at = 0.0
         self._awake_seen_at: float | None = None
         # every box of the last fresh detection, labelled for the recording's
         # overlay (boxlog): climber, other, or unsure
@@ -91,6 +94,7 @@ class Tracker:
         now = time.monotonic()
         box = self._awake_box if self.awake_person_in_frame else None
         self._awake_box = self._awake_seen_at = None
+        self._look = None
         self.confirmed = False
         self._begin_search(now, direction=1 if self.ptz.pan_deg <= 0 else -1)
         self._first_look = True
@@ -123,8 +127,9 @@ class Tracker:
         if fresh:
             self.labelled_at = time.monotonic()
             self.labelled = [(b, UNSURE) for b in boxes]
-        if fresh and boxes and self.ptz.zoom_mm <= config.ZOOM_MIN_MM:
-            self._awake_box = max(boxes, key=lambda b: b[2] * b[3])
+        sure = [b for b in boxes if score_of(b) >= config.PERSON_LOCK_CONFIDENCE]
+        if fresh and sure and self.ptz.zoom_mm <= config.ZOOM_MIN_MM:
+            self._awake_box = max(sure, key=lambda b: b[2] * b[3])
             self._awake_seen_at = time.monotonic()
 
     def forget_awake(self) -> None:
@@ -202,8 +207,8 @@ class Tracker:
         boxes = boxes if fresh else []
 
         if self.mode == SEARCH:
-            if boxes:
-                first = max(boxes, key=lambda b: b[2] * b[3])
+            first = self._pick(boxes, now)
+            if first is not None:
                 self._first_sighting(now, first)
                 self._label(now, boxes, first)
             else:
@@ -218,7 +223,7 @@ class Tracker:
             # Zoom, focus or autofocus under way: the picture is blurred, and
             # a frame without them proves nothing. Hold the clock.
             self._last_seen_at = min(now, self._last_seen_at + dt)
-        matched = self._select(boxes) if boxes else None
+        matched = self._select(boxes, now) if boxes else None
         if fresh:
             self._label(now, boxes, matched)
         if matched:
@@ -276,18 +281,50 @@ class Tracker:
         self._slew(0.05)
 
     # ---- FOUND / TRACK -----------------------------------------------------
-    def _select(self, boxes: list[Box]) -> Box | None:
+    def _looks_like(self, box: Box, now: float) -> bool | None:
+        """Is this box's colouring the person being followed? None when that
+        can't be said: no look, or the memory is too old to trust (the light
+        changes, and a stale memory would shut the real person out)."""
+        look = getattr(box, "look", None)
+        if look is None or self._look is None or now - self._look_at > config.TRACK_LOOK_FRESH_S:
+            return None
+        return look_distance(self._look, look) <= config.TRACK_LOOK_MAX_DISTANCE
+
+    def _pick(self, boxes: list[Box], now: float) -> Box | None:
+        """Someone to start following: confident enough, not known to be
+        someone else, and of those the largest. None if nobody qualifies."""
+        sure = [b for b in boxes if score_of(b) >= config.PERSON_LOCK_CONFIDENCE
+                and self._looks_like(b, now) is not False]
+        return max(sure, key=lambda b: b[2] * b[3], default=None)
+
+    def _select(self, boxes: list[Box], now: float) -> Box | None:
         """The detection that is 'our' person, or None.
 
-        With no previous position (first sighting) it is the largest. After
-        that, the nearest to where we last saw them, within a gate.
+        With no previous position (first sighting), `_pick`. After that the
+        nearest to where we last saw them, within a gate, that doesn't look
+        like someone else; back after TRACK_RESEEN_S unseen it must also be
+        confident, as for a first sighting. If that finds nobody, or only a
+        doubtful box, someone confident anywhere who does look like them
+        takes over: the gate must not hold the person out.
         """
         if self._last_centre is None:
-            return max(boxes, key=lambda b: b[2] * b[3])
+            return self._pick(boxes, now)
         lx, ly = self._last_centre
-        best = min(boxes, key=lambda b: math.hypot(b[0] + b[2] / 2 - lx, b[1] + b[3] / 2 - ly))
-        d = math.hypot(best[0] + best[2] / 2 - lx, best[1] + best[3] / 2 - ly)
-        return best if d <= config.TRACK_GATE_FRACTION * config.PREVIEW_SIZE[0] else None
+
+        def away(b: Box) -> float:
+            return math.hypot(b[0] + b[2] / 2 - lx, b[1] + b[3] / 2 - ly)
+
+        gone = now - (self._last_seen_at or now)
+        gate = config.TRACK_GATE_FRACTION * config.PREVIEW_SIZE[0]
+        near = [b for b in boxes if away(b) <= gate and self._looks_like(b, now) is not False
+                and (gone <= config.TRACK_RESEEN_S
+                     or score_of(b) >= config.PERSON_LOCK_CONFIDENCE)]
+        best = min(near, key=away, default=None)
+        if best is None or score_of(best) < config.PERSON_LOCK_CONFIDENCE:
+            them = [b for b in boxes if score_of(b) >= config.PERSON_LOCK_CONFIDENCE
+                    and self._looks_like(b, now)]
+            best = min(them, key=away, default=best)
+        return best
 
     def _seen(self, now: float, box: Box) -> None:
         x, y, w, h = box
@@ -296,6 +333,12 @@ class Tracker:
         self._last_seen_at = now
         self._last_centre = (cx, cy)
         cx_err, cy_err = cx - pw / 2, tilt_error_px(y, h)
+        look = getattr(box, "look", None)
+        if look is not None:
+            fresh = self._look is not None and now - self._look_at <= config.TRACK_LOOK_FRESH_S
+            k = config.TRACK_LOOK_BLEND
+            self._look = (1 - k) * self._look + k * look if fresh else look
+            self._look_at = now
         # Offsets are from where the head pointed when the frame was taken.
         pan, tilt = self._pose_at(getattr(self.camera, "captured_at", None))
         if abs(cx_err) > config.TRACK_DEADBAND_FRACTION * pw:
