@@ -84,7 +84,7 @@ class HogDetector:
         self._hog = cv2.HOGDescriptor()
         self._hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
 
-    def detect(self, img) -> list[Box]:
+    def detect(self, img, tiles: bool = True) -> list[Box]:
         h, w = img.shape[:2]
         sw = config.DETECT_DOWNSCALE_W
         sh = max(1, int(round(h * sw / w)))
@@ -101,8 +101,9 @@ class SsdDetector:
     def __init__(self, net=None) -> None:
         self._net = net if net is not None else cv2.dnn.readNetFromTensorflow(SSD_WEIGHTS, SSD_GRAPH)
 
-    def detect(self, img) -> list[Box]:
-        tiles = _tiles(img)
+    def detect(self, img, tiles: bool = True) -> list[Box]:
+        """`tiles` False: one pass over the whole image, for half the time."""
+        tiles = _tiles(img) if tiles else [(0, img)]
         found: list[tuple[Box, bool]] = []          # (box in the image, cut by a seam)
         for x0, tile in tiles:
             tw = tile.shape[1]

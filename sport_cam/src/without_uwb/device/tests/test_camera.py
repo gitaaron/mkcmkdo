@@ -69,14 +69,18 @@ def strip_and_full_frame() -> None:
     cam._capture = lambda: np.zeros((720, 1280, 3), np.uint8)
     seen = []
 
-    def found(rgb):
+    passes = []
+
+    def found(rgb, tiles=True):
         seen.append(rgb.shape[1])
+        passes.append(tiles)
         return [Person((10, 10, 200, 400), 0.7)]
     cam.detect_frame = found
     out = [cam._detect(640.0) for _ in range(config.DETECT_FULL_EVERY)]
     check("the strip is searched…", seen[0] < 1280 and out[0][0][0] > 10, f"{seen}")
     check("…with every DETECT_FULL_EVERY'th the whole frame",
           seen[:-1] == [seen[0]] * (config.DETECT_FULL_EVERY - 1) and seen[-1] == 1280, f"{seen}")
+    check("…in one pass, so it leaves no gap in the head's guidance", passes[-1] is False)
     check("a box keeps its score through the crop, and gets its colours",
           score_of(out[0][0]) == 0.7 and out[0][0].look is not None)
 

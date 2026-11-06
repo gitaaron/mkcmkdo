@@ -218,18 +218,21 @@ class Camera:
             x0 = int(max(0, min(pw - 2 * half, strip_cx - half)))
             rgb = rgb[:, x0:x0 + int(2 * half)]
 
-        out = [Person((b[0] + x0, b[1], b[2], b[3]), score_of(b)) for b in self.detect_frame(rgb)]
+        # one pass even for the whole frame, or each of these leaves a gap in the
+        # head's guidance twice the usual
+        out = [Person((b[0] + x0, b[1], b[2], b[3]), score_of(b))
+               for b in self.detect_frame(rgb, tiles=not full)]
         for b in out:
             b.look = look_of(frame, b)
         return out
 
-    def detect_frame(self, rgb) -> list:
+    def detect_frame(self, rgb, tiles: bool = True) -> list:
         """The person detector on `rgb`, now: [(x, y, w, h), …]; none
         without a detector."""
         if self._detector is None:
             return []
         with self._detect_lock:
-            return list(self._detector.detect(rgb))
+            return list(self._detector.detect(rgb, tiles))
 
     def snapshot(self):
         """(full frame, preview frame), RGB, from one capture: the same
