@@ -22,8 +22,11 @@ While it runs, Ptz.af_active holds off everyone else's zoom and focus moves,
 and the trackers don't count frames it blurs as their person lost.
 
 Awake: on a tap on the live view, once the zoom has come to rest, and on
-waking. Tracking: once, as the camera locks on to its person. Never while
-recording: the search would show in the clip.
+waking. Tracking: as the camera locks on to its person. Tracking and
+recording: once the tracker's own zoom has come to rest, a narrow search
+close by. A zoom move refocuses from FOCUS_GRID, whose sharp band is too thin
+to hit, and a blurred person can't be seen to be followed. The search shows
+briefly in a clip, which is better than the clip staying blurred.
 
 It runs on its own thread, like detection. A newer request, or `cancel()`,
 makes a running sweep stop at its next step. Each sweep prints a line — where
@@ -65,13 +68,15 @@ class AutoFocus:
         self._gen = 0          # bumped by every start/cancel: older sweeps stop
         self.busy = False      # a sweep is running (telemetry `focusing`)
 
-    def start(self, x: float, y: float) -> None:
-        """Focus on (x, y) of the frame, on a thread; replaces a running sweep."""
+    def start(self, x: float, y: float, narrow: bool = False) -> None:
+        """Focus on (x, y) of the frame, on a thread; replaces a running sweep.
+        `narrow`: search close by first (AF_REFOCUS_HALF), for a lens nearly
+        right, in a moment that may be being filmed."""
         with self._lock:
             self._gen += 1
             gen = self._gen
             self.busy = True
-        threading.Thread(target=self.focus, args=(x, y, gen),
+        threading.Thread(target=self.focus, args=(x, y, gen, narrow),
                          name="autofocus", daemon=True).start()
 
     def cancel(self) -> None:
@@ -80,7 +85,8 @@ class AutoFocus:
             self.busy = False
             self.ptz.af_active = False
 
-    def focus(self, x: float, y: float, gen: int | None = None) -> float | None:
+    def focus(self, x: float, y: float, gen: int | None = None,
+              narrow: bool = False) -> float | None:
         """One autofocus, here and now; the motor position chosen (0…1), or
         None if it was cancelled or there is no picture."""
         if gen is None:
@@ -95,7 +101,8 @@ class AutoFocus:
             start = self.ptz.focus_pos
             start = 0.5 if start is None else start
             peak = None
-            for half in config.AF_SWEEP_HALVES:
+            halves = config.AF_SWEEP_HALVES
+            for half in ((config.AF_REFOCUS_HALF, *halves[1:]) if narrow else halves):
                 lo, hi = max(0.0, start - half), min(1.0, start + half)
                 curve = self._sweep(gen, x, y, hi, lo)
                 if not curve:

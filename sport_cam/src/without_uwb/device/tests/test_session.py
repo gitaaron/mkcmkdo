@@ -123,8 +123,9 @@ class FakeAutoFocus:
         self.cancelled = 0
         self.busy = False
 
-    def start(self, x: float, y: float) -> None:
+    def start(self, x: float, y: float, narrow: bool = False) -> None:
         self.started.append((x, y))
+        self.narrow = narrow
 
     def cancel(self) -> None:
         self.cancelled += 1
@@ -220,6 +221,8 @@ async def full_flow() -> None:
           head.state == "tracking" and head.phase == "search" and max(map(abs, pans)) == 0.0,
           f"pan {pans}")
     await tick_for(0.3)
+    check("no autofocus while sweeping", head.autofocus.started == [] or head.phase != "search",
+          f"{head.autofocus.started}")
     check("…nobody in that look: ring chases, camera sweeping",
           head.state == "tracking" and head.phase == "search" and head.led.searching
           and head.ptz.pan_deg != 0.0, f"{seen}")
@@ -254,6 +257,22 @@ async def full_flow() -> None:
     head.ptz.lens_moving = False
     person.visible = True
     await tick_for(0.5)
+    # the tracker's zoom throws focus off: once the lens rests, autofocus on them
+    await tick_for(config.AF_TRACK_GAP_S)
+    head.autofocus.started.clear()
+    head.tracker._efl = head.ptz.zoom_mm = head.ptz.zoom_mm + 1.0   # as its fill loop would
+    await tick_for(config.AF_AFTER_ZOOM_S - 0.2)
+    check("a tracking zoom: no refocus while it may still be moving",
+          head.autofocus.started == [], f"{head.autofocus.started}")
+    await tick_for(0.5)
+    check("…then a narrow autofocus on the person, once",
+          len(head.autofocus.started) == 1 and head.autofocus.narrow is True,
+          f"{head.autofocus.started}")
+    await tick_for(1.0)
+    check("…not over and over", len(head.autofocus.started) == 1, f"{head.autofocus.started}")
+    head.autofocus.started.clear()
+    head.tracker._efl = head.ptz.zoom_mm = head.ptz.zoom_mm - 1.0
+
     # Record with no way to write the video: stay tracking, say why
     head.camera.no_recorder = "ffmpeg is not installed on the camera"
     head.local.sent.clear()
@@ -281,6 +300,7 @@ async def full_flow() -> None:
     check("the clip is stamped with whose session it is",
           owners.owner_of("/tmp/sportcam-test.mp4") == owner and head.session_hash == owner)
     check("…and Record isn't offered while recording", not head.can_record)
+    await tick_for(1.0)                          # the sends cleared above: a fresh detection
     msg = head.local.last_boxes()
     check("live view: each detection goes to direct viewers, the climber labelled",
           msg is not None and msg["size"] == list(config.PREVIEW_SIZE)

@@ -535,6 +535,19 @@ def main() -> None:
     tr.reset_lock()
     check("a new session forgets the colours", tr._look is None)
 
+    print("\nzoom framing")
+    tr, _cam, ptz = world()
+    tr._efl = 6.0
+    ph = config.PREVIEW_SIZE[1]
+    h = ph * config.ZOOM_FILL_TARGET * 1.1 / config.PERSON_IN_BOX_H   # a little over target
+    y = (ph - h) / 2
+    tr._frame_zoom(500, y, h * 0.4, h)
+    check("a small change in size leaves the zoom alone (each move costs a refocus)",
+          tr._efl == 6.0, f"{tr._efl}")
+    h2 = ph * config.ZOOM_FILL_TARGET * 0.5 / config.PERSON_IN_BOX_H  # stepped well back
+    tr._frame_zoom(500, (ph - h2) / 2, h2 * 0.4, h2)
+    check("…a big one still zooms in", tr._efl > 6.0, f"{tr._efl}")
+
     print("\ntilt aim for a person too tall to centre")
     from sportcam.motion import tilt_error_px
     headroom = config.TRACK_HEADROOM_FRACTION * config.PREVIEW_SIZE[1]

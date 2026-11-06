@@ -407,8 +407,9 @@ class FakeAutoFocus:
         self.cancelled = 0
         self.busy = False
 
-    def start(self, x: float, y: float) -> None:
+    def start(self, x: float, y: float, narrow: bool = False) -> None:
         self.started.append((x, y))
+        self.narrow = narrow
 
     def cancel(self) -> None:
         self.cancelled += 1

@@ -436,7 +436,8 @@ class Tracker:
         near_edge = left < ex or top < ey or right > pw - ex or bottom > ph - ey
         if near_edge or fill > config.ZOOM_GUARD_FILL:
             self._efl *= config.ZOOM_GUARD_STEP
-        else:
+        elif abs(fill / config.ZOOM_FILL_TARGET - 1.0) > config.ZOOM_FILL_DEADBAND:
+            # not for every small change: each zoom move costs a refocus
             self._efl *= (config.ZOOM_FILL_TARGET / fill) ** config.ZOOM_VISION_GAIN
         self._efl = _clamp(self._efl, config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
         self.ptz.set_zoom_mm(self._efl)

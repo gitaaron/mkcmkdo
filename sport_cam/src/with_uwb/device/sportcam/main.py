@@ -73,6 +73,10 @@ from .uwb import UwbArray
 class Head:
     _park_vel = (0.0, 0.0)      # the turn up to sleep: pan, tilt speeds now
     _park_at = 0.0              # …and when that tick was
+    _af_zoom = 0.0              # zoom the last autofocus in a session was for
+    _af_track_at = float("-inf")     # …and when
+    _zoom_seen = 0.0            # zoom at the last tick
+    _zoom_moved_at = 0.0        # …and when it last changed
 
     def __init__(self) -> None:
         self.state = "connecting"     # until the Wi-Fi gate lets it go (wifi_loop)
@@ -237,6 +241,7 @@ class Head:
             self.tracker.forget_awake()
         if old not in ("tracking", "recording") and new in ("tracking", "recording"):
             self.tracker.reset_lock()     # a new session acquires afresh
+            self._af_zoom = self._zoom_seen = self.ptz.zoom_mm
         if new not in ("tracking", "recording"):
             self.session_hash = None       # the session is over, by whatever route
             if old in ("tracking", "recording"):
@@ -327,7 +332,10 @@ class Head:
         while True:
             t0 = time.monotonic()
             await self.control_tick(t0)
-            await asyncio.sleep(max(0.0, period - (time.monotonic() - t0)))
+            late = time.monotonic() - t0
+            if late > config.TIMING_LOG_S:
+                print(f"[timing] control tick took {late * 1000:.0f} ms in {self.state}")
+            await asyncio.sleep(max(0.0, period - late))
 
     async def control_tick(self, now: float) -> None:
         """One 20 Hz tick: track, notice a lost tag, and run the tag session."""
@@ -340,6 +348,7 @@ class Head:
             if self.state == "tracking" and self.tracker.ready_to_record:
                 self.tracker.confirm()        # locked on: follow them; Record starts the recording
                 self.focus_on_subject()
+            self.refocus_after_zoom()
             self.led.lost = self.tracker.lost_for() > config.LOST_HOLD_S
             if self.tracker.lost_for() > config.LOST_END_S:
                 await self.apply_state("awake")
@@ -408,8 +417,11 @@ class Head:
         Only noted here; control_tick turns the head (manual_aim), so it moves
         at the control rate however fast messages arrive.
         """
+        now = time.monotonic()
+        if config.TIMING_LOG_S < now - self._jog_at < config.JOG_TIMEOUT_S * 4:
+            print(f"[timing] joystick messages {(now - self._jog_at) * 1000:.0f} ms apart")
         self._jog = (pan, tilt)
-        self._jog_at = time.monotonic()
+        self._jog_at = now
 
     def manual_aim(self) -> None:
         """Awake: turn the head by the joystick, until it stops sending.
@@ -442,18 +454,36 @@ class Head:
         self.autofocus.start(x, y)
         self._awake_since = time.monotonic()      # someone is using it
 
-    def focus_on_subject(self) -> None:
-        """Tracking has locked on: autofocus on the person followed — on the
-        upper body, where a face and shirt give the detail — so the picture
-        is sharp before Record. The trackers hold their zoom and focus, and
-        don't count the blurred frames, while it runs."""
+    def refocus_after_zoom(self) -> None:
+        """Tracking or recording: the tracker has zoomed and the lens has come
+        to rest, so autofocus on the person. The move refocused from
+        FOCUS_GRID, whose sharp band is too thin to hit; left there the
+        picture stays blurred, the detector loses them, the lens zooms out,
+        finds them, zooms in and blurs again."""
+        now = time.monotonic()
+        zoom = self.ptz.zoom_mm
+        if zoom != self._zoom_seen:
+            self._zoom_seen, self._zoom_moved_at = zoom, now
+        if (self.phase in ("found", "track")     # on a person: not in a sweep
+                and abs(zoom - self._af_zoom) >= config.AF_REZOOM_MM
+                and now - self._zoom_moved_at >= config.AF_AFTER_ZOOM_S
+                and now - self._af_track_at >= config.AF_TRACK_GAP_S
+                and not self.autofocus.busy):
+            self.focus_on_subject(narrow=True)
+
+    def focus_on_subject(self, narrow: bool = False) -> None:
+        """Autofocus on the person followed — on the upper body, where a face
+        and shirt give the detail. The trackers hold their zoom and focus,
+        and don't count the blurred frames, while it runs. `narrow`: search
+        close by first (AutoFocus.start)."""
         pw, ph = config.PREVIEW_SIZE
+        self._af_zoom, self._af_track_at = self.ptz.zoom_mm, time.monotonic()
         for (x, y, w, h), label in self.tracker.labelled:
             if label == CLIMBER:
                 self.autofocus.start(min(1.0, max(0.0, (x + w / 2) / pw)),
-                                     min(1.0, max(0.0, (y + 0.35 * h) / ph)))
+                                     min(1.0, max(0.0, (y + 0.35 * h) / ph)), narrow)
                 return
-        self.autofocus.start(0.5, 0.5)
+        self.autofocus.start(0.5, 0.5, narrow)
 
     def manual_lens(self) -> None:
         """Awake: zoom to the app's latest setting, and once the zoom has

@@ -137,6 +137,7 @@ JOG_TILT_MAX_DPS = 45.0
 # Higher is snappier; at these, full speed is a quarter of a second away.
 JOG_PAN_ACCEL_DPS2 = 240.0
 JOG_TILT_ACCEL_DPS2 = 180.0
+TIMING_LOG_S = 0.15             # a control tick or joystick gap longer than this is logged
 JOG_TIMEOUT_S = 0.3            # no joystick message this long: stop. A dropped
                                # connection can't leave the head turning
 # …and the app's zoom slider. The lens goes where it says at once, past
@@ -163,6 +164,12 @@ AF_REGION = 0.3                # side of the square scored, of the frame's short
 AF_AFTER_ZOOM_S = 0.8
 AF_ON_WAKE_S = 2.0             # CAMERA_WARMUP_S and some: exposure settled first
 AWAKE_FOCUS_M = 5.0            # focus for a room on booting or waking, until autofocus
+# The tracker's zoom moves throw focus off, and the sharp band is too thin for
+# FOCUS_GRID to hit: once a move of AF_REZOOM_MM has rested AF_AFTER_ZOOM_S,
+# autofocus on the person, close by first, at most every AF_TRACK_GAP_S.
+AF_REZOOM_MM = 0.3
+AF_TRACK_GAP_S = 5.0
+AF_REFOCUS_HALF = 0.08         # of the focus motor's travel
 
 # --- tracking -------------------------------------------------------------
 UWB_BASELINE_M = 0.4          # anchor separation (cad/config.scad uwb_half_base × 2)
