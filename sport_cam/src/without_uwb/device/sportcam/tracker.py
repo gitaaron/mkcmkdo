@@ -315,7 +315,11 @@ class Tracker:
             return math.hypot(b[0] + b[2] / 2 - lx, b[1] + b[3] / 2 - ly)
 
         gone = now - (self._last_seen_at or now)
-        gate = config.TRACK_GATE_FRACTION * config.PREVIEW_SIZE[0]
+        # unseen for a while, they may be anywhere near: wider, but they must
+        # be confident to come back
+        share = (config.TRACK_GATE_FRACTION if gone <= config.TRACK_RESEEN_S
+                 else config.TRACK_GATE_LOST_FRACTION)
+        gate = share * config.PREVIEW_SIZE[0]
         near = [b for b in boxes if away(b) <= gate and self._looks_like(b, now) is not False
                 and (gone <= config.TRACK_RESEEN_S
                      or score_of(b) >= config.PERSON_LOCK_CONFIDENCE)]

@@ -90,12 +90,12 @@ SERVO_US_AT_0, SERVO_US_AT_180 = 500, 2500
 # flips if your base is assembled mirrored. CENTER_RAW may be fractional with
 # the pigpio driver. Verify both on the bench with
 # `python -m sportcam.ptzcheck` before the first tracking run.
-# Which of the PTZ controller's two lens registers drives which motor.
-# Arducam's Focuser.py for the IMX477 kit has focus on 0x00 and zoom on 0x01,
-# but on the bench kit it is the other way round: lenscheck, writing each
-# register alone, found 0x00 changing the framing and 0x01 the sharpness
-# (one sharp peak, the framing still). True swaps the two.
-LENS_SWAP_ZOOM_FOCUS = True
+# Which of the PTZ controller's two lens registers drives which motor. The
+# IMX477 kit has focus on 0x00 and zoom on 0x01, as in Arducam's Focuser.py:
+# lenscheck stepped each as the zoom, focusing with the other, and measured
+# the picture's scale: 0x01 changes it (1.74× by 1400), 0x00 not measurably.
+# True swaps the two, for a controller wired the other way.
+LENS_SWAP_ZOOM_FOCUS = False
 I2C_BUS = 1                     # PTZ controller (zoom, focus; and pan/tilt on "arducam")
 # Measured on the bench kit (a sample aimed straight ahead and level with
 # the sticks): straight ahead is pan raw 89, level is tilt raw 175 — raw 90
@@ -351,8 +351,9 @@ DETECT_STRIP_FRACTION = 0.42
 DETECT_DOWNSCALE_W = 480       # HOG input width; smaller is faster
 
 # Horizontal field of view at the two ends of the zoom range, used to turn a
-# bearing into a pixel column. From the lens's published 96-33 deg spec.
-HFOV_WIDE_DEG, HFOV_TELE_DEG = 96.0, 33.0
+# bearing into a pixel column. Wide from the rated 4.38 mm on the sensor's
+# 6.3 mm width (calculated, not measured), tele as published.
+HFOV_WIDE_DEG, HFOV_TELE_DEG = 71.0, 33.0
 
 # --- framing --------------------------------------------------------------
 TARGET_FRAME_FRACTION = 0.45   # distance-only framing (vision refines it, below)
@@ -391,18 +392,17 @@ ZOOM_GUARD_FILL = 0.85
 ZOOM_GUARD_EDGE = 0.03         # box within this fraction of any frame edge
 ZOOM_GUARD_STEP = 0.8          # multiply the zoom by this per trigger
 
-# Arducam PTZ zoom lens. The published field of view is 96°→33° horizontal,
-# which on the IMX477's 16:9 frame is about 2.8-10.6 mm of focal length.
-# Verify during the zoom calibration in docs/04 and correct the curves below.
-ZOOM_MIN_MM, ZOOM_MAX_MM = 2.8, 10.6
+# Arducam PTZ zoom lens: 4.38-10.71 mm, Arducam's rating. lenscheck's measured
+# scales fit it: 8.4 mm at zoom register 700 and 6.2 mm at 1400, from 10.71 at 0.
+ZOOM_MIN_MM, ZOOM_MAX_MM = 4.38, 10.71
 ZOOM_MIN_STEP_MM = 0.15        # ignore smaller changes — stops the lens breathing
 ZOOM_RATE_LIMIT_S = 2.0
 
-# (focal length mm, raw motor value). Straight lines between the stops until
-# you measure yours; the raw ranges are the controller's own limits. On the
-# bench kit the zoom register's high end is wide and its low end tele: the
-# app's slider zoomed out as it rose with them the other way round.
-ZOOM_CURVE = [(2.8, 20000), (10.6, 3000)]
+# (focal length mm, raw motor value), on the 3000-20000 scale ptz.py rescales
+# to the controller's 0-2100. The zoom register's low end is tele, its high end
+# wide (lenscheck, measured scale), near enough a straight line between them.
+# Wide stops at register 1995 (19150 here): beyond that focus runs out of travel.
+ZOOM_CURVE = [(4.38, 19150), (10.71, 3000)]
 
 # How long the lens motors take. Ptz.wait_lens goes by the controller's busy
 # flag (a 16-bit word: lenscheck sees it set on every move); these are its
@@ -424,18 +424,18 @@ LENS_SETTLE_S = 0.05            # after the busy flag clears: the picture catche
 # sharpest position. UNTIL YOU DO, every row is flat, which reproduces the
 # old focal-length-only behaviour exactly — nothing gets worse, and nothing
 # gets better either.
-# Until calibrated, flat in distance and measured by lenscheck on the bench
-# kit for a room-sized scene (two to four metres): sharp at focus 1575 with
-# the zoom register at 1050 (6.7 mm), and at 1050 with it at 210 (≈ 9.8 mm),
-# on the controller's 0-2100 scale. The ends follow the same slope, the wide
-# end clamped at the focus stop (an earlier sweep found it sharp at ≈ 95 %
-# there). Autofocus starts its search here, so a good grid makes it quick;
-# focuscal measures one properly.
+# Until calibrated, flat in distance: where lenscheck found a room-sized scene
+# sharp at each zoom, on the bench kit. (zoom, focus) registers, 0-2100: (0,
+# 225), (700, 330), (1305, 700), (1400, 840), (1740, 1400), (1995, 2100).
+# Autofocus starts its search here, so a good grid makes it quick; focuscal
+# measures distance too.
 FOCUS_GRID = {
-    2.8:  [(2.0, 20000), (5.0, 20000), (10.0, 20000), (30.0, 20000)],
-    6.7:  [(2.0, 15000), (5.0, 15000), (10.0, 15000), (30.0, 15000)],
-    9.8:  [(2.0, 10000), (5.0, 10000), (10.0, 10000), (30.0, 10000)],
-    10.6: [(2.0, 8710), (5.0, 8710), (10.0, 8710), (30.0, 8710)],
+    4.38:  [(2.0, 20000), (5.0, 20000), (10.0, 20000), (30.0, 20000)],
+    5.19:  [(2.0, 13330), (5.0, 13330), (10.0, 13330), (30.0, 13330)],
+    6.27:  [(2.0, 8000), (5.0, 8000), (10.0, 8000), (30.0, 8000)],
+    6.57:  [(2.0, 6670), (5.0, 6670), (10.0, 6670), (30.0, 6670)],
+    8.49:  [(2.0, 3140), (5.0, 3140), (10.0, 3140), (30.0, 3140)],
+    10.71: [(2.0, 2140), (5.0, 2140), (10.0, 2140), (30.0, 2140)],
 }
 FOCUS_DEADBAND_DIOPTRE = 0.02  # ignore changes smaller than this in 1/d
 FOCUS_RATE_LIMIT_S = 0.5

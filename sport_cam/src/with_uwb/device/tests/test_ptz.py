@@ -95,7 +95,7 @@ def main() -> None:
     check("past the tele end clamps", focus_raw(14.0, 10.0, GRID) == 16600)
 
     # ---- 4. the shipped (uncalibrated) grid depends on focal length only ---
-    for efl, old in ((2.8, 20000), (6.7, 15000), (10.6, 8710)):
+    for efl, old in ((4.38, 20000), (6.27, 8000), (10.71, 2140)):
         flat = {focus_raw(efl, d) for d in (1.0, 3.0, 8.0, 40.0)}
         check(f"uncalibrated grid is distance-independent at {efl} mm",
               flat == {old}, f"{flat}")

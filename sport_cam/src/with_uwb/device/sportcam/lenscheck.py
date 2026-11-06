@@ -1,30 +1,25 @@
-"""Find out, from the lens itself, which register is zoom and which is focus,
-which way each runs, and how the controller reports its moves.
+"""Find out, from the lens itself, which motor is the zoom and how far it goes.
 
     ./scripts/pi/lenscheck.sh           # from the Mac; stop `run main` first: it needs the camera
 
 which keeps its output and contact sheet in logs/ on the Mac. On the Pi
 alone: ./scripts/pi/run lenscheck.
 
-Point the camera at a scene with detail at two metres or more — the lens
+Point the camera at a detailed scene two metres or more away — the lens
 can't focus closer than 1.5 m (Arducam's spec) — and leave it still. About
-three minutes.
+four minutes.
 
-It writes the controller's two lens registers directly — 0x00 and 0x01, at
-0…2100 as Arducam's Focuser.py does — ignoring LENS_SWAP_ZOOM_FOCUS and
-ZOOM_CURVE, so what it shows doesn't depend on them. For each register in
-turn, with the other held mid-way:
+It writes the controller's two lens registers directly, 0x00 and 0x01 at
+0…2100, ignoring LENS_SWAP_ZOOM_FOCUS and ZOOM_CURVE, so what it finds
+doesn't depend on them. Taking each register in turn as the zoom, it steps
+that register across its travel; at each stop it sweeps the other to find
+where the picture is sharpest, and measures the sharp picture's scale against
+the first from matched points (a blurred picture can't show its true scale).
 
-  * a row of the contact sheet (~/lenscheck.jpg): the picture at five values,
-    each taken once the controller says the motor has stopped, labelled with
-    the value, how long the move took and the sharpness. The zoom register
-    changes the framing; the focus register the sharpness, the framing barely
-  * a slow sweep, up and back down in steps of 105 (5 %), sharpness at each:
-    the focus register shows a peak; its position going up and coming down
-    says how much backlash there is
-
-and before that, what the controller says about itself: firmware, mode, and
-its built-in zoom → focus tracking map (registers 0x50 / 0x5b).
+The zoom is the register that changes the scale by about the lens's rating,
+2.4×. Focus breathing moves it only a little. The contact sheet (~/lenscheck.jpg)
+has a row of the sharp pictures per register, and the log gives the zoom →
+focus pairs FOCUS_GRID wants.
 """
 from __future__ import annotations
 
@@ -37,7 +32,8 @@ from .ptz import _REG_BUSY, CHIP_ADDR, Ptz
 
 REGS = (0x00, 0x01)
 TOP = 2100
-MID = 1050
+STOPS = (0, 700, 1400, 2100)
+COARSE, FINE = 60, 15   # steps of the sweep for focus; a sharp band is under 105 wide
 REGION = 0.5            # sharpness over the middle half of the frame
 TIMEOUT_S = 15.0
 
@@ -90,6 +86,48 @@ def score(cam: Camera) -> float:
     return sharpness(cam._capture(), 0.5, 0.5, REGION)
 
 
+def sharpest(raw: Raw, cam: Camera, reg: int) -> tuple[int, float]:
+    """Sweep `reg` for the sharpest picture; it ends there. (value, score)."""
+    raw.move(reg, 0)
+    scores = []
+    for value in range(0, TOP + 1, COARSE):
+        raw.move(reg, value)
+        scores.append((score(cam), value))
+    _s, peak = max(scores)
+    lo, hi = max(0, peak - COARSE), min(TOP, peak + COARSE)
+    raw.move(reg, max(0, lo - 30))
+    scores = []
+    for value in range(lo, hi + 1, FINE):
+        raw.move(reg, value)
+        scores.append((score(cam), value))
+    best, value = max(scores)
+    raw.move(reg, max(0, value - 30))
+    raw.move(reg, value)
+    return value, best
+
+
+def scale_between(a, b) -> tuple[float, int] | None:
+    """How much bigger things are in `b` than in `a`, and on how many matched
+    points; None if the pictures don't match well enough to say."""
+    import cv2
+    import numpy as np
+    orb = cv2.ORB_create(4000)
+    ka, da = orb.detectAndCompute(a, None)
+    kb, db = orb.detectAndCompute(b, None)
+    if da is None or db is None:
+        return None
+    pairs = sorted(cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True).match(da, db),
+                   key=lambda m: m.distance)[:400]
+    if len(pairs) < 12:
+        return None
+    pa = np.float32([ka[m.queryIdx].pt for m in pairs])
+    pb = np.float32([kb[m.trainIdx].pt for m in pairs])
+    m, inliers = cv2.estimateAffinePartial2D(pa, pb, method=cv2.RANSAC, ransacReprojThreshold=3)
+    if m is None or int(inliers.sum()) < 12:
+        return None
+    return float(np.hypot(m[0, 0], m[1, 0])), int(inliers.sum())
+
+
 def main() -> None:
     import cv2
     import numpy as np
@@ -101,51 +139,43 @@ def main() -> None:
     raw = Raw(ptz)
     print(f"controller firmware 0x{ptz.focuser.firmware or 0:04x}; waking the lens…")
     ptz.start()
-    print(f"mode register 0x30 = {raw.read(0x30)}   (1: 'Adjust', the firmware moves focus with zoom)")
-    print(f"busy word now = {raw.busy_word()}")
-    print(f"tracking map 0x50: {raw.block(0x50, 22)}")
-    print(f"tracking map 0x5b: {raw.block(0x5b, 22)}")
-    print(f"registers now: 0x00 = {raw.read(0x00)}, 0x01 = {raw.read(0x01)}")
+    print(f"mode register 0x30 = {raw.read(0x30)}")
 
     rows = []
-    for reg in REGS:
-        other = REGS[1 - REGS.index(reg)]
-        print(f"\n== register 0x{reg:02x} alone (0x{other:02x} held at {MID}) ==")
-        raw.move(other, MID)
-        raw.move(reg, 0)
+    ranges = {}
+    for zoom_reg in REGS:
+        focus_reg = REGS[1 - REGS.index(zoom_reg)]
+        print(f"\n== 0x{zoom_reg:02x} as the zoom, 0x{focus_reg:02x} as the focus ==")
+        first = None
+        scales = [1.0]
         tiles = []
-        for value in (0, 525, 1050, 1575, 2100):
-            dt, seen = raw.move(reg, value)
-            s = score(cam)
-            back = raw.read(reg)
-            print(f"  0x{reg:02x} = {value:4d}: move {dt:5.2f} s, busy {'seen' if seen else 'never set'}, "
-                  f"reads back {back}, sharpness {s:6.1f}")
-            small = cv2.resize(cam._capture(), (384, 216))
-            cv2.putText(small, f"0x{reg:02x}={value} {dt:.1f}s s={s:.0f}", (8, 26),
+        for z in STOPS:
+            raw.move(zoom_reg, z)
+            value, best = sharpest(raw, cam, focus_reg)
+            cam._capture()
+            rgb = cam._capture()
+            grey = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+            found = None if first is None else scale_between(first, grey)
+            if first is None:
+                first = grey
+            elif found:
+                scales.append(found[0])
+            said = "first" if found is None and grey is first else (
+                f"scale {found[0]:.3f} on {found[1]} points" if found else "scale unknown")
+            print(f"  0x{zoom_reg:02x} = {z:4d}: sharpest at 0x{focus_reg:02x} = {value:4d} "
+                  f"(sharpness {best:.0f}), {said}")
+            small = cv2.resize(rgb, (384, 216))
+            cv2.putText(small, f"0x{zoom_reg:02x}={z} 0x{focus_reg:02x}={value}", (8, 26),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
             tiles.append(small)
         rows.append(np.hstack(tiles))
-
-        print(f"  slow sweep of 0x{reg:02x}, steps of 105:")
-        raw.move(reg, 0)
-        up = []
-        for value in range(0, TOP + 1, 105):
-            raw.move(reg, value)
-            up.append((value, score(cam)))
-        down = []
-        for value in range(TOP, -1, -105):
-            raw.move(reg, value)
-            down.append((value, score(cam)))
-        print("    up:   " + " ".join(f"{v}:{s:.0f}" for v, s in up))
-        print("    down: " + " ".join(f"{v}:{s:.0f}" for v, s in reversed(down)))
-        bu = max(up, key=lambda p: p[1])
-        bd = max(down, key=lambda p: p[1])
-        print(f"    peak going up at {bu[0]} ({bu[1]:.0f}), coming down at {bd[0]} ({bd[1]:.0f})")
-        raw.move(reg, MID)
+        ranges[zoom_reg] = max(scales) / min(scales)
+        print(f"  range of scale: {ranges[zoom_reg]:.2f}×")
 
     path = os.path.expanduser("~/lenscheck.jpg")
     cv2.imwrite(path, np.vstack(rows)[:, :, ::-1])
-    print(f"\nsaved {path}: top row register 0x00, bottom row 0x01")
+    print(f"\nsaved {path}: top row 0x00 as the zoom, bottom row 0x01")
+    print("range of scale: " + ", ".join(f"0x{r:02x} {v:.2f}×" for r, v in ranges.items()))
     ptz.park()
 
 
