@@ -168,6 +168,12 @@ AWAKE_FOCUS_M = 5.0            # focus for a room on booting or waking, until au
 AF_REZOOM_MM = 0.3
 AF_TRACK_GAP_S = 5.0
 AF_REFOCUS_HALF = 0.08         # of the focus motor's travel
+# That search never runs the whole travel: the picture would go to a blur for
+# seconds and the tracker would lose its person. Best at a window's end: the
+# next window that way, up to AF_REFOCUS_WINDOWS. A peak stands AF_REFOCUS_RISE
+# above the window's ends; none, and the lens goes back where it was.
+AF_REFOCUS_WINDOWS = 3
+AF_REFOCUS_RISE = 1.15
 
 CONTROL_RATE_HZ = 20            # tracker / state-machine tick
 
@@ -298,13 +304,20 @@ DIST_MIN_M, DIST_MAX_M = 1.0, 30.0
 # body is about PERSON_IN_BOX_H of the box height and PERSON_IN_BOX_W of its
 # width, and fill is measured on the body.
 ZOOM_FILL_TARGET = 0.65        # person fills 65 %: ≈ 17 % margin each side
-ZOOM_VISION_GAIN = 0.35        # share of the log-error corrected per detection
+ZOOM_VISION_GAIN = 0.35        # share of the log-error corrected per lens move
 ZOOM_FILL_DEADBAND = 0.3       # fill within this share of the target: leave the zoom
 PERSON_IN_BOX_H = 0.75
 PERSON_IN_BOX_W = 0.55
 # Guard: a fast zoom-out when the body nears the edge of the frame or
 # outgrows ZOOM_GUARD_FILL. HOG cannot see a body that is already clipped,
 # so this has to act on the approach, and it wins over the fill loop.
+# A correction is worked out once per move, from the lens as it stands and a
+# picture of it at rest: adding one up per detection, while the lens hasn't
+# moved yet, overshoots by several times. The person must stay off target
+# ZOOM_FILL_HOLD_S (a step back and forward doesn't count), and moves are
+# ZOOM_TRACK_DWELL_S apart, which leaves autofocus its turn between them.
+ZOOM_FILL_HOLD_S = 2.0
+ZOOM_TRACK_DWELL_S = 6.0
 ZOOM_GUARD_FILL = 0.85
 ZOOM_GUARD_EDGE = 0.03         # box within this fraction of any frame edge
 ZOOM_GUARD_STEP = 0.8          # multiply the zoom by this per trigger
@@ -354,6 +367,7 @@ FOCUS_GRID = {
     8.49:  [(2.0, 3140), (5.0, 3140), (10.0, 3140), (30.0, 3140)],
     10.71: [(2.0, 2140), (5.0, 2140), (10.0, 2140), (30.0, 2140)],
 }
+FOCUS_TRIM_MAX = 150           # motor steps: the most the last autofocus may shift a lookup
 FOCUS_DEADBAND_DIOPTRE = 0.02  # ignore changes smaller than this in 1/d
 FOCUS_RATE_LIMIT_S = 0.5
 

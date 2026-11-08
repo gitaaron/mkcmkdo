@@ -72,6 +72,7 @@ class Tracker:
         self._pan_bias = 0.0           # CV-learned correction to the UWB bearing
         self._tilt_bias = 0.0          # same, for the UWB elevation
         self._zoom_scale = 1.0         # vision framing: multiplies the distance zoom
+        self._zoom_judged_at = float("-inf")   # the last framing correction
         self._pan_vel = 0.0            # deg/s, for easing toward the target
         self._tilt_vel = 0.0
         self._looking_wide = False     # recording, wearer out of sight: lens wide
@@ -417,7 +418,7 @@ class Tracker:
                 self.ptz.nudge_tilt(_clamp(
                     self._tilt_pid(cy_err) * config.TILT_STEP_GAIN,
                     -config.TILT_MAX_DPS * dt * 4, config.TILT_MAX_DPS * dt * 4))
-            self._frame_zoom(x, y, w, h)
+            self._frame_zoom(now, x, y, w, h)
         elif not self._looking_wide and (
                 self._last_seen_at is None or now - self._last_seen_at > config.ZOOM_STALE_S):
             # Vision has gone quiet: ease back toward the looser distance
@@ -462,7 +463,7 @@ class Tracker:
         half_v = math.atan(math.tan(math.radians(self.ptz.hfov_deg / 2)) * ph / pw)
         return math.degrees(math.atan(dy_px / (ph / 2) * math.tan(half_v)))
 
-    def _frame_zoom(self, x: int, y: int, w: int, h: int) -> None:
+    def _frame_zoom(self, now: float, x: int, y: int, w: int, h: int) -> None:
         """Zoom so the person fills ZOOM_FILL_TARGET of the frame, with margin.
 
         Measured on the body, not the padded HOG box. Two parts:
@@ -471,8 +472,14 @@ class Tracker:
           ZOOM_GUARD_FILL: zoom out a step at once. HOG cannot detect a body
           that is already clipped, so this acts on the approach, and it wins.
         * **fill loop** — otherwise move part of the way toward the target
-          fill each detection, in log space so in and out behave alike.
+          fill, in log space so in and out behave alike.
+
+        One correction per lens move, ZOOM_TRACK_DWELL_S apart (the guard,
+        ZOOM_RATE_LIMIT_S), and none from a picture of the lens moving: adding
+        one up per detection, before the lens has answered, overshoots.
         """
+        if getattr(self.ptz, "lens_moving", False):
+            return
         pw, ph = config.PREVIEW_SIZE
         bw, bh = w * config.PERSON_IN_BOX_W, h * config.PERSON_IN_BOX_H
         cx, cy = x + w / 2, y + h / 2
@@ -481,9 +488,14 @@ class Tracker:
         ex, ey = config.ZOOM_GUARD_EDGE * pw, config.ZOOM_GUARD_EDGE * ph
         near_edge = left < ex or top < ey or right > pw - ex or bottom > ph - ey
         if near_edge or fill > config.ZOOM_GUARD_FILL:
+            if now - self._zoom_judged_at < config.ZOOM_RATE_LIMIT_S:
+                return
             self._zoom_scale *= config.ZOOM_GUARD_STEP
         else:
+            if now - self._zoom_judged_at < config.ZOOM_TRACK_DWELL_S:
+                return
             self._zoom_scale *= (config.ZOOM_FILL_TARGET / fill) ** config.ZOOM_VISION_GAIN
+        self._zoom_judged_at = now
         self._zoom_scale = _clamp(self._zoom_scale, config.ZOOM_SCALE_MIN, config.ZOOM_SCALE_MAX)
 
     def _hint_search_column(self, bearing_deg: float) -> None:

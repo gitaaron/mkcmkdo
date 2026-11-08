@@ -286,7 +286,7 @@ def main() -> None:
     tr12 = Tracker(FakeUwb(dist=8.0), cam12, ptz12)
     tr12.step()
     first_fill = fill_of(cam12)
-    run(tr12, 400, 0.01)          # ~4 s: about a dozen detections
+    run(tr12, 4000, 0.01)         # ~40 s: a correction every ZOOM_TRACK_DWELL_S
     check("distance alone frames loosely", first_fill < config.ZOOM_FILL_TARGET - 0.1,
           f"{first_fill:.2f}")
     check("vision zooms in until the person fills the target",

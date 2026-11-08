@@ -157,6 +157,8 @@ class Tracker:
         self._tilt_goal = self.ptz.tilt_deg
         self._pan_vel = self._tilt_vel = 0.0   # deg/s, for easing (_slew)
         self._efl = config.ZOOM_MIN_MM
+        self._zoom_moved_at = float("-inf")    # the last framing move
+        self._zoom_off_since = None            # off target since, for the fill loop
         self.dist_m = None
         self.camera.set_search_column(None)
         self.ptz.set_zoom_mm(config.ZOOM_MIN_MM)
@@ -230,7 +232,7 @@ class Tracker:
             self._seen(now, matched)
         gone = now - (self._last_seen_at or now)
         if self.mode == TRACK and gone > config.LOST_ZOOM_OUT_S:
-            self._look_wide()
+            self._look_wide(now)
         else:
             self.ptz.set_zoom_mm(self._efl)      # retry anything the rate limit dropped
         self._slew(dt)
@@ -357,7 +359,7 @@ class Tracker:
                 config.TILT_MIN_DEG, config.TILT_MAX_DEG)
         self.camera.set_search_column(cx)
         self._estimate_distance(h)
-        self._frame_zoom(x, y, w, h)
+        self._frame_zoom(now, x, y, w, h)
 
     def _pose_at(self, t: float | None) -> tuple[float, float]:
         """Pan and tilt when the frame captured at `t` was taken.
@@ -416,17 +418,25 @@ class Tracker:
             self.dist_m + config.DIST_SMOOTHING * (d - self.dist_m))
         self.ptz.set_focus(self.dist_m)   # first, so a zoom move refocuses for this distance
 
-    def _frame_zoom(self, x: int, y: int, w: int, h: int) -> None:
+    def _frame_zoom(self, now: float, x: int, y: int, w: int, h: int) -> None:
         """Zoom so the person fills ZOOM_FILL_TARGET of the frame, with margin.
 
         Measured on the body, not the padded HOG box. Two parts:
 
         * **guard** — the body is near an edge, or fills more than
-          ZOOM_GUARD_FILL: zoom out a step at once. HOG cannot detect a body
-          that is already clipped, so this acts on the approach, and it wins.
-        * **fill loop** — otherwise move part of the way toward the target
-          fill each detection, in log space so in and out behave alike.
+          ZOOM_GUARD_FILL: zoom out a step, as soon as the lens may move. HOG
+          cannot detect a body that is already clipped, so this acts on the
+          approach, and it wins.
+        * **fill loop** — otherwise, off target for ZOOM_FILL_HOLD_S, move part
+          of the way to the target fill, in log space so in and out behave
+          alike, then wait ZOOM_TRACK_DWELL_S.
+
+        Both go from the lens as it stands: a picture taken while it moves, or
+        before a move lands, says nothing about the next one.
         """
+        if getattr(self.ptz, "lens_moving", False):
+            self._zoom_off_since = None
+            return
         pw, ph = config.PREVIEW_SIZE
         bw, bh = w * config.PERSON_IN_BOX_W, h * config.PERSON_IN_BOX_H
         cx, cy = x + w / 2, y + h / 2
@@ -434,15 +444,27 @@ class Tracker:
         fill = max(bh / ph, bw / pw, 1e-3)
         ex, ey = config.ZOOM_GUARD_EDGE * pw, config.ZOOM_GUARD_EDGE * ph
         near_edge = left < ex or top < ey or right > pw - ex or bottom > ph - ey
+        since_move = now - self._zoom_moved_at
         if near_edge or fill > config.ZOOM_GUARD_FILL:
-            self._efl *= config.ZOOM_GUARD_STEP
+            if since_move < config.ZOOM_RATE_LIMIT_S:
+                return
+            step = config.ZOOM_GUARD_STEP
         elif abs(fill / config.ZOOM_FILL_TARGET - 1.0) > config.ZOOM_FILL_DEADBAND:
             # not for every small change: each zoom move costs a refocus
-            self._efl *= (config.ZOOM_FILL_TARGET / fill) ** config.ZOOM_VISION_GAIN
-        self._efl = _clamp(self._efl, config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
+            if self._zoom_off_since is None:
+                self._zoom_off_since = now
+            if (now - self._zoom_off_since < config.ZOOM_FILL_HOLD_S
+                    or since_move < config.ZOOM_TRACK_DWELL_S):
+                return
+            step = (config.ZOOM_FILL_TARGET / fill) ** config.ZOOM_VISION_GAIN
+        else:
+            self._zoom_off_since = None
+            return
+        self._efl = _clamp(self.ptz.zoom_mm * step, config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
         self.ptz.set_zoom_mm(self._efl)
+        self._zoom_moved_at, self._zoom_off_since = now, None
 
-    def _look_wide(self) -> None:
+    def _look_wide(self, now: float) -> None:
         """Recording, and the person out of sight LOST_ZOOM_OUT_S: zoom out.
 
         Straight to the wide end, past the rate limit, still pointing where
@@ -457,7 +479,10 @@ class Tracker:
             lx, ly = self._last_centre
             self._last_centre = (pw / 2 + (lx - pw / 2) * k, ph / 2 + (ly - ph / 2) * k)
         self._efl = config.ZOOM_MIN_MM
+        self._zoom_moved_at = float("-inf")    # the last framing move
+        self._zoom_off_since = None            # off target since, for the fill loop
         self.ptz.set_zoom_mm(self._efl, urgent=True)
+        self._zoom_moved_at = now
         self.camera.set_search_column(None)
 
 

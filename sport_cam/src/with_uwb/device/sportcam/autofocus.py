@@ -12,7 +12,9 @@ narrow band of it, so a sweep:
      the clock: the move runs at a steady speed between the write and the
      controller's busy flag clearing, and a frame shows the lens AF_FRAME_LAG_S
      before it is handed over. No clear peak: once more over the whole travel
-     (AF_SWEEP_HALVES);
+     (AF_SWEEP_HALVES). A `narrow` search never does that: its windows walk
+     towards rising sharpness (AF_REFOCUS_WINDOWS), and with no peak in them
+     the lens goes back where it was;
   2. refines round the peak in short steps (AF_FINE), each move upward and
      the last one onto the best from below, as the gears have backlash;
   3. keeps where it ended, relative to FOCUS_GRID, as the focus trim
@@ -70,7 +72,7 @@ class AutoFocus:
 
     def start(self, x: float, y: float, narrow: bool = False) -> None:
         """Focus on (x, y) of the frame, on a thread; replaces a running sweep.
-        `narrow`: search close by first (AF_REFOCUS_HALF), for a lens nearly
+        `narrow`: search only close by (AF_REFOCUS_HALF), for a lens nearly
         right, in a moment that may be being filmed."""
         with self._lock:
             self._gen += 1
@@ -100,19 +102,16 @@ class AutoFocus:
             self.ptz.wait_lens()                # a zoom still travelling
             start = self.ptz.focus_pos
             start = 0.5 if start is None else start
-            peak = None
-            halves = config.AF_SWEEP_HALVES
-            for half in ((config.AF_REFOCUS_HALF, *halves[1:]) if narrow else halves):
-                lo, hi = max(0.0, start - half), min(1.0, start + half)
-                curve = self._sweep(gen, x, y, hi, lo)
-                if not curve:
-                    continue
-                best_pos, best = max(curve, key=lambda c: c[1])
-                ranked = sorted(v for _p, v in curve)
-                at_edge = half < 1.0 and (best_pos <= lo + 0.01 or best_pos >= hi - 0.01)
-                peak = best_pos
-                if best >= config.AF_PEAK_RATIO * ranked[len(ranked) // 2] and not at_edge:
-                    break
+            if narrow:
+                peak = self._walk(gen, x, y, start)
+                if peak is None:
+                    self._move(gen, start - config.AF_BACKLASH)
+                    self._move(gen, start)
+                    print(f"[af] ({x:.2f}, {y:.2f}) no peak near {start:.0%} in "
+                          f"{self._clock() - t0:.1f} s: lens left where it was")
+                    return None
+            else:
+                peak = self._search(gen, x, y, start)
             if peak is None:
                 return None
             step, half = config.AF_FINE
@@ -139,6 +138,46 @@ class AutoFocus:
                 if gen == self._gen:
                     self.busy = False
                     self.ptz.af_active = False
+
+    def _search(self, gen: int, x: float, y: float, start: float) -> float | None:
+        """Where the sharpness peaks, widening until a clear peak shows."""
+        peak = None
+        for half in config.AF_SWEEP_HALVES:
+            lo, hi = max(0.0, start - half), min(1.0, start + half)
+            curve = self._sweep(gen, x, y, hi, lo)
+            if not curve:
+                continue
+            best_pos, best = max(curve, key=lambda c: c[1])
+            ranked = sorted(v for _p, v in curve)
+            at_edge = half < 1.0 and (best_pos <= lo + 0.01 or best_pos >= hi - 0.01)
+            peak = best_pos
+            if best >= config.AF_PEAK_RATIO * ranked[len(ranked) // 2] and not at_edge:
+                break
+        return peak
+
+    def _walk(self, gen: int, x: float, y: float, start: float) -> float | None:
+        """Where the sharpness peaks close to `start`, or None if it doesn't.
+
+        The window sits near focus, so most of it scores high and a peak is
+        not many times the median, as in _search: it is a best position inside
+        the window, standing above the window's ends by AF_REFOCUS_RISE. Best
+        at an end: sharper further on, so the next window goes that way.
+        """
+        half, centre = config.AF_REFOCUS_HALF, start
+        for _ in range(config.AF_REFOCUS_WINDOWS):
+            lo, hi = max(0.0, centre - half), min(1.0, centre + half)
+            curve = self._sweep(gen, x, y, hi, lo)
+            if len(curve) < 3:
+                return None
+            best_pos, best = max(curve, key=lambda c: c[1])
+            ends = max(curve[0][1], curve[-1][1])
+            if best_pos >= hi - 0.01 and hi < 1.0:
+                centre = hi + half / 2      # overlapping: a peak on the seam shows
+            elif best_pos <= lo + 0.01 and lo > 0.0:
+                centre = lo - half / 2
+            else:
+                return best_pos if best >= config.AF_REFOCUS_RISE * ends else None
+        return None
 
     def _sweep(self, gen: int, x: float, y: float, a: float, b: float) -> list[tuple[float, float]]:
         """Run the focus motor a → b in one move, scoring each frame on the

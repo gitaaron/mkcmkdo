@@ -205,7 +205,9 @@ All in `src/without_uwb/device/sportcam/config.py`.
 | `LOST_HOLD_S` | 2 | target missing → hold and flash the ring |
 | `RESEARCH_AFTER_S` | 6 | target missing → sweep again |
 | `ZOOM_FILL_TARGET` | 0.65 | fraction of the frame the person should fill |
-| `ZOOM_VISION_GAIN` | 0.35 | share of the log error corrected per detection |
+| `ZOOM_VISION_GAIN` | 0.35 | share of the log error corrected per lens move |
+| `ZOOM_FILL_HOLD_S` | 2.0 | how long the fill must stay off target before a move |
+| `ZOOM_TRACK_DWELL_S` | 6.0 | between fill moves, leaving autofocus its turn; each works from the lens as it stands, never while it moves |
 | `ZOOM_GUARD_FILL` / `_EDGE` / `_STEP` | 0.85 / 0.03 / 0.8 | fast zoom-out guard |
 | `SUBJECT_HEIGHT_M` | 1.7 | body height assumed for the distance estimate |
 | `DIST_SMOOTHING` | 0.3 | share of each new distance estimate taken |

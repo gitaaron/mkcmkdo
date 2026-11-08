@@ -111,8 +111,35 @@ def run(best: float, start: float | None = 0.5):
     return got, ptz, af, w, where
 
 
+def narrow(score, start: float = 0.5):
+    w = World()
+    ptz = Ptz(w, start)
+    af = AutoFocus(Camera(w, ptz), ptz, score=score, sleep=w.sleep, clock=w.clock)
+    return af.focus(0.5, 0.5, narrow=True), ptz, w
+
+
+def hill(best: float):
+    """Near focus: sharpness falls off gently, so a peak isn't many medians."""
+    return lambda frame, x, y, region: 100.0 - 300.0 * abs(frame - best)
+
+
 def main() -> None:
     print("autofocus")
+    # after a zoom: the lens nearly right, perhaps on film
+    step, _half = config.AF_FINE
+    got, ptz, w = narrow(hill(0.53))
+    check("narrow: a gentle peak close by is found",
+          got is not None and abs(got - 0.53) <= step + 1e-9, f"{got}")
+    check("…in a moment", w.t < 4.0, f"{w.t:.1f} s")
+    got, ptz, w = narrow(hill(0.75))
+    check("narrow: outside the window, it walks to the peak",
+          got is not None and abs(got - 0.75) <= step + 1e-9, f"{got}")
+    reach = config.AF_REFOCUS_WINDOWS * 2 * config.AF_REFOCUS_HALF + 2 * config.AF_BACKLASH
+    check("…without running the whole travel",
+          max(ptz.moves) - min(ptz.moves) < reach + 1e-9, f"{ptz.moves}")
+    got, ptz, w = narrow(lambda frame, x, y, region: 5.0)
+    check("narrow: no peak at all gives up", got is None and ptz.learned is None, f"{got}")
+    check("…and puts the lens back", ptz.focus_pos == 0.5, f"{ptz.focus_pos}")
     check("fine steps stay inside the travel", min(_steps(-0.05, 0.05, 0.01)) == 0.0
           and max(_steps(0.95, 1.05, 0.01)) == 1.0)
     step, _half = config.AF_FINE

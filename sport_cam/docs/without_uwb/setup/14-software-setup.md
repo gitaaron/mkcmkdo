@@ -427,7 +427,7 @@ and film a short walk or climb after each. Defaults are in
 | Records furniture or empty wall | false positives | raise `DETECT_HIT_THRESHOLD`; raise `FOUND_CONFIRM_S` |
 | Camera oscillates around the person | gain too high for the detection rate | lower `TRACK_PAN_GAIN` / `TRACK_TILT_GAIN` (0.6 → 0.45); widen `TRACK_DEADBAND_FRACTION` |
 | Camera lags a mover and the person drifts out of frame | gain too low | raise the gains toward 0.8; raise `PAN_MAX_DPS`; widen `ZOOM_FILL_TARGET` margin (lower it) |
-| Shot "breathes" in and out | zoom too reactive | lower `ZOOM_VISION_GAIN`; raise `ZOOM_MIN_STEP_MM` |
+| Shot "breathes" in and out | zoom too reactive | raise `ZOOM_TRACK_DWELL_S` or `ZOOM_FILL_HOLD_S`; lower `ZOOM_VISION_GAIN` |
 | Person clipped at the edge | fill target too high or guard too late | lower `ZOOM_FILL_TARGET` (0.65 → 0.55); raise `ZOOM_GUARD_EDGE` |
 | Bystanders take over | gate too wide | lower `TRACK_GATE_FRACTION` (0.45 → 0.3) |
 | Tracking jumps to someone else after a short loss | re-search too eager | raise `RESEARCH_AFTER_S`; lower `TRACK_GATE_FRACTION` |

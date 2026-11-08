@@ -127,7 +127,9 @@ Shared by both builds; only the initial zoom guess differs (your build's 05).
 | Step | Parameter | Default |
 | --- | --- | --- |
 | Measure fill: larger of height and width fraction, on the body rather than the padded detector box | `PERSON_IN_BOX_H`, `PERSON_IN_BOX_W` | 75 %, 55 % of the box |
-| Move zoom toward the target, in log terms, by | `ZOOM_VISION_GAIN` | 35 % |
+| Move zoom toward the target, in log terms, by | `ZOOM_VISION_GAIN` | 35 % per lens move |
+| Fill must stay off target for | `ZOOM_FILL_HOLD_S` | 2 s |
+| Between fill moves | `ZOOM_TRACK_DWELL_S` | 6 s |
 | Target fill (≈ 17 % margin each side) | `ZOOM_FILL_TARGET` | **65 %** |
 | **Guard:** body within this of an edge… | `ZOOM_GUARD_EDGE` | 3 % |
 | …or filling more than | `ZOOM_GUARD_FILL` | 85 % |

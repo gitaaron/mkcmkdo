@@ -158,8 +158,14 @@ def main() -> None:
     a.learn_focus(0.6)                      # autofocus: sharp at 60 %, not the grid's
     trim = round(0.6 * 20000) - grid
     a.set_zoom_mm(9.8, urgent=True)
-    check("after autofocus, a zoom move refocuses at the grid's position plus its trim",
-          a._focus_raw == ptz_mod.focus_raw(9.8, 5.0) + trim, f"{a._focus_raw} vs {ptz_mod.focus_raw(9.8, 5.0)} + {trim}")
+    check("after autofocus, a zoom move refocuses at the grid's position plus its trim, capped",
+          a._focus_raw == ptz_mod.focus_raw(9.8, 5.0) + config.FOCUS_TRIM_MAX * (1 if trim > 0 else -1),
+          f"{a._focus_raw} vs {ptz_mod.focus_raw(9.8, 5.0)}, trim {trim}")
+    a._focus_trim, a._trim_zoom_mm = 20, 5.0
+    a.set_zoom_mm(10.0, urgent=True)
+    check("…grown with the square of the focal length: twice as long, four times the trim",
+          a._focus_raw == ptz_mod.focus_raw(10.0, 5.0) + 80,
+          f"{a._focus_raw} vs {ptz_mod.focus_raw(10.0, 5.0)} + 80")
 
     # ---- autofocus running: nobody else moves zoom or focus ---------------------
     a.af_active = True

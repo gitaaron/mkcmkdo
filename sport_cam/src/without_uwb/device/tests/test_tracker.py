@@ -259,8 +259,8 @@ def main() -> None:
     check("…and counts down from FOUND_CONFIRM_S", tr.countdown == math.ceil(config.FOUND_CONFIRM_S),
           f"{tr.countdown}")
     run(tr, config.FOUND_CONFIRM_S - 0.5)
-    check("FOUND frames them as recording will: zoom, focus, search strip",
-          tr.mode == "found" and ptz.zoom_mm > config.ZOOM_MIN_MM and cam.column is not None
+    check("FOUND frames them as recording will: focus, search strip",
+          tr.mode == "found" and cam.column is not None
           and ptz.focus_dist is not None and abs(ptz.focus_dist - (tr.dist_m or 0)) < 1e-6,
           f"mode={tr.mode} zoom {ptz.zoom_mm:.1f}")
     check("…not ready to record before FOUND_CONFIRM_S", not tr.ready_to_record and tr.countdown == 1,
@@ -357,7 +357,9 @@ def main() -> None:
     cam = LaggedCamera(ptz, [b])
     tr = Tracker(cam, ptz)
     run(tr, 20, until=lambda: locked(tr))
-    run(tr, 4)
+    run(tr, 12)                                                 # zoomed in on them by now
+    check("settled on a person: the zoom has come in", ptz.zoom_mm > config.ZOOM_MIN_MM,
+          f"{ptz.zoom_mm:.2f}")
     b.bearing = 30.0                                            # moves well aside
     peak = 0.0
     for _ in range(int(5 / 0.05)):
@@ -366,7 +368,8 @@ def main() -> None:
     # Taken from the current pose instead, the turn made during the detection
     # is counted twice: ≈ 1.8° past them here.
     check("late detections: offsets taken from the pose at capture, no overshoot",
-          peak < 0.5 and abs(ptz.pan_deg - 30.0) < 1.5, f"peak +{peak:.1f}°, pan {ptz.pan_deg:.1f}")
+          peak < 0.5 and abs(ptz.pan_deg - 30.0) < config.TRACK_DEADBAND_FRACTION * ptz.hfov_deg + 0.5,
+          f"peak +{peak:.1f}°, pan {ptz.pan_deg:.1f}")
     # ---- 6. losing the person ----------------------------------------------------
     print("\nlost")
     a = Person(25.0)
@@ -541,12 +544,34 @@ def main() -> None:
     ph = config.PREVIEW_SIZE[1]
     h = ph * config.ZOOM_FILL_TARGET * 1.1 / config.PERSON_IN_BOX_H   # a little over target
     y = (ph - h) / 2
-    tr._frame_zoom(500, y, h * 0.4, h)
+    ptz.zoom_mm = 6.0
+    tr._frame_zoom(100.0, 500, y, h * 0.4, h)
     check("a small change in size leaves the zoom alone (each move costs a refocus)",
           tr._efl == 6.0, f"{tr._efl}")
     h2 = ph * config.ZOOM_FILL_TARGET * 0.5 / config.PERSON_IN_BOX_H  # stepped well back
-    tr._frame_zoom(500, (ph - h2) / 2, h2 * 0.4, h2)
-    check("…a big one still zooms in", tr._efl > 6.0, f"{tr._efl}")
+    small = (500, (ph - h2) / 2, h2 * 0.4, h2)
+    tr._frame_zoom(100.0, *small)
+    tr._frame_zoom(100.0 + config.ZOOM_FILL_HOLD_S / 2, *small)
+    check("…a big one that doesn't last leaves it too", tr._efl == 6.0, f"{tr._efl}")
+    tr._frame_zoom(100.0 + config.ZOOM_FILL_HOLD_S, *small)
+    once = 6.0 * 2.0 ** config.ZOOM_VISION_GAIN
+    check("…one that lasts zooms in, by one correction",
+          abs(tr._efl - once) < 1e-6, f"{tr._efl} vs {once}")
+    ptz.zoom_mm = 6.0                                   # the lens hasn't got there yet
+    t = 100.0 + config.ZOOM_FILL_HOLD_S
+    for i in range(1, 20):
+        tr._frame_zoom(t + i / 3, *small)
+    check("…and the size not changing yet doesn't add up to more", abs(tr._efl - once) < 1e-6,
+          f"{tr._efl}")
+    tr._frame_zoom(t + config.ZOOM_TRACK_DWELL_S + 1, *small)
+    check("…the next one comes after ZOOM_TRACK_DWELL_S, from the lens as it stands",
+          abs(tr._efl - once) < 1e-6, f"{tr._efl}")
+    tr, _cam, ptz = world()
+    tr._efl = ptz.zoom_mm = 6.0
+    ptz.lens_moving = True
+    tr._frame_zoom(100.0, *small)
+    tr._frame_zoom(100.0 + config.ZOOM_TRACK_DWELL_S, *small)
+    check("a picture of the lens moving changes nothing", tr._efl == 6.0, f"{tr._efl}")
 
     print("\ntilt aim for a person too tall to centre")
     from sportcam.motion import tilt_error_px

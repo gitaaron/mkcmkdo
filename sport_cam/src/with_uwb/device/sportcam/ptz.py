@@ -317,6 +317,7 @@ class Ptz:
         # position was from FOCUS_GRID's for that zoom. Added to every grid
         # lookup after, so zoom changes and sweeps stay near focus.
         self._focus_trim = 0
+        self._trim_zoom_mm = config.ZOOM_MIN_MM    # the focal length it was found at
         # Autofocus is sweeping the focus motor: everyone else's zoom and
         # focus requests wait (they would spoil the sweep, and it them).
         self.af_active = False
@@ -429,12 +430,25 @@ class Ptz:
 
     def learn_focus(self, pos: float) -> None:
         """Autofocus found the focus motor sharp at `pos` (0…1): keep how far
-        that is from FOCUS_GRID's position for this zoom, and apply it to
-        every lookup from now on."""
+        that is from FOCUS_GRID's position for this zoom, for _trim to carry
+        to every lookup from now on."""
         _reg, lo, hi = _CHANNELS[OPT_FOCUS]
         raw = round(lo + max(0.0, min(1.0, pos)) * (hi - lo))
         dist = self._want_dist_m or self._focus_dist_m or config.AWAKE_FOCUS_M
         self._focus_trim = raw - focus_raw(self._zoom_mm, dist)
+        self._trim_zoom_mm = self._zoom_mm
+
+    def _trim(self) -> float:
+        """The last autofocus's correction, carried to this focal length.
+
+        A lens's focus travel for the same subject grows as the square of its
+        focal length, so a correction found wide is several times bigger at
+        tele. Capped: a small error at the wide end, where the sharp band is
+        broad, must not become a wild guess at the long end.
+        """
+        grown = (self._zoom_mm / self._trim_zoom_mm) ** 2
+        cap = config.FOCUS_TRIM_MAX
+        return max(-cap, min(cap, self._focus_trim * grown))
 
     @property
     def lens_moving(self) -> bool:
@@ -582,7 +596,7 @@ class Ptz:
         self._focus_dist_m = dist_m
         self._last_focus_at = time.monotonic()
         _reg, lo, hi = _CHANNELS[OPT_FOCUS]
-        raw = int(max(lo, min(hi, focus_raw(self._zoom_mm, dist_m) + self._focus_trim)))
+        raw = int(max(lo, min(hi, focus_raw(self._zoom_mm, dist_m) + self._trim())))
         if raw != self._focus_raw:
             self._focus_raw = raw
             self._lens_set(OPT_FOCUS, raw)
