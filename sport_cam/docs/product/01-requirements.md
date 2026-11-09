@@ -184,7 +184,8 @@ Rules:
 - `sleep`: the camera's sensor is stopped (no preview, detector or live
   view), the head turns slowly to look straight up (`SLEEP_TILT_DEG`, eased
   at `SLEEP_PARK_DPS`, about 8 s), and the ring shows
-  one dim pixel; leaving sleep it parks level and straight ahead. The Pi keeps
+  one dim pixel; leaving sleep it parks level and straight ahead (woken, eased
+  down at `WAKE_LEVEL_DPS`, and the joystick takes over at once). The Pi keeps
   its local API, Firebase link and mDNS up. **Wake up** → `awake`;
   **Track** → `tracking`, skipping `awake`. With UWB the radios keep
   ranging, so switching the tag on also starts a session from `sleep`.

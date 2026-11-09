@@ -113,6 +113,8 @@ SLEEP_TILT_DEG = 85.0          # asleep the head looks straight up (raw 90 on th
                                # awake, and leaving sleep, it parks level and straight ahead
 SLEEP_PARK_DPS = 15.0          # the slow, eased turn up on going to sleep: about 8 s from level
 SLEEP_PARK_ACCEL_DPS2 = 20.0
+WAKE_LEVEL_DPS = 45.0          # waking: eased down to level, ≈ 2.5 s; the joystick takes over at once
+WAKE_LEVEL_ACCEL_DPS2 = 60.0
 
 PAN_MAX_DPS = 120.0            # slew limit on the pan servo (deg/s)
 TILT_MAX_DPS = 90.0

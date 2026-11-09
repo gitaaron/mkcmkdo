@@ -427,9 +427,31 @@ async def full_flow() -> None:
     await head.apply_state("awake")
     check("woken: focused for a room at once", head.ptz.focus_dist == config.AWAKE_FOCUS_M,
           f"{head.ptz.focus_dist}")
-    await tick_for(config.AF_ON_WAKE_S + 0.2)
+    check("…the head doesn't snap down from the ceiling",
+          head.ptz.tilt_deg == config.SLEEP_TILT_DEG, f"tilt {head.ptz.tilt_deg}")
+    tilts = [head.ptz.tilt_deg]
+    await tick_for(config.AF_ON_WAKE_S + 0.2, until=lambda: tilts.append(head.ptz.tilt_deg) and False)
     check("…then an autofocus once the exposure has settled",
           (0.5, 0.5) in head.autofocus.started, f"{head.autofocus.started}")
+    await tick_for(10.0, until=lambda: tilts.append(head.ptz.tilt_deg) or head.ptz.tilt_deg == 0.0)
+    steps = [a - b for a, b in zip(tilts, tilts[1:])]
+    check("…it eases down to level, no faster than WAKE_LEVEL_DPS",
+          head.ptz.tilt_deg == 0.0 and max(steps) <= config.WAKE_LEVEL_DPS * 0.05 + 1e-6
+          and min(steps) >= 0.0, f"tilt {head.ptz.tilt_deg}, {max(steps):.3f} per tick")
+    await head.apply_state("sleep")
+    head.ptz.set_pan(0.0)
+    head.ptz.set_tilt(config.SLEEP_TILT_DEG)
+    await head.apply_state("awake")
+    await tick_for(0.5)
+    low = head.ptz.tilt_deg
+    tilts = []
+    for _ in range(10):                       # the joystick, up, during the wake
+        head.jog(0.0, 1.0)
+        await tick_for(0.05)
+        tilts.append(head.ptz.tilt_deg)
+    check("woken, the joystick pushed up while it levels: it takes over, no fight",
+          not head._leveling and all(b >= a for a, b in zip([low] + tilts, tilts)),
+          f"{low:.1f} → {[round(t, 1) for t in tilts]}")
     await head.apply_state("sleep")
 
     # --- the app's Record from sleep, the person already in front -------------------

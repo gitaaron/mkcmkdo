@@ -73,6 +73,7 @@ from .uwb import UwbArray
 class Head:
     _park_vel = (0.0, 0.0)      # the turn up to sleep: pan, tilt speeds now
     _park_at = 0.0              # …and when that tick was
+    _leveling = False           # awake: easing level, until the joystick takes over
     _af_zoom = 0.0              # zoom the last autofocus in a session was for
     _af_track_at = float("-inf")     # …and when
     _zoom_seen = 0.0            # zoom at the last tick
@@ -268,7 +269,14 @@ class Head:
         self.camera.set_detect_fps(
             config.DETECT_FPS_TRACKING if new in ("tracking", "recording")
             else config.DETECT_FPS_AWAKE)
-        if new in ("awake", *BOOT_STATES) or (old == "sleep" and new != "sleep"):
+        self._leveling = False
+        if new == "awake":
+            # level and straight ahead, eased by control_tick: a snap from
+            # looking straight up throws the head down at the servos' full
+            # speed, and a joystick pushed meanwhile fights it
+            self._leveling = True
+            self._park_vel, self._park_at = (0.0, 0.0), time.monotonic()
+        elif new in BOOT_STATES or (old == "sleep" and new != "sleep"):
             self.ptz.park()                         # level and straight ahead
         elif new == "sleep" and old != "sleep":
             # asleep it looks straight up; control_tick eases it there
@@ -358,6 +366,9 @@ class Head:
                 self.ease_to_sleep()
             if self.state == "awake":
                 self.manual_aim()
+                if self._leveling and self._ease_head(0.0, 0.0, config.WAKE_LEVEL_DPS,
+                                                      config.WAKE_LEVEL_ACCEL_DPS2):
+                    self._leveling = False
                 self.manual_lens()
                 self.tracker.watch_awake(wide=self._lens_zoom is None)     # person in frame? (LED and app only: sessions start in SEARCH)
             self.led.lost = False
@@ -393,23 +404,27 @@ class Head:
         """Asleep: turn the head slowly to look straight up, easing in and
         out (SLEEP_PARK_DPS), a step each control tick. Once there, no more
         servo writes."""
+        self._ease_head(0.0, config.SLEEP_TILT_DEG,
+                        config.SLEEP_PARK_DPS, config.SLEEP_PARK_ACCEL_DPS2)
+
+    def _ease_head(self, pan_goal: float, goal: float, dps: float, accel: float) -> bool:
+        """One control tick's step of an eased turn to (pan_goal, goal);
+        True once there."""
         pan, tilt = self.ptz.pan_deg, self.ptz.tilt_deg
-        goal = config.SLEEP_TILT_DEG
-        if pan == 0.0 and tilt == goal:
-            return
+        if pan == pan_goal and tilt == goal:
+            return True
         now = time.monotonic()
         dt = min(now - self._park_at, 0.25)
         self._park_at = now
-        pan, pan_vel = ease_to(pan, self._park_vel[0], 0.0, dt,
-                               config.SLEEP_PARK_DPS, config.SLEEP_PARK_ACCEL_DPS2)
-        tilt, tilt_vel = ease_to(tilt, self._park_vel[1], goal, dt,
-                                 config.SLEEP_PARK_DPS, config.SLEEP_PARK_ACCEL_DPS2)
+        pan, pan_vel = ease_to(pan, self._park_vel[0], pan_goal, dt, dps, accel)
+        tilt, tilt_vel = ease_to(tilt, self._park_vel[1], goal, dt, dps, accel)
         # the easing only approaches its goal: land on it
-        pan = 0.0 if abs(pan) < 0.1 else pan
+        pan = pan_goal if abs(pan - pan_goal) < 0.1 else pan
         tilt = goal if abs(tilt - goal) < 0.1 else tilt
         self._park_vel = (pan_vel, tilt_vel)
         self.ptz.set_pan(pan)
         self.ptz.set_tilt(tilt)
+        return False
 
     def jog(self, pan: float, tilt: float) -> None:
         """The app's joystick, sent ≈ 20 times a second while it is held.
@@ -436,6 +451,7 @@ class Head:
             self.ptz.jog(pan, tilt, 1.0 / config.UWB_RATE_HZ)
         if pan or tilt:
             self._awake_since = time.monotonic()   # someone is using it
+            self._leveling = False                 # …and aiming it: theirs now
 
     def lens(self, zoom_mm: float) -> None:
         """The app's zoom slider. Awake only; control_tick moves the lens

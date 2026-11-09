@@ -621,7 +621,8 @@ async def full_flow() -> None:
           head.state == "tracking" and head.phase == "search" and head.led.searching,
           head.tracker.mode)
     head.camera._bbox = bbox
-    await tick_for(config.FOUND_CONFIRM_S + 1.5)
+    # from wherever the head was easing level when the recording ended
+    await tick_for(config.FOUND_CONFIRM_S + 4.0)
     check("…turns to the tag, finds them, and locks on 3 s later (no recording)",
           head.state == "tracking" and head.phase == "track" and not head.camera.recording,
           f"{head.state} {head.phase}")
