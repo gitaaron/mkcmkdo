@@ -11,8 +11,8 @@ build adds two arms, a mast and a pod ([With UWB](#with-uwb))<!--/-->.
 
 ## Enclosure and lid
 
-- **Lid:** no substitute. It carries the Arducam base on slots and passes
-  the ribbon through its centre.
+- **Lid:** no substitute. It carries the Arducam base's standoffs on slots and passes
+  the ribbon through a slot at the back.
 - **Enclosure:** a round box with a light band; candidates below.
 
 - [Parametric Raspberry Pi 4B case — Printables 204101](https://www.printables.com/model/204101-parametric-raspberry-pi-4b-case-30mm-fan-with-vert) — if you would rather bolt a stock Pi case inside a bigger shell than use our standoffs. It has a 30 mm fan: set the Pi's height in `cad/ordered_parts.toml` to the case's and re-run `cad/fit.py`.

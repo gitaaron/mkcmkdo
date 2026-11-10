@@ -53,7 +53,7 @@ Common connections:
 
 | Signal | From → To | Notes |
 | --- | --- | --- |
-| CSI | Pi CSI → Arducam 15-pin FFC | kit cable fits a Pi 4; service loop under the lid |
+| CSI | Pi CSI → Arducam 15-pin FFC | kit cable fits a Pi 4; in through the lid's cable slot, service loop outside behind the base |
 | PTZ I2C | Pi GPIO2/3 → PTZ controller | one device at **0x0C** for zoom and focus (and pan/tilt with `SERVO_DRIVER = "arducam"`) |
 | Servo PWM | Pi GPIO12 / GPIO13 (hardware PWM0 / PWM1) → 74AHCT125 gates 2, 3 → pan / tilt servo | [below](#servo-drive) |
 | LED data | Pi GPIO10 (SPI0 MOSI) → 74AHCT125 → WS2812B DIN | [below](#driving-the-ws2812b-ring) |

@@ -21,9 +21,9 @@ enclosure or a bracket.
 | --- | --- | --- |
 | 1 | **Tripod** | any standard tripod. Floor socket: 3/8-16 insert with removable 1/4-20 reducer bushing |
 | 2 | **Battery tray** | printed saddle for the USB-C bank, strapped low on a leg or the centre column (lowers the centre of mass). Cable to a USB-C inlet low in the enclosure wall |
-| 3 | **Enclosure** | printed, <!--with_uwb-->Ø 141 × 84 mm<!--/--><!--both--> with UWB, <!--/--><!--without_uwb-->Ø 135 × 73 mm<!--/--><!--both--> without<!--/--> with the assumed part sizes ([layout](#layout-inside-the-enclosure)). No moving parts inside. <!--both-->Wall: three bosses and an anchor-cable slot with UWB; plain without<!--/--><!--with_uwb: Wall: three bosses for the arms and mast, and an anchor-cable slot--><!--without_uwb: Wall: plain all round--> |
-| 4 | **Lid** | printed, 5 mm, structural: carries the whole camera. The Arducam base bolts through four radial slots; ribbon and servo lead pass through the central opening |
-| 5 | **Arducam pan-tilt base** | aluminium bracket, two digital servos, both axes 0–180°. Supplied assembled with the camera |
+| 3 | **Enclosure** | printed, <!--with_uwb-->Ø 141 × 83 mm<!--/--><!--both--> with UWB, <!--/--><!--without_uwb-->Ø 135 × 67 mm<!--/--><!--both--> without<!--/--> with the assumed part sizes ([layout](#layout-inside-the-enclosure)). No moving parts inside. <!--both-->Wall: three bosses and an anchor-cable slot with UWB; plain without<!--/--><!--with_uwb: Wall: three bosses for the arms and mast, and an anchor-cable slot--><!--without_uwb: Wall: plain all round--> |
+| 4 | **Lid** | printed, 5 mm, structural: carries the whole camera. The Arducam base stands on it on its four brass standoffs; four M3 screws come up through radial slots into them. Ribbon and leads enter through a cable slot at the back |
+| 5 | **Arducam pan-tilt base** | round turntable on four brass standoffs, pan servo hanging underneath between them; tilt bracket and servo on top. Two digital servos, both axes 0–180°. Supplied assembled with the camera. Every cable leaves from the camera head at the top, none through the base |
 | 6 | **Camera and lens** | IMX477 12 MP sensor, motorized zoom lens. Zoom and focus steppers on the kit's I2C controller; the servos are driven by the Pi's PWM ([04](04-electronics.md#servo-drive)) |
 
 <!--with_uwb-->
@@ -39,7 +39,7 @@ The UWB build adds anchor arms and a mast to this stack ([below](#with-uwb)).
 | Floor | USB-C PD trigger (socket at the wall inlet), rocker switch (on/off) and 5 V jack in the wall, power latch, battery gauge, buck converter | foam tape; switch and jack panel-mount |
 | LED window | WS2812B ring, LEDs down, lighting a 12 mm window all round; translucent band over the window outside | ring foam-taped under the shelf; band slides onto a ledge |
 | Shelf | Raspberry Pi 4, level shifter | Pi on M2.5 nylon standoffs; shelf on three wall posts, M3 into inserts |
-| Lid | Arducam base | ring under the lid drops into the mouth; four M3 through the wall into inserts in the ring |
+| Lid | Arducam base, on its standoffs | four M3 up through the lid into the standoffs. Ring under the lid drops into the mouth; four M3 through the wall into inserts in the ring |
 
 Board positions, Pi orientation, wall openings and enclosure size are
 generated, not hand-drawn: `cad/fit.py` solves them from the bought-part sizes
@@ -91,12 +91,16 @@ subject fills `5.4 / d` of it:
 ## Design rules that matter
 
 - **The lid is the structure:** 5 walls, 40 % infill. Everything above it is
-  cantilevered off four slots.
+  cantilevered off four standoffs.
 - **Stability:** the pan axis carries only the camera, so head balance is
   irrelevant; tripod stability is not. Hence the battery tray sits low on a
   leg or the centre column<!--with_uwb-->, and the UWB arms and mast make the head top-heavy<!--/-->.
-- **Cable service loop:** ribbon and servo lead cross the pan axis, so they
-  need ≈ 80 mm of slack under the lid (12 — Wiring, connection C1).
+- **Cable route:** the ribbon and the leads start on the camera head, which
+  pans and tilts, and the pan servo fills the middle of the base. So they run
+  outside: down behind the turntable and in through the lid's cable slot,
+  straight behind the lens. They need a free loop of ≈ 60 mm outside the lid
+  for the travel (12 — Wiring, connection C1). `cad/fit.py` checks the ribbon
+  is long enough for the whole run.
 
 ## Printed parts and CAD
 
@@ -131,7 +135,7 @@ Head envelope: ≈ **42 cm across the arms, 28 cm tall** to the mast top
 ([C1](../product/01-requirements.md#non-functional-requirements)).
 
 **Tilt and the mast.** Top frame edge at +85°, full wide: ≈ 27° past
-vertical. A3 board: ≈ 30° past vertical from the tilt axis, so just out of
+vertical. A3 board: ≈ 43° past vertical from the tilt axis, so out of
 shot. A taller mast enters the shot; lower `TILT_MAX_DEG` to compensate.
 
 ### Design rules, with UWB

@@ -21,7 +21,7 @@ sufficient.
 | Requirement | Minimum | Why |
 | --- | --- | --- |
 | Technology | FDM / FFF | all parts are designed for it |
-| Build volume | **160 × 155 × 90 mm** | the battery tray is 155 mm long; the with-UWB enclosure is 147 × 149 mm and 84 mm tall |
+| Build volume | **160 × 155 × 90 mm** | the battery tray is 155 mm long; the with-UWB enclosure is 147 × 149 mm and 83 mm tall |
 | Nozzle | 0.4 mm | every setting below assumes it. 0.6 works if you raise wall counts |
 | Hotend temperature | **250 °C** | PETG |
 | Heated bed | **80 °C** | PETG will not stay down without one |
@@ -44,9 +44,9 @@ Sizes with the assumed parts (bounding box, mm):
 
 | Part | Build | Size | Margin to 170 |
 | --- | --- | --- | --- |
-| Enclosure | with UWB | 147 × 149 × 84 | 21 |
-| Enclosure | without UWB | 139 × 139 × 73 | 31 |
-| Pi shelf | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->132 × 117 × 3<!--/--><!--both--> / <!--/--><!--without_uwb-->128 × 87 × 3<!--/--> | 38+ |
+| Enclosure | with UWB | 147 × 149 × 83 | 21 |
+| Enclosure | without UWB | 139 × 139 × 67 | 31 |
+| Pi shelf | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->132 × 117 × 3<!--/--><!--both--> / <!--/--><!--without_uwb-->128 × 93 × 3<!--/--> | 38+ |
 | Lid | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->141 × 141 × 11<!--/--><!--both--> / <!--/--><!--without_uwb-->135 × 135 × 11<!--/--> | 29+ |
 | LED diffuser band | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->Ø 145 × 16<!--/--><!--both--> / <!--/--><!--without_uwb-->Ø 139 × 16<!--/--> | 25+ |
 | Battery tray | both | 155 × 77 × 12 | 15 |

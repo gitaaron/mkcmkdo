@@ -3,17 +3,24 @@ window.SPORTCAM_LAYOUT = {
  "R_in": 67.5,
  "a3_back": 89.1,
  "a3_up": 250,
+ "anchor_z": 22,
  "antenna_x": 0.0,
  "arm_boss_r": 74.5,
  "base_d": 141,
- "base_h": 84,
+ "base_h": 83,
  "baseline": 400.0,
- "below_lid": 2,
+ "below_lid": 2.4,
+ "bolt_angs": [
+  45,
+  135,
+  225,
+  315
+ ],
  "boxes": {
   "buck": {
-   "ang": 150,
-   "cx": 19.0,
-   "cy": 33.0,
+   "ang": 165,
+   "cx": 9.0,
+   "cy": 37.0,
    "l": 60.0,
    "name": "buck converter",
    "w": 40.0,
@@ -41,9 +48,9 @@ window.SPORTCAM_LAYOUT = {
    "z1": 15.0
   },
   "latch": {
-   "ang": 120,
-   "cx": -25.0,
-   "cy": -41.0,
+   "ang": 90,
+   "cx": -27.0,
+   "cy": -15.0,
    "l": 30.0,
    "name": "power latch",
    "w": 24.0,
@@ -51,9 +58,9 @@ window.SPORTCAM_LAYOUT = {
    "z1": 14.0
   },
   "shifter": {
-   "ang": 0,
-   "cx": -32.0,
-   "cy": 40.0,
+   "ang": 30,
+   "cx": 44.0,
+   "cy": -24.0,
    "l": 25.0,
    "name": "level shifter",
    "w": 15.0,
@@ -61,9 +68,9 @@ window.SPORTCAM_LAYOUT = {
    "z1": 60.5
   },
   "switch": {
-   "ang": 120,
+   "ang": 240,
    "cx": -28.5,
-   "cy": 49.363,
+   "cy": -49.363,
    "l": 27.0,
    "name": "rocker switch",
    "w": 21.0,
@@ -82,6 +89,12 @@ window.SPORTCAM_LAYOUT = {
   }
  },
  "build": "with_uwb",
+ "cable_slot": {
+  "ang": 180,
+  "d": 9,
+  "r": 58.25,
+  "w": 28
+ },
  "deck_z": 4,
  "design": {
   "base_wall": 3,
@@ -96,8 +109,8 @@ window.SPORTCAM_LAYOUT = {
  },
  "dowel_l": 246,
  "floor_z": 3,
- "gap_ang": 300.0,
- "gap_d": 22.000000000000007,
+ "gap_ang": 210.0,
+ "gap_d": 22.000000000000004,
  "jack": {
   "ang": 210,
   "d": 8.2,
@@ -109,12 +122,12 @@ window.SPORTCAM_LAYOUT = {
   225,
   315
  ],
- "lid_screw_z": 81.0,
- "lid_top": 89,
- "lid_z": 84,
+ "lid_screw_z": 80.0,
+ "lid_t": 5,
+ "lid_top": 88,
+ "lid_z": 83,
  "mast_axis_r": 89.1,
  "mast_bore": 13.2,
- "nut_recess": 0.7,
  "parts": {
   "buck": {
    "bom": 11,
@@ -220,15 +233,20 @@ window.SPORTCAM_LAYOUT = {
    "w": 72
   },
   "ptz": {
+   "base_d": 100,
+   "bolt_ang": 45,
    "bolt_l": 10,
-   "bolt_spacing": 46,
+   "bolt_spacing": 90,
    "bom": 1,
-   "cable_bundle_d": 20,
+   "head_d": 5.6,
+   "head_h": 2.4,
+   "lead_bundle_d": 8,
    "measured": false,
-   "nut_af": 5.5,
-   "nut_h": 2.4,
-   "plate_l": 56,
-   "plate_t": 3
+   "ribbon_l": 500,
+   "ribbon_w": 16,
+   "servo_drop": 30,
+   "standoff_h": 40,
+   "tilt_axis_h": 49
   },
   "shifter": {
    "bom": 8,
@@ -293,16 +311,16 @@ window.SPORTCAM_LAYOUT = {
   }
  },
  "pi": {
-  "ang": 30,
-  "x": -15,
-  "y": 0,
+  "ang": 300,
+  "x": 0,
+  "y": 15,
   "z": 57.5
  },
  "pi_boxes": [
   {
-   "ang": 30,
-   "cx": -15.0,
-   "cy": 0.0,
+   "ang": 300,
+   "cx": 0.0,
+   "cy": 15.0,
    "l": 85.0,
    "name": "Pi board",
    "w": 56.0,
@@ -310,9 +328,9 @@ window.SPORTCAM_LAYOUT = {
    "z1": 59.1
   },
   {
-   "ang": 30,
-   "cx": -15.0,
-   "cy": 0.0,
+   "ang": 300,
+   "cx": 0.0,
+   "cy": 15.0,
    "l": 85.0,
    "name": "Pi underside",
    "w": 56.0,
@@ -320,9 +338,9 @@ window.SPORTCAM_LAYOUT = {
    "z1": 57.5
   },
   {
-   "ang": 30,
-   "cx": -15.0,
-   "cy": 0.0,
+   "ang": 300,
+   "cx": 0.0,
+   "cy": 15.0,
    "l": 85.0,
    "name": "Pi heatsinks",
    "w": 56.0,
@@ -330,9 +348,9 @@ window.SPORTCAM_LAYOUT = {
    "z1": 69.1
   },
   {
-   "ang": 30,
-   "cx": 12.713,
-   "cy": 16.0,
+   "ang": 300,
+   "cx": 16.0,
+   "cy": -12.713,
    "l": 27.0,
    "name": "Pi USB/Ethernet",
    "w": 54.0,
@@ -340,9 +358,9 @@ window.SPORTCAM_LAYOUT = {
    "z1": 75.1
   },
   {
-   "ang": 30,
-   "cx": -35.91,
-   "cy": 16.218,
+   "ang": 300,
+   "cx": 16.218,
+   "cy": 35.91,
    "l": 51.0,
    "name": "Pi GPIO leads",
    "w": 7.0,
@@ -350,9 +368,9 @@ window.SPORTCAM_LAYOUT = {
    "z1": 75.1
   },
   {
-   "ang": 30,
-   "cx": -23.107,
-   "cy": -48.559,
+   "ang": 300,
+   "cx": -48.559,
+   "cy": 23.107,
    "l": 11.999999999999996,
    "name": "Pi USB-C plug",
    "w": 20.0,
@@ -360,9 +378,9 @@ window.SPORTCAM_LAYOUT = {
    "z1": 66.1
   },
   {
-   "ang": 30,
-   "cx": 43.145,
-   "cy": 20.291,
+   "ang": 300,
+   "cx": 20.291,
+   "cy": -43.145,
    "l": 30.0,
    "name": "Pi USB plugs (anchors)",
    "w": 31.0,
@@ -372,20 +390,20 @@ window.SPORTCAM_LAYOUT = {
  ],
  "pi_holes": [
   [
-   -36.52499074759311,
-   -40.717622392718745
+   -40.71762239271875,
+   36.52499074759311
   ],
   [
-   13.704482671904337,
-   -11.71762239271875
+   -11.717622392718743,
+   -13.704482671904337
   ],
   [
-   -61.02499074759311,
-   1.7176223927187522
+   1.7176223927187415,
+   61.02499074759311
   ],
   [
-   -10.795517328095661,
-   30.717622392718745
+   30.717622392718745,
+   10.79551732809567
   ]
  ],
  "pod": {
@@ -398,38 +416,40 @@ window.SPORTCAM_LAYOUT = {
  },
  "pose_rank": 0,
  "post_angs": [
-  15,
-  100,
-  225
+  30,
+  135,
+  285
  ],
  "post_r": 63.5,
  "power_top": 26.0,
- "ptz_slot_max": 72,
- "ptz_slot_min": 30,
+ "ptz_slot_max": 104,
+ "ptz_slot_min": 70,
+ "ptz_z": 128,
  "raised": false,
  "ring_z0": 44.0,
  "ring_z1": 47.5,
  "risers": [],
+ "screw_recess": 0.0,
  "shelf_r": 66.75,
  "shelf_top": 51.5,
  "shelf_z": 48.5,
  "shifter_on": "shelf",
  "switch": {
-  "ang": 120,
+  "ang": 240,
   "cut_h": 13.2,
   "cut_w": 19.2,
   "panel_t": 2.0,
   "z": 11.5
  },
- "tilt_z": 138,
+ "tilt_z": 177,
  "tray_z": -52.4,
  "ula1_radial_room": 77.5,
  "ula1_tangential": false,
  "usb_entry": {
-  "ang": 25,
+  "ang": 295,
   "h": 10,
   "w": 18,
-  "z": 71.0
+  "z": 70.0
  },
  "usbc": {
   "ang": 150,
@@ -444,10 +464,11 @@ window.SPORTCAM_LAYOUT = {
   "uwb_half_base": 190,
   "uwb_v_base": 250
  },
- "vent_high_z": 64.75,
+ "vent_high_z": 64.25,
  "vent_low_z": 9.0,
  "vents_high": [
   5,
+  25,
   65,
   85,
   105,
@@ -456,38 +477,36 @@ window.SPORTCAM_LAYOUT = {
   205,
   245,
   265,
-  285,
   345
  ],
  "vents_low": [
   5,
-  25,
   45,
   65,
-  245,
+  125,
   305,
   325,
   345
  ],
  "window_ribs": [
-  15.0,
-  35.0,
-  55.0,
-  75.0,
-  95.0,
-  115.0,
-  135.0,
-  155.0,
-  175.0,
-  195.0,
-  215.0,
-  235.0,
-  255.0,
-  275.0,
-  295.0,
-  315.0,
-  335.0,
-  355.0
+  30.0,
+  50.0,
+  70.0,
+  90.0,
+  110.0,
+  130.0,
+  150.0,
+  170.0,
+  190.0,
+  210.0,
+  230.0,
+  250.0,
+  270.0,
+  290.0,
+  310.0,
+  330.0,
+  350.0,
+  10.0
  ],
  "window_z": 36.5
 };

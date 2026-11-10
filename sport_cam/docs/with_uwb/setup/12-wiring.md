@@ -195,7 +195,7 @@ signal pin.
 | M4 | 74AHCT125 **2Y (pin 6)** | pan header **S** | 5 V pulses |
 | M5 | 74AHCT125 **3Y (pin 8)** | tilt header **S** | |
 | M6 | both headers **+** and **−** | the 5 V rail (R7) | |
-| M7 | pan servo lead, tilt servo lead | pan header, tilt header | unplugged from the PTZ controller's servo sockets. Add a 30 cm servo extension (BOM 18) if a lead won't reach through the lid |
+| M7 | pan servo lead, tilt servo lead | pan header, tilt header | unplugged from the PTZ controller's servo sockets. Both run down behind the base and in through the lid's cable slot with the ribbon. Add a 30 cm servo extension (BOM 18) if a lead won't reach |
 
 <!--/servo-->
 
@@ -215,7 +215,7 @@ step by a fraction of a degree.
 
 | # | From | To | Notes |
 | --- | --- | --- | --- |
-| C1 | camera ribbon (15-pin, from the Arducam kit) | Pi **CSI** connector | silver contacts **toward the HDMI ports**; lift the latch, insert fully, press the latch down. Leave ≈ 80 mm of slack coiled under the lid |
+| C1 | camera ribbon (15-pin, from the Arducam kit) | Pi **CSI** connector | silver contacts **toward the HDMI ports**; lift the latch, insert fully, press the latch down. The ribbon leaves the camera board at the top of the head, runs down behind the base and in through the lid's cable slot. Leave a free loop of ≈ 60 mm outside the lid, so neither pan nor tilt pulls it |
 | C2 | PTZ controller's lens leads | as fitted in the Arducam kit | factory-wired. The two servo leads <!--both-->move to the shifter's headers or stay in the controller ([servos](#servos))<!--/--><!--pigpio: move to the shifter's headers ([M7](#servos))--><!--arducam: stay in its PAN and TILT sockets ([servos](#servos))--> |
 | U1 | anchor **A1** (arm, +Y) | Pi USB-A, via a 50 cm extension | the **data** anchor: shows up as `/dev/ttyUSB0` |
 | U2 | anchor **A2** (arm, −Y) | Pi USB-A, via a 50 cm extension | power only |

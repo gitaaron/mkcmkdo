@@ -137,13 +137,23 @@ count = 16
 name = "Arducam IMX477 PTZ camera, metal pan-tilt base"
 bom = 1
 measured = false
-bolt_spacing = 46     # between opposite mounting holes of the base — MEASURE: the lid slots take 30–72
-plate_l = 56          # base plate footprint (square)
-plate_t = 3           # base plate thickness where the bolts go through
-bolt_l = 10           # the M3 screws you bolt it down with
-nut_h = 2.4           # M3 nut (nylon-insert)
-nut_af = 5.5
-cable_bundle_d = 20   # ribbon plus servo/I2C leads, bunched, through the lid opening
+# The base is a round turntable standing on four brass standoffs, with the pan
+# servo hanging underneath between them. It stays on those standoffs: M3 screws
+# come up through the lid's slots into them. Every cable leaves from the camera
+# head at the top (not through the base), so the lid has a cable slot at the back.
+bolt_spacing = 90     # between two OPPOSITE standoffs, centre to centre — MEASURE: the lid slots take 70–104
+bolt_ang = 45         # where the standoffs sit, seen from above with the lens straight ahead at mid-pan:
+                      # 0 = one directly under the lens, 45 = on the diagonals
+base_d = 100          # the turntable's bottom disc, across
+standoff_h = 40       # the brass standoffs under it; their bottom ends take an M3 screw (try one before printing)
+servo_drop = 30       # how far the pan servo hangs below the bottom disc
+tilt_axis_h = 49      # underside of the bottom disc up to the tilt axis
+bolt_l = 10           # the M3 screws you fix it with, up through the lid into the standoffs
+head_d = 5.6          # their heads (pan or cap head)
+head_h = 2.4
+ribbon_w = 16         # the camera ribbon (15-pin FFC)
+ribbon_l = 500        # its length, end to end — it has to reach from the camera board, over the base, to the Pi
+lead_bundle_d = 8     # the I2C/5 V lead (and the servo leads, if the Pi drives them), bunched
 
 # ---- tripod --------------------------------------------------------------
 

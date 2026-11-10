@@ -200,9 +200,10 @@ UWB_A3_BACK_M = 0.089
 UWB_A3_UP_M = 0.250
 
 # Elevation is measured at the anchor plane, but the lens sits higher, on the
-# tilt axis. At 5 m the 10 cm difference is over a degree, so it is corrected.
-# TILT_Z − the A1/A2 board height in docs/setup/assembly (120 − 22 mm).
-LENS_ABOVE_ANCHORS_M = 0.098
+# tilt axis. At 5 m the 15 cm difference is nearly two degrees, so it is corrected.
+# The tilt axis's height (enclosure + lid + the Arducam base's standoffs + its
+# tilt-axis height) − the A1/A2 board height; cad/fit.py keeps it in step.
+LENS_ABOVE_ANCHORS_M = 0.155
 # Where to aim relative to the tag. The recommended climbing spots (harness
 # belt, low back) sit near the body's centre, so the default is zero; raise
 # it if you wear the tag low and the shots look bottom-heavy.

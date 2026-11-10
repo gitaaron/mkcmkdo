@@ -216,7 +216,7 @@ def mechanical_layout():
 
     # lid
     ax.add_patch(Rectangle((cx - 1.5, 4.65), 3.0, 0.3, fc="#dde3ef", ec=INK, lw=1.5))
-    ax.text(cx + 2.55, 4.78, "LID — carries the camera,\nslotted bolt pattern",
+    ax.text(cx + 2.75, 4.78, "LID — the base's standoffs screw\nto it; cable slot at the back",
             fontsize=8.5, color=INK, ha="center")
 
     # anchor arms
@@ -238,10 +238,19 @@ def mechanical_layout():
     ax.text(mx - 0.4, 7.25, "A3 — 250 mm up,\nbehind the lens\n(elevation)", fontsize=8.5,
             color=BLUE, ha="right")
 
-    # PTZ base + camera
-    ax.add_patch(Rectangle((cx - 0.75, 4.95), 1.5, 0.85, fc="#e8ecf5", ec=INK, lw=1.5))
-    ax.text(cx, 5.38, "Arducam metal\npan-tilt base", ha="center", va="center",
-            fontsize=8, color=INK)
+    # PTZ base + camera: a turntable on four brass standoffs, the pan servo hanging between them
+    for sx in (-0.85, 0.85):
+        ax.add_patch(Rectangle((cx + sx - 0.05, 4.95), 0.1, 0.4, fc="#c9a24a", ec=INK, lw=0.8))
+    ax.add_patch(Rectangle((cx - 0.3, 5.05), 0.75, 0.3, fc="#3a3f4a", ec=INK, lw=1))
+    ax.add_patch(Rectangle((cx - 1.05, 5.35), 2.1, 0.2, fc="#b8bec9", ec=INK, lw=1.5))
+    ax.add_patch(Rectangle((cx - 0.45, 5.55), 0.9, 0.45, fc="#e8ecf5", ec=INK, lw=1.5))
+    ax.text(cx + 2.75, 5.62, "Arducam pan-tilt base:\nturntable on standoffs,\npan servo underneath", ha="center",
+            va="center", fontsize=8, color=INK)
+    # ribbon + leads: off the camera head, down behind the base, in through the lid
+    ax.add_patch(FancyArrowPatch((cx - 0.5, 6.4), (cx - 1.25, 4.95), arrowstyle="-", color="#c98a1c", lw=2.2,
+                                 connectionstyle="arc3,rad=0.45", zorder=5))
+    ax.text(cx - 3.0, 5.45, "ribbon + leads run\noutside, behind the base,\ninto the lid's cable slot", fontsize=8,
+            color="#a06a10", ha="center", va="center")
     ax.add_patch(Circle((cx, 6.5), 0.52, fc="#cfd7e6", ec=INK, lw=1.5))
     ax.add_patch(Rectangle((cx + 0.35, 6.28), 0.75, 0.44, fc=INK, ec=INK))
     ax.text(cx - 3.0, 6.55, "IMX477 + motorized\nzoom lens", fontsize=8.5,

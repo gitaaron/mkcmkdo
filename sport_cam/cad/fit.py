@@ -59,6 +59,9 @@ BUILDS = ("with_uwb", "without_uwb")
 PRINTER = "Bambu Lab A1 Mini"
 PRINT_LIMIT = 170.0        # its 180 mm cube, less 5 mm a side for a brim
 EPS = 1e-6
+PTZ_ENGAGE = 4.0        # M3 thread each PTZ screw needs in its standoff
+PTZ_HEAD_ARM = 45       # camera board's ribbon socket, out from the tilt axis
+PI_CSI = (45.0, 11.5)   # Pi 4 camera socket, from the microSD end / power edge
 
 # Printed parts and how many separate bodies each STL should contain
 # (the wearable is printed as body + lid side by side).
@@ -350,20 +353,38 @@ def solve_at(build, P, C, base_d, raised=False):
     if not poses:
         raise NoFit(f"the Pi ({pi['l']}×{pi['w']} plus its plug) doesn't fit on a Ø{2 * r_shelf:.0f} shelf")
 
+    # The Arducam base stands on its four standoffs on the lid; M3 screws come up
+    # through radial slots into them. Short screws: counterbore the lid underneath.
     ptz = P["ptz"]
-    tail = ptz["bolt_l"] - ptz["plate_t"] - C["lid_t"]
-    nut_recess = 0.0 if tail >= ptz["nut_h"] else ptz["nut_h"] - tail + 0.3
-    below_lid = max(tail, 0.0)
+    grip = ptz["bolt_l"] - C["lid_t"]
+    screw_recess = 0.0 if grip >= PTZ_ENGAGE else PTZ_ENGAGE - grip
+    below_lid = max(ptz["head_h"] - screw_recess, 0.0)
     r_bolt = ptz["bolt_spacing"] / 2
+    bolt_angs = [(ptz["bolt_ang"] + k * 90) % 360 for k in range(4)]
     # the lid's slots cover the configured range, stretched to your base if needed
     slot_min = min(C["ptz_bolt_min"], ptz["bolt_spacing"] - 6)
     slot_max = max(C["ptz_bolt_max"], ptz["bolt_spacing"] + 6)
-    if slot_max / 2 + ptz["nut_af"] / math.sqrt(3) + 1 > R_in - C["clr"] - C["spigot_w"] - 1:
-        raise NoFit(f"the Arducam base's bolts ({ptz['bolt_spacing']} mm apart) land on the lid's locating ring")
-    if r_bolt - ptz["nut_af"] / math.sqrt(3) < C["ptz_cable_d"] / 2 + 0.5:
-        raise NoFit(f"the Arducam base's bolts ({ptz['bolt_spacing']} mm apart) land in the lid's cable opening")
-    nut_r = ptz["nut_af"] / math.sqrt(3) + 0.5
+    head_r = ptz["head_d"] / 2 + 0.5
+    spig_in = R_in - C["clr"] - C["spigot_w"]
+    if slot_max / 2 + head_r + 1 > spig_in - 1:
+        raise NoFit(f"the Arducam base's standoffs ({ptz['bolt_spacing']} mm apart) land on the lid's locating ring")
     lid_screw_angs = [45, 135, 225, 315]
+    # Cable slot: the ribbon and leads come off the camera head, over the turntable,
+    # and in through the lid at the back — as near straight behind the lens (180°)
+    # as the bolt slots and the lid-screw pads allow.
+    cs_w = ptz["ribbon_w"] + ptz["lead_bundle_d"] + 4
+    cs_d = max(ptz["lead_bundle_d"], 6) + 1
+    cs_r = spig_in - 1.5 - cs_d / 2
+    if cs_r - cs_d / 2 < 20:
+        raise NoFit("no room in the lid for the camera cable slot")
+    radial_clear = slot_max / 2 + C["ptz_slot_w"] / 2 + 2 <= cs_r - cs_d / 2
+    need_bolt = 0.0 if radial_clear else math.degrees((cs_w / 2 + head_r + 2) / cs_r)
+    need_pad = math.degrees((cs_w / 2 + 5 + 2) / cs_r)
+    cs_ang = next((a % 360 for d in (0, 7.5, 15, 22.5, 30, 37.5, 45) for a in (180 - d, 180 + d)
+                   if all(angdiff(a, b) >= need_bolt for b in bolt_angs)
+                   and all(angdiff(a, p) >= need_pad for p in lid_screw_angs)), None)
+    if cs_ang is None:
+        raise NoFit("no place at the back of the lid for the camera cable slot between the bolt slots and the lid screws")
 
     def ceiling_need(objs, base_h_guess=0.0):
         """How far above each object the lid underside must be (relative)."""
@@ -371,8 +392,8 @@ def solve_at(build, P, C, base_d, raised=False):
         spig_r = R_in - C["clr"] - C["spigot_w"] - 0.5
         pads = [place("pad", (R_in - C["clr"] - C["lid_screw_pad"] - 0.5, R_in, -5.5, 5.5, 0, 1), (0, 0, 0, a))
                 for a in lid_screw_angs]
-        nuts = [Cyl("nut", *polar(r_bolt, a), nut_r, 0, 1) for a in (0, 90, 180, 270)]
-        slack = Cyl("slack", 0, 0, C["ptz_cable_d"] / 2 + 10, 0, 1)
+        nuts = [Cyl("screw head", *polar(r_bolt, a), head_r, 0, 1) for a in bolt_angs]
+        slack = Cyl("slack", *polar(cs_r, cs_ang), cs_w / 2 + 4, 0, 1)
         for o in objs:
             n = o.z1 + 1
             if o.rmax() > spig_r or any(overlap2d(o, p) for p in pads):
@@ -635,7 +656,9 @@ def solve_at(build, P, C, base_d, raised=False):
                            "panel_t": min(C["base_wall"], sw["max_panel_t"])},
                 "vents_low": vents_low, "vent_low_z": low_vz or 0, "vents_high": vents_high, "vent_high_z": high_vz,
                 "lid_screw_angs": lid_screw_angs, "lid_screw_z": base_h - C["spigot_h"] / 2,
-                "nut_recess": nut_recess, "below_lid": below_lid,
+                "screw_recess": screw_recess, "below_lid": below_lid,
+                "bolt_angs": bolt_angs,
+                "cable_slot": {"ang": cs_ang, "r": cs_r, "w": cs_w, "d": cs_d},
                 "shifter_on": shifter[0],
                 "boxes": {
                     "trigger": box_d(deck["trigger"]), "buck": box_d(deck["buck"]), "gauge": box_d(deck["gauge"]),
@@ -689,6 +712,7 @@ def solve_uwb(P, C, base_d):
         # A3 is placed relative to the A1–A2 midpoint. Turning the boards
         # shifts all three antennas the same way along X, so it cancels.
         "a3_back": mast_axis_r, "a3_up": C["uwb_v_base"],
+        "anchor_z": C["anchor_board_z"], "lid_t": C["lid_t"],
     }
 
 
@@ -721,8 +745,10 @@ def gen_scad(build, P, C, L) -> str:
         "vents_low": L["vents_low"], "vent_low_z": L["vent_low_z"],
         "vents_high": L["vents_high"], "vent_high_z": L["vent_high_z"],
         "lid_screw_angs": L["lid_screw_angs"], "lid_screw_z": L["lid_screw_z"],
-        "lid_nut_recess": L["nut_recess"], "ptz_nut_af": P["ptz"]["nut_af"],
-        "ptz_slot_min": L["ptz_slot_min"], "ptz_slot_max": L["ptz_slot_max"],
+        "lid_screw_recess": L["screw_recess"], "ptz_head_d": P["ptz"]["head_d"],
+        "ptz_slot_min": L["ptz_slot_min"], "ptz_slot_max": L["ptz_slot_max"], "ptz_bolt_angs": L["bolt_angs"],
+        "cable_slot_ang": L["cable_slot"]["ang"], "cable_slot_r": L["cable_slot"]["r"],
+        "cable_slot_w": L["cable_slot"]["w"], "cable_slot_d": L["cable_slot"]["d"],
         "risers": L["risers"],
         "insert_od": P["tripod_insert"]["od"], "insert_l": P["tripod_insert"]["l"],
         "bank_l": P["power_bank"]["l"], "bank_w": P["power_bank"]["w"], "bank_h": P["power_bank"]["h"],
@@ -754,7 +780,9 @@ def gen_json(build, P, C, L) -> dict:
     keep["tray_z"] = -(C["tray_wall"] + P["power_bank"]["h"]) - 20
     keep["lid_z"] = L["base_h"]
     keep["lid_top"] = L["base_h"] + C["lid_t"]
-    keep["tilt_z"] = L["base_h"] + C["lid_t"] + 49     # Arducam base: tilt axis 49 mm above the lid top
+    # Arducam base: on its standoffs on the lid; the tilt axis is above the bottom disc
+    keep["ptz_z"] = keep["lid_top"] + P["ptz"]["standoff_h"]
+    keep["tilt_z"] = keep["ptz_z"] + P["ptz"]["tilt_axis_h"]
     return keep
 
 
@@ -787,6 +815,8 @@ def device_updates(build, P, L) -> dict:
             "UWB_BASELINE_M": f"{L['baseline'] / 1000:.3f}".rstrip("0").rstrip("."),
             "UWB_A3_BACK_M": f"{L['a3_back'] / 1000:.3f}".rstrip("0").rstrip("."),
             "UWB_A3_UP_M": f"{L['a3_up'] / 1000:.3f}",
+            # tilt axis above the A1/A2 boards: lid top + the base's standoffs + its tilt-axis height
+            "LENS_ABOVE_ANCHORS_M": f"{(L['base_h'] + L['lid_t'] + P['ptz']['standoff_h'] + P['ptz']['tilt_axis_h'] - L['anchor_z']) / 1000:.3f}",
         })
     return out
 
@@ -897,9 +927,11 @@ def scene(build, P, C, L):
     printed += [Box("lid spigot pad", *polar(R_in - C["clr"] - C["lid_screw_pad"] / 2, a), C["lid_screw_pad"], 10, a,
                     base_h - C["spigot_h"], base_h) for a in L["lid_screw_angs"]]
     r_b = P["ptz"]["bolt_spacing"] / 2
-    nut_r = P["ptz"]["nut_af"] / math.sqrt(3) + 0.5
-    printed += [Cyl("PTZ nut", *polar(r_b, a), nut_r, base_h - L["below_lid"], base_h) for a in (0, 90, 180, 270)]
-    printed.append(Cyl("ribbon slack", 0, 0, C["ptz_cable_d"] / 2 + 10, base_h - C["ribbon_slack_h"] + 1, base_h))
+    head_r = P["ptz"]["head_d"] / 2 + 0.5
+    printed += [Cyl("PTZ screw head", *polar(r_b, a), head_r, base_h - L["below_lid"], base_h) for a in L["bolt_angs"]]
+    cs = L["cable_slot"]
+    printed.append(Cyl("ribbon slack", *polar(cs["r"], cs["ang"]), cs["w"] / 2 + 4,
+                       base_h - C["ribbon_slack_h"] + 1, base_h))
     standoffs = [Cyl("Pi standoff", x, y, 2.9, L["shelf_top"], L["pi"]["z"]) for x, y in L["pi_holes"]]
     heads = [Cyl("shelf screw head", *polar(L["post_r"], a), 3.2, L["shelf_top"], L["shelf_top"] + 3) for a in L["post_angs"]]
     return objs, printed, standoffs, heads
@@ -1006,16 +1038,29 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
 
     # 7. camera mount
     ptz = P["ptz"]
-    A.check(L["ptz_slot_min"] <= ptz["bolt_spacing"] <= L["ptz_slot_max"], "The Arducam base's bolts land in the lid slots",
-            f"bolt spacing {ptz['bolt_spacing']} mm; slots take {L['ptz_slot_min']:g}–{L['ptz_slot_max']:g}"
+    cs = L["cable_slot"]
+    A.check(L["ptz_slot_min"] <= ptz["bolt_spacing"] <= L["ptz_slot_max"], "The Arducam base's standoffs land on the lid slots",
+            f"standoffs {ptz['bolt_spacing']} mm apart; slots take {L['ptz_slot_min']:g}–{L['ptz_slot_max']:g}"
             + ("" if (L["ptz_slot_min"], L["ptz_slot_max"]) == (C["ptz_bolt_min"], C["ptz_bolt_max"]) else " (stretched to fit your base)"), ["ptz"])
-    A.check(L["nut_recess"] <= C["lid_t"] - 2, "The PTZ bolts are long enough to take a nut",
-            f"M3 × {ptz['bolt_l']} through {ptz['plate_t']} mm plate + {C['lid_t']} mm lid"
-            + (f"; lid relieved {L['nut_recess']:.1f} mm under each slot so the nut engages" if L["nut_recess"] else ""), ["ptz"])
-    A.check(ptz["plate_l"] * math.sqrt(2) / 2 <= R_out, "The Arducam base plate sits on the lid",
-            f"plate diagonal {ptz['plate_l'] * math.sqrt(2):.0f} mm on a Ø{L['base_d']} lid", ["ptz"])
-    A.check(C["ptz_cable_d"] >= ptz["cable_bundle_d"] + 4, "The ribbon and servo leads fit through the lid",
-            f"opening Ø{C['ptz_cable_d']}, bundle Ø{ptz['cable_bundle_d']}", ["ptz"])
+    grip = ptz["bolt_l"] - C["lid_t"] + L["screw_recess"]
+    A.check(L["screw_recess"] <= C["lid_t"] - 2 and grip <= ptz["standoff_h"] - 2, "The PTZ screws reach into the standoffs",
+            f"M3 × {ptz['bolt_l']} up through the {C['lid_t']} mm lid: {grip:g} mm of thread in each standoff"
+            + (f"; lid counterbored {L['screw_recess']:.1f} mm under each slot" if L["screw_recess"] else ""), ["ptz"])
+    A.check(ptz["servo_drop"] + 2 <= ptz["standoff_h"], "The pan servo under the base clears the lid",
+            f"servo hangs {ptz['servo_drop']} mm below the base, on {ptz['standoff_h']} mm standoffs", ["ptz"])
+    A.check(cs["w"] >= ptz["ribbon_w"] + 2 and cs["d"] >= ptz["lead_bundle_d"] + 1, "The ribbon and leads fit the lid's cable slot",
+            f"slot {cs['w']:g}×{cs['d']:g} mm at {cs['ang']:g}° (180° = straight behind the lens); "
+            f"ribbon {ptz['ribbon_w']} mm wide, leads Ø{ptz['lead_bundle_d']}", ["ptz"])
+    # the ribbon's run: camera board → over the turntable → cable slot → the Pi's CSI socket
+    sx, sy = polar(cs["r"], cs["ang"])
+    pi_ = L["pi"]
+    cx, cy = rot((PI_CSI[0] - P["pi"]["l"] / 2, PI_CSI[1] - P["pi"]["w"] / 2), pi_["ang"])
+    inside = math.dist((sx, sy, L["base_h"]), (pi_["x"] + cx, pi_["y"] + cy, pi_["z"] + P["pi"]["pcb_t"])) + 15
+    outside = math.hypot(ptz["standoff_h"] + ptz["tilt_axis_h"], cs["r"]) + PTZ_HEAD_ARM + C["ptz_loop"]
+    run = outside + C["lid_t"] + inside
+    A.check(run <= ptz["ribbon_l"], "The camera ribbon reaches the Pi",
+            f"≈ {run:.0f} mm needed ({outside:.0f} outside with a {C['ptz_loop']} mm loop for pan and tilt, "
+            f"{inside:.0f} inside); ribbon {ptz['ribbon_l']} mm", ["ptz", "pi"])
 
     # 8. battery tray
     bk = P["power_bank"]
@@ -1131,22 +1176,37 @@ def deep_check(build, L, P, C) -> list:
         "lid": f'translate([0,0,{L["base_h"]}]) import("{cad}/stl/lid.stl");',
         "led_diffuser_ring": f'translate([0,0,{L["window_z"] - C["diffuser_lip"]}]) import("{cad}/stl/led_diffuser_ring.stl");',
     }
+    def ask(td, name, head, body, solids):
+        src, out = os.path.join(td, f"{name}.scad"), os.path.join(td, f"{name}.stl")
+        with open(src, "w") as f:
+            f.write(head + "intersection(){ union(){ " + body + " }\n union(){\n" + "\n".join(solids) + "\n} }\n")
+        if os.path.exists(out):
+            os.remove(out)
+        r = subprocess.run(["openscad", "-o", out, src], capture_output=True, text=True)
+        if "CGAL error" in r.stderr:
+            return None       # the kernel gave up (and hands back its first operand): not an answer
+        return not ("empty" in r.stderr or not os.path.exists(out) or os.path.getsize(out) < 200)
+
+    def meets(td, name, solids):
+        """Does the part intersect these solids? Asked of its STL; if CGAL chokes on the
+        re-imported mesh (it can, on a sound one), asked again of the part's CAD source.
+        None if OpenSCAD could not say either way."""
+        hit = ask(td, name, "", parts[name], solids)
+        if hit is None:
+            hit = ask(td, name, f'use <{cad}/{name}.scad>\n', parts[name].replace(f'import("{cad}/stl/{name}.stl");', f"{name}();"), solids)
+        return hit
+
     hits = []
     with tempfile.TemporaryDirectory() as td:
-        for name, body in parts.items():
-            src = os.path.join(td, f"{name}.scad")
-            with open(src, "w") as f:
-                f.write("intersection(){ union(){ " + body + " }\n union(){\n" + "\n".join(solid(o) for o in envelopes) + "\n} }\n")
-            out = os.path.join(td, f"{name}.stl")
-            r = subprocess.run(["openscad", "-o", out, src], capture_output=True, text=True)
-            if "Current top level object is empty" in r.stderr or not os.path.exists(out) or os.path.getsize(out) < 200:
+        for name in parts:
+            if meets(td, name, [solid(o) for o in envelopes]) is False:
                 continue
             # find which envelope(s)
             for o in envelopes:
-                with open(src, "w") as f:
-                    f.write("intersection(){ union(){ " + body + " }\n" + solid(o) + " }\n")
-                r = subprocess.run(["openscad", "-o", out, src], capture_output=True, text=True)
-                if "empty" not in r.stderr and os.path.exists(out) and os.path.getsize(out) > 200:
+                hit = meets(td, name, [solid(o)])
+                if hit is None:
+                    hits.append(f"{name} × {o.name} (OpenSCAD could not evaluate it)")
+                elif hit:
                     hits.append(f"{name} × {o.name}")
     return hits
 

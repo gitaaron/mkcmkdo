@@ -15,24 +15,28 @@ value in [`cad/ordered_parts.toml`](../../../cad/ordered_parts.toml) with
 `measured = true`, run `python3 cad/fit.py` from `sport_cam/` (re-solves the
 layout, re-renders, audits fit).
 [`cad/FIT_REPORT.md`](../../../cad/FIT_REPORT.md) lists the checks and any sizes
-still assumed.
+still assumed. Each row's drawing shows the part with every dimension labelled by
+the key it goes into; the notes under the drawing say where each one starts and stops.
+Click a drawing for the full size. (Drawn by `python3 cad/render_measure_diagrams.py`.)
 
-| # | Measure | Why it matters | What fit.py does / what a mistake costs |
-| --- | --- | --- | --- |
-| 1 | **Arducam base bolt spacing** → `[ptz] bolt_spacing` | The lid carries the whole camera on four bolts. Arducam publishes no drawing and the footprint has changed between revisions, so the lid is cut with radial slots, 30–72 mm by default | `fit.py` stretches the slots to your spacing; set `bolt_l` to the screws you have and it relieves the lid under the slots if they're short. Reprinting the lid is the **four-hour** mistake — measure before the printer starts |
-| 2 | **Buck converter, PD trigger, battery gauge, power latch** → `[buck]`, `[pd_trigger]`, `[gauge]`, `[latch]` | They sit on the enclosure floor round the tripod boss and the shelf posts, under the LED window. Modules of the same rating vary a lot | `fit.py` rearranges them, lifts the boards onto risers over the boss, or makes the enclosure taller or wider. An **18-hour** reprint if you skip it |
-| 3 | **Rocker switch and barrel jack** → `[switch]`, `[jack]` | Their cut-outs go in the wall, and the switch clips need a thin enough panel | `fit.py` sizes the cut-outs and thins the wall round the switch |
-| 4 | **Pi heatsinks or fan case** → `[pi] heatsink_h` | The Pi sits on the shelf under the lid; a fan case is taller than stick-on heatsinks | `fit.py` makes the enclosure taller |
-| 5 | **Camera power bank** → `[power_bank]` | The battery tray is a pocket sized to it. Banks of the same advertised capacity vary by 15 mm in every direction | Reprint the tray (3.5 h) |
-| 6 | **Wearable power bank** → `[tag_bank]` | The pod is sized to it, with the ULA1 plugged into its end | Reprint the pod (4 h) |
-| 7 | **ULA1 outline, holes and USB plug** → `[ula1]` | The arms and the mast cradle carry the anchors on M2.5 standoffs. The manual gives the 40 × 25 mm outline but not the hole pattern | Reprint the arms (1.7 h each) and the cradle |
-| 8 | **USB extension ends** → `[usb_extension]` | The rigid socket end has to fit between each anchor's plug and the enclosure, or `fit.py` turns the boards across the arms; the plug end sets the size of the cable slot | Reprint the arms and cradle |
-| 9 | **Dowel diameter** → `[dowel] d` | The A3 mast sockets are bored to it. "½-inch" dowels vary by a few tenths of a millimetre | Reprint the foot and cradle (≈ 1.5 h each). Slightly loose is fine — the pinch screws take it up |
+| # | Measure | What exactly to measure (click to enlarge) | Why it matters | What fit.py does / what a mistake costs |
+| --- | --- | --- | --- | --- |
+| 1 | **Arducam base: standoff spacing, standoff height, pan servo, ribbon** → `[ptz]` | <a href="../images/measure/ptz.png"><img src="../images/measure/ptz.png" width="260" alt="Arducam base: bolt_spacing between opposite standoffs, base_d, standoff_h, servo_drop, tilt_axis_h, screw and ribbon"></a> | The base stands on the lid on its four brass standoffs, with the pan servo hanging between them, and is screwed from under the lid. Arducam publishes no drawing, so the lid is cut with radial slots, 70–104 mm by default. The ribbon and leads run outside, from the camera head to a cable slot at the back of the lid | `fit.py` stretches the slots to your spacing and turns them to `bolt_ang`, counterbores the lid if `bolt_l` is short, sizes the cable slot to `ribbon_w`, and checks the servo clears the lid and the ribbon (`ribbon_l`) reaches the Pi. Reprinting the lid is the **four-hour** mistake — measure before the printer starts |
+| 2 | **Buck converter, PD trigger, battery gauge, power latch** → `[buck]`, `[pd_trigger]`, `[gauge]`, `[latch]` | <a href="../images/measure/boards.png"><img src="../images/measure/boards.png" width="260" alt="Buck, PD trigger, gauge and latch: l, w, h and the PD trigger's plug"></a> | They sit on the enclosure floor round the tripod boss and the shelf posts, under the LED window. Modules of the same rating vary a lot | `fit.py` rearranges them, lifts the boards onto risers over the boss, or makes the enclosure taller or wider. An **18-hour** reprint if you skip it |
+| 3 | **Rocker switch and barrel jack** → `[switch]`, `[jack]` | <a href="../images/measure/switch_jack.png"><img src="../images/measure/switch_jack.png" width="260" alt="Rocker switch and barrel jack: cut-outs, flanges, depth and panel thickness"></a> | Their cut-outs go in the wall, and the switch clips need a thin enough panel | `fit.py` sizes the cut-outs and thins the wall round the switch |
+| 4 | **Pi heatsinks or fan case** → `[pi] heatsink_h` | <a href="../images/measure/pi_heatsink.png"><img src="../images/measure/pi_heatsink.png" width="260" alt="Pi: heatsink_h from the board's top surface"></a> | The Pi sits on the shelf under the lid; a fan case is taller than stick-on heatsinks | `fit.py` makes the enclosure taller |
+| 5 | **Camera power bank** → `[power_bank]` | <a href="../images/measure/power_bank.png"><img src="../images/measure/power_bank.png" width="260" alt="Camera power bank: l, w, h of the body"></a> | The battery tray is a pocket sized to it. Banks of the same advertised capacity vary by 15 mm in every direction | Reprint the tray (3.5 h) |
+| 6 | **Wearable power bank** → `[tag_bank]` | <a href="../images/measure/tag_bank.png"><img src="../images/measure/tag_bank.png" width="260" alt="Wearable power bank: l, w, h and which end charges"></a> | The pod is sized to it, with the ULA1 plugged into its end | Reprint the pod (4 h) |
+| 7 | **ULA1 outline, holes and USB plug** → `[ula1]` | <a href="../images/measure/ula1.png"><img src="../images/measure/ula1.png" width="260" alt="ULA1: outline, hole pattern, plug and antenna"></a> | The arms and the mast cradle carry the anchors on M2.5 standoffs. The manual gives the 40 × 25 mm outline but not the hole pattern | Reprint the arms (1.7 h each) and the cradle |
+| 8 | **USB extension ends** → `[usb_extension]` | <a href="../images/measure/usb_extension.png"><img src="../images/measure/usb_extension.png" width="260" alt="USB extension: socket end and plug end"></a> | The rigid socket end has to fit between each anchor's plug and the enclosure, or `fit.py` turns the boards across the arms; the plug end sets the size of the cable slot | Reprint the arms and cradle |
+| 9 | **Dowel diameter** → `[dowel] d` | <a href="../images/measure/dowel.png"><img src="../images/measure/dowel.png" width="260" alt="Dowel: diameter d"></a> | The A3 mast sockets are bored to it. "½-inch" dowels vary by a few tenths of a millimetre | Reprint the foot and cradle (≈ 1.5 h each). Slightly loose is fine — the pinch screws take it up |
 
 **Tripod insert** (`[tripod_insert]`): floor bore = insert outside diameter
 (12.7 mm assumed); insert length ≤ 8 mm (boss height). If the insert doesn't
 fit, enlarge the bore with a drill rather than reprinting. Check both
 threads: 3/8-16 screw into the insert; 1/4-20 screw with the bushing fitted.
+
+<a href="../images/measure/tripod_insert.png"><img src="../images/measure/tripod_insert.png" width="260" alt="Tripod insert: od and l"></a>
 
 ## On arrival, before you wire anything
 

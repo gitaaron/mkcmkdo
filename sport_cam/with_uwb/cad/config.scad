@@ -51,17 +51,21 @@ post_d        = 10;            // shelf posts, merged into the wall; M3 insert i
 post_insert_d = 4.0;
 vent_w        = 4;
 vent_h        = 8;
-ribbon_slack_h = 8;            // clear height kept under the lid opening for the coiled camera ribbon
+ribbon_slack_h = 8;            // clear height kept under the lid's cable slot for the ribbon to turn
 
 // ---- Arducam pan-tilt base interface ---------------------------------------
-// Arducam publishes no drawing for the B0167B12 metal base and the footprint
-// has changed between revisions, so the lid is cut with radial SLOTS spanning
-// this range. Your base's spacing goes in ordered_parts.toml [ptz]; the audit
-// checks it lands inside.
-ptz_bolt_min  = 30;
-ptz_bolt_max  = 72;
+// The base is a round turntable on four brass standoffs, the pan servo hanging
+// under it between them. It keeps its standoffs: four M3 screws come up
+// through the lid into them. Arducam publishes no drawing for the B0167B12
+// base, so the lid is cut with radial SLOTS spanning this range. Your base's
+// spacing goes in ordered_parts.toml [ptz]; the audit checks it lands inside.
+ptz_bolt_min  = 70;
+ptz_bolt_max  = 104;
 ptz_slot_w    = 3.4;           // M3 clearance
-ptz_cable_d   = 34;            // central opening: CSI ribbon + servo leads drop through
+// The ribbon and the leads leave the camera head at the top, drape over the
+// turntable and come in through a slot at the back of the lid (fit.py sizes
+// it to the ribbon and places it clear of the bolt slots and the lid screws).
+ptz_loop      = 60;            // free ribbon kept outside for the pan and tilt travel
 
 // ---- UWB anchor arms (static) ----------------------------------------------
 // The anchors don't rotate with the camera, so the arms bolt to the enclosure
