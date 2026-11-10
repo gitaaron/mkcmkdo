@@ -40,7 +40,7 @@ import time
 
 from . import config, owners, samples, wifi_link
 from .boxlog import CLIMBER, BoxLog
-from .autofocus import AutoFocus
+from .autofocus import AutoFocus, Refocus
 from .camera import Camera
 from .cloud import CloudLink
 from .discovery import Advertiser
@@ -71,15 +71,11 @@ from .uwb import UwbArray
 
 
 class Head:
-    _park_vel = (0.0, 0.0)      # the turn up to sleep: pan, tilt speeds now
-    _park_at = 0.0              # …and when that tick was
-    _leveling = False           # awake: easing level, until the joystick takes over
-    _af_zoom = 0.0              # zoom the last autofocus in a session was for
-    _af_track_at = float("-inf")     # …and when
-    _zoom_seen = 0.0            # zoom at the last tick
-    _zoom_moved_at = 0.0        # …and when it last changed
-
     def __init__(self) -> None:
+        self._park_vel = (0.0, 0.0)   # an eased turn (to sleep, to level): pan, tilt speeds now
+        self._park_at = 0.0           # …and when that tick was
+        self._leveling = False        # awake: easing level, until the joystick takes over
+        self._aim_at = 0.0            # the joystick's last control tick
         self.state = "connecting"     # until the Wi-Fi gate lets it go (wifi_loop)
         self._boot_at = time.monotonic()
         self._qr_sent: dict[str, float] = {}   # Wi-Fi QR code → when it was last sent
@@ -89,6 +85,8 @@ class Head:
         self.uwb = UwbArray()
         self.tracker = Tracker(self.uwb, self.camera, self.ptz)
         self.autofocus = AutoFocus(self.camera, self.ptz)
+        # when autofocus runs: after a zoom once the lens has stopped, on waking
+        self.refocus = Refocus(self.ptz, self.autofocus)
         self.session = AutoSession()
         self.pairings = Pairings()
         # with TAG_NEEDS_PAIRING, only a tag paired to a phone starts sessions
@@ -115,7 +113,6 @@ class Head:
         self._lens_zoom: float | None = None
         self._lens_new = False              # set since the last control tick
         self._af_point = (0.5, 0.5)         # where the app last tapped to focus
-        self._af_due: float | None = None   # autofocus then: the zoom has come to rest
 
     # convenience for local_api/telemetry — pan and tilt are commanded angles
     @property
@@ -217,7 +214,7 @@ class Head:
         # nothing (no ffmpeg did exactly that)
         rec_path = None
         if new == "recording" and self.state != "recording":
-            why = getattr(self.camera, "no_recorder", None)
+            why = self.camera.no_recorder
             if why:
                 print(f"[rec] refusing to record — {why}")
                 await self.warn("no-recorder", reason=why)
@@ -233,8 +230,9 @@ class Head:
         if new != old:
             self._lens_zoom = None          # the app's lens is awake's alone
             self._lens_new = False
-            self._af_point, self._af_due = (0.5, 0.5), None
+            self._af_point = (0.5, 0.5)
             self.autofocus.cancel()
+            self.refocus.reset()
         self.camera.set_awake(new != "sleep")
         if new == "awake":
             self._awake_since = time.monotonic()
@@ -242,7 +240,7 @@ class Head:
             self.tracker.forget_awake()
         if old not in ("tracking", "recording") and new in ("tracking", "recording"):
             self.tracker.reset_lock()     # a new session acquires afresh
-            self._af_zoom = self._zoom_seen = self.ptz.zoom_mm
+            self.refocus.reset()
         if new not in ("tracking", "recording"):
             self.session_hash = None       # the session is over, by whatever route
             if old in ("tracking", "recording"):
@@ -252,7 +250,7 @@ class Head:
             self._rec_started = time.monotonic()
             owners.stamp(self._rec_path, self.session_hash)
             self.boxlog.start(self._rec_path, self._rec_started)
-            self.tracker.confirm()
+            self.tracker.lock_on()
             print(f"[rec] → {self._rec_path}")
         elif old == "recording" and new != "recording":
             self.camera.stop_recording()
@@ -291,7 +289,7 @@ class Head:
             # Booted (the lens homed far out of focus) or woken: focus now for
             # a room, then autofocus once the exposure has settled
             self.ptz.refocus(config.AWAKE_FOCUS_M)
-            self._af_due = time.monotonic() + config.AF_ON_WAKE_S
+            self.refocus.request(config.AF_ON_WAKE_S)
 
     async def start_session(self, target: str, session_hash: str | None,
                             tag: int | None = None) -> None:
@@ -354,9 +352,16 @@ class Head:
             if self.state == "recording":
                 self.boxlog.note(self.tracker.labelled_at, self.tracker.labelled)
             if self.state == "tracking" and self.tracker.ready_to_record:
-                self.tracker.confirm()        # locked on: follow them; Record starts the recording
-                self.focus_on_subject()
-            self.refocus_after_zoom()
+                self.tracker.lock_on()        # locked on: follow them; Record starts the recording
+                self.refocus.now(*self.subject_point())
+            if self.phase in ("found", "track"):     # on a person: not in a sweep
+                # The tracker's zoom threw focus off, and FOCUS_GRID_STEPS's
+                # sharp band is too thin to hit: left there the picture stays
+                # blurred, the detector loses them, the lens zooms out, finds
+                # them, zooms in and blurs again. Refocus sees the zoom and
+                # waits for the lens to stop.
+                self.refocus.tick(*self.subject_point(), narrow=True,
+                                  gap_s=config.AF_TRACK_GAP_S)
             self.led.lost = self.tracker.lost_for() > config.LOST_HOLD_S
             if self.tracker.lost_for() > config.LOST_END_S:
                 await self.apply_state("awake")
@@ -445,10 +450,17 @@ class Head:
         the boot states have no picture to aim by.
         """
         pan, tilt = self._jog
-        if time.monotonic() - self._jog_at > config.JOG_TIMEOUT_S:
+        now = time.monotonic()
+        # The time this tick really took, as tracking uses: a late tick must
+        # turn the head further, or it slows and then seems to catch up
+        dt = now - self._aim_at
+        if not 0.0 < dt <= 0.25:               # the first tick of a spell in awake
+            dt = 1.0 / config.UWB_RATE_HZ
+        self._aim_at = now
+        if now - self._jog_at > config.JOG_TIMEOUT_S:
             pan = tilt = 0.0                   # let go, or the app went quiet
         if pan or tilt or self.ptz.jogging:    # …and once let go, ease to a stop
-            self.ptz.jog(pan, tilt, 1.0 / config.UWB_RATE_HZ)
+            self.ptz.jog(pan, tilt, dt)
         if pan or tilt:
             self._awake_since = time.monotonic()   # someone is using it
             self._leveling = False                 # …and aiming it: theirs now
@@ -466,55 +478,34 @@ class Head:
         frame (each 0…1). Awake only."""
         if self.state != "awake":
             return
-        self._af_point, self._af_due = (x, y), None
-        self.autofocus.start(x, y)
+        self._af_point = (x, y)
+        self.refocus.now(x, y)
         self._awake_since = time.monotonic()      # someone is using it
 
-    def refocus_after_zoom(self) -> None:
-        """Tracking or recording: the tracker has zoomed and the lens has come
-        to rest, so autofocus on the person. The move refocused from
-        FOCUS_GRID, whose sharp band is too thin to hit; left there the
-        picture stays blurred, the detector loses them, the lens zooms out,
-        finds them, zooms in and blurs again."""
-        now = time.monotonic()
-        zoom = self.ptz.zoom_mm
-        if zoom != self._zoom_seen:
-            self._zoom_seen, self._zoom_moved_at = zoom, now
-        if (self.phase in ("found", "track")     # on a person: not in a sweep
-                and abs(zoom - self._af_zoom) >= config.AF_REZOOM_MM
-                and now - self._zoom_moved_at >= config.AF_AFTER_ZOOM_S
-                and now - self._af_track_at >= config.AF_TRACK_GAP_S
-                and not self.autofocus.busy):
-            self.focus_on_subject(narrow=True)
-
-    def focus_on_subject(self, narrow: bool = False) -> None:
-        """Autofocus on the person followed — on the upper body, where a face
-        and shirt give the detail. The trackers hold their zoom and focus,
-        and don't count the blurred frames, while it runs. `narrow`: search
-        close by first (AutoFocus.start)."""
+    def subject_point(self) -> tuple[float, float]:
+        """Where to autofocus while following a person: on their upper body,
+        where a face and shirt give the detail (each 0…1 of the frame); the
+        centre with nobody labelled the climber."""
         pw, ph = config.PREVIEW_SIZE
-        self._af_zoom, self._af_track_at = self.ptz.zoom_mm, time.monotonic()
         for (x, y, w, h), label in self.tracker.labelled:
             if label == CLIMBER:
-                self.autofocus.start(min(1.0, max(0.0, (x + w / 2) / pw)),
-                                     min(1.0, max(0.0, (y + 0.35 * h) / ph)), narrow)
-                return
-        self.autofocus.start(0.5, 0.5, narrow)
+                return (min(1.0, max(0.0, (x + w / 2) / pw)),
+                        min(1.0, max(0.0, (y + 0.35 * h) / ph)))
+        return 0.5, 0.5
 
     def manual_lens(self) -> None:
-        """Awake: zoom to the app's latest setting, and once the zoom has
-        been still AF_AFTER_ZOOM_S, autofocus on the last point tapped."""
-        now = time.monotonic()
+        """Awake: zoom to the app's latest setting, and once the slider has
+        been quiet AF_AFTER_ZOOM_S and the lens has stopped, autofocus on the
+        last point tapped (Refocus)."""
         if self._lens_new:
             self._lens_new = False
             if self._lens_zoom is not None:
-                self.ptz.set_zoom_mm(self._lens_zoom, urgent=True)
-                self.autofocus.cancel()            # the picture is changing under it
-                self._af_due = now + config.AF_AFTER_ZOOM_S
-            self._awake_since = now                # someone is using it
-        if self._af_due is not None and now >= self._af_due:
-            self._af_due = None
-            self.autofocus.start(*self._af_point)
+                self.autofocus.cancel()            # the picture is changing under it,
+                self.ptz.set_zoom_mm(self._lens_zoom, urgent=True)   # and the lens is its
+                self.refocus.request(config.AF_AFTER_ZOOM_S)
+            self._awake_since = time.monotonic()   # someone is using it
+        # the tracker's own zoom back to wide is not the app's: only what was asked for
+        self.refocus.tick(*self._af_point, watch_zoom=False)
 
     async def health_loop(self) -> None:
         """Watch the two things that run out: charge and card space.
@@ -610,7 +601,10 @@ class Head:
         period = 1.0 / config.MJPEG_FPS
         while True:
             t0 = time.monotonic()
-            if self.state in LIVE_STATES:         # sleep and boot: no live view
+            # Sleep and boot: no live view. Nobody watching: no frame made — a
+            # capture and a JPEG 15 times a second for no one, which detection
+            # and autofocus would wait behind.
+            if self.state in LIVE_STATES and self.watched:
                 # Off the loop: the capture waits up to a frame and the JPEG
                 # encode takes a few ms more, and the control tick shares it.
                 jpg = await asyncio.to_thread(self.camera.preview_jpeg)
@@ -635,7 +629,7 @@ class Head:
         """Record is allowed: tracking, with the detector having seen someone
         within RECORD_NEEDS_PERSON_S. The app greys Record out otherwise, and
         local_api refuses it."""
-        seen = getattr(self, "_person_seen_at", None)
+        seen = self._person_seen_at
         return (self.state == "tracking" and seen is not None
                 and time.monotonic() - seen <= config.RECORD_NEEDS_PERSON_S)
 

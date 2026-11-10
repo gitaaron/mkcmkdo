@@ -19,7 +19,7 @@ from __future__ import annotations
 import time
 
 from . import config
-from .ptz import Ptz
+from .ptz import LENS_STEPS, Ptz
 
 
 def sweep(name: str, setter, lo: float, hi: float) -> None:
@@ -74,12 +74,12 @@ def main() -> None:
             print(f"  zoom → {mm:.1f} mm")
             time.sleep(2.5)
         print("Focus: the framing should stay put while the picture goes soft and sharp.")
-        for pos in (0.0, 0.5, 1.0, 0.5):
-            ptz.set_focus_pos(pos)
-            print(f"  focus motor → {pos:.0%} of its travel")
-            time.sleep(2.0)
-        print(f"  (LENS_SWAP_ZOOM_FOCUS = {config.LENS_SWAP_ZOOM_FOCUS}: if zoom and focus "
-              "did each other's job, flip it in config.py)")
+        for steps in (0, LENS_STEPS // 2, LENS_STEPS, LENS_STEPS // 2):
+            ptz.set_focus_steps(steps)
+            print(f"  focus motor → step {steps} of {LENS_STEPS}")
+            ptz.wait_lens()
+        print("  (if zoom and focus did each other's job, run lenscheck: it measures "
+              "which register is which)")
     except KeyboardInterrupt:
         pass
     finally:

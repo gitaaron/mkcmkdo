@@ -1,22 +1,32 @@
 """Pan, tilt, zoom and focus: the Arducam PTZ base.
 
 The B0167B12 kit puts all four axes behind a single controller board at
-I2C 0x0C (Arducam's `Focuser` register map):
+I2C 0x0C (Arducam's `Focuser` register map). This kit's controller, the
+IMX477 one (firmware 0x0104 on, register 0x40):
 
-    channel      register   range        axis
-    OPT_ZOOM     0x00       3000-20000   zoom motor (wide → tele)
-    OPT_FOCUS    0x01       0-20000      focus motor
-    OPT_MOTOR_X  0x05       0-180        pan servo, degrees
-    OPT_MOTOR_Y  0x06       0-180        tilt servo, degrees
-    OPT_IRCUT    0x0C       0/1          IR-cut filter
+    channel      register   range     axis
+    OPT_FOCUS    0x00       0-2100    focus motor
+    OPT_ZOOM     0x01       0-2100    zoom motor
+    OPT_MOTOR_X  0x05       0-180     pan servo, degrees
+    OPT_MOTOR_Y  0x06       0-180     tilt servo, degrees
 
-That is the older controllers' map. The IMX477 kit's controller (firmware
-0x0104 on, register 0x40) swaps zoom and focus and runs both 0-2100, from
-Arducam's B016712MP/Focuser.py. Everything here, config.py and focuscal keep
-the older 3000/0-20000 scale, and `Focuser.set` rescales for the newer one.
-It also powers up in mode 0 (register 0x30), in which it acknowledges every
-move and ignores it: `Ptz.start` switches it to mode 1 and resets the lens,
-as Arducam's tool does on its r and t keys.
+Which register is the zoom was measured (lenscheck). Older controllers have
+the two lens registers the other way round and run them 3000-20000 (zoom) and
+0-20000 (focus).
+
+**One unit for a lens motor's position: steps, 0…LENS_STEPS**, this kit's
+own. config.py's calibration (ZOOM_CURVE_STEPS, FOCUS_GRID_STEPS), autofocus,
+the calibration tools and the logs all speak it; `Focuser` turns steps into
+an older controller's numbers at the I2C write and nowhere else.
+
+The controller powers up in mode 0 (register 0x30), in which it acknowledges
+every move and ignores it: `Ptz.start` switches it to mode 1 and resets the
+lens, as Arducam's tool does on its r and t keys.
+
+A lens write while a lens motor runs cuts that move short, so lens moves are
+queued (`Focuser`'s lens thread) and each waits for the controller's busy
+flag to clear. That thread is the one place that knows whether the lens is
+moving: `Focuser.lens_idle`.
 
 The pan and tilt registers take **whole degrees**. Zoomed in (≈ 33° across
 the frame at full zoom) one degree is ≈ 3 % of the frame, so a slow pan
@@ -32,6 +42,7 @@ degrees. The tracker's CV trim and `docs/04` both assume that.
 """
 from __future__ import annotations
 
+import enum
 import math
 import threading
 import time
@@ -56,13 +67,13 @@ OPT_FOCUS = "focus"
 OPT_MOTOR_X = "pan"
 OPT_MOTOR_Y = "tilt"
 
-# channel -> (register, min, max)
-_CHANNELS = {
-    OPT_ZOOM:    (0x00, 3000, 20000),
-    OPT_FOCUS:   (0x01, 0, 20000),
-    OPT_MOTOR_X: (0x05, 0, 180),
-    OPT_MOTOR_Y: (0x06, 0, 180),
-}
+LENS_STEPS = 2100          # a lens motor's travel, in steps: positions are 0…LENS_STEPS
+
+_SERVO_REG = {OPT_MOTOR_X: 0x05, OPT_MOTOR_Y: 0x06}     # whole degrees, 0-180
+# lens channel -> (register, lens reset register): this kit's controller
+_IMX477_LENS = {OPT_ZOOM: (0x01, 0x0B), OPT_FOCUS: (0x00, 0x0A)}
+# lens channel -> (register, its number at step 0, at step LENS_STEPS): older controllers
+_OLDER_LENS = {OPT_ZOOM: (0x00, 3000, 20000), OPT_FOCUS: (0x01, 0, 20000)}
 _REG_BUSY = 0x04
 _REG_MODE = 0x30
 _REG_VERSION = 0x40
@@ -73,18 +84,18 @@ _WRITE_GAP_S = 0.025
 _LENS_MOVE_MAX_S = 8.0     # the longest a lens motor takes end to end, and then some
 _LENS_BUSY_RISE_S = 0.05   # after a write, before the busy flag can be trusted
 _IMX477_FIRMWARE = 0x0104
-# the IMX477 kit's controller: channel -> (register, min, max, lens reset register)
-_IMX477_LENS = {
-    OPT_ZOOM:  (0x01, 0, 2100, 0x0B),
-    OPT_FOCUS: (0x00, 0, 2100, 0x0A),
-}
 
 
-def _lens_motor(channel: str) -> str:
-    """The channel whose register really drives `channel`'s motor."""
-    if config.LENS_SWAP_ZOOM_FOCUS and channel in (OPT_ZOOM, OPT_FOCUS):
-        return OPT_FOCUS if channel == OPT_ZOOM else OPT_ZOOM
-    return channel
+class LensMove(enum.Enum):
+    """What became of a request to move the lens. Truthy only if it moved."""
+    MOVED = "moved"
+    SAME = "same"        # already there
+    SMALL = "small"      # under the deadband: not worth a move
+    PACED = "paced"      # inside the rate limit: ask again later
+    HELD = "held"        # someone else has the lens (autofocus)
+
+    def __bool__(self) -> bool:
+        return self is LensMove.MOVED
 
 
 class Focuser:
@@ -96,32 +107,27 @@ class Focuser:
         self._wrote_at = 0.0
         self.available = self._bus is not None
         self.firmware = self._read(_REG_VERSION) if self._bus else None
+        self.busy_works = False        # the busy flag has been seen set: it can be trusted
         # Lens moves wait their turn behind a moving motor (Ptz turns this on).
         self.queue_lens = False
         self._lens_cv = threading.Condition()
-        self._lens_pending: dict[str, int] = {}   # channel → latest value, oldest first
-        self._lens_writing = False
+        self._lens_pending: dict[str, tuple[int, float]] = {}   # channel → (steps, expect_s)
+        self._lens_idle = threading.Event()     # nothing queued and no motor running
+        self._lens_idle.set()
         self._lens_thread: threading.Thread | None = None
+        self.lens_started_at = 0.0     # the last lens move: when it was written…
+        self.lens_stopped_at = 0.0     # …and when its motor stopped
 
     @property
     def imx477(self) -> bool:
         return (self.firmware or 0) >= _IMX477_FIRMWARE
 
-    def _register(self, channel: str, value: int) -> tuple[int, int]:
-        """The register and value to write for a value on the older scale.
-
-        With LENS_SWAP_ZOOM_FOCUS the zoom goes to the focus register and the
-        focus to the zoom one; the value is still scaled as its own channel.
-        """
-        motor = _lens_motor(channel)
-        reg, lo, hi = _CHANNELS[channel]
-        if self.imx477 and channel in _IMX477_LENS:
-            _reg, lo2, hi2, _reset = _IMX477_LENS[channel]
-            reg = _IMX477_LENS[motor][0]
-            value = round(lo2 + (value - lo) * (hi2 - lo2) / (hi - lo))
-        else:
-            reg = _CHANNELS[motor][0]
-        return reg, value
+    def _lens_register(self, channel: str, steps: int) -> tuple[int, int]:
+        """The register and number to write for a lens position in steps."""
+        if self.imx477:
+            return _IMX477_LENS[channel][0], steps
+        reg, at_0, at_top = _OLDER_LENS[channel]
+        return reg, round(at_0 + steps * (at_top - at_0) / LENS_STEPS)
 
     def _read(self, reg: int) -> int | None:
         try:
@@ -140,25 +146,33 @@ class Focuser:
             self._bus.write_i2c_block_data(CHIP_ADDR, reg, [(value >> 8) & 0xFF, value & 0xFF])
             self._wrote_at = time.monotonic()
 
-    def set(self, channel: str, value: int, wait: bool = False) -> int:
-        _reg, lo, hi = _CHANNELS[channel]
-        value = int(max(lo, min(hi, value)))
-        if self._bus and self.queue_lens and channel in (OPT_ZOOM, OPT_FOCUS):
-            self._queue_lens(channel, value)
-        elif self._bus:
-            self._write(*self._register(channel, value))
-            if wait:
-                self._wait_idle()
+    def set(self, channel: str, value: int, expect_s: float = 0.0) -> int:
+        """Send a servo to `value` degrees, or a lens motor to `value` steps.
+
+        `expect_s`: how long a lens move should take, for a controller whose
+        busy flag never sets (the move is then waited out by time).
+        """
+        top = 180 if channel in _SERVO_REG else LENS_STEPS
+        value = int(max(0, min(top, value)))
+        if not self._bus:
+            return value
+        if channel in _SERVO_REG:
+            self._write(_SERVO_REG[channel], value)
+        elif self.queue_lens:
+            self._queue_lens(channel, value, expect_s)
+        else:
+            self._write(*self._lens_register(channel, value))
         return value
 
-    def _queue_lens(self, channel: str, value: int) -> None:
+    def _queue_lens(self, channel: str, steps: int, expect_s: float) -> None:
         """Move a lens motor once the controller is free, as Arducam's
         Focuser.set does: lenscheck, waiting between moves, got the lens's
         full zoom; zoom then focus 25 ms apart did not. On a thread, as a zoom
         takes seconds and the control loop mustn't. A newer value for a
         channel replaces one still waiting."""
         with self._lens_cv:
-            self._lens_pending[channel] = value
+            self._lens_pending[channel] = (steps, expect_s)
+            self._lens_idle.clear()
             if self._lens_thread is None:
                 self._lens_thread = threading.Thread(target=self._lens_loop, name="lens",
                                                      daemon=True)
@@ -169,37 +183,64 @@ class Focuser:
         while True:
             with self._lens_cv:
                 while not self._lens_pending:
-                    self._lens_writing = False
                     self._lens_cv.wait()
-                self._lens_writing = True
             self._wait_idle(_LENS_MOVE_MAX_S)      # …before taking it: a later value may land
             with self._lens_cv:
-                channel = next(iter(self._lens_pending))
-                value = self._lens_pending.pop(channel)
-            self._write(*self._register(channel, value))
-            time.sleep(_LENS_BUSY_RISE_S)
+                channel = next(iter(self._lens_pending))     # oldest first
+                steps, expect_s = self._lens_pending.pop(channel)
+            self._write(*self._lens_register(channel, steps))
+            self.lens_started_at = time.monotonic()
+            self._wait_move(self.lens_started_at, expect_s)
+            with self._lens_cv:
+                self.lens_stopped_at = time.monotonic()
+                if not self._lens_pending:
+                    self._lens_idle.set()
+
+    def _wait_move(self, started: float, expect_s: float) -> None:
+        """Until the move just written is over: the busy flag rising and
+        clearing. A controller that has never set the flag is waited out for
+        `expect_s` instead; one that has, and doesn't for this move, made a
+        move too short to see."""
+        seen = False
+        while time.monotonic() - started < _LENS_MOVE_MAX_S:
+            b = self.busy()
+            if b:
+                seen = True
+            elif b is None:
+                break                           # no answer: by time
+            elif seen:
+                return
+            elif time.monotonic() - started >= _LENS_BUSY_RISE_S:
+                if self.busy_works:
+                    return
+                break                           # never set: by time
+            time.sleep(0.01)
+        time.sleep(max(0.0, started + expect_s - time.monotonic()))
 
     @property
-    def lens_pending(self) -> bool:
-        """A lens move is waiting its turn, or was only just written."""
-        with self._lens_cv:
-            return bool(self._lens_pending) or self._lens_writing
+    def lens_idle(self) -> bool:
+        """No lens move is waiting its turn and no lens motor is running."""
+        return self._lens_idle.is_set()
+
+    def wait_lens_idle(self, timeout_s: float) -> bool:
+        """Until `lens_idle`, or `timeout_s`; whether it is."""
+        return self._lens_idle.wait(timeout_s)
 
     def get(self, channel: str) -> int | None:
+        """A lens motor's position as the controller reports it, in steps."""
         if not self._bus:
             return None
-        reg, lo, hi = _CHANNELS[channel]
-        raw = self._read(self._register(channel, lo)[0])
-        if raw is not None and self.imx477 and channel in _IMX477_LENS:
-            _reg, lo2, hi2, _reset = _IMX477_LENS[channel]
-            raw = round(lo + (raw - lo2) * (hi - lo) / (hi2 - lo2))
+        raw = self._read(self._lens_register(channel, 0)[0])
+        if raw is not None and not self.imx477:
+            _reg, at_0, at_top = _OLDER_LENS[channel]
+            raw = round((raw - at_0) * LENS_STEPS / (at_top - at_0))
         return raw
 
     def wake(self) -> None:
         """The IMX477 kit's controller: lens reset, then out of mode 0."""
         if not (self._bus and self.imx477):
             return
-        for _reg, _lo, _hi, reset in _IMX477_LENS.values():
+        for _reg, reset in _IMX477_LENS.values():
             self._write(reset, 0)
             self._wait_idle(15.0)
         if self._read(_REG_MODE) == 0:
@@ -214,14 +255,15 @@ class Focuser:
         Arducam's Focuser.py does: its flag is in the low byte, so reading
         only the first (high) byte, as this once did, never saw it set.
         """
-        try:
-            with self._lock:
-                hi, lo = self._bus.read_i2c_block_data(CHIP_ADDR, _REG_BUSY, 2)
-        except OSError:
+        word = self._read(_REG_BUSY)
+        if word is None:
             return None
-        return ((hi << 8) | lo) != 0
+        if word:
+            self.busy_works = True
+        return word != 0
 
     def _wait_idle(self, timeout_s: float = 3.0) -> None:
+        """Until the busy flag is clear (or the controller doesn't answer)."""
         deadline = time.monotonic() + timeout_s
         while time.monotonic() < deadline:
             if not self.busy():
@@ -270,6 +312,7 @@ class PigpioServos:
                       "(sudo systemctl enable --now pigpiod)")
                 self._pi = None
         self._gpio = {OPT_MOTOR_X: config.PAN_GPIO, OPT_MOTOR_Y: config.TILT_GPIO}
+        self._sent: dict[str, int] = {}     # the duty last sent per channel
 
     @property
     def available(self) -> bool:
@@ -281,17 +324,27 @@ class PigpioServos:
         raw_deg = max(0.0, min(180.0, raw_deg))
         us = config.SERVO_US_AT_0 + raw_deg / 180.0 * (config.SERVO_US_AT_180 - config.SERVO_US_AT_0)
         # duty is in millionths of the period: us / (1e6 / hz) × 1e6
-        self._pi.hardware_PWM(self._gpio[channel], config.SERVO_PWM_HZ,
-                              round(us * config.SERVO_PWM_HZ))
+        duty = round(us * config.SERVO_PWM_HZ)
+        # Only a changed pulse: each write is a round trip to the pigpio
+        # daemon, and a head at rest is asked for the same angle every tick
+        if self._sent.get(channel) != duty:
+            self._sent[channel] = duty
+            self._pi.hardware_PWM(self._gpio[channel], config.SERVO_PWM_HZ, duty)
 
 
 class Ptz:
     """Pan, tilt and zoom in engineering units.
 
-    Angles are **degrees from centre**: pan 0 is the lens pointing along the
-    the enclosure's front, positive to the right; tilt 0 is horizontal, positive
-    up. Both are clamped to the soft limits in `config`, which exist because
-    the mechanical travel of the metal base is narrower than the servos' 180°.
+    Angles are **degrees from centre**: pan 0 is the lens pointing straight
+    ahead of the enclosure, positive to the right; tilt 0 is horizontal,
+    positive up. Both are clamped to the soft limits in `config`, which exist
+    because the mechanical travel of the metal base is narrower than the
+    servos' 180°.
+
+    The lens has at most one **owner** at a time (`take_lens`): autofocus,
+    for the length of a sweep. While it is held, a zoom or focus request from
+    anyone else comes back `LensMove.HELD`; the check and the move happen
+    under one lock, so a zoom can't slip in as a sweep begins.
     """
 
     def __init__(self, bus: int = 1) -> None:
@@ -307,20 +360,16 @@ class Ptz:
         self._last_zoom_at = 0.0
         self._focus_dist_m: float | None = None    # distance the focus was set for
         self._want_dist_m: float | None = None     # latest distance we were told
-        self._focus_raw: int | None = None
+        self._focus_steps: int | None = None       # where the focus motor was last sent
         self._last_focus_at = 0.0
-        self._lens_raw: dict[str, int] = {}        # last sent to each lens motor
-        self._lens_until = 0.0                     # when the last lens move should be done
-        self._lens_written_at = 0.0                # when the last lens move was sent
-        self._busy_seen = False                    # the controller's busy flag has been seen set
-        # What the last autofocus taught: how far (raw focus steps) the sharp
-        # position was from FOCUS_GRID's for that zoom. Added to every grid
-        # lookup after, so zoom changes and sweeps stay near focus.
-        self._focus_trim = 0
+        self._lens_steps: dict[str, int] = {}      # last sent to each lens motor
+        # What the last autofocus taught: how far (steps) the sharp position
+        # was from FOCUS_GRID_STEPS's for that zoom. Added to every grid
+        # lookup after (_trim), so zoom changes and sweeps stay near focus.
+        self._focus_trim_steps = 0
         self._trim_zoom_mm = config.ZOOM_MIN_MM    # the focal length it was found at
-        # Autofocus is sweeping the focus motor: everyone else's zoom and
-        # focus requests wait (they would spoil the sweep, and it them).
-        self.af_active = False
+        self._lens_lock = threading.RLock()        # lens state, and who may move it
+        self._lens_owner: object | None = None
 
     # ---- pan / tilt -------------------------------------------------------
     @property
@@ -386,10 +435,31 @@ class Ptz:
         self.home()
 
     def park(self) -> None:
-        """Centre both axes and relax the lens. Called on shutdown."""
+        """Pan and tilt to centre: level and straight ahead. The lens is left
+        as it is. At boot, on leaving sleep and on shutdown."""
         self.set_pan(0.0)
         self.set_tilt(0.0)
         self._jog_vel = (0.0, 0.0)
+
+    # ---- who may move the lens ----------------------------------------------
+    def take_lens(self, owner: object) -> None:
+        """The lens is `owner`'s until give_lens: everyone else's zoom and
+        focus requests come back HELD (they would spoil a sweep, and it them)."""
+        with self._lens_lock:
+            self._lens_owner = owner
+
+    def give_lens(self, owner: object) -> None:
+        """`owner` is done with the lens; nothing if it isn't theirs."""
+        with self._lens_lock:
+            if self._lens_owner is owner:
+                self._lens_owner = None
+
+    @property
+    def lens_owner(self) -> object | None:
+        return self._lens_owner
+
+    def _held(self, owner: object | None) -> bool:
+        return self._lens_owner is not None and owner is not self._lens_owner
 
     # ---- zoom / focus -----------------------------------------------------
     @property
@@ -397,229 +467,222 @@ class Ptz:
         return self._zoom_mm
 
     @property
+    def zoom_steps(self) -> int | None:
+        """Where the zoom motor was last sent; None until it has been."""
+        return self._lens_steps.get(OPT_ZOOM)
+
+    @property
     def hfov_deg(self) -> float:
         """Horizontal field of view at the current zoom.
 
-        The tracker uses this to turn a bearing into a pixel column, so the
-        detector can search a strip instead of the whole frame. The sensor's
-        half-width is derived from the published wide-end field of view rather
-        than hard-coded, so correcting `HFOV_WIDE_DEG` after the zoom
-        calibration fixes this too.
+        The tracker uses this to turn a pixel offset into an angle. The
+        sensor's half-width is derived from the published wide-end field of
+        view rather than hard-coded, so correcting `HFOV_WIDE_DEG` after the
+        zoom calibration fixes this too.
         """
         half_w = config.ZOOM_MIN_MM * math.tan(math.radians(config.HFOV_WIDE_DEG / 2))
         return math.degrees(2 * math.atan(half_w / max(0.1, self._zoom_mm)))
 
     def home(self) -> None:
-        """Zoom to wide (ZOOM_CURVE's wide end, whichever way the motor runs)
-        and focus to its low stop — far out of focus: refocus() after."""
-        self._lens_set(OPT_ZOOM, _interp(config.ZOOM_MIN_MM, config.ZOOM_CURVE))
-        self._lens_set(OPT_FOCUS, _CHANNELS[OPT_FOCUS][1])
-        self._zoom_mm = config.ZOOM_MIN_MM
-        self._focus_raw = None
-        # Forget the distance focused for: the motor is not there any more,
-        # and set_focus's deadband would otherwise skip the next request.
-        self._focus_dist_m = None
+        """Zoom to wide (ZOOM_CURVE_STEPS's wide end, whichever way the motor
+        runs) and focus to its low stop — far out of focus: refocus() after."""
+        with self._lens_lock:
+            self._lens_set(OPT_ZOOM, _interp(config.ZOOM_MIN_MM, config.ZOOM_CURVE_STEPS))
+            self._lens_set(OPT_FOCUS, 0)
+            self._zoom_mm = config.ZOOM_MIN_MM
+            self._focus_steps = None
+            # Forget the distance focused for: the motor is not there any more,
+            # and set_focus's deadband would otherwise skip the next request.
+            self._focus_dist_m = None
 
-    def refocus(self, dist_m: float | None = None) -> None:
+    def refocus(self, dist_m: float | None = None, owner: object | None = None) -> LensMove:
         """Focus now, whatever the deadband and rate limit say: for `dist_m`,
         or the last distance asked for (AWAKE_FOCUS_M before any)."""
-        if self.af_active:
-            return
-        self._apply_focus(dist_m or self._want_dist_m or self._focus_dist_m
-                          or config.AWAKE_FOCUS_M)
+        with self._lens_lock:
+            if self._held(owner):
+                return LensMove.HELD
+            return self._apply_focus(dist_m or self._want_dist_m or self._focus_dist_m
+                                     or config.AWAKE_FOCUS_M)
 
-    def learn_focus(self, pos: float) -> None:
-        """Autofocus found the focus motor sharp at `pos` (0…1): keep how far
-        that is from FOCUS_GRID's position for this zoom, for _trim to carry
-        to every lookup from now on."""
-        _reg, lo, hi = _CHANNELS[OPT_FOCUS]
-        raw = round(lo + max(0.0, min(1.0, pos)) * (hi - lo))
-        dist = self._want_dist_m or self._focus_dist_m or config.AWAKE_FOCUS_M
-        self._focus_trim = raw - focus_raw(self._zoom_mm, dist)
-        self._trim_zoom_mm = self._zoom_mm
+    def learn_focus(self, steps: float) -> None:
+        """Autofocus found the picture sharp with the focus motor at `steps`:
+        keep how far that is from FOCUS_GRID_STEPS's position for this zoom,
+        for _trim to carry to every lookup from now on."""
+        with self._lens_lock:
+            dist = self._want_dist_m or self._focus_dist_m or config.AWAKE_FOCUS_M
+            self._focus_trim_steps = round(steps) - grid_focus_steps(self._zoom_mm, dist)
+            self._trim_zoom_mm = self._zoom_mm
 
     def _trim(self) -> float:
-        """The last autofocus's correction, carried to this focal length.
+        """The last autofocus's correction, in steps, carried to this focal length.
 
         A lens's focus travel for the same subject grows as the square of its
         focal length, so a correction found wide is several times bigger at
-        tele. Capped: a small error at the wide end, where the sharp band is
-        broad, must not become a wild guess at the long end.
+        tele. Capped at FOCUS_TRIM_MAX_STEPS: a small error at the wide end,
+        where the sharp band is broad, must not become a wild guess at the
+        long end.
         """
         grown = (self._zoom_mm / self._trim_zoom_mm) ** 2
-        cap = config.FOCUS_TRIM_MAX
-        return max(-cap, min(cap, self._focus_trim * grown))
+        cap = config.FOCUS_TRIM_MAX_STEPS
+        return max(-cap, min(cap, self._focus_trim_steps * grown))
 
     @property
     def lens_moving(self) -> bool:
-        """A zoom or focus move is under way (or autofocus is sweeping): the
-        picture is blurred for a while, and a missed detection means little."""
-        return self.af_active or time.monotonic() < self._lens_until
+        """A zoom or focus move is queued or under way, or autofocus has the
+        lens: the picture is blurred for a while, and a missed detection
+        means little. No I2C: the lens thread keeps it."""
+        return self._lens_owner is not None or not self.focuser.lens_idle
 
     def lens_busy(self) -> bool:
-        """The lens motors are moving now: the controller's busy flag, or, from
-        a controller that never sets it, the time a move should take."""
-        if getattr(self.focuser, "lens_pending", False):
-            return True
-        b = self.focuser.busy() if self.focuser.available else None
-        if b is None or not self._busy_seen:
-            if b:
-                self._busy_seen = True
-                return True
-            return time.monotonic() < self._lens_until
-        return b
+        """A lens motor is moving, or about to: a move is queued or running."""
+        return not self.focuser.lens_idle
 
-    def _lens_set(self, channel: str, raw: int) -> None:
-        """Move a lens motor, noting when it should have arrived (wait_lens):
-        the controller won't say."""
-        _reg, lo, hi = _CHANNELS[channel]
-        last = self._lens_raw.get(channel)
-        share = 1.0 if last is None else abs(raw - last) / (hi - lo)
-        self._lens_raw[channel] = raw
-        self._lens_until = max(self._lens_until, time.monotonic() + config.LENS_SETTLE_S
-                               + share * config.LENS_TRAVEL_S)
-        self._lens_written_at = time.monotonic()
-        self.focuser.set(channel, raw)
+    @property
+    def lens_run(self) -> tuple[float, float]:
+        """When the last lens move started and stopped (time.monotonic):
+        between them the motor ran at a steady speed."""
+        return self.focuser.lens_started_at, self.focuser.lens_stopped_at
 
-    def set_zoom_mm(self, efl_mm: float, urgent: bool = False) -> None:
-        """Set the zoom motor from a wanted focal length.
+    def _lens_set(self, channel: str, steps: int) -> None:
+        """Move a lens motor, saying how long it should take: a controller
+        that never sets its busy flag is waited out by that."""
+        last = self._lens_steps.get(channel)
+        share = 1.0 if last is None else abs(steps - last) / LENS_STEPS
+        self._lens_steps[channel] = steps
+        self.focuser.set(channel, steps,
+                         expect_s=config.LENS_SETTLE_S + share * config.LENS_TRAVEL_S)
+
+    def set_zoom_mm(self, efl_mm: float, urgent: bool = False,
+                    owner: object | None = None) -> LensMove:
+        """Set the zoom motor from a wanted focal length; what became of it.
 
         `urgent` skips ZOOM_RATE_LIMIT_S: zooming out to look for a person
         lost while recording can't wait for the lens's next turn.
 
         The motor is open-loop with a non-linear relationship between step
-        count and focal length; `config.ZOOM_CURVE` holds the measured
-        (efl_mm, raw) pairs from the calibration in docs/04 and we interpolate
-        between them. The default curve is a straight line between the two
-        ends, which is close enough to start filming and wrong enough that you
-        should measure it once.
+        count and focal length; `config.ZOOM_CURVE_STEPS` holds the measured
+        (efl_mm, steps) pairs (lenscheck prints them) and we interpolate
+        between them.
         """
-        if self.af_active:
-            return                          # the sweep's picture must hold still
-        efl_mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, efl_mm))
-        now = time.monotonic()
-        if (abs(efl_mm - self._zoom_mm) < config.ZOOM_MIN_STEP_MM
-                or (not urgent and now - self._last_zoom_at < config.ZOOM_RATE_LIMIT_S)):
-            return
-        self._zoom_mm = efl_mm
-        self._last_zoom_at = now
-        self._lens_set(OPT_ZOOM, _interp(efl_mm, config.ZOOM_CURVE))
-        # A zoom move always throws focus off, so refocus at once for the
-        # last known distance, ignoring the focus rate limit.
-        self._apply_focus(self._want_dist_m or self._focus_dist_m or 10.0)
+        with self._lens_lock:
+            if self._held(owner):
+                return LensMove.HELD            # the sweep's picture must hold still
+            efl_mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, efl_mm))
+            now = time.monotonic()
+            if efl_mm == self._zoom_mm:
+                return LensMove.SAME
+            if abs(efl_mm - self._zoom_mm) < config.ZOOM_MIN_STEP_MM:
+                return LensMove.SMALL
+            if not urgent and now - self._last_zoom_at < config.ZOOM_RATE_LIMIT_S:
+                return LensMove.PACED
+            self._zoom_mm = efl_mm
+            self._last_zoom_at = now
+            self._lens_set(OPT_ZOOM, _interp(efl_mm, config.ZOOM_CURVE_STEPS))
+            # A zoom move always throws focus off, so refocus at once for the
+            # last known distance, ignoring the focus rate limit.
+            self._apply_focus(self._want_dist_m or self._focus_dist_m or 10.0)
+            return LensMove.MOVED
 
     @property
     def focus_m(self) -> float | None:
         """The subject distance the focus is set for; None until first set."""
         return self._focus_dist_m
 
-    def wait_lens(self, timeout_s: float | None = None) -> None:
-        """Until the zoom and focus motors have stopped, or `timeout_s`.
+    @property
+    def subject_m(self) -> float | None:
+        """The subject distance last asked for (set_focus), whether or not
+        the motor was moved for it; None before any."""
+        return self._want_dist_m
 
-        The controller's busy flag says so. Until it has been seen set once
-        (a controller that never sets it), a move is waited out by time
-        instead: LENS_SETTLE_S plus its share of LENS_TRAVEL_S.
-        """
+    def wait_lens(self, timeout_s: float | None = None) -> None:
+        """Until the zoom and focus motors have stopped (every queued move
+        done), or `timeout_s`; then LENS_SETTLE_S for the picture to settle."""
         if not self.focuser.available:
             return
         if timeout_s is None:
-            timeout_s = config.LENS_SETTLE_S + config.LENS_TRAVEL_S + 1.0
-        deadline = time.monotonic() + timeout_s + _LENS_MOVE_MAX_S
-        while self.focuser.lens_pending and time.monotonic() < deadline:
-            time.sleep(0.01)                    # moves queued ahead of this one
-        deadline = time.monotonic() + timeout_s
-        seen = False
-        while time.monotonic() < deadline:
-            b = self.focuser.busy()
-            if b is None:
-                break                                   # no answer: by time
-            since = time.monotonic() - self._lens_written_at
-            if b:
-                seen = self._busy_seen = True
-            elif seen or (self._busy_seen and since > 0.05):
-                time.sleep(config.LENS_SETTLE_S)        # stopped; let the picture settle
-                return
-            elif since > 0.3:
-                break                                   # never set: by time
-            time.sleep(0.01)
-        time.sleep(min(max(0.0, deadline - time.monotonic()),
-                       max(0.0, self._lens_until - time.monotonic())))
+            timeout_s = 2 * (_LENS_MOVE_MAX_S + config.LENS_SETTLE_S)   # a zoom, then its focus
+        self.focuser.wait_lens_idle(timeout_s)
+        time.sleep(config.LENS_SETTLE_S)
 
     @property
-    def focus_pos(self) -> float | None:
-        """Where the focus motor was last sent, as a fraction of its travel
-        (0 at its low stop, 1 at its high); None until it has been."""
-        if self._focus_raw is None:
-            return None
-        _reg, lo, hi = _CHANNELS[OPT_FOCUS]
-        return (self._focus_raw - lo) / (hi - lo)
+    def focus_steps(self) -> int | None:
+        """Where the focus motor was last sent, in steps (0 at its low stop,
+        LENS_STEPS at its high); None until it has been."""
+        return self._focus_steps
 
-    def set_focus_pos(self, pos: float) -> None:
-        """Send the focus motor to `pos` of its travel (0…1): the app's focus
-        slider, focusing by eye.
+    def set_focus_steps(self, steps: float, owner: object | None = None) -> LensMove:
+        """Send the focus motor to `steps`: autofocus and the calibration
+        tools, which find focus by looking.
 
-        Straight to the motor, not through FOCUS_GRID, which until it is
-        calibrated maps every distance to the same position. Forgets the
+        Straight to the motor, not through FOCUS_GRID_STEPS. Forgets the
         distance it was focused for, so the tracker's next set_focus moves
         the motor whatever it asks for.
         """
-        _reg, lo, hi = _CHANNELS[OPT_FOCUS]
-        raw = round(lo + max(0.0, min(1.0, pos)) * (hi - lo))
-        self._focus_dist_m = None
-        self._last_focus_at = time.monotonic()
-        if raw != self._focus_raw:
-            self._focus_raw = raw
-            self._lens_set(OPT_FOCUS, raw)
+        with self._lens_lock:
+            if self._held(owner):
+                return LensMove.HELD
+            steps = int(round(max(0, min(LENS_STEPS, steps))))
+            self._focus_dist_m = None
+            self._last_focus_at = time.monotonic()
+            if steps == self._focus_steps:
+                return LensMove.SAME
+            self._focus_steps = steps
+            self._lens_set(OPT_FOCUS, steps)
+            return LensMove.MOVED
 
-    def set_focus(self, dist_m: float, urgent: bool = False) -> None:
+    def set_focus(self, dist_m: float, urgent: bool = False,
+                  owner: object | None = None) -> LensMove:
         """Focus for a subject `dist_m` away, at the current focal length.
 
-        `urgent` skips FOCUS_RATE_LIMIT_S, as for zoom: the app's focus
-        slider is a person waiting to see the picture sharpen.
+        `urgent` skips FOCUS_RATE_LIMIT_S, as for zoom.
 
         Rate-limited, and changes smaller than FOCUS_DEADBAND_DIOPTRE in 1/d
         are ignored: at 10 m that is about ±2 m, well inside the depth of
-        field at any zoom, so the motor is not chattering on distance-estimate noise.
+        field at any zoom, so the motor is not chattering on noise in the
+        distance.
         """
-        dist_m = max(0.5, dist_m)
-        self._want_dist_m = dist_m
-        if self.af_active:
-            return                          # autofocus decides, for now
-        now = time.monotonic()
-        if self._focus_dist_m is not None:
-            if (abs(1.0 / dist_m - 1.0 / self._focus_dist_m) < config.FOCUS_DEADBAND_DIOPTRE
-                    or (not urgent and now - self._last_focus_at < config.FOCUS_RATE_LIMIT_S)):
-                return
-        self._apply_focus(dist_m)
+        with self._lens_lock:
+            dist_m = max(0.5, dist_m)
+            self._want_dist_m = dist_m
+            if self._held(owner):
+                return LensMove.HELD            # autofocus decides, for now
+            now = time.monotonic()
+            if self._focus_dist_m is not None:
+                if abs(1.0 / dist_m - 1.0 / self._focus_dist_m) < config.FOCUS_DEADBAND_DIOPTRE:
+                    return LensMove.SMALL
+                if not urgent and now - self._last_focus_at < config.FOCUS_RATE_LIMIT_S:
+                    return LensMove.PACED
+            return self._apply_focus(dist_m)
 
-    def _apply_focus(self, dist_m: float) -> None:
+    def _apply_focus(self, dist_m: float) -> LensMove:
         self._focus_dist_m = dist_m
         self._last_focus_at = time.monotonic()
-        _reg, lo, hi = _CHANNELS[OPT_FOCUS]
-        raw = int(max(lo, min(hi, focus_raw(self._zoom_mm, dist_m) + self._trim())))
-        if raw != self._focus_raw:
-            self._focus_raw = raw
-            self._lens_set(OPT_FOCUS, raw)
+        steps = int(max(0, min(LENS_STEPS,
+                               grid_focus_steps(self._zoom_mm, dist_m) + self._trim())))
+        if steps == self._focus_steps:
+            return LensMove.SAME
+        self._focus_steps = steps
+        self._lens_set(OPT_FOCUS, steps)
+        return LensMove.MOVED
 
 
+def grid_focus_steps(efl_mm: float, dist_m: float,
+                     grid: dict[float, list[tuple[float, int]]] | None = None) -> int:
+    """Focus motor position, in steps, for a focal length and subject distance.
 
-def focus_raw(efl_mm: float, dist_m: float,
-              grid: dict[float, list[tuple[float, int]]] | None = None) -> int:
-    """Focus motor position for a focal length and subject distance.
-
-    Bilinear over `config.FOCUS_GRID`: linear in focal length between rows,
-    and within a row linear in 1/distance, which is how lens extension
+    Bilinear over `config.FOCUS_GRID_STEPS`: linear in focal length between
+    rows, and within a row linear in 1/distance, which is how lens extension
     actually varies. Clamped at the edges of the measured grid rather than
     extrapolated — an extrapolated focus motor position is a guess with a
     motor attached.
     """
-    grid = grid if grid is not None else config.FOCUS_GRID
+    grid = grid if grid is not None else config.FOCUS_GRID_STEPS
     rows = sorted(grid)
     inv_d = 1.0 / max(0.1, dist_m)
 
     def row_at(efl: float) -> float:
-        # rows are (distance, raw); in 1/d they run far → near, so sort by it
-        pts = sorted((1.0 / d, raw) for d, raw in grid[efl])
+        # rows are (distance, steps); in 1/d they run far → near, so sort by it
+        pts = sorted((1.0 / d, steps) for d, steps in grid[efl])
         return float(_interp(inv_d, pts, as_int=False))
 
     if efl_mm <= rows[0]:
@@ -634,7 +697,7 @@ def focus_raw(efl_mm: float, dist_m: float,
 
 
 def _interp(x: float, curve: list[tuple[float, float]], as_int: bool = True) -> float:
-    """Piecewise-linear lookup over a sorted (x, raw) calibration curve."""
+    """Piecewise-linear lookup over a sorted (x, steps) calibration curve."""
     def out(v: float) -> float:
         return int(round(v)) if as_int else v
     if x <= curve[0][0]:

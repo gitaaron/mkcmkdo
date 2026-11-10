@@ -12,7 +12,6 @@ measurement twice. It is the only sensor in this build.
 """
 from __future__ import annotations
 
-import io
 import os
 import shutil
 import threading
@@ -43,6 +42,55 @@ from . import config
 from .detector import Person, look_of, make_detector, score_of
 
 Box = tuple[int, int, int, int]      # x, y, w, h in preview pixels
+
+
+class Frame:
+    """One preview frame as the sensor gave it (YUV 4:2:0), and when it was
+    exposed, on time.monotonic's clock. Each user converts only what it
+    needs: `luma` is free, `rgb` is converted once and kept, `bgr()` is for
+    the JPEG encoder."""
+
+    __slots__ = ("yuv", "at", "seq", "_rgb")
+
+    def __init__(self, yuv, at: float, seq: int = 0, rgb=None) -> None:
+        self.yuv, self.at, self.seq, self._rgb = yuv, at, seq, rgb
+
+    @classmethod
+    def from_rgb(cls, rgb, at: float, seq: int = 0) -> "Frame":
+        """A frame from an RGB picture: tests, and pictures read from disk."""
+        return cls(None, at, seq, rgb)
+
+    @property
+    def luma(self):
+        """The grey picture: the Y plane, a view of the frame, no conversion."""
+        if self.yuv is None:
+            return cv2.cvtColor(self._rgb, cv2.COLOR_RGB2GRAY)
+        return self.yuv[:self.yuv.shape[0] * 2 // 3]
+
+    @property
+    def rgb(self):
+        if self._rgb is None:
+            self._rgb = cv2.cvtColor(self.yuv, cv2.COLOR_YUV2RGB_I420)
+        return self._rgb
+
+    def bgr(self):
+        if self.yuv is None:
+            return cv2.cvtColor(self._rgb, cv2.COLOR_RGB2BGR)
+        return cv2.cvtColor(self.yuv, cv2.COLOR_YUV2BGR_I420)
+
+
+def sensor_clock_offset(sensor_s: float, arrived: float) -> float | None:
+    """What to add to the camera's frame timestamps to put them on
+    time.monotonic's clock, worked out from the first frame: 0 if they are on
+    it already (the frame was exposed within the last second), the difference
+    if they count from boot (CLOCK_BOOTTIME), None if neither fits."""
+    if 0.0 <= arrived - sensor_s < 1.0:
+        return 0.0
+    if hasattr(time, "CLOCK_BOOTTIME"):
+        off = time.monotonic() - time.clock_gettime(time.CLOCK_BOOTTIME)
+        if 0.0 <= arrived - (sensor_s + off) < 1.0:
+            return off
+    return None
 
 
 class Camera:
@@ -86,10 +134,11 @@ class Camera:
         self.awake = True                        # sensor running (stopped in sleep)
         self._warm_until = 0.0
         self._strip_cx: float | None = None      # column to search, once locked on
-        # Detection runs on its own thread (_detect_loop): HOG takes a few
-        # hundred ms on a Pi 4, and run inside the 20 Hz control tick it froze
-        # the servos for that long every detection. OpenCV releases the GIL
-        # while it works, so the control loop keeps easing meanwhile.
+        # Detection runs on its own thread (_detect_loop): it takes a few
+        # hundred ms on a Pi 4 (measured: the [detect] log line), and run
+        # inside the 20 Hz control tick it froze the servos for that long every
+        # detection. OpenCV releases the GIL while it works, so the control
+        # loop keeps easing meanwhile.
         self._lock = threading.Lock()
         # Held around every detect(): the detector thread's and a sample's
         # (detect_frame) — OpenCV's networks aren't safe to share across
@@ -99,6 +148,20 @@ class Camera:
         # capture waiting on a frame from a sensor stopped under it (sleep)
         # would wait for good. Captures are one frame, so it is held briefly.
         self._cam_lock = threading.Lock()
+        # Frames are fetched on demand and shared (frame()): whoever asks
+        # while a fetch is under way gets that same frame, not a turn in a
+        # queue for one of their own.
+        self._frame_cv = threading.Condition()
+        self._latest: Frame | None = None
+        self._fetching = False
+        self._frames = 0                         # fetched so far: a frame's seq
+        # the camera's frame timestamps → time.monotonic: unknown until the
+        # first frame (None), then the offset, or False if they can't be used
+        self._sensor_offset: float | bool | None = None
+        # How detection is doing, logged every DETECT_LOG_EVERY (the [detect] line)
+        self._stat_infer: list[float] = []       # seconds in the detector, each run
+        self._stat_age: list[float] = []         # exposure → the tracker taking the boxes
+        self._stat_whole = 0                     # runs over the whole frame
         self._detections = 0                     # run so far, for DETECT_FULL_EVERY
         self._seq = 0                            # results published
         self._seq_read = 0                       # results handed to the tracker
@@ -123,13 +186,27 @@ class Camera:
             gen, strip = self._gen, self._strip_cx
             self._detect_at = now
             try:
-                boxes = self._detect(strip)
+                boxes, at = self._detect(strip)
             except Exception:                    # asleep now, or a bad frame
                 continue
             with self._lock:
                 if gen == self._gen:
-                    self._boxes, self.captured_at = boxes, now
+                    self._boxes, self.captured_at = boxes, at
                     self._seq += 1
+                self._log_detection()
+
+    def _log_detection(self) -> None:
+        """Every DETECT_LOG_EVERY detections, one line on how long they take
+        and how old a result is when the tracker acts on it. Under _lock."""
+        n = len(self._stat_infer)
+        if not config.DETECT_LOG_EVERY or n < config.DETECT_LOG_EVERY:
+            return
+        infer, age = self._stat_infer, self._stat_age
+        acted = (f"exposure to tracker {1000 * sum(age) / len(age):.0f} ms (max "
+                 f"{1000 * max(age):.0f})" if age else "none taken by the tracker")
+        print(f"[detect] {n} detections: detector {1000 * sum(infer) / n:.0f} ms "
+              f"(max {1000 * max(infer):.0f}), {acted}, {self._stat_whole} whole-frame")
+        self._stat_infer, self._stat_age, self._stat_whole = [], [], 0
 
     def set_awake(self, on: bool) -> None:
         """Start or stop the sensor: stopped in sleep to save the battery.
@@ -170,19 +247,78 @@ class Camera:
         """
         self._strip_cx = cx_px
 
-    def _capture(self):
-        """One preview frame (RGB), or None while the sensor sleeps. Any thread."""
+    def frame(self, newer_than: Frame | None = None) -> Frame | None:
+        """A preview frame newer than `newer_than` (or than any fetched before
+        this call), or None while the sensor sleeps. Any thread.
+
+        Fetched on demand and shared: the first to ask fetches, and everyone
+        asking meanwhile (detection, autofocus, the live view) gets that same
+        frame when it arrives. Nobody waiting, nothing is fetched.
+        """
+        with self._frame_cv:
+            after = newer_than.seq if newer_than is not None else self._frames
+            while True:
+                if not (self._cam and self.awake):
+                    return None
+                if self._latest is not None and self._latest.seq > after:
+                    return self._latest
+                if not self._fetching:
+                    self._fetching = True
+                    break
+                self._frame_cv.wait(0.5)
+        got = None
+        try:
+            got = self._fetch()
+        finally:
+            with self._frame_cv:
+                self._fetching = False
+                if got is not None:
+                    self._frames += 1
+                    got.seq = self._frames
+                    self._latest = got
+                self._frame_cv.notify_all()
+        return got
+
+    def _fetch(self) -> Frame | None:
+        """The sensor's next frame, with its exposure time."""
         with self._cam_lock:
             if not (self._cam and self.awake):
                 return None
-            yuv = self._cam.capture_array("lores")
-        return cv2.cvtColor(yuv, cv2.COLOR_YUV2RGB_I420)
+            request = self._cam.capture_request()
+            try:
+                yuv = request.make_array("lores")
+                meta = request.get_metadata()
+            finally:
+                request.release()
+        return Frame(yuv, self._exposed_at(meta, time.monotonic()))
+
+    def _exposed_at(self, meta: dict, arrived: float) -> float:
+        """When a frame was exposed (the middle of its exposure), on
+        time.monotonic's clock, from the camera's own timestamp. Where that
+        can't be used, a guess: AF_FRAME_LAG_S before it arrived."""
+        stamp = meta.get("SensorTimestamp")
+        if stamp is not None and self._sensor_offset is None:
+            off = sensor_clock_offset(stamp / 1e9, arrived)
+            self._sensor_offset = False if off is None else off
+            if off is None:
+                print("[camera] frame timestamps are on an unknown clock: "
+                      "guessing exposure times (AF_FRAME_LAG_S)")
+        if stamp is None or self._sensor_offset is False or self._sensor_offset is None:
+            return arrived - config.AF_FRAME_LAG_S
+        at = stamp / 1e9 + self._sensor_offset + meta.get("ExposureTime", 0) / 2e6
+        return min(at, arrived)
+
+    def _capture(self):
+        """One preview frame as RGB, or None while the sensor sleeps: for the
+        calibration tools. Any thread."""
+        got = self.frame()
+        return None if got is None else got.rgb
 
     def preview_jpeg(self) -> bytes | None:
-        rgb = self._capture()
-        if rgb is None:
+        got = self.frame()
+        if got is None:
             return None
-        ok, jpg = cv2.imencode(".jpg", rgb[:, :, ::-1], [cv2.IMWRITE_JPEG_QUALITY, 80])
+        ok, jpg = cv2.imencode(".jpg", got.bgr(), [cv2.IMWRITE_JPEG_QUALITY, 80])
         return jpg.tobytes() if ok else None
 
     def person_boxes(self) -> tuple[list[Box], bool]:
@@ -198,12 +334,16 @@ class Camera:
         with self._lock:
             fresh = self._seq != self._seq_read
             self._seq_read = self._seq
+            if fresh and self.captured_at is not None:
+                self._stat_age.append(time.monotonic() - self.captured_at)
             return self._boxes, fresh
 
-    def _detect(self, strip_cx: float | None) -> list[Box]:
-        rgb = self._capture()
-        if rgb is None:
+    def _detect(self, strip_cx: float | None) -> tuple[list[Box], float]:
+        """One detection: (the people found, when their frame was exposed)."""
+        got = self.frame()
+        if got is None:
             raise RuntimeError("asleep")         # set_awake(False) since the loop looked
+        rgb = got.rgb
         pw = config.PREVIEW_SIZE[0]
 
         # Crop to a vertical strip around the followed person, when locked on.
@@ -220,11 +360,15 @@ class Camera:
 
         # one pass even for the whole frame, or each of these leaves a gap in the
         # head's guidance twice the usual
+        t0 = time.monotonic()
         out = [Person((b[0] + x0, b[1], b[2], b[3]), score_of(b))
                for b in self.detect_frame(rgb, tiles=not full)]
+        with self._lock:
+            self._stat_infer.append(time.monotonic() - t0)
+            self._stat_whole += rgb is frame
         for b in out:
             b.look = look_of(frame, b)
-        return out
+        return out, got.at
 
     def detect_frame(self, rgb, tiles: bool = True) -> list:
         """The person detector on `rgb`, now: [(x, y, w, h), …]; none
@@ -258,10 +402,10 @@ class Camera:
         """
         if not (self._cam and cv2 and self.awake):
             return None
-        rgb = self._capture()
-        if rgb is None:
+        got = self.frame()
+        if got is None:
             return None
-        grey = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+        grey = np.ascontiguousarray(got.luma)    # the Y plane: no conversion
         if zbar_decode:
             for code in zbar_decode(grey, symbols=[ZBarSymbol.QRCODE]):
                 return code.data.decode("utf-8", "replace")

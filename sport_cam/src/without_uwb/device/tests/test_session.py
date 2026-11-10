@@ -97,6 +97,7 @@ class RecCamera(SimCamera):
         super().__init__(ptz, people)
         self.recording = False
         self.no_detector = None
+        self.no_recorder = None
 
     def start_recording(self):
         self.recording = True
@@ -123,7 +124,7 @@ class FakeAutoFocus:
         self.cancelled = 0
         self.busy = False
 
-    def start(self, x: float, y: float, narrow: bool = False) -> None:
+    def start(self, x: float, y: float, narrow: bool = False, on_done=None) -> None:
         self.started.append((x, y))
         self.narrow = narrow
 
@@ -135,6 +136,7 @@ async def full_flow() -> None:
     import sportcam.main as main_mod
     from sportcam.cloud import CloudLink
     from sportcam.boxlog import BoxLog
+    from sportcam.autofocus import Refocus
     from sportcam.main import Head
 
     async def no_upload(*a, **k):
@@ -162,11 +164,14 @@ async def full_flow() -> None:
     head._near_focus = False
     head._tasks = set()
     head._boxes_sent_at = None
+    head._person_seen_at = None
     head._jog, head._jog_at = (0.0, 0.0), float("-inf")
     head._lens_zoom = None
     head._lens_new = False
-    head._af_point, head._af_due = (0.5, 0.5), None
+    head._af_point = (0.5, 0.5)
+    head._park_vel, head._park_at, head._leveling, head._aim_at = (0.0, 0.0), 0.0, False, 0.0
     head.autofocus = FakeAutoFocus()
+    head.refocus = Refocus(ptz, head.autofocus, clock=CLOCK.monotonic)
     head.session_hash = None
     owner = "c0" * 32                   # the hash of the secret the app was handed
     if os.path.exists("/tmp/sportcam-test.owner"):
@@ -257,21 +262,25 @@ async def full_flow() -> None:
     head.ptz.lens_moving = False
     person.visible = True
     await tick_for(0.5)
-    # the tracker's zoom throws focus off: once the lens rests, autofocus on them
+    # the tracker's zoom throws focus off: once the lens has stopped, autofocus on them
     await tick_for(config.AF_TRACK_GAP_S)
     head.autofocus.started.clear()
-    head.tracker._efl = head.ptz.zoom_mm = head.ptz.zoom_mm + 1.0   # as its fill loop would
-    await tick_for(config.AF_AFTER_ZOOM_S - 0.2)
-    check("a tracking zoom: no refocus while it may still be moving",
+    head.ptz.zoom_mm += 1.0                      # as the tracker's framing would
+    head.ptz.lens_moving = True                  # …and the lens is on its way
+    await tick_for(2.0)
+    check("a tracking zoom: no refocus while the lens is still moving, however long",
           head.autofocus.started == [], f"{head.autofocus.started}")
-    await tick_for(0.5)
-    check("…then a narrow autofocus on the person, once",
-          len(head.autofocus.started) == 1 and head.autofocus.narrow is True,
-          f"{head.autofocus.started}")
-    await tick_for(1.0)
+    head.ptz.lens_moving = False
+    await tick_for(0.2)
+    x, y = head.autofocus.started[-1] if head.autofocus.started else (None, None)
+    check("…as soon as it has stopped, a narrow autofocus on the person, once",
+          len(head.autofocus.started) == 1 and head.autofocus.narrow is True
+          and x is not None and 0.0 < y < 0.5, f"{head.autofocus.started}")
+    await tick_for(config.AF_TRACK_GAP_S + 1.0)
     check("…not over and over", len(head.autofocus.started) == 1, f"{head.autofocus.started}")
     head.autofocus.started.clear()
-    head.tracker._efl = head.ptz.zoom_mm = head.ptz.zoom_mm - 1.0
+    head.ptz.zoom_mm -= 1.0
+    await tick_for(0.2)
 
     # Record with no way to write the video: stay tracking, say why
     head.camera.no_recorder = "ffmpeg is not installed on the camera"
@@ -498,10 +507,28 @@ async def full_flow() -> None:
     await tick_for(0.3)
     check("…and stops JOG_TIMEOUT_S after the last message", head.ptz.jogs == held,
           f"{head.ptz.jogs - held} more moves")
+    # a control tick that ran late turns the head by the time that really passed
+    head.jog(1.0, 0.0)
+    await tick_for(0.2)
+    on_time = head.ptz.jog_dt
+    CLOCK.t += 0.15
+    head.jog(1.0, 0.0)
+    await head.control_tick()
+    check("the joystick turns the head by each tick's real length: 50 ms on time…",
+          abs(on_time - 0.05) < 1e-6, f"{on_time}")
+    check("…and 150 ms for a tick that came 150 ms after the last",
+          abs(head.ptz.jog_dt - 0.15) < 1e-6, f"{head.ptz.jog_dt}")
+    CLOCK.t += 5.0
+    head.jog(1.0, 0.0)
+    await head.control_tick()
+    check("…a first tick after a long pause is not one long step", head.ptz.jog_dt <= 0.05 + 1e-6,
+          f"{head.ptz.jog_dt}")
+    await tick_for(config.JOG_TIMEOUT_S + 0.5)
+    head.ptz.park()
 
     # the app's zoom slider holds the lens in awake, and the lens refocuses once it rests…
     head.autofocus.started.clear()              # the wake's and lock-ons' are not this
-    head._af_due = None
+    head.refocus.reset()
     head.lens(8.0)
     await tick_for(0.2)
     check("zoom: awake, the app's zoom holds (awake no longer forces wide)",
@@ -529,6 +556,28 @@ async def full_flow() -> None:
     check("…and woken again the lens is back to wide", head.ptz.zoom_mm == config.ZOOM_MIN_MM,
           f"{head.ptz.zoom_mm}")
 
+    # the live view is made only for someone watching: nobody, no capture, no JPEG
+    made: list[int] = []
+    head.camera.preview_jpeg = lambda: made.append(1) or b"\xff\xd8jpeg"
+    head.local.publish_frame = lambda jpg: None
+
+    async def sent_on(jpg, boxes):
+        pass
+    head.cloud.preview = sent_on
+    head.cloud.viewer_at = 0.0
+    head.local.viewers = 0
+    loop = asyncio.create_task(head.frame_loop())
+    await asyncio.sleep(0.3)
+    unwatched = len(made)
+    head.local.viewers = 1
+    await asyncio.sleep(0.3)
+    watched = len(made) - unwatched
+    head.local.viewers = 0
+    loop.cancel()
+    check("nobody watching the live view: no frame is captured or encoded for it",
+          head.state == "awake" and unwatched == 0, f"{unwatched} made")
+    check("…someone watching: frames at MJPEG_FPS", watched >= 2, f"{watched} in 0.3 s")
+
 
 def ring_animation() -> None:
     print("\nring")
@@ -549,6 +598,7 @@ async def switched_off() -> None:
     print("\nswitched off while recording")
     import signal
     import sportcam.main as main_mod
+    from sportcam.autofocus import Refocus
     from sportcam.main import Head
 
     async def no_upload(*a, **k):
@@ -577,6 +627,7 @@ async def switched_off() -> None:
     head._rec_path, head._rec_started = "/tmp/sportcam-test.mp4", main_mod.time.monotonic()
     head._near_focus = False
     head.autofocus = FakeAutoFocus()
+    head.refocus = Stub()
     head._tasks = set()
     head.session_hash = None
 

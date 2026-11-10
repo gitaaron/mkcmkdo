@@ -6,7 +6,7 @@ tracker is a small state machine,
     (awake, no person in frame)       (awake, person in frame)
                │ session start                │ session start
                ▼                              ▼
-    SEARCH ──person seen──► FOUND ──FOUND_CONFIRM_S──► TRACK (recording)
+    SEARCH ──person seen──► FOUND ──FOUND_CONFIRM_S──► TRACK (locked on)
        ▲                       │                          │
        └─ nobody seen ◄────────┘                          │
           FOUND_LOST_S                                    │
@@ -25,20 +25,25 @@ tracker is a small state machine,
   session holds still until the detector's first look, since the person may
   already be in frame (a session started from sleep knows nothing yet).
 * **FOUND** — the sweep stops and the camera follows and frames that person
-  exactly as it will while recording; they need not be centred. Seen
-  throughout FOUND_CONFIRM_S (no gap longer than FOUND_LOST_S), the session
-  starts recording and calls `confirm()`. A lone false positive does not
-  survive the wait.
-* **TRACK** — recording. Pan and tilt follow the person, zoom frames them,
-  and among several detections the one nearest the last position is
-  followed, so a bystander walking through does not steal the shot. If the
+  exactly as it will once locked on; they need not be centred. Seen
+  throughout FOUND_CONFIRM_S (no gap longer than FOUND_LOST_S), the head
+  locks on (`lock_on()`): the app's Record is then allowed. A lone false
+  positive does not survive the wait.
+* **TRACK** — locked on, in the tracking state and all through a recording.
+  Pan and tilt follow the person, zoom frames them, and among several
+  detections the one nearest where they were last seen is followed
+  (subject.py), so a bystander walking through does not steal the shot. If the
   person is gone for LOST_ZOOM_OUT_S the lens zooms straight out to wide,
   still pointing where they were, and the detector looks at the whole frame:
   someone who stepped or climbed just out of a tight shot is usually still
   in a wide one, and seen again the zoom closes back in. Gone for
   RESEARCH_AFTER_S the camera goes back to SEARCH (the sweep starts toward
-  the side they were last heading for), still recording; the next person
-  found goes straight back to TRACK.
+  the side they were last heading for), a recording still running; the next
+  person found goes straight back to TRACK.
+
+Three jobs live here: the modes, pointing the head, and the distance
+estimate. Choosing which detection is the person is subject.py's, and how big
+they should be in the picture framing.py's.
 
 The detector runs at a few frames per second, far slower than the 20 Hz loop
 that calls `step()`. Corrections are therefore applied only on a *fresh*
@@ -54,9 +59,11 @@ from collections import deque
 from . import config
 from .boxlog import CLIMBER, OTHER, UNSURE, Box
 from .camera import Camera
-from .detector import look_distance, score_of
+from .detector import score_of
+from .framing import Framing
 from .motion import ease_to, tilt_error_px
 from .ptz import Ptz
+from .subject import Direction, Subject
 
 SEARCH, FOUND, TRACK = "search", "found", "track"
 
@@ -66,11 +73,23 @@ class Tracker:
         self.camera = camera
         self.ptz = ptz
         self.dist_m: float | None = None   # estimated from the person's size
-        self.confirmed = False             # recording: found people go straight to TRACK
+        self.locked = False                # locked on: people found go straight to TRACK
+        self.subject = Subject()           # who is followed: where last seen, their colours
+        self.framing = Framing()           # how big they should be in the picture
         self._awake_box: Box | None = None  # largest person seen while awake
-        self._look = None                  # the followed person's colours, recent (_seen)
-        self._look_at = 0.0
         self._awake_seen_at: float | None = None
+        # set by _begin_search, at every new search:
+        self.mode = SEARCH
+        self._first_look = False           # a new session: hold still for the detector's first look
+        self._dir = 1                      # the sweep's direction, +1 right
+        self._row = 0                      # which of SEARCH_TILT_ROWS_DEG
+        self._searching_since = 0.0
+        self._last_step = 0.0
+        self._found_since = 0.0
+        self._last_seen_at: float | None = None
+        self._last_side = 0                # which way the person was drifting
+        self._pan_goal = self._tilt_goal = 0.0
+        self._pan_vel = self._tilt_vel = 0.0   # deg/s, for easing (_slew)
         # every box of the last fresh detection, labelled for the recording's
         # overlay (boxlog): climber, other, or unsure
         self.labelled: list[tuple[Box, str]] = []
@@ -94,16 +113,17 @@ class Tracker:
         now = time.monotonic()
         box = self._awake_box if self.awake_person_in_frame else None
         self._awake_box = self._awake_seen_at = None
-        self._look = None
-        self.confirmed = False
+        self.subject.forget()
+        self.locked = False
         self._begin_search(now, direction=1 if self.ptz.pan_deg <= 0 else -1)
         self._first_look = True
         if box is not None:
             self._first_sighting(now, box)
 
-    def confirm(self) -> None:
-        """Recording has started: follow the person (TRACK) for the rest of it."""
-        self.confirmed = True
+    def lock_on(self) -> None:
+        """The person has been in frame FOUND_CONFIRM_S, or Record was
+        pressed: follow them (TRACK) for the rest of the session."""
+        self.locked = True
         if self.mode == FOUND:
             self.mode = TRACK
 
@@ -150,15 +170,13 @@ class Tracker:
         self._searching_since = now
         self._last_step = now
         self._found_since = now
-        self._last_centre: tuple[float, float] | None = None
-        self._last_seen_at: float | None = None
-        self._last_side = 0                  # which way the subject was drifting
+        self.subject.direction = None        # their colours are kept: they may come back
+        self._last_seen_at = None
+        self._last_side = 0
         self._pan_goal = self.ptz.pan_deg
         self._tilt_goal = self.ptz.tilt_deg
-        self._pan_vel = self._tilt_vel = 0.0   # deg/s, for easing (_slew)
-        self._efl = config.ZOOM_MIN_MM
-        self._zoom_moved_at = float("-inf")    # the last framing move
-        self._zoom_off_since = None            # off target since, for the fill loop
+        self._pan_vel = self._tilt_vel = 0.0
+        self.framing.reset()
         self.dist_m = None
         self.camera.set_search_column(None)
         self.ptz.set_zoom_mm(config.ZOOM_MIN_MM)
@@ -176,7 +194,7 @@ class Tracker:
 
     @property
     def countdown(self) -> int:
-        """Whole seconds left in FOUND before recording (0 outside FOUND)."""
+        """Whole seconds left in FOUND before locking on (0 outside FOUND)."""
         if self.mode != FOUND:
             return 0
         return max(1, math.ceil(config.FOUND_CONFIRM_S - self.found_for()))
@@ -192,7 +210,7 @@ class Tracker:
         return time.monotonic() - self._searching_since if self.mode == SEARCH else 0.0
 
     def lost_for(self) -> float:
-        """Seconds the person being recorded has been missing (0 outside TRACK)."""
+        """Seconds the person locked on to has been missing (0 outside TRACK)."""
         if self.mode != TRACK or self._last_seen_at is None:
             return 0.0
         return time.monotonic() - self._last_seen_at
@@ -209,7 +227,7 @@ class Tracker:
         boxes = boxes if fresh else []
 
         if self.mode == SEARCH:
-            first = self._pick(boxes, now)
+            first = self.subject.pick(boxes, now)
             if first is not None:
                 self._first_sighting(now, first)
                 self._label(now, boxes, first)
@@ -221,11 +239,11 @@ class Tracker:
                     self._sweep(dt)
             return
 
-        if getattr(self.ptz, "lens_moving", False) and self._last_seen_at is not None:
+        if self.ptz.lens_moving and self._last_seen_at is not None:
             # Zoom, focus or autofocus under way: the picture is blurred, and
             # a frame without them proves nothing. Hold the clock.
             self._last_seen_at = min(now, self._last_seen_at + dt)
-        matched = self._select(boxes, now) if boxes else None
+        matched = self._choose(boxes, now) if boxes else None
         if fresh:
             self._label(now, boxes, matched)
         if matched:
@@ -233,8 +251,6 @@ class Tracker:
         gone = now - (self._last_seen_at or now)
         if self.mode == TRACK and gone > config.LOST_ZOOM_OUT_S:
             self._look_wide(now)
-        else:
-            self.ptz.set_zoom_mm(self._efl)      # retry anything the rate limit dropped
         self._slew(dt)
 
         if self.mode == FOUND and gone > config.FOUND_LOST_S:
@@ -248,10 +264,11 @@ class Tracker:
         Without a tag "the climber" can only mean the person being followed:
         CLIMBER, and everyone else OTHER. When that person is out of sight
         and someone else is in frame, the camera cannot tell whether it is
-        them, so every box is UNSURE.
+        them, so every box is UNSURE. The followed box is that very one, not
+        any with the same corners.
         """
         self.labelled_at = now
-        self.labelled = [(b, UNSURE if followed is None else CLIMBER if b == followed else OTHER)
+        self.labelled = [(b, UNSURE if followed is None else CLIMBER if b is followed else OTHER)
                          for b in boxes]
 
     # ---- SEARCH ------------------------------------------------------------
@@ -276,77 +293,37 @@ class Tracker:
 
     def _first_sighting(self, now: float, box: Box) -> None:
         """Stop the sweep and start following the first person seen."""
-        self.mode = TRACK if self.confirmed else FOUND
+        self.mode = TRACK if self.locked else FOUND
         self._found_since = now
-        self._last_centre = None            # nothing to gate against yet
         self._seen(now, box)
         self._slew(0.05)
 
     # ---- FOUND / TRACK -----------------------------------------------------
-    def _looks_like(self, box: Box, now: float) -> bool | None:
-        """Is this box's colouring the person being followed? None when that
-        can't be said: no look, or the memory is too old to trust (the light
-        changes, and a stale memory would shut the real person out)."""
-        look = getattr(box, "look", None)
-        if look is None or self._look is None or now - self._look_at > config.TRACK_LOOK_FRESH_S:
-            return None
-        return look_distance(self._look, look) <= config.TRACK_LOOK_MAX_DISTANCE
+    def _direction(self, box: Box, pose: tuple[float, float]) -> Direction:
+        """Where in the room a box's centre is (pan, tilt, degrees), given the
+        pose the head had when its frame was taken."""
+        pw, ph = config.PREVIEW_SIZE
+        pan, tilt = pose
+        return (pan + self._px_to_hdeg(box[0] + box[2] / 2 - pw / 2),
+                tilt - self._px_to_vdeg(box[1] + box[3] / 2 - ph / 2))
 
-    def _pick(self, boxes: list[Box], now: float) -> Box | None:
-        """Someone to start following: confident enough, not known to be
-        someone else, and of those the largest. None if nobody qualifies."""
-        sure = [b for b in boxes if score_of(b) >= config.PERSON_LOCK_CONFIDENCE
-                and self._looks_like(b, now) is not False]
-        return max(sure, key=lambda b: b[2] * b[3], default=None)
-
-    def _select(self, boxes: list[Box], now: float) -> Box | None:
-        """The detection that is 'our' person, or None.
-
-        With no previous position (first sighting), `_pick`. After that the
-        nearest to where we last saw them, within a gate, that doesn't look
-        like someone else; back after TRACK_RESEEN_S unseen it must also be
-        confident, as for a first sighting. If that finds nobody, or only a
-        doubtful box, someone confident anywhere who does look like them
-        takes over: the gate must not hold the person out.
-        """
-        if self._last_centre is None:
-            return self._pick(boxes, now)
-        lx, ly = self._last_centre
-
-        def away(b: Box) -> float:
-            return math.hypot(b[0] + b[2] / 2 - lx, b[1] + b[3] / 2 - ly)
-
-        gone = now - (self._last_seen_at or now)
-        # unseen for a while, they may be anywhere near: wider, but they must
-        # be confident to come back
-        share = (config.TRACK_GATE_FRACTION if gone <= config.TRACK_RESEEN_S
-                 else config.TRACK_GATE_LOST_FRACTION)
-        gate = share * config.PREVIEW_SIZE[0]
-        near = [b for b in boxes if away(b) <= gate and self._looks_like(b, now) is not False
-                and (gone <= config.TRACK_RESEEN_S
-                     or score_of(b) >= config.PERSON_LOCK_CONFIDENCE)]
-        best = min(near, key=away, default=None)
-        if best is None or score_of(best) < config.PERSON_LOCK_CONFIDENCE:
-            them = [b for b in boxes if score_of(b) >= config.PERSON_LOCK_CONFIDENCE
-                    and self._looks_like(b, now)]
-            best = min(them, key=away, default=best)
-        return best
+    def _choose(self, boxes: list[Box], now: float) -> Box | None:
+        """The detection that is the person followed (subject.py), each box
+        placed in the room first: the head has turned since they were last
+        seen, and their place in the picture has moved with it."""
+        pose = self._pose_at(self.camera.captured_at)
+        return self.subject.choose(boxes, [self._direction(b, pose) for b in boxes], now,
+                                   now - (self._last_seen_at or now), self.ptz.hfov_deg)
 
     def _seen(self, now: float, box: Box) -> None:
         x, y, w, h = box
         pw, ph = config.PREVIEW_SIZE
-        cx, cy = x + w / 2, y + h / 2
+        cx = x + w / 2
         self._last_seen_at = now
-        self._last_centre = (cx, cy)
         cx_err, cy_err = cx - pw / 2, tilt_error_px(y, h)
-        look = getattr(box, "look", None)
-        if look is not None:
-            fresh = self._look is not None and now - self._look_at <= config.TRACK_LOOK_FRESH_S
-            k = config.TRACK_LOOK_BLEND
-            self._look = (1 - k) * self._look + k * look if fresh else look
-            self._look_at = now
         # Offsets are from where the head pointed when the frame was taken.
-        pan, tilt = self._pose_at(getattr(self.camera, "captured_at", None))
+        pan, tilt = self._pose_at(self.camera.captured_at)
+        self.subject.saw(now, box, self._direction(box, (pan, tilt)))
         if abs(cx_err) > config.TRACK_DEADBAND_FRACTION * pw:
             self._last_side = 1 if cx_err > 0 else -1
             self._pan_goal = _clamp(
@@ -359,15 +336,15 @@ class Tracker:
                 config.TILT_MIN_DEG, config.TILT_MAX_DEG)
         self.camera.set_search_column(cx)
         self._estimate_distance(h)
-        self._frame_zoom(now, x, y, w, h)
+        self._frame(now, box)
 
     def _pose_at(self, t: float | None) -> tuple[float, float]:
         """Pan and tilt when the frame captured at `t` was taken.
 
         Detection runs on its own thread, so by the time boxes arrive the
         head has moved on; offsets in them are from where it pointed then.
-        Falls back to the current pose when `t` is unknown (test cameras) or
-        older than the log.
+        Falls back to the current pose when `t` is unknown (no detection
+        yet) or older than the log.
         """
         if t is not None:
             for at, pan, tilt in reversed(self._poses):
@@ -418,71 +395,28 @@ class Tracker:
             self.dist_m + config.DIST_SMOOTHING * (d - self.dist_m))
         self.ptz.set_focus(self.dist_m)   # first, so a zoom move refocuses for this distance
 
-    def _frame_zoom(self, now: float, x: int, y: int, w: int, h: int) -> None:
-        """Zoom so the person fills ZOOM_FILL_TARGET of the frame, with margin.
-
-        Measured on the body, not the padded HOG box. Two parts:
-
-        * **guard** — the body is near an edge, or fills more than
-          ZOOM_GUARD_FILL: zoom out a step, as soon as the lens may move. HOG
-          cannot detect a body that is already clipped, so this acts on the
-          approach, and it wins.
-        * **fill loop** — otherwise, off target for ZOOM_FILL_HOLD_S, move part
-          of the way to the target fill, in log space so in and out behave
-          alike, then wait ZOOM_TRACK_DWELL_S.
-
-        Both go from the lens as it stands: a picture taken while it moves, or
-        before a move lands, says nothing about the next one.
-        """
-        if getattr(self.ptz, "lens_moving", False):
-            self._zoom_off_since = None
+    def _frame(self, now: float, box: Box) -> None:
+        """Zoom so the person fills the frame as framing.py wants: one step
+        from the lens as it stands, counted only if the lens takes it."""
+        step = self.framing.step(now, box, self.ptz.lens_moving)
+        if step is None:
             return
-        pw, ph = config.PREVIEW_SIZE
-        bw, bh = w * config.PERSON_IN_BOX_W, h * config.PERSON_IN_BOX_H
-        cx, cy = x + w / 2, y + h / 2
-        left, right, top, bottom = cx - bw / 2, cx + bw / 2, cy - bh / 2, cy + bh / 2
-        fill = max(bh / ph, bw / pw, 1e-3)
-        ex, ey = config.ZOOM_GUARD_EDGE * pw, config.ZOOM_GUARD_EDGE * ph
-        near_edge = left < ex or top < ey or right > pw - ex or bottom > ph - ey
-        since_move = now - self._zoom_moved_at
-        if near_edge or fill > config.ZOOM_GUARD_FILL:
-            if since_move < config.ZOOM_RATE_LIMIT_S:
-                return
-            step = config.ZOOM_GUARD_STEP
-        elif abs(fill / config.ZOOM_FILL_TARGET - 1.0) > config.ZOOM_FILL_DEADBAND:
-            # not for every small change: each zoom move costs a refocus
-            if self._zoom_off_since is None:
-                self._zoom_off_since = now
-            if (now - self._zoom_off_since < config.ZOOM_FILL_HOLD_S
-                    or since_move < config.ZOOM_TRACK_DWELL_S):
-                return
-            step = (config.ZOOM_FILL_TARGET / fill) ** config.ZOOM_VISION_GAIN
-        else:
-            self._zoom_off_since = None
-            return
-        self._efl = _clamp(self.ptz.zoom_mm * step, config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
-        self.ptz.set_zoom_mm(self._efl)
-        self._zoom_moved_at, self._zoom_off_since = now, None
+        want = _clamp(self.ptz.zoom_mm * step, config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
+        if self.ptz.set_zoom_mm(want):
+            self.framing.moved(now)
 
     def _look_wide(self, now: float) -> None:
-        """Recording, and the person out of sight LOST_ZOOM_OUT_S: zoom out.
+        """Locked on, and the person out of sight LOST_ZOOM_OUT_S: zoom out.
 
         Straight to the wide end, past the rate limit, still pointing where
         they were last seen, and the detector searches the whole frame rather
-        than the strip they were in. Where they were last seen moves toward
-        the centre by the zoom ratio, so the follow gate still finds them
-        there. Seen again, the fill loop zooms back in from wide.
+        than the strip they were in. Where they were last seen is a direction
+        in the room (subject.py), so it holds through the zoom. Seen again,
+        the fill loop zooms back in from wide. Asked every tick until the
+        lens takes it (autofocus may have it).
         """
-        if self.ptz.zoom_mm > config.ZOOM_MIN_MM and self._last_centre is not None:
-            k = config.ZOOM_MIN_MM / self.ptz.zoom_mm
-            pw, ph = config.PREVIEW_SIZE
-            lx, ly = self._last_centre
-            self._last_centre = (pw / 2 + (lx - pw / 2) * k, ph / 2 + (ly - ph / 2) * k)
-        self._efl = config.ZOOM_MIN_MM
-        self._zoom_moved_at = float("-inf")    # the last framing move
-        self._zoom_off_since = None            # off target since, for the fill loop
-        self.ptz.set_zoom_mm(self._efl, urgent=True)
-        self._zoom_moved_at = now
+        if self.ptz.set_zoom_mm(config.ZOOM_MIN_MM, urgent=True):
+            self.framing.moved(now)
         self.camera.set_search_column(None)
 
 

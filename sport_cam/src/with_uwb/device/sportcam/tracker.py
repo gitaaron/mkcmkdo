@@ -19,7 +19,7 @@ Acquisition runs the same state machine as the camera-only build. The
 difference is SEARCH: the tag gives the subject's location at once, so there
 is no sweep; the head turns straight to the bearing.
 
-    awake ──session start──► SEARCH ──on target, tag wearer seen──► FOUND ──FOUND_CONFIRM_S──► TRACK (recording)
+    awake ──session start──► SEARCH ──on target, tag wearer seen──► FOUND ──FOUND_CONFIRM_S──► TRACK (locked on)
                                ▲                                      │
                                └───── tag wearer unseen FOUND_LOST_S ─┘
 
@@ -29,11 +29,11 @@ is no sweep; the head turns straight to the bearing.
   the camera-only build it never skips SEARCH.
 * **SEARCH** — turn to the tag's bearing, and hold there ACQUIRE_SETTLE_S
   until the detector sees the tag wearer (`_match_tag`).
-* **FOUND** — the same pan, tilt, zoom and focus as recording; the person
+* **FOUND** — the same pan, tilt, zoom and focus as once locked on; the person
   does not have to be centred. Seen throughout FOUND_CONFIRM_S (no gap
   longer than FOUND_LOST_S), and clearly the tag wearer rather than someone
-  beside them, the session starts recording and calls `confirm()`.
-* **TRACK** — recording, for the rest of the session: a hidden tag or a
+  beside them, the head locks on (`lock_on()`): Record is then allowed.
+* **TRACK** — locked on, for the rest of the session, recording or not: a hidden tag or a
   missed detection afterwards is ordinary tracking. With the wearer out of
   sight LOST_ZOOM_OUT_S, the lens zooms straight out to wide (still turning
   with the tag) so vision can find them again, and closes back in once it
@@ -54,6 +54,7 @@ from . import config
 from .boxlog import CLIMBER, OTHER, UNSURE, Box
 from .camera import Camera
 from .detector import score_of
+from .framing import Framing
 from .motion import ease_to, tilt_error_px
 from .ptz import Ptz
 from .uwb import UwbArray
@@ -72,10 +73,10 @@ class Tracker:
         self._pan_bias = 0.0           # CV-learned correction to the UWB bearing
         self._tilt_bias = 0.0          # same, for the UWB elevation
         self._zoom_scale = 1.0         # vision framing: multiplies the distance zoom
-        self._zoom_judged_at = float("-inf")   # the last framing correction
+        self.framing = Framing()       # how big the wearer should be in the picture
         self._pan_vel = 0.0            # deg/s, for easing toward the target
         self._tilt_vel = 0.0
-        self._looking_wide = False     # recording, wearer out of sight: lens wide
+        self._looking_wide = False     # locked on, wearer out of sight: lens wide
         self._last_seen_at: float | None = None   # last fresh person detection
         self.last_fix_at = time.monotonic()
         self.dist_m: float | None = None
@@ -113,8 +114,9 @@ class Tracker:
         self._people, self._chosen = [], None
         self._found_since = self._found_seen_at = now
 
-    def confirm(self) -> None:
-        """Recording has started: hold the subject for the rest of the session."""
+    def lock_on(self) -> None:
+        """The wearer has been in frame FOUND_CONFIRM_S, or Record was
+        pressed: hold the subject for the rest of the session."""
         self.mode = TRACK
 
     # ---- awake --------------------------------------------------------------
@@ -176,7 +178,7 @@ class Tracker:
 
     @property
     def countdown(self) -> int:
-        """Whole seconds left in FOUND before recording (0 outside FOUND)."""
+        """Whole seconds left in FOUND before locking on (0 outside FOUND)."""
         if self.mode != FOUND:
             return 0
         return max(1, math.ceil(config.FOUND_CONFIRM_S - self.found_for()))
@@ -189,7 +191,7 @@ class Tracker:
 
     def _advance(self, now: float, have_fix: bool, pan_target: float,
                  tilt_target: float | None, saw_wearer: bool) -> None:
-        """SEARCH ⇄ FOUND. FOUND → TRACK is the session's call (`confirm()`)."""
+        """SEARCH ⇄ FOUND. FOUND → TRACK is the session's call (`lock_on()`)."""
         if self.mode == TRACK:
             return
         on_target = False
@@ -329,7 +331,7 @@ class Tracker:
         """Label each box of a detection for the recording's overlay.
 
         The wearer is CLIMBER and everyone else OTHER once the camera can
-        tell them apart: recording (TRACK), or the chosen person clear of
+        tell them apart: locked on (TRACK), or the chosen person clear of
         everyone else in the gate. Boxes that all failed the gate are OTHER:
         none of them is where the tag is. Otherwise — two people still being
         told apart, the wearer out of sight while someone in the gate is
@@ -347,7 +349,7 @@ class Tracker:
         dt = min(now - self._last_step, 0.25)
         self._last_step = now
         self._poses.append((now, self.ptz.pan_deg, self.ptz.tilt_deg))
-        if getattr(self.ptz, "lens_moving", False):
+        if self.ptz.lens_moving:
             # Zoom, focus or autofocus under way: the picture is blurred, and
             # a frame without the wearer proves nothing. Hold the clocks.
             if self._last_seen_at is not None:
@@ -382,7 +384,7 @@ class Tracker:
         boxes, fresh = self.camera.person_boxes()
         bbox = None
         if fresh:
-            self._view_pan = self._pose_at(getattr(self.camera, "captured_at", None))[0]
+            self._view_pan = self._pose_at(self.camera.captured_at)[0]
             bbox = self._match_tag(boxes, target if have_fix else None,
                                    fix.dist_m if have_fix else (self.dist_m or 0.0))
         if fresh:
@@ -464,39 +466,15 @@ class Tracker:
         return math.degrees(math.atan(dy_px / (ph / 2) * math.tan(half_v)))
 
     def _frame_zoom(self, now: float, x: int, y: int, w: int, h: int) -> None:
-        """Zoom so the person fills ZOOM_FILL_TARGET of the frame, with margin.
-
-        Measured on the body, not the padded HOG box. Two parts:
-
-        * **guard** — the body is near an edge, or fills more than
-          ZOOM_GUARD_FILL: zoom out a step at once. HOG cannot detect a body
-          that is already clipped, so this acts on the approach, and it wins.
-        * **fill loop** — otherwise move part of the way toward the target
-          fill, in log space so in and out behave alike.
-
-        One correction per lens move, ZOOM_TRACK_DWELL_S apart (the guard,
-        ZOOM_RATE_LIMIT_S), and none from a picture of the lens moving: adding
-        one up per detection, before the lens has answered, overshoots.
-        """
-        if getattr(self.ptz, "lens_moving", False):
+        """Zoom so the wearer fills the frame as framing.py wants. Here the
+        step scales the zoom that ranging asks for (`_zoom_scale`); the lens
+        follows in _update_zoom."""
+        step = self.framing.step(now, (x, y, w, h), self.ptz.lens_moving)
+        if step is None:
             return
-        pw, ph = config.PREVIEW_SIZE
-        bw, bh = w * config.PERSON_IN_BOX_W, h * config.PERSON_IN_BOX_H
-        cx, cy = x + w / 2, y + h / 2
-        left, right, top, bottom = cx - bw / 2, cx + bw / 2, cy - bh / 2, cy + bh / 2
-        fill = max(bh / ph, bw / pw, 1e-3)
-        ex, ey = config.ZOOM_GUARD_EDGE * pw, config.ZOOM_GUARD_EDGE * ph
-        near_edge = left < ex or top < ey or right > pw - ex or bottom > ph - ey
-        if near_edge or fill > config.ZOOM_GUARD_FILL:
-            if now - self._zoom_judged_at < config.ZOOM_RATE_LIMIT_S:
-                return
-            self._zoom_scale *= config.ZOOM_GUARD_STEP
-        else:
-            if now - self._zoom_judged_at < config.ZOOM_TRACK_DWELL_S:
-                return
-            self._zoom_scale *= (config.ZOOM_FILL_TARGET / fill) ** config.ZOOM_VISION_GAIN
-        self._zoom_judged_at = now
-        self._zoom_scale = _clamp(self._zoom_scale, config.ZOOM_SCALE_MIN, config.ZOOM_SCALE_MAX)
+        self._zoom_scale = _clamp(self._zoom_scale * step,
+                                  config.ZOOM_SCALE_MIN, config.ZOOM_SCALE_MAX)
+        self.framing.moved(now)
 
     def _hint_search_column(self, bearing_deg: float) -> None:
         """Tell the detector which column of the frame the subject is in.
@@ -520,7 +498,7 @@ class Tracker:
         base_mm = (config.TARGET_FRAME_FRACTION * config.SENSOR_H_MM
                    * dist_m / config.SUBJECT_HEIGHT_M)
         if self._looking_wide:
-            efl_mm = config.ZOOM_MIN_MM       # lost from sight while recording: find them
+            efl_mm = config.ZOOM_MIN_MM       # locked on and lost from sight: find them
         else:
             efl_mm = _clamp(base_mm * self._zoom_scale, config.ZOOM_MIN_MM, config.ZOOM_MAX_MM)
         # Anti-windup: at the end of the lens's range, keep the vision scale

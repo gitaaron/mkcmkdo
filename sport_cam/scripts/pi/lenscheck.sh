@@ -7,11 +7,22 @@
 #
 #   ./scripts/pi/lenscheck.sh                    stop `run main` first: it needs the camera
 #   ./scripts/pi/lenscheck.sh --host 192.168.4.37
+#   ./scripts/pi/lenscheck.sh --stops 0,300,600,900,1200,1500,1800,1995
+#                                                more zoom stops (motor steps, 0-2100): a truer
+#                                                curve, about a minute a stop
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 
 HOST="${SPORTCAM_HOST:-sportcam}"
-if [[ "${1:-}" == --host ]]; then HOST="${2:?--host needs a value}"; fi
+STOPS=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --host) HOST="${2:?--host needs a value}"; shift ;;
+    --stops) STOPS="${2:?--stops needs a list, like 0,700,1400,2100}"; shift ;;
+    *) echo "usage: scripts/pi/lenscheck.sh [--host <host>] [--stops N,N,…]"; exit 1 ;;
+  esac
+  shift
+done
 
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10 -o LogLevel=ERROR)
 PI="pi@${HOST}"
@@ -33,7 +44,7 @@ jpg="logs/lenscheck-${stamp}.jpg"
 
 # Not last run's picture, if this one fails
 ssh "${SSH_OPTS[@]}" "$PI" 'rm -f ~/lenscheck.jpg'
-./scripts/pi/run --host "$HOST" PYTHONUNBUFFERED=1 lenscheck 2>&1 | tee "$log"
+./scripts/pi/run --host "$HOST" PYTHONUNBUFFERED=1 lenscheck ${STOPS:+--stops "$STOPS"} 2>&1 | tee "$log"
 status=${PIPESTATUS[0]}
 
 if [[ $status != 0 ]]; then

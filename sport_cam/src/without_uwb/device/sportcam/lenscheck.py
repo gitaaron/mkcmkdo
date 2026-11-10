@@ -1,37 +1,43 @@
 """Find out, from the lens itself, which motor is the zoom and how far it goes.
 
     ./scripts/pi/lenscheck.sh           # from the Mac; stop `run main` first: it needs the camera
+    ./scripts/pi/lenscheck.sh --stops 0,300,600,900,1200,1500,1800,1995
 
 which keeps its output and contact sheet in logs/ on the Mac. On the Pi
-alone: ./scripts/pi/run lenscheck.
+alone: ./scripts/pi/run lenscheck [--stops …].
 
 Point the camera at a detailed scene two metres or more away — the lens
 can't focus closer than 1.5 m (Arducam's spec) — and leave it still. About
-four minutes.
+half a minute a stop for each register: four stops, four minutes.
 
-It writes the controller's two lens registers directly, 0x00 and 0x01 at
-0…2100, ignoring LENS_SWAP_ZOOM_FOCUS and ZOOM_CURVE, so what it finds
-doesn't depend on them. Taking each register in turn as the zoom, it steps
-that register across its travel; at each stop it sweeps the other to find
-where the picture is sharpest, and measures the sharp picture's scale against
-the first from matched points (a blurred picture can't show its true scale).
+It writes the controller's two lens registers directly, 0x00 and 0x01, in
+motor steps (0…2100), not through ptz.py's idea of which is which or
+ZOOM_CURVE_STEPS, so what it finds doesn't depend on them. Taking each
+register in turn as the zoom, it steps that register through `--stops`
+(STOPS by default); at each stop it sweeps the other to find where the
+picture is sharpest, and measures the sharp picture's scale against the first
+from matched points (a blurred picture can't show its true scale).
 
 The zoom is the register that changes the scale by about the lens's rating,
-2.4×. Focus breathing moves it only a little. The contact sheet (~/lenscheck.jpg)
-has a row of the sharp pictures per register, and the log gives the zoom →
-focus pairs FOCUS_GRID wants.
+2.4×. Focus breathing moves it only a little. The contact sheet
+(~/lenscheck.jpg) has a row of the sharp pictures per register. For the
+register ptz.py takes as the zoom, the log ends with ZOOM_CURVE_STEPS and
+FOCUS_GRID_STEPS statements ready to paste into config.py: more stops, a
+truer curve between them.
 """
 from __future__ import annotations
 
 import os
+import sys
 import time
 
+from . import config
 from .autofocus import sharpness
 from .camera import Camera
-from .ptz import _REG_BUSY, CHIP_ADDR, Ptz
+from .ptz import _IMX477_LENS, _REG_BUSY, LENS_STEPS, OPT_ZOOM, Ptz
 
 REGS = (0x00, 0x01)
-TOP = 2100
+TOP = LENS_STEPS
 STOPS = (0, 700, 1400, 2100)
 COARSE, FINE = 60, 15   # steps of the sweep for focus; a sharp band is under 105 wide
 REGION = 0.5            # sharpness over the middle half of the frame
@@ -48,12 +54,7 @@ class Raw:
         return self.f._read(reg)
 
     def busy_word(self) -> int | None:
-        try:
-            with self.f._lock:
-                hi, lo = self.f._bus.read_i2c_block_data(CHIP_ADDR, _REG_BUSY, 2)
-        except OSError:
-            return None
-        return (hi << 8) | lo
+        return self.f._read(_REG_BUSY)
 
     def move(self, reg: int, value: int) -> tuple[float, bool]:
         """Write and wait until the busy word clears (or TIMEOUT_S, or 0.4 s
@@ -72,18 +73,55 @@ class Raw:
             time.sleep(3.0)          # no flag to go by: give it time
         return time.monotonic() - t0, seen
 
-    def block(self, reg: int, n: int) -> list[int]:
-        try:
-            with self.f._lock:
-                data = self.f._bus.read_i2c_block_data(CHIP_ADDR, reg, n)
-        except OSError:
-            return []
-        return [(data[i] << 8) | data[i + 1] for i in range(0, len(data) - 1, 2)]
+
+def shot(cam: Camera):
+    """A frame exposed from now on: not one already under way."""
+    t = time.monotonic()
+    got = cam.frame()
+    while got is not None and got.at < t:
+        got = cam.frame(got)
+    return got
 
 
 def score(cam: Camera) -> float:
-    cam._capture()                       # the frame already under way
-    return sharpness(cam._capture(), 0.5, 0.5, REGION)
+    return sharpness(shot(cam).luma, 0.5, 0.5, REGION)
+
+
+def parse_stops(argv: list[str]) -> tuple[int, ...]:
+    """`--stops 0,700,1400` from the command line, or STOPS; in motor steps,
+    each held to the travel, in rising order, at least two."""
+    if "--stops" not in argv:
+        return STOPS
+    i = argv.index("--stops")
+    if i + 1 >= len(argv):
+        raise SystemExit("--stops needs a list: --stops 0,700,1400,2100")
+    try:
+        stops = sorted({max(0, min(TOP, int(v))) for v in argv[i + 1].split(",") if v.strip()})
+    except ValueError:
+        raise SystemExit(f"--stops takes whole motor steps, 0 to {TOP}: {argv[i + 1]!r}")
+    if len(stops) < 2:
+        raise SystemExit("--stops needs at least two different stops")
+    return tuple(stops)
+
+
+def config_lines(found: list[tuple[int, int, float | None]]) -> str:
+    """What was measured with the zoom register, as the statements config.py
+    wants, in its unit (motor steps).
+
+    `found`: (zoom steps, sharpest focus steps, scale against the first stop
+    or None if it couldn't be measured) per stop. Focal lengths come from the
+    scales, the longest taken as the lens's rating (ZOOM_MAX_MM); stops with
+    no scale are left out. The scene was at one distance, so each row of the
+    grid is flat in distance: focuscal measures that.
+    """
+    scaled = [(z, f, s) for z, f, s in found if s]
+    if len(scaled) < 2:
+        return "(too few stops with a measured scale to write ZOOM_CURVE_STEPS)"
+    longest = max(s for _z, _f, s in scaled)
+    rows = sorted((round(config.ZOOM_MAX_MM * s / longest, 2), z, f) for z, f, s in scaled)
+    curve = ", ".join(f"({efl:g}, {z})" for efl, z, _f in rows)
+    grid = [f"    {efl:g}: [(2.0, {f}), (30.0, {f})]," for efl, _z, f in rows]
+    return "\n".join([f"ZOOM_CURVE_STEPS = [{curve}]", "FOCUS_GRID_STEPS = {", *grid, "}"])
 
 
 def sharpest(raw: Raw, cam: Camera, reg: int) -> tuple[int, float]:
@@ -132,11 +170,13 @@ def main() -> None:
     import cv2
     import numpy as np
 
+    stops = parse_stops(sys.argv[1:])
     ptz, cam = Ptz(), Camera()
     if not (ptz.focuser.available and cam._cam):
         print("Needs the Pi: no I2C bus or no camera.")
         return
     raw = Raw(ptz)
+    print(f"stops (motor steps): {', '.join(map(str, stops))}")
     print(f"controller firmware 0x{ptz.focuser.firmware or 0:04x}; waking the lens…")
     ptz.start()
     ptz.wait_lens()                      # the home moves, which queue
@@ -144,19 +184,22 @@ def main() -> None:
 
     rows = []
     ranges = {}
+    measured: dict[int, list[tuple[int, int, float | None]]] = {}
     for zoom_reg in REGS:
         focus_reg = REGS[1 - REGS.index(zoom_reg)]
         print(f"\n== 0x{zoom_reg:02x} as the zoom, 0x{focus_reg:02x} as the focus ==")
         first = None
         scales = [1.0]
         tiles = []
-        for z in STOPS:
+        for z in stops:
             raw.move(zoom_reg, z)
             value, best = sharpest(raw, cam, focus_reg)
-            cam._capture()
-            rgb = cam._capture()
-            grey = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+            got = shot(cam)
+            rgb = got.rgb
+            grey = np.ascontiguousarray(got.luma)
             found = None if first is None else scale_between(first, grey)
+            measured.setdefault(zoom_reg, []).append(
+                (z, value, 1.0 if first is None else found[0] if found else None))
             if first is None:
                 first = grey
             elif found:
@@ -177,6 +220,9 @@ def main() -> None:
     cv2.imwrite(path, np.vstack(rows)[:, :, ::-1])
     print(f"\nsaved {path}: top row 0x00 as the zoom, bottom row 0x01")
     print("range of scale: " + ", ".join(f"0x{r:02x} {v:.2f}×" for r, v in ranges.items()))
+    zoom_reg = _IMX477_LENS[OPT_ZOOM][0]
+    print(f"\nWith 0x{zoom_reg:02x} as the zoom (as ptz.py has it), for config.py, in motor steps:\n")
+    print(config_lines(measured.get(zoom_reg, [])))
     ptz.park()
 
 

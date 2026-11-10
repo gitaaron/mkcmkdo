@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sportcam import config
 from sportcam.camera import Camera
+from sportcam.ptz import LensMove
 from sportcam.tracker import Tracker
 from sportcam.uwb import Fix
 
@@ -47,6 +48,7 @@ class FakeCamera:
         self.column = None
         self.detections = 0
         self.awake = True
+        self.captured_at = None                # unknown: the pose now is used
 
     def set_awake(self, on):
         self.awake = on
@@ -90,6 +92,8 @@ class FakePtz:
         self.focus_dist = None
         self.jogs = 0
         self.jogging = False                   # no easing: stops at once
+        self.lens_moving = False               # the lens arrives at once
+        self.lens_owner = None
 
     @property
     def hfov_deg(self):
@@ -113,20 +117,19 @@ class FakePtz:
         self.tilt_calls += 1
         self.set_tilt(self.tilt_deg + d)
 
-    def set_zoom_mm(self, mm, urgent=False):
-        self.zoom_mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, mm))
+    def set_zoom_mm(self, mm, urgent=False, owner=None):
+        mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, mm))
+        moved = LensMove.MOVED if mm != self.zoom_mm else LensMove.SAME
+        self.zoom_mm = mm
+        return moved
 
-    def set_focus(self, dist, urgent=False):
+    def set_focus(self, dist, urgent=False, owner=None):
         self.focus_dist = dist
+        return LensMove.MOVED
 
     @property
     def focus_m(self):
         return self.focus_dist
-
-    focus_pos = None
-
-    def set_focus_pos(self, pos):
-        self.focus_pos = pos
 
     def wait_lens(self, timeout_s=5.0):
         pass
@@ -333,7 +336,7 @@ def main() -> None:
     ptz16 = FakePtz()
     cam16 = FramedCamera(ptz16, dist=8.0)
     tr16 = Tracker(FakeUwb(theta_deg=10.0, dist=8.0), cam16, ptz16)
-    tr16.confirm()                                        # recording
+    tr16.lock_on()                                        # recording
     run(tr16, 400, 0.01)
     tight = ptz16.zoom_mm
     seen = cam16.person_bbox

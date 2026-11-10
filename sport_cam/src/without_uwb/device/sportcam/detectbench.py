@@ -40,7 +40,7 @@ def main() -> None:
     end = time.monotonic() + seconds
     print(f"running {seconds:.0f} s — move about in front of the camera")
     while time.monotonic() < end:
-        frame = cam._capture()
+        frame = cam._capture()               # RGB
         if frame is None:
             raise SystemExit("no picture — is the camera connected?")
         strip = frame[:, pw // 2 - half:pw // 2 + half]

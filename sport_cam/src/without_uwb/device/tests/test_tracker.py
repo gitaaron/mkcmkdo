@@ -32,6 +32,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sportcam import config, tracker as tracker_mod
+from sportcam.framing import Framing
+from sportcam.ptz import LensMove
+from sportcam.subject import Subject
 from sportcam.tracker import Tracker
 
 failures: list[str] = []
@@ -73,6 +76,8 @@ class FakePtz:
         self.max_pan_step = 0.0
         self.jogs = 0
         self.jogging = False                   # no easing: stops at once
+        self.lens_moving = False               # the lens arrives at once
+        self.lens_owner = None                 # set: as autofocus holding the lens
 
     @property
     def hfov_deg(self) -> float:
@@ -91,29 +96,36 @@ class FakePtz:
 
     def jog(self, x: float, y: float, dt: float) -> None:
         self.jogs += 1
+        self.jog_dt = dt
         self.set_pan(self.pan_deg + x * config.JOG_PAN_MAX_DPS * dt)
         self.set_tilt(self.tilt_deg + y * config.JOG_TILT_MAX_DPS * dt)
 
-    def set_zoom_mm(self, mm: float, urgent: bool = False) -> None:
-        self.zoom_mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, mm))
+    def set_zoom_mm(self, mm: float, urgent: bool = False, owner=None) -> LensMove:
+        """As the real one answers, but for the rate limit: the lens arrives at once."""
+        mm = max(config.ZOOM_MIN_MM, min(config.ZOOM_MAX_MM, mm))
+        if self.lens_owner is not None and owner is not self.lens_owner:
+            return LensMove.HELD
+        if mm == self.zoom_mm:
+            return LensMove.SAME
+        if abs(mm - self.zoom_mm) < config.ZOOM_MIN_STEP_MM:
+            return LensMove.SMALL
+        self.zoom_mm = mm
+        return LensMove.MOVED
 
-    def set_focus(self, dist: float, urgent: bool = False) -> None:
+    def set_focus(self, dist: float, urgent: bool = False, owner=None) -> LensMove:
         self.focus_dist = dist
+        return LensMove.MOVED
 
     @property
     def focus_m(self) -> float | None:
         return self.focus_dist
 
-    focus_pos = None
-
-    def set_focus_pos(self, pos):
-        self.focus_pos = pos
-
     def wait_lens(self, timeout_s=5.0):
         pass
 
-    def refocus(self, dist=None):
+    def refocus(self, dist=None, owner=None) -> LensMove:
         self.focus_dist = dist or self.focus_dist or config.AWAKE_FOCUS_M
+        return LensMove.MOVED
 
     def park(self) -> None:
         pass
@@ -132,6 +144,7 @@ class SimCamera:
         self.spurious: list[tuple[int, int, int, int]] = []   # one-shot false positives
         self.awake = True
         self._warm_until = 0.0
+        self.captured_at: float | None = None    # unknown: the pose now is used
 
     def set_awake(self, on: bool) -> None:
         """As the real one: nothing seen asleep; the first look after CAMERA_WARMUP_S."""
@@ -187,7 +200,6 @@ class LaggedCamera(SimCamera):
     def __init__(self, ptz: FakePtz, people: list[Person]) -> None:
         super().__init__(ptz, people)
         self._pending = None                 # (taken at, boxes)
-        self.captured_at: float | None = None
 
     def person_boxes(self):
         if self._pending is None and CLOCK.t - self._at >= self._period:
@@ -220,7 +232,7 @@ def run(tr: Tracker, seconds: float, dt: float = 0.05, until=None) -> float:
 def locked(tr: Tracker) -> bool:
     """Recording, as the session would have it: found for FOUND_CONFIRM_S → confirm()."""
     if tr.ready_to_record:
-        tr.confirm()
+        tr.lock_on()
     return tr.mode == "track"
 
 
@@ -267,8 +279,8 @@ def main() -> None:
           f"countdown {tr.countdown}")
     run(tr, 1.0)
     check("still in frame FOUND_CONFIRM_S later → ready to record", tr.ready_to_record)
-    tr.confirm()
-    check("confirm() (recording started) → TRACK", tr.mode == "track" and tr.confirmed
+    tr.lock_on()
+    check("lock_on() → TRACK", tr.mode == "track" and tr.locked
           and tr.countdown == 0)
     run(tr, 4)
     check("camera is pointing at them", abs(ptz.pan_deg - 50.0) < 3.0, f"pan {ptz.pan_deg:.1f}")
@@ -282,7 +294,7 @@ def main() -> None:
     check("a sighting stops the sweep (FOUND)", tr.mode == "found", tr.mode)
     run(tr, config.FOUND_LOST_S + 0.5)
     check("…but one frame never records; sweep resumes",
-          tr.mode == "search" and not tr.ready_to_record and not tr.confirmed, f"mode={tr.mode}")
+          tr.mode == "search" and not tr.ready_to_record and not tr.locked, f"mode={tr.mode}")
 
     # ---- 4. the first person found wins; bystanders do not steal the lock ------
     print("\nfirst person")
@@ -381,7 +393,7 @@ def main() -> None:
     check("lost_for rises", tr.lost_for() > 0.5, f"{tr.lost_for():.2f}")
     run(tr, config.RESEARCH_AFTER_S + 0.5)
     check("gone long enough → search again", tr.mode == "search")
-    check("…still confirmed: the recording carries on", tr.confirmed)
+    check("…still locked on: a recording carries on", tr.locked)
     a.visible, a.bearing = True, -50.0
     run(tr, 30, until=lambda: locked(tr))
     run(tr, 3)
@@ -442,7 +454,7 @@ def main() -> None:
     print("\nreset")
     tr.reset_lock()
     check("reset_lock forgets the subject",
-          tr.mode == "search" and not tr.confirmed and tr.dist_m is None)
+          tr.mode == "search" and not tr.locked and tr.dist_m is None)
 
     # ---- 9. awake: is anyone in frame? -----------------------------------------------
     print("\nawake")
@@ -497,7 +509,7 @@ def main() -> None:
     check("person in awake frame gone at session start → FOUND times out to SEARCH",
           tr.mode == "search", tr.mode)
 
-    print("\nwho counts as the person")
+    print("\nwho counts as the person (subject.py)")
     import numpy as np
     from sportcam.detector import Person as Scored, look_of
 
@@ -507,71 +519,171 @@ def main() -> None:
     blue, orange = looks((30, 60, 200)), looks((220, 120, 20))
     you = Scored((100, 50, 300, 600), 0.78, blue)
     chair = Scored((420, 50, 500, 600), 0.51, orange)   # bigger, but barely a person
-    tr, _cam, _ptz = world()
-    t = CLOCK.t
+    who = Subject()
+    t = 50.0
+    HFOV = 70.0
+    gate = config.TRACK_GATE_FRACTION * HFOV            # degrees
     check("first sighting: a low score is no one, however large",
-          tr._pick([chair, you], t) == you, f"{tr._pick([chair, you], t)}")
-    check("…and with only the chair, nobody to follow", tr._pick([chair], t) is None)
+          who.pick([chair, you], t) is you, f"{who.pick([chair, you], t)}")
+    check("…and with only the chair, nobody to follow", who.pick([chair], t) is None)
+    check("nobody followed yet: choosing is picking",
+          who.choose([chair, you], [(0.0, 0.0), (30.0, 0.0)], t, 0.0, HFOV) is you)
 
-    tr._seen(t, you)
+    here = (-10.0, 5.0)
+    who.saw(t, you, here)
+    beside = (here[0] + gate * 0.4, here[1])            # inside the gate
+    across = (here[0] + gate * 2.5, here[1])            # well outside it
+
+    def choose(box, where, at=t, gone=0.0, others=()):
+        boxes = [*(b for b, _ in others), box]
+        return who.choose(boxes, [*(d for _, d in others), where], at, gone, HFOV)
+
     near = Scored((180, 50, 300, 600), 0.9, orange)     # sure, close by, the wrong colours
-    check("a sure box close by in other colours is not them",
-          tr._select([near], t) is None, f"{tr._select([near], t)}")
+    check("a sure box close by in other colours is not them", choose(near, beside) is None)
     moved = Scored((180, 50, 300, 600), 0.55, blue)
-    check("…the person themselves, doubtful a moment, is kept",
-          tr._select([moved], t) == moved)
+    check("…the person themselves, doubtful a moment, is kept", choose(moved, beside) is moved)
     far = Scored((850, 50, 300, 600), 0.8, blue)
     check("out of the gate, but sure and in their colours: still them",
-          tr._select([chair, far], t) == far, f"{tr._select([chair, far], t)}")
+          choose(far, across, others=[(chair, beside)]) is far)
     stray = Scored((850, 50, 300, 600), 0.8, None)
-    check("out of the gate with no colours to go by: no", tr._select([stray], t) is None)
+    check("out of the gate with no colours to go by: no", choose(stray, across) is None)
     check("the gate is narrower than a chair's width away",
           config.TRACK_GATE_FRACTION * config.PREVIEW_SIZE[0] < 320)
+    edge_in = Scored((0, 0, 10, 10), 0.9, None)
+    check("the gate is an angle: TRACK_GATE_FRACTION of the picture's width",
+          choose(edge_in, (here[0] + gate - 0.1, here[1])) is edge_in
+          and choose(edge_in, (here[0] + gate + 0.1, here[1])) is None)
+    check("…up or down counts as much as sideways",
+          choose(edge_in, (here[0], here[1] + gate + 0.1)) is None)
 
     late = t + config.TRACK_LOOK_FRESH_S + 0.5
-    tr._last_seen_at = t
     back = Scored((180, 50, 300, 600), 0.8, orange)
     check("colours gone stale don't shut them out: the light may have changed",
-          tr._select([back], late) == back, f"{tr._select([back], late)}")
+          choose(back, beside, at=late, gone=late - t) is back)
     check("…but back after TRACK_RESEEN_S a doubtful box isn't enough",
-          tr._select([Scored((180, 50, 300, 600), 0.55, orange)], late) is None)
-    tr.reset_lock()
-    check("a new session forgets the colours", tr._look is None)
+          choose(Scored((180, 50, 300, 600), 0.55, orange), beside, at=late, gone=late - t) is None)
+    wide = (here[0] + HFOV * (config.TRACK_GATE_FRACTION + config.TRACK_GATE_LOST_FRACTION) / 2,
+            here[1])
+    check("…and unseen that long, the gate is the wider one",
+          choose(back, wide, at=late, gone=late - t) is back and choose(back, wide) is None)
+    who.saw(late, back, beside)
+    check("seen again: where they are now, and their colours as they are now",
+          who.direction == beside and who.looks_like(back, late) is True)
+    who.forget()
+    check("a new session forgets them", who.look is None and who.direction is None)
 
-    print("\nzoom framing")
+    print("\nthe gate holds while the camera itself moves")
+    def at_bearing(deg: float, ptz, score=0.9):
+        """A person's box as the camera at `ptz`'s pose and zoom sees them at `deg`."""
+        pw, ph = config.PREVIEW_SIZE
+        half = math.tan(math.radians(ptz.hfov_deg / 2))
+        cx = pw / 2 + pw / 2 * math.tan(math.radians(deg - ptz.pan_deg)) / half
+        return Scored((int(cx - 60), 200, 120, 300), score, None)
+
     tr, _cam, ptz = world()
-    tr._efl = 6.0
+    ptz.zoom_mm = config.ZOOM_MAX_MM                    # ≈ 33° across: a degree is many pixels
+    tr.lock_on()
+    first = at_bearing(10.0, ptz)
+    tr._first_sighting(CLOCK.t, first)
+    was_at_px = first[0]
+    ptz.pan_deg = 8.0                                   # the head has turned toward them
+    CLOCK.t += 0.3
+    same = at_bearing(10.0, ptz)                        # they haven't moved: now near the centre
+    other = at_bearing(18.0, ptz)                       # someone else, where they were in the picture
+    check("(the stranger is where the person was in the picture, the person 300 px from there)",
+          abs(other[0] - was_at_px) < 40 and abs(same[0] - was_at_px) > 0.2 * config.PREVIEW_SIZE[0],
+          f"was {was_at_px}, same {same[0]}, other {other[0]}")
+    check("the head turned, the person didn't: still them, not whoever is where they were",
+          tr._choose([other, same], CLOCK.t) is same, f"{tr._choose([other, same], CLOCK.t)}")
+
+    print("\nlost: the lens goes wide, and where they were stays put")
+    tr, cam, ptz = world()
+    tr.lock_on()
+    ptz.zoom_mm = config.ZOOM_MIN_MM + config.ZOOM_MIN_STEP_MM / 2   # too near wide to be moved
+    tr._first_sighting(CLOCK.t, at_bearing(12.0, ptz))
+    where = tr.subject.direction
+    run(tr, config.LOST_ZOOM_OUT_S + 3.0)               # nobody in sight: asks for wide every tick
+    check("the lens refuses the zoom-out (too small a move) for seconds on end…",
+          ptz.zoom_mm > config.ZOOM_MIN_MM and tr.lost_for() > config.LOST_ZOOM_OUT_S)
+    check("…and where they were last seen has not drifted",
+          tr.subject.direction == where, f"{where} → {tr.subject.direction}")
+    tr, cam, ptz = world()
+    tr.lock_on()
+    ptz.zoom_mm = 9.0
+    tr._first_sighting(CLOCK.t, at_bearing(12.0, ptz))
+    where = tr.subject.direction
+    ptz.lens_owner = object()                           # autofocus has the lens
+    run(tr, config.LOST_ZOOM_OUT_S + 1.0)
+    check("autofocus has the lens: the zoom-out waits, nothing drifts",
+          ptz.zoom_mm == 9.0 and tr.subject.direction == where)
+    ptz.lens_owner = None
+    run(tr, 0.2)
+    check("…and goes as soon as the lens is free", ptz.zoom_mm == config.ZOOM_MIN_MM,
+          f"{ptz.zoom_mm}")
+
+    print("\nlabels")
+    tr, _cam, _ptz = world()
+    a, b2 = Scored((100, 100, 80, 200), 0.9), Scored((100, 100, 80, 200), 0.9)
+    tr._label(CLOCK.t, [a, b2], a)
+    check("two boxes with the same corners: only the one followed is the climber",
+          [label for _b, label in tr.labelled] == ["climber", "other"], f"{tr.labelled}")
+
+    print("\nzoom framing (framing.py)")
     ph = config.PREVIEW_SIZE[1]
-    h = ph * config.ZOOM_FILL_TARGET * 1.1 / config.PERSON_IN_BOX_H   # a little over target
-    y = (ph - h) / 2
-    ptz.zoom_mm = 6.0
-    tr._frame_zoom(100.0, 500, y, h * 0.4, h)
+
+    def person(fill: float):
+        """A centred box whose body fills `fill` of the frame's height."""
+        h = ph * fill / config.PERSON_IN_BOX_H
+        return (500, (ph - h) / 2, h * 0.4, h)
+
+    fr = Framing()
     check("a small change in size leaves the zoom alone (each move costs a refocus)",
-          tr._efl == 6.0, f"{tr._efl}")
-    h2 = ph * config.ZOOM_FILL_TARGET * 0.5 / config.PERSON_IN_BOX_H  # stepped well back
-    small = (500, (ph - h2) / 2, h2 * 0.4, h2)
-    tr._frame_zoom(100.0, *small)
-    tr._frame_zoom(100.0 + config.ZOOM_FILL_HOLD_S / 2, *small)
-    check("…a big one that doesn't last leaves it too", tr._efl == 6.0, f"{tr._efl}")
-    tr._frame_zoom(100.0 + config.ZOOM_FILL_HOLD_S, *small)
-    once = 6.0 * 2.0 ** config.ZOOM_VISION_GAIN
+          fr.step(100.0, person(config.ZOOM_FILL_TARGET * 1.1), False) is None)
+    small = person(config.ZOOM_FILL_TARGET * 0.5)       # stepped well back
+    fr.step(100.0, small, False)
+    check("…a big one that doesn't last leaves it too",
+          fr.step(100.0 + config.ZOOM_FILL_HOLD_S / 2, small, False) is None)
+    step = fr.step(100.0 + config.ZOOM_FILL_HOLD_S, small, False)
     check("…one that lasts zooms in, by one correction",
-          abs(tr._efl - once) < 1e-6, f"{tr._efl} vs {once}")
-    ptz.zoom_mm = 6.0                                   # the lens hasn't got there yet
+          step is not None and abs(step - 2.0 ** config.ZOOM_VISION_GAIN) < 1e-9, f"{step}")
     t = 100.0 + config.ZOOM_FILL_HOLD_S
-    for i in range(1, 20):
-        tr._frame_zoom(t + i / 3, *small)
-    check("…and the size not changing yet doesn't add up to more", abs(tr._efl - once) < 1e-6,
-          f"{tr._efl}")
-    tr._frame_zoom(t + config.ZOOM_TRACK_DWELL_S + 1, *small)
-    check("…the next one comes after ZOOM_TRACK_DWELL_S, from the lens as it stands",
-          abs(tr._efl - once) < 1e-6, f"{tr._efl}")
+    check("the lens didn't take it (paced, held): asked again at the next sighting",
+          fr.step(t + 0.3, small, False) == step)
+    fr.moved(t + 0.3)
+    again = [fr.step(t + 0.3 + i / 3, small, False) for i in range(1, 15)]
+    check("the lens took it: the size not changing yet doesn't add up to more",
+          all(a is None for a in again), f"{again}")
+    check("…the next comes after ZOOM_TRACK_DWELL_S",
+          fr.step(t + 0.3 + config.ZOOM_TRACK_DWELL_S + 0.1, small, False) == step)
+    fr = Framing()
+    fr.step(100.0, small, True)
+    check("a picture of the lens moving changes nothing, and doesn't count towards the hold",
+          fr.step(100.0 + config.ZOOM_FILL_HOLD_S, small, True) is None
+          and fr.step(100.0 + config.ZOOM_FILL_HOLD_S + 0.1, small, False) is None)
+    big = person(config.ZOOM_GUARD_FILL + 0.05)
+    fr = Framing()
+    check("too big in the frame: out a step at once, no hold",
+          fr.step(100.0, big, False) == config.ZOOM_GUARD_STEP)
+    fr.moved(100.0)
+    check("…and again only ZOOM_RATE_LIMIT_S after the lens took that",
+          fr.step(100.0 + config.ZOOM_RATE_LIMIT_S / 2, big, False) is None
+          and fr.step(100.0 + config.ZOOM_RATE_LIMIT_S, big, False) == config.ZOOM_GUARD_STEP)
+    edge = (0, 200, 150, 300)                           # small, but against the frame's edge
+    check("against an edge of the frame: out a step, whatever the size",
+          Framing().step(100.0, edge, False) == config.ZOOM_GUARD_STEP)
+    fr.reset()
+    check("a new search starts clean", fr.step(100.0, big, False) == config.ZOOM_GUARD_STEP)
+
     tr, _cam, ptz = world()
-    tr._efl = ptz.zoom_mm = 6.0
-    ptz.lens_moving = True
-    tr._frame_zoom(100.0, *small)
-    tr._frame_zoom(100.0 + config.ZOOM_TRACK_DWELL_S, *small)
-    check("a picture of the lens moving changes nothing", tr._efl == 6.0, f"{tr._efl}")
+    tr.lock_on()
+    ptz.zoom_mm = 6.0
+    ptz.lens_owner = object()                           # autofocus has the lens
+    tr._frame(100.0, big)
+    tr._frame(100.0 + config.ZOOM_RATE_LIMIT_S / 2, big)
+    ptz.lens_owner = None
+    tr._frame(100.0 + config.ZOOM_RATE_LIMIT_S / 2 + 0.3, big)
+    check("the tracker counts a framing move only once the lens takes it",
+          abs(ptz.zoom_mm - 6.0 * config.ZOOM_GUARD_STEP) < 1e-9, f"{ptz.zoom_mm}")
 
     print("\ntilt aim for a person too tall to centre")
     from sportcam.motion import tilt_error_px

@@ -15,8 +15,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sportcam import config
 from sportcam import ptz as ptz_mod
-from sportcam.ptz import (OPT_FOCUS, OPT_MOTOR_X, OPT_MOTOR_Y, OPT_ZOOM, ArducamServos,
-                          Focuser, PigpioServos, Ptz, focus_raw)
+from sportcam.ptz import (LENS_STEPS, OPT_FOCUS, OPT_MOTOR_X, OPT_MOTOR_Y, OPT_ZOOM,
+                          ArducamServos, Focuser, LensMove, PigpioServos, Ptz,
+                          grid_focus_steps)
 
 failures: list[str] = []
 
@@ -29,9 +30,10 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 # A made-up but plausibly shaped grid: nearer subjects need more extension,
 # and more so at the long end.
+# In lens motor steps, 0…LENS_STEPS, as everything about the lens is.
 GRID = {
-    2.8:  [(2.0, 2600), (10.0, 2120), (30.0, 2040)],
-    10.6: [(2.0, 19000), (10.0, 16600), (30.0, 16200)],
+    2.8:  [(2.0, 260), (10.0, 212), (30.0, 204)],
+    10.6: [(2.0, 1900), (10.0, 1660), (30.0, 1620)],
 }
 
 
@@ -61,12 +63,16 @@ def focuser_on(bus: FakeBus) -> Focuser:
 
 class RecordingFocuser:
     available = False
+    lens_idle = True
+    lens_started_at = lens_stopped_at = 0.0
 
     def __init__(self):
         self.writes: list[tuple[str, int]] = []
+        self.expected: list[float] = []
 
-    def set(self, channel, value, wait=False):
+    def set(self, channel, value, expect_s=0.0):
         self.writes.append((channel, int(value)))
+        self.expected.append(expect_s)
         return value
 
 
@@ -76,56 +82,58 @@ def main() -> None:
     # ---- 1. lookup hits the measured points exactly -----------------------
     for efl, row in GRID.items():
         for d, raw in row:
-            got = focus_raw(efl, d, GRID)
+            got = grid_focus_steps(efl, d, GRID)
             check(f"grid point {efl} mm @ {d} m", got == raw, f"{got} vs {raw}")
 
     # ---- 2. interpolation is in 1/d, not d --------------------------------
     # 1/d halfway between 1/2 and 1/10 is 0.3, i.e. 3.33 m, not 6 m
-    mid = focus_raw(10.6, 1 / 0.3, GRID)
-    check("halfway in 1/d lands halfway in raw", abs(mid - (19000 + 16600) / 2) <= 1, f"{mid}")
+    mid = grid_focus_steps(10.6, 1 / 0.3, GRID)
+    check("halfway in 1/d lands halfway in raw", abs(mid - (1900 + 1660) / 2) <= 1, f"{mid}")
     check("6 m is nearer the 10 m setting than the 2 m one",
-          abs(focus_raw(10.6, 6.0, GRID) - 16600) < abs(focus_raw(10.6, 6.0, GRID) - 19000))
+          abs(grid_focus_steps(10.6, 6.0, GRID) - 1660) < abs(grid_focus_steps(10.6, 6.0, GRID) - 1900))
 
     # ---- 3. between focal lengths, and clamped outside the grid -----------
-    between = focus_raw(6.7, 10.0, GRID)
+    between = grid_focus_steps(6.7, 10.0, GRID)
     check("between rows interpolates on focal length",
-          abs(between - (2120 + 16600) / 2) <= 1, f"{between}")
-    check("past the far end clamps", focus_raw(10.6, 500.0, GRID) == 16200)
-    check("inside the near end clamps", focus_raw(10.6, 0.6, GRID) == 19000)
-    check("past the tele end clamps", focus_raw(14.0, 10.0, GRID) == 16600)
+          abs(between - (212 + 1660) / 2) <= 1, f"{between}")
+    check("past the far end clamps", grid_focus_steps(10.6, 500.0, GRID) == 1620)
+    check("inside the near end clamps", grid_focus_steps(10.6, 0.6, GRID) == 1900)
+    check("past the tele end clamps", grid_focus_steps(14.0, 10.0, GRID) == 1660)
 
     # ---- 4. the shipped (uncalibrated) grid depends on focal length only ---
-    for efl, old in ((4.38, 20000), (6.27, 8000), (10.71, 2140)):
-        flat = {focus_raw(efl, d) for d in (1.0, 3.0, 8.0, 40.0)}
+    for efl, old in ((4.38, 2100), (6.27, 840), (10.71, 225)):
+        flat = {grid_focus_steps(efl, d) for d in (1.0, 3.0, 8.0, 40.0)}
         check(f"uncalibrated grid is distance-independent at {efl} mm",
               flat == {old}, f"{flat}")
 
     # ---- 5. set_focus deadband, and zoom refocusing at the known distance --
-    config.FOCUS_GRID = GRID
+    config.FOCUS_GRID_STEPS = GRID
     config.FOCUS_RATE_LIMIT_S = 0.0
     config.ZOOM_RATE_LIMIT_S = 0.0
     ptz = Ptz()
     ptz.focuser = RecordingFocuser()
-    ptz.set_focus(10.0)
+    said = ptz.set_focus(10.0)
     n = len(ptz.focuser.writes)
-    check("first focus call moves the motor", n == 1, f"{ptz.focuser.writes}")
-    ptz.set_focus(10.5)            # 1/10 − 1/10.5 ≈ 0.005 D, inside the deadband
-    check("ranging jitter inside the deadband is ignored", len(ptz.focuser.writes) == n)
-    ptz.set_focus(4.0)
-    check("a real move refocuses", len(ptz.focuser.writes) == n + 1)
+    check("first focus call moves the motor, and says so",
+          n == 1 and said is LensMove.MOVED and bool(said), f"{ptz.focuser.writes} {said}")
+    said = ptz.set_focus(10.5)     # 1/10 − 1/10.5 ≈ 0.005 D, inside the deadband
+    check("ranging jitter inside the deadband is ignored, and says why",
+          len(ptz.focuser.writes) == n and said is LensMove.SMALL and not said, f"{said}")
+    check("a real move refocuses", bool(ptz.set_focus(4.0)) and len(ptz.focuser.writes) == n + 1)
 
     ptz.set_zoom_mm(10.6)
     focus_after = [v for ch, v in ptz.focuser.writes if ch == OPT_FOCUS][-1]
     check("a zoom move refocuses for the last ranged distance",
-          focus_after == focus_raw(10.6, 4.0, GRID), f"{focus_after}")
+          focus_after == grid_focus_steps(10.6, 4.0, GRID), f"{focus_after}")
 
     # ---- the app's focus slider skips the rate limit, not the deadband -------
     config.FOCUS_RATE_LIMIT_S = 2.0
     f = Ptz()
     f.focuser = RecordingFocuser()
     f.set_focus(10.0)
-    f.set_focus(3.0)
-    check("a second focus inside FOCUS_RATE_LIMIT_S is dropped", f.focus_m == 10.0, f"{f.focus_m}")
+    said = f.set_focus(3.0)
+    check("a second focus inside FOCUS_RATE_LIMIT_S is dropped, and says so",
+          f.focus_m == 10.0 and said is LensMove.PACED, f"{f.focus_m} {said}")
     f.set_focus(3.0, urgent=True)
     check("…but the app's goes at once", f.focus_m == 3.0, f"{f.focus_m}")
     n = len(f.focuser.writes)
@@ -152,73 +160,87 @@ def main() -> None:
     config.ZOOM_RATE_LIMIT_S = 0.0
     a = Ptz()
     a.focuser = RecordingFocuser()
-    a.set_zoom_mm(6.7, urgent=True)
+    a.set_zoom_mm(5.0, urgent=True)
     a.refocus(5.0)
-    grid = a._focus_raw
-    a.learn_focus(0.6)                      # autofocus: sharp at 60 %, not the grid's
-    trim = round(0.6 * 20000) - grid
-    a.set_zoom_mm(9.8, urgent=True)
-    check("after autofocus, a zoom move refocuses at the grid's position plus its trim, capped",
-          a._focus_raw == ptz_mod.focus_raw(9.8, 5.0) + config.FOCUS_TRIM_MAX * (1 if trim > 0 else -1),
-          f"{a._focus_raw} vs {ptz_mod.focus_raw(9.8, 5.0)}, trim {trim}")
-    a._focus_trim, a._trim_zoom_mm = 20, 5.0
+    a.learn_focus(a.focus_steps + 20)       # autofocus: sharp 20 steps from the grid's
     a.set_zoom_mm(10.0, urgent=True)
-    check("…grown with the square of the focal length: twice as long, four times the trim",
-          a._focus_raw == ptz_mod.focus_raw(10.0, 5.0) + 80,
-          f"{a._focus_raw} vs {ptz_mod.focus_raw(10.0, 5.0)} + 80")
+    check("after autofocus, a zoom move refocuses at the grid's position plus its trim, "
+          "grown with the square of the focal length: twice as long, four times the trim",
+          a.focus_steps == grid_focus_steps(10.0, 5.0) + 80,
+          f"{a.focus_steps} vs {grid_focus_steps(10.0, 5.0)} + 80")
+    a.set_zoom_mm(5.0, urgent=True)
+    a.learn_focus(a.focus_steps - 20 + 100)     # 100 steps out at 5 mm: 400 at 10 mm…
+    a.set_zoom_mm(10.0, urgent=True)
+    check("…capped at 150 motor steps (FOCUS_TRIM_MAX_STEPS), of a travel of 2100",
+          a.focus_steps == grid_focus_steps(10.0, 5.0) + 150 and config.FOCUS_TRIM_MAX_STEPS == 150
+          and LENS_STEPS == 2100, f"{a.focus_steps} vs {grid_focus_steps(10.0, 5.0)} + 150")
 
-    # ---- autofocus running: nobody else moves zoom or focus ---------------------
-    a.af_active = True
+    # ---- autofocus has the lens: nobody else moves zoom or focus ----------------
+    af = object()
+    a.take_lens(af)
     n = len(a.focuser.writes)
-    a.set_zoom_mm(4.0, urgent=True)
-    a.set_focus(1.0)
-    a.refocus(2.0)
-    check("autofocus running: zoom and focus requests wait", len(a.focuser.writes) == n
-          and a.lens_moving, f"{a.focuser.writes[n:]}")
-    a.af_active = False
+    said = (a.set_zoom_mm(4.4, urgent=True), a.set_focus(1.0), a.refocus(2.0),
+            a.set_focus_steps(100))
+    check("the lens taken: everyone else's zoom and focus come back HELD, nothing moves",
+          len(a.focuser.writes) == n and set(said) == {LensMove.HELD} and a.lens_moving
+          and a.lens_owner is af, f"{a.focuser.writes[n:]} {said}")
+    check("…its owner's own moves go through",
+          a.set_focus_steps(100, owner=af) is LensMove.MOVED and a.focus_steps == 100)
+    a.give_lens(object())
+    check("…only its owner can give it back", a.lens_owner is af)
+    a.give_lens(af)
+    check("…and then the others' requests are taken again",
+          a.lens_owner is None and not a.lens_moving and bool(a.set_zoom_mm(4.4, urgent=True)))
 
-    # ---- lens moves are waited out by time: the controller never says ------
-    import time as _t
+    # ---- how long a move should take goes with it, for a controller with no busy flag
     w = Ptz()
     w.focuser = RecordingFocuser()
-    w.set_focus_pos(0.0)
-    w.set_focus_pos(1.0)
-    full = w._lens_until - _t.monotonic()
-    w.set_focus_pos(0.95)
-    short = w._lens_until - _t.monotonic()
-    check("a move across the whole focus travel is waited out for LENS_TRAVEL_S",
-          abs(full - (config.LENS_SETTLE_S + config.LENS_TRAVEL_S)) < 0.05, f"{full:.2f} s")
-    check("…a short one for a share of it (the longer wait still stands)",
-          short <= full and abs(full - short) < 0.1, f"{short:.2f} s")
+    w.set_focus_steps(0)
+    w.set_focus_steps(LENS_STEPS)
+    w.set_focus_steps(LENS_STEPS - 105)
+    check("a move across the whole focus travel is expected to take LENS_TRAVEL_S",
+          abs(w.focuser.expected[-2] - (config.LENS_SETTLE_S + config.LENS_TRAVEL_S)) < 1e-9,
+          f"{w.focuser.expected}")
+    check("…a short one a share of it",
+          abs(w.focuser.expected[-1] - (config.LENS_SETTLE_S + 0.05 * config.LENS_TRAVEL_S)) < 1e-9,
+          f"{w.focuser.expected}")
     w.home()
     zoom_writes = [v for ch, v in w.focuser.writes if ch == OPT_ZOOM]
     check("home zooms to the curve's wide end, whichever way the motor runs",
-          zoom_writes[-1] == ptz_mod._interp(config.ZOOM_MIN_MM, config.ZOOM_CURVE)
-          and w.zoom_mm == config.ZOOM_MIN_MM, f"{zoom_writes}")
+          zoom_writes[-1] == ptz_mod._interp(config.ZOOM_MIN_MM, config.ZOOM_CURVE_STEPS)
+          and w.zoom_mm == config.ZOOM_MIN_MM and w.zoom_steps == zoom_writes[-1],
+          f"{zoom_writes}")
 
-    # ---- the app's focus slider moves the motor itself ----------------------
+    # ---- autofocus and the tools move the focus motor itself ------------------
     f = Ptz()
     f.focuser = RecordingFocuser()
     f.set_focus(10.0)
-    f.set_focus_pos(0.25)
-    lo, hi = 0, 20000
-    check("focus slider: straight to that much of the motor's travel",
-          f.focuser.writes[-1] == (OPT_FOCUS, lo + (hi - lo) // 4) and f.focus_pos == 0.25,
-          f"{f.focuser.writes[-1]}, {f.focus_pos}")
+    f.set_focus_steps(525)
+    check("set_focus_steps: straight to that step of the motor's travel",
+          f.focuser.writes[-1] == (OPT_FOCUS, 525) and f.focus_steps == 525,
+          f"{f.focuser.writes[-1]}, {f.focus_steps}")
+    check("…the same again is no move", f.set_focus_steps(525) is LensMove.SAME)
     n = len(f.focuser.writes)
     f.set_focus(10.0)
     check("…and the tracker's next focus moves it, even to the distance it had",
           len(f.focuser.writes) == n + 1)
+    check("the distance last asked for is kept, moved for or not", f.subject_m == 10.0)
 
     # ---- zooming out for a lost person skips the rate limit ----------------
     config.ZOOM_RATE_LIMIT_S = 2.0                 # section 4 turned it off
     p = Ptz()
     p.focuser = RecordingFocuser()
-    p.set_zoom_mm(8.0)
-    p.set_zoom_mm(5.0)
-    check("a second zoom inside ZOOM_RATE_LIMIT_S is dropped", p.zoom_mm == 8.0, f"{p.zoom_mm}")
-    p.set_zoom_mm(config.ZOOM_MIN_MM, urgent=True)
-    check("…but an urgent one goes at once", p.zoom_mm == config.ZOOM_MIN_MM, f"{p.zoom_mm}")
+    first = p.set_zoom_mm(8.0)
+    said = p.set_zoom_mm(5.0)
+    check("a second zoom inside ZOOM_RATE_LIMIT_S is dropped, and says so",
+          p.zoom_mm == 8.0 and first is LensMove.MOVED and said is LensMove.PACED,
+          f"{p.zoom_mm} {first} {said}")
+    check("a change under ZOOM_MIN_STEP_MM says it is too small, the same zoom that it is the same",
+          p.set_zoom_mm(8.0 + config.ZOOM_MIN_STEP_MM / 2, urgent=True) is LensMove.SMALL
+          and p.set_zoom_mm(8.0, urgent=True) is LensMove.SAME and p.zoom_mm == 8.0)
+    said = p.set_zoom_mm(config.ZOOM_MIN_MM, urgent=True)
+    check("…but an urgent one goes at once", p.zoom_mm == config.ZOOM_MIN_MM and bool(said),
+          f"{p.zoom_mm}")
 
     # ---- the app's joystick: speed grows with the square of the pull --------
     p = Ptz()
@@ -268,9 +290,11 @@ def main() -> None:
     class FakePi:
         def __init__(self):
             self.pwm: dict[int, tuple[int, int]] = {}
+            self.calls = 0
 
         def hardware_PWM(self, gpio, hz, duty):
             self.pwm[gpio] = (hz, duty)
+            self.calls += 1
 
     def us(pi, gpio):
         hz, duty = pi.pwm[gpio]
@@ -287,6 +311,11 @@ def main() -> None:
           pi.pwm[config.PAN_GPIO][0] == config.SERVO_PWM_HZ
           and abs(us(pi, config.PAN_GPIO) - centre) < 0.05, f"{pi.pwm}")
     check("…and tilt on TILT_GPIO", config.TILT_GPIO in pi.pwm)
+    n = pi.calls
+    for _ in range(20):                       # a head at rest, asked every tick
+        p.set_pan(0.0)
+        p.set_tilt(0.0)
+    check("pigpio: an unchanged angle is not sent again", pi.calls == n, f"{pi.calls - n}")
     per_deg = (config.SERVO_US_AT_180 - config.SERVO_US_AT_0) / 180
     p.set_pan(0.1)
     check("pigpio: a tenth of a degree moves the pulse a tenth of a degree's width",
@@ -318,17 +347,16 @@ def main() -> None:
           f"{writes}")
 
     # ---- the IMX477 kit's controller (firmware 0x0104) ---------------------
-    swap = config.LENS_SWAP_ZOOM_FOCUS
-    config.LENS_SWAP_ZOOM_FOCUS = False            # Arducam's own map first
     bus = FakeBus(0x0104)
     f = focuser_on(bus)
-    f.set(OPT_ZOOM, 20000)
-    f.set(OPT_FOCUS, 10000)
+    f.set(OPT_ZOOM, 2100)
+    f.set(OPT_FOCUS, 1050)
     f.set(OPT_MOTOR_X, 120)
-    check("imx477: zoom on 0x01, focus on 0x00, rescaled to 0-2100; pan unchanged",
+    check("imx477: zoom on 0x01, focus on 0x00, in steps as they are; pan unchanged",
           bus.writes == [(0x01, 2100), (0x00, 1050), (0x05, 120)], f"{bus.writes}")
-    check("imx477: reads come back on the older scale",
-          f.get(OPT_ZOOM) == 20000 and f.get(OPT_FOCUS) == 10000)
+    check("imx477: reads come back in steps",
+          f.get(OPT_ZOOM) == 2100 and f.get(OPT_FOCUS) == 1050)
+    check("a position past the travel is held to it", f.set(OPT_FOCUS, 9999) == LENS_STEPS)
     bus.writes.clear()
     f.wake()
     check("imx477: wake resets the lens, then leaves mode 0",
@@ -340,10 +368,13 @@ def main() -> None:
 
     bus = FakeBus(0x0000)
     f = focuser_on(bus)
-    f.set(OPT_ZOOM, 20000)
+    f.set(OPT_ZOOM, 2100)
+    f.set(OPT_FOCUS, 1050)
     f.wake()
-    check("older controller: zoom on 0x00 as is, and no wake writes",
-          bus.writes == [(0x00, 20000)], f"{bus.writes}")
+    check("older controller: steps become its own numbers at the write, zoom on 0x00 "
+          "(3000-20000) and focus on 0x01 (0-20000); no wake writes",
+          bus.writes == [(0x00, 20000), (0x01, 10000)], f"{bus.writes}")
+    check("…and reads come back in steps", f.get(OPT_ZOOM) == 2100 and f.get(OPT_FOCUS) == 1050)
 
     # ---- the busy flag is the low byte of a 16-bit word ----------------------
     bus = FakeBus(0x0104)
@@ -362,43 +393,51 @@ def main() -> None:
             if reg in (0x00, 0x01):
                 self.regs[0x04] = 1
 
-    swap, config.LENS_SWAP_ZOOM_FOCUS = config.LENS_SWAP_ZOOM_FOCUS, False
     bus = BusyBus(0x0104)
     f = focuser_on(bus)
     f.queue_lens = True
-    f.set(OPT_ZOOM, 20000)
-    f.set(OPT_FOCUS, 10000)
+    check("nothing asked of the lens: idle", f.lens_idle)
+    f.set(OPT_ZOOM, 2100)
+    f.set(OPT_FOCUS, 1050)
     _time.sleep(0.15)
     check("zoom goes first, and focus waits while the zoom motor runs",
-          bus.writes == [(0x01, 2100)] and f.lens_pending, f"{bus.writes}")
-    f.set(OPT_FOCUS, 12000)
+          bus.writes == [(0x01, 2100)] and not f.lens_idle, f"{bus.writes}")
+    f.set(OPT_FOCUS, 1260)
     bus.regs[0x04] = 0
     _time.sleep(0.2)
-    check("…then focus, at the latest value asked for",
-          bus.writes == [(0x01, 2100), (0x00, 1260)], f"{bus.writes}")
+    check("…then focus, at the latest value asked for; still not idle: its motor is running",
+          bus.writes == [(0x01, 2100), (0x00, 1260)] and not f.lens_idle, f"{bus.writes}")
+    stopped = _time.monotonic()
     bus.regs[0x04] = 0
-    _time.sleep(0.15)
-    check("…and nothing is left waiting", not f.lens_pending)
-    config.LENS_SWAP_ZOOM_FOCUS = swap
+    check("…idle once that has stopped too, which a waiter is told at once",
+          f.wait_lens_idle(1.0) and f.lens_idle and _time.monotonic() - stopped < 0.1)
+    check("…with when the last move started and stopped",
+          0 < f.lens_started_at < f.lens_stopped_at <= _time.monotonic())
 
-    # ---- LENS_SWAP_ZOOM_FOCUS: the two lens motors the other way round ------
-    config.LENS_SWAP_ZOOM_FOCUS = True
+    # ---- a controller whose busy flag never sets: moves are waited out by time,
+    # ---- one after the other (a zoom and its refocus take the sum, not the longer)
     bus = FakeBus(0x0104)
     f = focuser_on(bus)
-    f.set(OPT_ZOOM, 20000)
-    f.set(OPT_FOCUS, 10000)
-    f.set(OPT_MOTOR_X, 120)
-    check("swapped, imx477: zoom on 0x00, focus on 0x01, each scaled as itself; pan unchanged",
-          bus.writes == [(0x00, 2100), (0x01, 1050), (0x05, 120)], f"{bus.writes}")
-    check("swapped, imx477: reads come from the same registers",
-          f.get(OPT_ZOOM) == 20000 and f.get(OPT_FOCUS) == 10000)
-    bus = FakeBus(0x0101)
-    f = focuser_on(bus)
-    f.set(OPT_ZOOM, 20000)
-    f.set(OPT_FOCUS, 7000)
-    check("swapped, older controller: zoom on 0x01, focus on 0x00",
-          bus.writes == [(0x01, 20000), (0x00, 7000)], f"{bus.writes}")
-    config.LENS_SWAP_ZOOM_FOCUS = swap
+    f.queue_lens = True
+    t0 = _time.monotonic()
+    f.set(OPT_ZOOM, 1000, expect_s=0.3)
+    f.set(OPT_FOCUS, 500, expect_s=0.3)
+    _time.sleep(0.4)
+    check("no busy flag: after the longer of two moves the lens is still not idle",
+          not f.lens_idle and bus.writes == [(0x01, 1000), (0x00, 500)], f"{bus.writes}")
+    check("…idle after the two together", f.wait_lens_idle(1.0)
+          and 0.55 <= _time.monotonic() - t0 < 0.9, f"{_time.monotonic() - t0:.2f} s")
+    p = Ptz()
+    p.focuser = f
+    travel, config.LENS_TRAVEL_S = config.LENS_TRAVEL_S, 0.5
+    config.ZOOM_RATE_LIMIT_S = 0.0
+    p.set_zoom_mm(8.0)
+    check("Ptz.lens_moving: true from the moment a zoom is asked for…", p.lens_moving)
+    t0 = _time.monotonic()
+    p.wait_lens()
+    check("…and wait_lens returns when zoom and refocus are both done",
+          not p.lens_moving and _time.monotonic() - t0 > 0.1, f"{_time.monotonic() - t0:.2f} s")
+    config.LENS_TRAVEL_S = travel
 
     print()
     if failures:

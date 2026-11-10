@@ -264,8 +264,8 @@ def tracker_found() -> None:
     check("…not ready yet", not tr.ready_to_record)
     run_tracker(tr, config.FOUND_CONFIRM_S + 0.1)
     check("still seen FOUND_CONFIRM_S later → ready to record", tr.ready_to_record)
-    tr.confirm()
-    check("confirm() → TRACK, countdown 0", tr.mode == "track" and tr.countdown == 0)
+    tr.lock_on()
+    check("lock_on() → TRACK, countdown 0", tr.mode == "track" and tr.countdown == 0)
 
     tr2 = Tracker(FakeUwb(theta_deg=10.0), FakeCamera(None), FakePtz())
     run_tracker(tr2, 1.5)
@@ -378,6 +378,7 @@ class FakeRecCamera(FakeCamera):
         super().__init__(bbox)
         self.recording = False
         self.no_detector = None
+        self.no_recorder = None
 
     def start_recording(self):
         self.recording = True
@@ -407,7 +408,7 @@ class FakeAutoFocus:
         self.cancelled = 0
         self.busy = False
 
-    def start(self, x: float, y: float, narrow: bool = False) -> None:
+    def start(self, x: float, y: float, narrow: bool = False, on_done=None) -> None:
         self.started.append((x, y))
         self.narrow = narrow
 
@@ -418,6 +419,7 @@ async def full_flow() -> None:
     print("\nfull flow through Head.control_tick()")
     import sportcam.main as main_mod
     from sportcam.cloud import CloudLink
+    from sportcam.autofocus import Refocus
     from sportcam.boxlog import BoxLog
     from sportcam.main import Head
 
@@ -456,11 +458,14 @@ async def full_flow() -> None:
     head._near_focus = False
     head._tasks = set()
     head._boxes_sent_at = None
+    head._person_seen_at = None
     head._jog, head._jog_at = (0.0, 0.0), float("-inf")
     head._lens_zoom = None
     head._lens_new = False
-    head._af_point, head._af_due = (0.5, 0.5), None
+    head._af_point = (0.5, 0.5)
+    head._park_vel, head._park_at, head._leveling, head._aim_at = (0.0, 0.0), 0.0, False, 0.0
     head.autofocus = FakeAutoFocus()
+    head.refocus = Refocus(head.ptz, head.autofocus)
     head._awake_since = time.monotonic()
     head.boxlog = BoxLog()
 
@@ -515,7 +520,7 @@ async def full_flow() -> None:
 
     # the app's zoom slider holds the lens in awake, and the lens refocuses once it rests…
     head.autofocus.started.clear()              # the wake's and lock-ons' are not this
-    head._af_due = None
+    head.refocus.reset()
     head.lens(8.0)
     await tick_for(0.2)
     check("zoom: awake, the app's zoom holds (awake no longer forces wide)",
@@ -542,6 +547,28 @@ async def full_flow() -> None:
     await tick_for(config.ZOOM_RATE_LIMIT_S + 0.2)
     check("…and woken again the lens is back to wide", head.ptz.zoom_mm == config.ZOOM_MIN_MM,
           f"{head.ptz.zoom_mm}")
+
+    # the live view is made only for someone watching: nobody, no capture, no JPEG
+    made: list[int] = []
+    head.camera.preview_jpeg = lambda: made.append(1) or b"\xff\xd8jpeg"
+    head.local.publish_frame = lambda jpg: None
+
+    async def sent_on(jpg, boxes):
+        pass
+    head.cloud.preview = sent_on
+    head.cloud.viewer_at = 0.0
+    head.local.viewers = 0
+    loop = asyncio.create_task(head.frame_loop())
+    await asyncio.sleep(0.3)
+    unwatched = len(made)
+    head.local.viewers = 1
+    await asyncio.sleep(0.3)
+    watched = len(made) - unwatched
+    head.local.viewers = 0
+    loop.cancel()
+    check("nobody watching the live view: no frame is captured or encoded for it",
+          head.state == "awake" and unwatched == 0, f"{unwatched} made")
+    check("…someone watching: frames at MJPEG_FPS", watched >= 2, f"{watched} in 0.3 s")
     bbox, head.camera._bbox = head.camera._bbox, None
     await tick_for(config.AWAKE_PERSON_HOLD_S + 0.5)
     check("awake sub-state: no person in frame once they have gone for AWAKE_PERSON_HOLD_S; ring solid",
@@ -724,6 +751,7 @@ async def switched_off() -> None:
     head._rec_path, head._rec_started = "/tmp/sportcam-test.mp4", main_mod.time.monotonic()
     head._near_focus = False
     head.autofocus = FakeAutoFocus()
+    head.refocus = Stub()
     head._tasks = set()
     head.session_hash = None
     head.uwb = Stub()

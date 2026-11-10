@@ -85,15 +85,26 @@ def camera_reads_qr() -> None:
     frame[y:y + code.shape[0], x:x + code.shape[1]] = code[:, :, None]   # …and the phone
 
     class FakeCam:
+        """Picamera2's part in a capture: a request holding the lores frame."""
         def __init__(self, img):
             self.img = img
 
-        def capture_array(self, _stream):        # the lores stream is YUV420
+        def capture_request(self):
+            return self
+
+        def make_array(self, _stream):           # the lores stream is YUV420
             return cv2.cvtColor(self.img, cv2.COLOR_RGB2YUV_I420)
 
-    cam = Camera.__new__(Camera)
-    cam._cam, cam._qr, cam.awake = FakeCam(frame), None, True
-    cam._cam_lock = threading.Lock()
+        def get_metadata(self):
+            return {}
+
+        def release(self):
+            pass
+
+    from sportcam import camera as camera_mod
+    camera_mod.Picamera2 = None                  # never the real camera, even on the Pi
+    cam = Camera()
+    cam._cam = FakeCam(frame)
     got = cam.qr_text()
     check("decodes a phone's code in the frame", got == text, f"{got!r}")
     cam._cam = FakeCam(np.full((h, w, 3), 90, np.uint8))
@@ -186,6 +197,10 @@ def make_head():
     head._boot_at = asyncio.get_event_loop().time()
     head._qr_sent, head._near_focus = {}, False
     head.autofocus = type("NoAutoFocus", (), {"cancel": lambda self: None})()
+    head.refocus = type("NoRefocus", (), {"reset": lambda self: None,
+                                          "request": lambda self, delay_s=0.0: None,
+                                          "tick": lambda self, *a, **k: None})()
+    head._park_vel, head._park_at, head._leveling, head._aim_at = (0.0, 0.0), 0.0, False, 0.0
     head.camera, head.ptz, head.led = FakeCamera(), FakePtz(), FakeRing()
     head.storage = FakeStorage()
     head.cloud = head.mdns = head.local = FakeReporter()

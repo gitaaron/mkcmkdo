@@ -88,12 +88,6 @@ SERVO_US_AT_0, SERVO_US_AT_180 = 500, 2500
 # flips if your base is assembled mirrored. CENTER_RAW may be fractional with
 # the pigpio driver. Verify both on the bench with
 # `python -m sportcam.ptzcheck` before the first tracking run.
-# Which of the PTZ controller's two lens registers drives which motor. The
-# IMX477 kit has focus on 0x00 and zoom on 0x01, as in Arducam's Focuser.py:
-# lenscheck stepped each as the zoom, focusing with the other, and measured
-# the picture's scale: 0x01 changes it (1.74× by 1400), 0x00 not measurably.
-# True swaps the two, for a controller wired the other way.
-LENS_SWAP_ZOOM_FOCUS = False
 I2C_BUS = 1                     # PTZ controller (zoom, focus; and pan/tilt on "arducam")
 # Measured on the bench kit (a sample aimed straight ahead and level with
 # the sticks): straight ahead is pan raw 89, level is tilt raw 175 — raw 90
@@ -145,31 +139,38 @@ JOG_TIMEOUT_S = 0.3            # no joystick message this long: stop. A dropped
 # few a second at most while the slider moves).
 #
 # Autofocus in awake (autofocus.py): tapping the live view focuses on what is
-# under the tap, and the lens refocuses by itself once the zoom has been still
-# AF_AFTER_ZOOM_S, on the last point tapped; on waking, AF_ON_WAKE_S after;
+# under the tap, and the lens refocuses by itself once the zoom slider has been
+# quiet AF_AFTER_ZOOM_S and the lens has stopped, on the last point tapped; on
+# waking, AF_ON_WAKE_S after;
 # and in tracking, as it locks on to its person. Contrast autofocus,
 # focuscal's measure (autofocus.py): the focus motor run down a window of
-# ± AF_SWEEP_HALVES round where it is, in one continuous move, every frame
+# ± AF_SWEEP_HALVES_STEPS round where it is, in one continuous move, every frame
 # scored on the way (the whole travel if the first shows no clear peak,
 # AF_PEAK_RATIO × the median), then a short stepped pass round the peak,
-# AF_FINE = (step, ± range). ≈ 3-4 s. What it finds corrects FOCUS_GRID from
-# then on (the focus trim).
-AF_SWEEP_HALVES = (0.15, 1.0)  # of the focus motor's travel
+# AF_FINE_STEPS = (step, ± range). ≈ 3-4 s. What it finds corrects
+# FOCUS_GRID_STEPS from then on (the focus trim). Everything named _STEPS is in
+# lens motor steps, 0-2100 (ptz.LENS_STEPS), as the calibration tools print.
+AF_SWEEP_HALVES_STEPS = (315, 2100)
 AF_PEAK_RATIO = 3.0
-AF_FINE = (0.005, 0.015)
-AF_FRAME_LAG_S = 0.05          # a frame shows the lens this long before it is handed over
-AF_BACKLASH = 0.02             # every measured move, and the last, comes from this far below
+AF_FINE_STEPS = (10, 30)
+# A frame's exposure time comes from the camera (camera.Frame.at). Only where
+# the camera gives none: a frame shows the lens this long before it arrives.
+AF_FRAME_LAG_S = 0.05
+AF_BACKLASH_STEPS = 42         # every measured move, and the last, comes from this far below
 AF_EXTRA_SETTLE_S = 0.03       # after the busy flag clears and LENS_SETTLE_S
 AF_REGION = 0.3                # side of the square scored, of the frame's short side
-AF_AFTER_ZOOM_S = 0.8
+AF_AFTER_ZOOM_S = 0.8          # the app's zoom slider quiet this long (and the lens stopped)
 AF_ON_WAKE_S = 2.0             # CAMERA_WARMUP_S and some: exposure settled first
 AWAKE_FOCUS_M = 5.0            # focus for a room on booting or waking, until autofocus
 # The tracker's zoom moves throw focus off, and the sharp band is too thin for
-# FOCUS_GRID to hit: once a move of AF_REZOOM_MM has rested AF_AFTER_ZOOM_S,
-# autofocus on the person, close by first, at most every AF_TRACK_GAP_S.
+# FOCUS_GRID_STEPS to hit: once the zoom is AF_REZOOM_MM from where it was last
+# focused and the lens has really stopped, autofocus on the person, close by,
+# at most every AF_TRACK_GAP_S (autofocus.Refocus). No peak found: once more,
+# AF_REFOCUS_RETRIES times, then leave it until the next zoom.
 AF_REZOOM_MM = 0.3
 AF_TRACK_GAP_S = 5.0
-AF_REFOCUS_HALF = 0.08         # of the focus motor's travel
+AF_REFOCUS_RETRIES = 1
+AF_REFOCUS_HALF_STEPS = 168
 # That search never runs the whole travel: the picture would go to a blur for
 # seconds and the tracker would lose its person. Best at a window's end: the
 # next window that way, up to AF_REFOCUS_WINDOWS. A peak stands AF_REFOCUS_RISE
@@ -265,6 +266,7 @@ SSD_SWAP_RB = False            # the preview is handed over as RGB, which the mo
 SSD_WIDE_TILES = True          # whole-frame searches run as two overlapping halves:
                                # twice the time, but a far person stays big enough
 DETECT_FPS_TRACKING = 3.0
+DETECT_LOG_EVERY = 30          # a [detect] timing line every this many detections; 0: never
 DETECT_FPS_AWAKE = 0.5
 AWAKE_PERSON_HOLD_S = 4.0       # awake: a person stays "in frame" this long after the
                                # last detection (two awake detections), so one
@@ -292,7 +294,6 @@ HFOV_WIDE_DEG, HFOV_TELE_DEG = 71.0, 33.0
 # to spare at the wide end.
 SUBJECT_HEIGHT_M = 1.7
 SENSOR_H_MM = 3.537            # IMX477 active height in 16:9 video modes
-ZOOM_DEADBAND_M = 0.3
 DIST_SMOOTHING = 0.3           # share of each new distance estimate that is taken
 DIST_MIN_M, DIST_MAX_M = 1.0, 30.0
 
@@ -311,8 +312,9 @@ ZOOM_FILL_DEADBAND = 0.3       # fill within this share of the target: leave the
 PERSON_IN_BOX_H = 0.75
 PERSON_IN_BOX_W = 0.55
 # Guard: a fast zoom-out when the body nears the edge of the frame or
-# outgrows ZOOM_GUARD_FILL. HOG cannot see a body that is already clipped,
-# so this has to act on the approach, and it wins over the fill loop.
+# outgrows ZOOM_GUARD_FILL. The detector's boxes stop at the frame's edge, so
+# a body running off it shows as a box against the edge: this acts on the
+# approach, and it wins over the fill loop (framing.py).
 # A correction is worked out once per move, from the lens as it stands and a
 # picture of it at rest: adding one up per detection, while the lens hasn't
 # moved yet, overshoots by several times. The person must stay off target
@@ -330,17 +332,17 @@ ZOOM_MIN_MM, ZOOM_MAX_MM = 4.38, 10.71
 ZOOM_MIN_STEP_MM = 0.15        # ignore smaller changes — stops the lens breathing
 ZOOM_RATE_LIMIT_S = 2.0
 
-# (focal length mm, raw motor value), on the 3000-20000 scale ptz.py rescales
-# to the controller's 0-2100. The zoom register's low end is tele, its high end
-# wide (lenscheck, measured scale), near enough a straight line between them.
-# Wide stops at register 1995 (19150 here): beyond that focus runs out of travel.
-ZOOM_CURVE = [(4.38, 19150), (10.71, 3000)]
+# (focal length mm, zoom motor steps), sorted by focal length; lenscheck
+# prints this line. The zoom motor's low end is tele, its high end wide
+# (lenscheck, measured scale), near enough a straight line between them.
+# Wide stops at step 1995: beyond that focus runs out of travel.
+ZOOM_CURVE_STEPS = [(4.38, 1995), (10.71, 0)]
 
-# How long the lens motors take. Ptz.wait_lens goes by the controller's busy
-# flag (a 16-bit word: lenscheck sees it set on every move); these are its
-# fallback for a controller that never sets it — LENS_SETTLE_S, plus
-# LENS_TRAVEL_S for a move across the whole travel, in proportion. Measured:
-# a quarter of the travel (525) in 1.35 s, so ≈ 5.4 s end to end.
+# How long the lens motors take. The lens thread (ptz.Focuser) goes by the
+# controller's busy flag (a 16-bit word: lenscheck sees it set on every move);
+# these are its fallback for a controller that never sets it — LENS_SETTLE_S,
+# plus LENS_TRAVEL_S for a move across the whole travel, in proportion.
+# Measured: a quarter of the travel (525 steps) in 1.35 s, so ≈ 5.4 s end to end.
 LENS_TRAVEL_S = 6.0
 LENS_SETTLE_S = 0.05            # after the busy flag clears: the picture catches up
 
@@ -348,7 +350,7 @@ LENS_SETTLE_S = 0.05            # after the busy flag clears: the picture catche
 # is deep at the wide end and shallow at the tele end (roughly 6-20 m when
 # focused at 10 m at 10.6 mm), so one curve per focal length is not enough.
 #
-#   FOCUS_GRID[efl_mm] = [(distance_m, raw), ...]
+#   FOCUS_GRID_STEPS[efl_mm] = [(distance_m, focus motor steps), ...]
 #
 # Lookup interpolates between rows on focal length and within a row on
 # 1/distance, because lens extension goes as 1/d. Measure it with
@@ -357,19 +359,19 @@ LENS_SETTLE_S = 0.05            # after the busy flag clears: the picture catche
 # old focal-length-only behaviour exactly — nothing gets worse, and nothing
 # gets better either.
 # Until calibrated, flat in distance: where lenscheck found a room-sized scene
-# sharp at each zoom, on the bench kit. (zoom, focus) registers, 0-2100: (0,
-# 225), (700, 330), (1305, 700), (1400, 840), (1740, 1400), (1995, 2100).
+# sharp at each zoom, on the bench kit. (zoom, focus) steps: (0, 225),
+# (700, 330), (1305, 700), (1400, 840), (1740, 1400), (1995, 2100).
 # Autofocus starts its search here, so a good grid makes it quick; focuscal
-# measures distance too.
-FOCUS_GRID = {
-    4.38:  [(2.0, 20000), (5.0, 20000), (10.0, 20000), (30.0, 20000)],
-    5.19:  [(2.0, 13330), (5.0, 13330), (10.0, 13330), (30.0, 13330)],
-    6.27:  [(2.0, 8000), (5.0, 8000), (10.0, 8000), (30.0, 8000)],
-    6.57:  [(2.0, 6670), (5.0, 6670), (10.0, 6670), (30.0, 6670)],
-    8.49:  [(2.0, 3140), (5.0, 3140), (10.0, 3140), (30.0, 3140)],
-    10.71: [(2.0, 2140), (5.0, 2140), (10.0, 2140), (30.0, 2140)],
+# measures distance too, and both tools print this in the form below.
+FOCUS_GRID_STEPS = {
+    4.38:  [(2.0, 2100), (30.0, 2100)],
+    5.19:  [(2.0, 1400), (30.0, 1400)],
+    6.27:  [(2.0, 840), (30.0, 840)],
+    6.57:  [(2.0, 700), (30.0, 700)],
+    8.49:  [(2.0, 330), (30.0, 330)],
+    10.71: [(2.0, 225), (30.0, 225)],
 }
-FOCUS_TRIM_MAX = 150           # motor steps: the most the last autofocus may shift a lookup
+FOCUS_TRIM_MAX_STEPS = 150     # the most the last autofocus may shift a lookup
 FOCUS_DEADBAND_DIOPTRE = 0.02  # ignore changes smaller than this in 1/d
 FOCUS_RATE_LIMIT_S = 0.5
 

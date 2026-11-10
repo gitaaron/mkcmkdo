@@ -92,6 +92,10 @@ if touches '^src/backend/'; then
     fi
 fi
 
+if touches '^src/[^/]+/device/|^tools/check-shared-device-files\.py$'; then
+    run device-shared-files python3 tools/check-shared-device-files.py
+fi
+
 for build in with_uwb without_uwb; do
     if touches "^src/$build/device/"; then
         if ensure_venv >"$log/venv.out" 2>&1; then
