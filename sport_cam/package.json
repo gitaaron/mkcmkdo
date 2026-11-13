@@ -20,6 +20,7 @@
     "cad:fit": "python3 cad/fit.py",
     "cad:check": "python3 cad/fit.py --check",
     "cad:watch": "python3 cad/fit.py --watch",
+    "print": "python3 cad/printer.py",
     "hooks:install": "git config core.hooksPath \"$(git rev-parse --show-prefix)tools/hooks\""
   }
 }

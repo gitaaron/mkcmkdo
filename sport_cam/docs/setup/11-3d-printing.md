@@ -182,6 +182,34 @@ UWB build: anchor arms and pod order in [Print order, with UWB](#print-order-wit
 
 <!--/-->
 
+## Printing from the command line
+
+With an A1 Mini on your network, [`cad/printer.py`](../../cad/printer.py)
+slices a part with the settings above, sends it to the printer and follows the
+print:
+
+```bash
+python3 cad/printer.py --list                  # the parts and their settings
+python3 cad/printer.py lid                     # slice, upload, start, follow
+python3 cad/printer.py anchor_arm --copies 2   # both arms on one plate (with UWB)
+python3 cad/printer.py lid --slice-only        # just slice; open the .3mf in Bambu Studio to check
+python3 cad/printer.py --status                # what the printer is doing
+```
+
+| Needs | Detail |
+| --- | --- |
+| Bambu Studio | installed on the same computer; its command line does the slicing, with its own A1 mini, 0.20 mm and PETG profiles plus the per-part settings in the tables above (the lid is flipped onto its top face automatically) |
+| Printer | an SD card in it; on its screen, Settings → Network: **LAN Only Mode** on and, on current firmware, **Developer Mode** on (without it the printer ignores commands from anything but Bambu's apps) |
+| Its details | IP address, serial number (Settings → Device) and access code (Settings → Network), plus which build you are printing, in `~/.config/sportcam/printer.toml` — outside the repo, as the access code is a password. Running the script without them prints the template |
+
+Before slicing it refuses STLs that are out of date with the CAD (run
+`python3 cad/fit.py`), and lists any part sizes the part depends on that are
+still assumed rather than measured. It asks before starting the printer
+(`--yes` skips the question) and stops if the printer is already busy.
+Ctrl-C stops following the print, not the print. Sliced jobs are kept in
+`cad/sliced/` (not committed). The part settings live in `PARTS` at the top
+of the script: change them there and in the tables above together.
+
 ---
 
 ## With UWB

@@ -28,3 +28,6 @@ samples/
 
 # clips copied from the camera (scripts/pi/samples.sh --recordings): video of people
 /recordings/
+
+# sliced print jobs from cad/printer.py — regenerated from the STLs
+cad/sliced/
