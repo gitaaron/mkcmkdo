@@ -96,6 +96,7 @@ const LID_Z = LY.lid_z;           // lid ring drops into the enclosure mouth
 const LID_TOP = LY.lid_top;       // top face of the lid — the PTZ base bolts here
 const PTZ_Z = LY.ptz_z;           // underside of the Arducam base's bottom disc, on its standoffs
 const TILT_Z = LY.tilt_z;         // tilt axis of the Arducam base
+const PTZ = LY.parts.ptz;         // its measured sizes, from cad/ordered_parts.toml
 const SHELF_Z = LY.shelf_z;       // underside of the Pi shelf
 const BAND_Z = LY.window_z - LY.design.diffuser_lip;   // bottom of the diffuser band
 const ARM_R = LY.arm_boss_r;       // enclosure wall boss the anchor arms bolt to
@@ -225,12 +226,14 @@ const STEPS = [
   },
   {
     id: "lid-ptz", phase: 2, title: "Arducam base onto the lid", time: "25 min",
-    parts: ["Lid", "Arducam IMX477 PTZ camera with metal pan-tilt base", "4 × M3 × 10"],
+    parts: ["Lid", "Arducam IMX477 PTZ camera with metal pan-tilt base", `4 × M3 × ${PTZ.bolt_l}`,
+            ...(LY.ptz_washers ? [`${4 * LY.ptz_washers} × M3 washer`] : [])],
     tools: ["Calipers", "2.5 mm hex key"],
     steps: [
       "The base is a round turntable standing on <b>four brass standoffs</b>, with the pan servo hanging underneath between them. Leave the standoffs on: they hold the servo clear of the lid, and they are what the lid screws into.",
-      "Measure across two opposite standoffs, centre to centre. The lid's four radial slots accept 70–104 mm; if yours is outside that, put it in <code>cad/ordered_parts.toml</code>, run <code>cad/fit.py</code> and reprint the lid.",
-      "Stand the base on the lid with a standoff over each slot, turned so the lens points along <b>+X</b> when pan is centred — the cable slot is then straight behind the camera. Push 4 × M3 × 10 <b>up from under the lid</b> into the standoffs.",
+      "The lid was cut for the standoff spacing in <code>cad/ordered_parts.toml</code> (<code>horizontal_bolt_spacing</code> side to side, <code>vertical_bolt_spacing</code> front to back, centre to centre, with the lens straight ahead). Check it before you go on; if it's wrong, correct it, run <code>cad/fit.py</code> and reprint the lid.",
+      ...(LY.ptz_washers ? [`Stack <b>${LY.ptz_washers} M3 washers</b> on the lid over each slot, under each standoff. Your standoffs are only ${PTZ.standoff_h} mm and the servo hangs ${PTZ.servo_drop} mm under the base, so the washers lift it clear of the lid.`] : []),
+      `Stand the base on the lid with a standoff over each slot, turned so the lens points along <b>+X</b> when pan is centred — the cable slot is then straight behind the camera. Push 4 × M3 × ${PTZ.bolt_l} <b>up from under the lid</b>${LY.ptz_washers ? " through the washers" : ""} into the standoffs.`,
       "Every cable leaves from the camera head at the top: the ribbon from the camera board, the I2C and 5 V lead from the PTZ controller under it, and both servo leads if the Pi drives the servos. Bring them down behind the base and feed them <b>through the lid's cable slot</b>, ribbon first.",
       "Sweep pan and tilt fully by hand and leave enough free ribbon outside that neither axis pulls it — about 60 mm more than the straight run — then tape the bundle to the lid beside the slot.",
     ],

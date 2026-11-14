@@ -99,8 +99,8 @@ In both builds' `cad/`. Print settings for each are in
 ## Before printing — measure these
 
 Measure every part as it arrives, put the numbers in
-[`cad/ordered_parts.toml`](../../cad/ordered_parts.toml) with `measured = true`
-on each, and re-run `fit.py`. Which sizes matter, and what each one changes,
+[`cad/ordered_parts.toml`](../../cad/ordered_parts.toml), change each value's
+`MEASURE_TODO` to `MEASURE_DONE`, and re-run `fit.py`. Which sizes matter, and what each one changes,
 is the first table of your build's 15 — Verification checklist
 ([with UWB](../with_uwb/setup/15-verification.md#before-you-print),
 [without UWB](../without_uwb/setup/15-verification.md#before-you-print)).

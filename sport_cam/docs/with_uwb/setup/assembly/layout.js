@@ -9,7 +9,7 @@ window.SPORTCAM_LAYOUT = {
  "base_d": 141,
  "base_h": 83,
  "baseline": 400.0,
- "below_lid": 2.4,
+ "below_lid": 3.1,
  "bolt_angs": [
   45.0,
   135.0,
@@ -133,7 +133,6 @@ window.SPORTCAM_LAYOUT = {
    "bom": 11,
    "h": 22,
    "l": 60,
-   "measured": false,
    "w": 40
   },
   "dowel": {
@@ -142,14 +141,12 @@ window.SPORTCAM_LAYOUT = {
     "with_uwb"
    ],
    "d": 12.7,
-   "measured": false,
    "stock_l": 914
   },
   "gauge": {
    "bom": 12,
    "h": 12,
    "l": 22.9,
-   "measured": false,
    "w": 22.9
   },
   "jack": {
@@ -157,14 +154,12 @@ window.SPORTCAM_LAYOUT = {
    "bom": 18,
    "depth": 16,
    "hole_d": 8.2,
-   "max_panel_t": 4.0,
-   "measured": false
+   "max_panel_t": 4.0
   },
   "latch": {
    "bom": "13a",
    "h": 10,
    "l": 30,
-   "measured": false,
    "w": 24
   },
   "led_ring": {
@@ -172,14 +167,12 @@ window.SPORTCAM_LAYOUT = {
    "count": 16,
    "h": 3.5,
    "id": 31.75,
-   "measured": false,
    "od": 44.5
   },
   "pd_trigger": {
    "bom": 10,
    "h": 6,
    "l": 33,
-   "measured": false,
    "plug_h": 7,
    "plug_w": 12.5,
    "port_h": 3.3,
@@ -212,7 +205,6 @@ window.SPORTCAM_LAYOUT = {
     ]
    ],
    "l": 85,
-   "measured": false,
    "pcb_t": 1.6,
    "plug_h": 7,
    "plug_l": 20,
@@ -229,30 +221,27 @@ window.SPORTCAM_LAYOUT = {
    "bom": 9,
    "h": 30,
    "l": 150,
-   "measured": false,
    "w": 72
   },
   "ptz": {
-   "base_d": 100,
-   "bolt_l": 10,
+   "base_d": 120,
+   "bolt_l": 12,
    "bom": 1,
-   "head_d": 5.6,
-   "head_h": 2.4,
-   "horizontal_bolt_spacing": 64,
+   "head_d": 5.3,
+   "head_h": 3.1,
+   "horizontal_bolt_spacing": 76.5,
    "lead_bundle_d": 8,
-   "measured": false,
    "ribbon_l": 500,
    "ribbon_w": 16,
-   "servo_drop": 30,
-   "standoff_h": 40,
-   "tilt_axis_h": 49,
-   "vertical_bolt_spacing": 64
+   "servo_drop": 30.8,
+   "standoff_h": 32,
+   "tilt_axis_h": 38,
+   "vertical_bolt_spacing": 76.5
   },
   "shifter": {
    "bom": 8,
    "h": 8,
    "l": 25,
-   "measured": false,
    "w": 15
   },
   "switch": {
@@ -262,8 +251,7 @@ window.SPORTCAM_LAYOUT = {
    "cut_h": 13.2,
    "cut_w": 19.2,
    "depth": 24,
-   "max_panel_t": 2.0,
-   "measured": false
+   "max_panel_t": 2.0
   },
   "tag_bank": {
    "bom": 15,
@@ -273,13 +261,11 @@ window.SPORTCAM_LAYOUT = {
    "h": 23,
    "input_on_far_end": true,
    "l": 95,
-   "measured": false,
    "w": 23
   },
   "tripod_insert": {
    "bom": 23,
    "l": 8,
-   "measured": false,
    "od": 12.7
   },
   "ula1": {
@@ -292,7 +278,6 @@ window.SPORTCAM_LAYOUT = {
    "hole_dx": 32,
    "hole_dy": 17,
    "l": 40,
-   "measured": false,
    "plug_overhang": 12,
    "w": 25
   },
@@ -306,8 +291,7 @@ window.SPORTCAM_LAYOUT = {
    "female_w": 14,
    "male_h": 8,
    "male_l": 30,
-   "male_w": 16,
-   "measured": false
+   "male_w": 16
   }
  },
  "pi": {
@@ -422,9 +406,11 @@ window.SPORTCAM_LAYOUT = {
  ],
  "post_r": 63.5,
  "power_top": 26.0,
- "ptz_slot_max": 104,
+ "ptz_lift": 1.0,
+ "ptz_slot_max": 114.19,
  "ptz_slot_min": 70,
- "ptz_z": 128,
+ "ptz_washers": 2,
+ "ptz_z": 121.0,
  "raised": false,
  "ring_z0": 44.0,
  "ring_z1": 47.5,
@@ -441,7 +427,7 @@ window.SPORTCAM_LAYOUT = {
   "panel_t": 2.0,
   "z": 11.5
  },
- "tilt_z": 177,
+ "tilt_z": 159.0,
  "tray_z": -52.4,
  "ula1_radial_room": 77.5,
  "ula1_tangential": false,

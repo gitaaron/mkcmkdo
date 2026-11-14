@@ -61,6 +61,9 @@ PRINT_LIMIT = 170.0        # its 180 mm cube, less 5 mm a side for a brim
 EPS = 1e-6
 PTZ_ENGAGE = 4.0        # M3 thread each PTZ screw needs in its standoff
 PTZ_HEAD_ARM = 45       # camera board's ribbon socket, out from the tilt axis
+SERVO_CLEAR = 2.0       # air kept under the pan servo, above the lid
+PTZ_WASHER_T = 0.5      # an M3 washer (DIN 125, from the screw kit) — stacked under a standoff to lift the base
+PTZ_WASHERS_MAX = 6
 PI_CSI = (45.0, 11.5)   # Pi 4 camera socket, from the microSD end / power edge
 
 # Printed parts and how many separate bodies each STL should contain
@@ -83,6 +86,21 @@ def load_parts(build: str) -> dict:
     with open(PARTS_FILE, "rb") as f:
         raw = tomllib.load(f)
     return {k: v for k, v in raw.items() if build in v.get("builds", BUILDS)}
+
+
+def measure_todos(path: str = PARTS_FILE) -> dict:
+    """{part: [keys]} still marked MEASURE_TODO in ordered_parts.toml (a comment, so read the raw text)."""
+    todo: dict = {}
+    section = None
+    for line in open(path, encoding="utf-8"):
+        m = re.match(r"\s*\[(\w+)\]", line)
+        if m:
+            section = m.group(1)
+            continue
+        key = re.match(r"\s*(\w+)\s*=", line)
+        if section and key and "MEASURE_TODO" in line.partition("#")[2]:
+            todo.setdefault(section, []).append(key.group(1))
+    return todo
 
 
 _ASSIGN = re.compile(r"^\s*([A-Za-z_]\w*)\s*=\s*([^;]+);")
@@ -366,7 +384,13 @@ def solve_at(build, P, C, base_d, raised=False):
     # The Arducam base stands on its four standoffs on the lid; M3 screws come up
     # through radial slots into them. Short screws: counterbore the lid underneath.
     ptz = P["ptz"]
-    grip = ptz["bolt_l"] - C["lid_t"]
+    # the pan servo must clear the lid: if the standoffs are too short, stack M3 washers under them
+    short = ptz["servo_drop"] + SERVO_CLEAR - ptz["standoff_h"]
+    washers = max(0, math.ceil(round(short / PTZ_WASHER_T, 6)))
+    if washers > PTZ_WASHERS_MAX:
+        washers = 0           # more than a few washers is the wrong fix — the audit says so
+    lift = washers * PTZ_WASHER_T
+    grip = ptz["bolt_l"] - C["lid_t"] - lift
     screw_recess = 0.0 if grip >= PTZ_ENGAGE else PTZ_ENGAGE - grip
     below_lid = max(ptz["head_h"] - screw_recess, 0.0)
     diag, bolt_angs = ptz_bolts(ptz)
@@ -667,7 +691,7 @@ def solve_at(build, P, C, base_d, raised=False):
                 "vents_low": vents_low, "vent_low_z": low_vz or 0, "vents_high": vents_high, "vent_high_z": high_vz,
                 "lid_screw_angs": lid_screw_angs, "lid_screw_z": base_h - C["spigot_h"] / 2,
                 "screw_recess": screw_recess, "below_lid": below_lid,
-                "bolt_angs": bolt_angs,
+                "bolt_angs": bolt_angs, "ptz_washers": washers, "ptz_lift": lift,
                 "cable_slot": {"ang": cs_ang, "r": cs_r, "w": cs_w, "d": cs_d},
                 "shifter_on": shifter[0],
                 "boxes": {
@@ -791,7 +815,8 @@ def gen_json(build, P, C, L) -> dict:
     keep["lid_z"] = L["base_h"]
     keep["lid_top"] = L["base_h"] + C["lid_t"]
     # Arducam base: on its standoffs on the lid; the tilt axis is above the bottom disc
-    keep["ptz_z"] = keep["lid_top"] + P["ptz"]["standoff_h"]
+    keep["ptz_washers"] = L["ptz_washers"]
+    keep["ptz_z"] = keep["lid_top"] + L["ptz_lift"] + P["ptz"]["standoff_h"]
     keep["tilt_z"] = keep["ptz_z"] + P["ptz"]["tilt_axis_h"]
     return keep
 
@@ -826,7 +851,7 @@ def device_updates(build, P, L) -> dict:
             "UWB_A3_BACK_M": f"{L['a3_back'] / 1000:.3f}".rstrip("0").rstrip("."),
             "UWB_A3_UP_M": f"{L['a3_up'] / 1000:.3f}",
             # tilt axis above the A1/A2 boards: lid top + the base's standoffs + its tilt-axis height
-            "LENS_ABOVE_ANCHORS_M": f"{(L['base_h'] + L['lid_t'] + P['ptz']['standoff_h'] + P['ptz']['tilt_axis_h'] - L['anchor_z']) / 1000:.3f}",
+            "LENS_ABOVE_ANCHORS_M": f"{(L['base_h'] + L['lid_t'] + L['ptz_lift'] + P['ptz']['standoff_h'] + P['ptz']['tilt_axis_h'] - L['anchor_z']) / 1000:.3f}",
         })
     return out
 
@@ -888,7 +913,8 @@ def stl_info(path):
 
 def inputs_hash(build):
     h = hashlib.sha256()
-    h.update(open(PARTS_FILE, "rb").read())
+    with open(PARTS_FILE, "rb") as f:           # the values, not the text: MEASURE_TODO → MEASURE_DONE re-renders nothing
+        h.update(json.dumps(tomllib.load(f), sort_keys=True).encode())
     cad = os.path.join(ROOT, build, "cad")
     for f in sorted(os.listdir(cad)):
         if f.endswith(".scad") or f == "render_all.sh":
@@ -1054,12 +1080,18 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
             f"standoffs {ptz['horizontal_bolt_spacing']:g} × {ptz['vertical_bolt_spacing']:g} mm, {diag:g} corner to corner, "
             f"at {', '.join(f'{a:g}°' for a in L['bolt_angs'])}; slots take {L['ptz_slot_min']:g}–{L['ptz_slot_max']:g}"
             + ("" if (L["ptz_slot_min"], L["ptz_slot_max"]) == (C["ptz_bolt_min"], C["ptz_bolt_max"]) else " (stretched to fit your base)"), ["ptz"])
-    grip = ptz["bolt_l"] - C["lid_t"] + L["screw_recess"]
+    grip = ptz["bolt_l"] - C["lid_t"] - L["ptz_lift"] + L["screw_recess"]
     A.check(L["screw_recess"] <= C["lid_t"] - 2 and grip <= ptz["standoff_h"] - 2, "The PTZ screws reach into the standoffs",
-            f"M3 × {ptz['bolt_l']} up through the {C['lid_t']} mm lid: {grip:g} mm of thread in each standoff"
+            f"M3 × {ptz['bolt_l']} up through the {C['lid_t']} mm lid"
+            + (f" and {L['ptz_washers']} washers" if L["ptz_washers"] else "") + f": {grip:g} mm of thread in each standoff"
             + (f"; lid counterbored {L['screw_recess']:.1f} mm under each slot" if L["screw_recess"] else ""), ["ptz"])
-    A.check(ptz["servo_drop"] + 2 <= ptz["standoff_h"], "The pan servo under the base clears the lid",
-            f"servo hangs {ptz['servo_drop']} mm below the base, on {ptz['standoff_h']} mm standoffs", ["ptz"])
+    clear = ptz["standoff_h"] + L["ptz_lift"] - ptz["servo_drop"]
+    A.check(clear >= SERVO_CLEAR - EPS, "The pan servo under the base clears the lid",
+            f"servo hangs {ptz['servo_drop']:g} mm below the base, on {ptz['standoff_h']:g} mm standoffs"
+            + (f" lifted on {L['ptz_washers']} M3 washers each ({L['ptz_lift']:g} mm)" if L["ptz_washers"] else "")
+            + f": {clear:.1f} mm above the lid"
+            + ("" if clear >= SERVO_CLEAR - EPS else
+               f"; needs {SERVO_CLEAR:g} — more than {PTZ_WASHERS_MAX} washers would take, so use longer standoffs"), ["ptz"])
     A.check(cs["w"] >= ptz["ribbon_w"] + 2 and cs["d"] >= ptz["lead_bundle_d"] + 1, "The ribbon and leads fit the lid's cable slot",
             f"slot {cs['w']:g}×{cs['d']:g} mm at {cs['ang']:g}° (180° = straight behind the lens); "
             f"ribbon {ptz['ribbon_w']} mm wide, leads Ø{ptz['lead_bundle_d']}", ["ptz"])
@@ -1068,7 +1100,7 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
     pi_ = L["pi"]
     cx, cy = rot((PI_CSI[0] - P["pi"]["l"] / 2, PI_CSI[1] - P["pi"]["w"] / 2), pi_["ang"])
     inside = math.dist((sx, sy, L["base_h"]), (pi_["x"] + cx, pi_["y"] + cy, pi_["z"] + P["pi"]["pcb_t"])) + 15
-    outside = math.hypot(ptz["standoff_h"] + ptz["tilt_axis_h"], cs["r"]) + PTZ_HEAD_ARM + C["ptz_loop"]
+    outside = math.hypot(ptz["standoff_h"] + L["ptz_lift"] + ptz["tilt_axis_h"], cs["r"]) + PTZ_HEAD_ARM + C["ptz_loop"]
     run = outside + C["lid_t"] + inside
     A.check(run <= ptz["ribbon_l"], "The camera ribbon reaches the Pi",
             f"≈ {run:.0f} mm needed ({outside:.0f} outside with a {C['ptz_loop']} mm loop for pan and tilt, "
@@ -1126,9 +1158,10 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
         A.check(max(size) <= PRINT_LIMIT and bodies == want, f"{f} prints in one piece on the {PRINTER}",
                 f"{' × '.join(f'{s:.0f}' for s in size)} mm" + ("" if bodies == want else f"; {bodies} separate bodies, expected {want}"))
 
-    assumed = [f"{v.get('name', k)} (item {v.get('bom', '?')})" for k, v in P.items() if not v.get("measured")]
+    todo = measure_todos()
+    assumed = [f"{v.get('name', k)} (item {v.get('bom', '?')}: {', '.join(todo[k])})" for k, v in P.items() if k in todo]
     if assumed:
-        A.note("Sizes still assumed, not measured", ", ".join(assumed))
+        A.note("Still marked MEASURE_TODO in ordered_parts.toml", "; ".join(assumed))
     if L.get("attempts"):
         A.note("Narrower enclosures tried first", "; ".join(L["attempts"]))
     return A

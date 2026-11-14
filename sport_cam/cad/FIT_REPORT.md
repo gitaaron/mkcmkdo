@@ -23,18 +23,18 @@ Enclosure Ø141 × 83 mm (floor to lid). Power boards on the floor up to z = 26;
 | ✅ | The Pi's holes have plastic round them on the shelf | nearest edge 5.0 mm |
 | ✅ | The Pi's standoffs clear the parts under the board | 6 mm standoffs, 2.5 mm underneath |
 | ✅ | The tripod insert fits the floor boss | insert 8 mm long, boss 8 mm; bore cut to 12.7 mm |
-| ✅ | The Arducam base's standoffs land on the lid slots | standoffs 64 × 64 mm, 90.51 corner to corner, at 45°, 135°, 225°, 315°; slots take 70–104 |
-| ✅ | The PTZ screws reach into the standoffs | M3 × 10 up through the 5 mm lid: 5 mm of thread in each standoff |
-| ✅ | The pan servo under the base clears the lid | servo hangs 30 mm below the base, on 40 mm standoffs |
+| ✅ | The Arducam base's standoffs land on the lid slots | standoffs 76.5 × 76.5 mm, 108.19 corner to corner, at 45°, 135°, 225°, 315°; slots take 70–114.19 (stretched to fit your base) |
+| ✅ | The PTZ screws reach into the standoffs | M3 × 12 up through the 5 mm lid and 2 washers: 6 mm of thread in each standoff |
+| ✅ | The pan servo under the base clears the lid | servo hangs 30.8 mm below the base, on 32 mm standoffs lifted on 2 M3 washers each (1 mm): 2.2 mm above the lid |
 | ✅ | The ribbon and leads fit the lid's cable slot | slot 28×9 mm at 180° (180° = straight behind the lens); ribbon 16 mm wide, leads Ø8 |
-| ✅ | The camera ribbon reaches the Pi | ≈ 283 mm needed (211 outside with a 60 mm loop for pan and tilt, 66 inside); ribbon 500 mm |
+| ✅ | The camera ribbon reaches the Pi | ≈ 268 mm needed (197 outside with a 60 mm loop for pan and tilt, 66 inside); ribbon 500 mm |
 | ✅ | The battery tray (sized to the bank) prints in one piece | tray 155 × 77 mm |
 | ✅ | The anchor boards' USB plugs have room for the extension cables | 78 mm between plug and arm root |
 | ✅ | The anchor USB cables have a way into the enclosure, and room to plug into the Pi | slot 18×10 mm at 295°, z = 70, behind the Pi's USB ports; 30 mm kept clear beyond them for the plugs |
 | ✅ | The ULA1 hole pattern is inside the board | 32×17 on 40×25 |
 | ✅ | The mast dowel can be cut from the stock length | cut to 246 mm from 914 mm |
 | ✅ | The wearable pod holds the tag plugged straight into its bank | tag in line with the bank: pod 142 × 31 mm (limit 150) |
-| ✅ | Device config matches the geometry | LED_COUNT = 16, UWB_BASELINE_M = 0.4, UWB_A3_BACK_M = 0.089, UWB_A3_UP_M = 0.250, LENS_ABOVE_ANCHORS_M = 0.155 |
+| ✅ | Device config matches the geometry | LED_COUNT = 16, UWB_BASELINE_M = 0.4, UWB_A3_BACK_M = 0.089, UWB_A3_UP_M = 0.250, LENS_ABOVE_ANCHORS_M = 0.137 |
 | ✅ | STLs are rendered from the current CAD and part sizes |  |
 | ✅ | anchor_arm.stl prints in one piece on the Bambu Lab A1 Mini | 142 × 28 × 24 mm |
 | ✅ | base_housing.stl prints in one piece on the Bambu Lab A1 Mini | 147 × 149 × 83 mm |
@@ -45,16 +45,16 @@ Enclosure Ø141 × 83 mm (floor to lid). Power boards on the floor up to z = 26;
 | ✅ | mast_foot.stl prints in one piece on the Bambu Lab A1 Mini | 21 × 25 × 44 mm |
 | ✅ | shelf.stl prints in one piece on the Bambu Lab A1 Mini | 117 × 132 × 3 mm |
 | ✅ | wearable_case.stl prints in one piece on the Bambu Lab A1 Mini | 142 × 74 × 31 mm |
-| ℹ️ | Sizes still assumed, not measured | Raspberry Pi 4 Model B (item 2), 74AHCT125 level shifter on a scrap of perfboard (item 8), USB-C PD trigger board, 12 V (item 10), 12 V → 5 V 8 A adjustable buck (item 11), INA260 breakout (battery gauge) (item 12), Power latch (P-MOSFET and two transistors on a scrap of perfboard) (item 13a), Panel-mount rocker switch, 10 A (item 13), Panel-mount barrel jack (5 V service tap) (item 18), USB-C PD power bank, 25 000 mAh (item 9), WS2812B 16-LED ring (item 7), Arducam IMX477 PTZ camera, metal pan-tilt base (item 1), 3/8-16 brass insert (item 23), Haorutech ULA1 UWB module (item 6), USB-A male-to-female extension (item 20), ½-inch hardwood dowel (item 27a), Slim USB power bank for the wearable (item 15) |
+| ℹ️ | Still marked MEASURE_TODO in ordered_parts.toml | Raspberry Pi 4 Model B (item 2: heatsink_h); USB-C PD trigger board, 12 V (item 10: l, w, h, port_h, plug_w, plug_h); 12 V → 5 V 8 A adjustable buck (item 11: l, w, h); INA260 breakout (battery gauge) (item 12: l, w, h); Power latch (P-MOSFET and two transistors on a scrap of perfboard) (item 13a: l, w, h); Panel-mount rocker switch, 10 A (item 13: cut_w, cut_h, body_w, body_h, depth, max_panel_t); Panel-mount barrel jack (5 V service tap) (item 18: hole_d, body_d, depth, max_panel_t); USB-C PD power bank, 25 000 mAh (item 9: l, w, h); 3/8-16 brass insert (item 23: od, l); Haorutech ULA1 UWB module (item 6: l, w, h, hole_dx, hole_dy, plug_overhang, antenna_from_end); USB-A male-to-female extension (item 20: female_l, female_w, female_h, male_l, male_w, male_h); ½-inch hardwood dowel (item 27a: d); Slim USB power bank for the wearable (item 15: l, w, h, input_on_far_end) |
 | ℹ️ | Narrower enclosures tried first | Ø135: the Pi (85×56 plus its plug) doesn't fit on a Ø128 shelf; Ø135 on risers: the Pi (85×56 plus its plug) doesn't fit on a Ø128 shelf; Ø137: the Pi (85×56 plus its plug) doesn't fit on a Ø130 shelf; Ø137 on risers: the Pi (85×56 plus its plug) doesn't fit on a Ø130 shelf; Ø139: the Pi (85×56 plus its plug) doesn't fit on a Ø132 shelf; Ø139 on risers: the Pi (85×56 plus its plug) doesn't fit on a Ø132 shelf |
 
 ## without uwb — ✅ everything fits
 
-Enclosure Ø135 × 67 mm (floor to lid). Power boards on the floor up to z = 26; LED window 27–39; shelf at 39; Pi on 4 standoffs at z = 48, turned 90°.
+Enclosure Ø137 × 67 mm (floor to lid). Power boards on the floor up to z = 26; LED window 27–39; shelf at 39; Pi on 4 standoffs at z = 48, turned 60°.
 
 | | Check | Detail |
 | --- | --- | --- |
-| ✅ | Every bought part is inside the enclosure wall | inner radius 64.5 mm; furthest part at r = 62.9 mm |
+| ✅ | Every bought part is inside the enclosure wall | inner radius 65.5 mm; furthest part at r = 64.5 mm |
 | ✅ | Everything is below the lid | lid underside at z = 67 mm |
 | ✅ | No two parts overlap, and none hits a post, the boss, the shelf or the lid | 35 envelopes checked pairwise |
 | ✅ | The power boards sit below the LED window | tallest at z = 26.0; window 27.0–39.0 |
@@ -63,23 +63,24 @@ Enclosure Ø135 × 67 mm (floor to lid). Power boards on the floor up to z = 26;
 | ✅ | The rocker switch's clips can grip the wall | wall 3 mm, thinned to 2.0 mm round the cut-out (clips take ≤ 2.0) |
 | ✅ | The barrel jack's nut reaches through the wall | wall 3 mm, jack takes ≤ 4.0 |
 | ✅ | The bank's USB-C plug fits through its wall opening | opening 13.5×8 mm for a 12.5×7 plug |
-| ✅ | The wall above the LED window prints without support | 17 ribs; longest bridge 22 mm (limit 22) |
-| ✅ | Three posts hold the shelf level (its centre is inside them) | posts at 70°, 165°, 270°; widest gap 160° |
-| ✅ | No post is under the shelf's cable gap | gap 34 mm deep at 360° |
+| ✅ | The wall above the LED window prints without support | 18 ribs; longest bridge 21 mm (limit 22) |
+| ✅ | Three posts hold the shelf level (its centre is inside them) | posts at 40°, 135°, 240°; widest gap 160° |
+| ✅ | No post is under the shelf's cable gap | gap 35 mm deep at 330° |
 | ✅ | The Pi's holes have plastic round them on the shelf | nearest edge 5.0 mm |
 | ✅ | The Pi's standoffs clear the parts under the board | 6 mm standoffs, 2.5 mm underneath |
 | ✅ | The tripod insert fits the floor boss | insert 8 mm long, boss 8 mm; bore cut to 12.7 mm |
-| ✅ | The Arducam base's standoffs land on the lid slots | standoffs 64 × 64 mm, 90.51 corner to corner, at 45°, 135°, 225°, 315°; slots take 70–104 |
-| ✅ | The PTZ screws reach into the standoffs | M3 × 10 up through the 5 mm lid: 5 mm of thread in each standoff |
-| ✅ | The pan servo under the base clears the lid | servo hangs 30 mm below the base, on 40 mm standoffs |
+| ✅ | The Arducam base's standoffs land on the lid slots | standoffs 76.5 × 76.5 mm, 108.19 corner to corner, at 45°, 135°, 225°, 315°; slots take 70–114.19 (stretched to fit your base) |
+| ✅ | The PTZ screws reach into the standoffs | M3 × 12 up through the 5 mm lid and 2 washers: 6 mm of thread in each standoff |
+| ✅ | The pan servo under the base clears the lid | servo hangs 30.8 mm below the base, on 32 mm standoffs lifted on 2 M3 washers each (1 mm): 2.2 mm above the lid |
 | ✅ | The ribbon and leads fit the lid's cable slot | slot 28×9 mm at 180° (180° = straight behind the lens); ribbon 16 mm wide, leads Ø8 |
-| ✅ | The camera ribbon reaches the Pi | ≈ 304 mm needed (210 outside with a 60 mm loop for pan and tilt, 89 inside); ribbon 500 mm |
+| ✅ | The camera ribbon reaches the Pi | ≈ 290 mm needed (196 outside with a 60 mm loop for pan and tilt, 89 inside); ribbon 500 mm |
 | ✅ | The battery tray (sized to the bank) prints in one piece | tray 155 × 77 mm |
 | ✅ | Device config matches the geometry | LED_COUNT = 16 |
 | ✅ | STLs are rendered from the current CAD and part sizes |  |
-| ✅ | base_housing.stl prints in one piece on the Bambu Lab A1 Mini | 139 × 139 × 67 mm |
+| ✅ | base_housing.stl prints in one piece on the Bambu Lab A1 Mini | 141 × 141 × 67 mm |
 | ✅ | battery_tray.stl prints in one piece on the Bambu Lab A1 Mini | 155 × 77 × 12 mm |
-| ✅ | led_diffuser_ring.stl prints in one piece on the Bambu Lab A1 Mini | 139 × 139 × 16 mm |
-| ✅ | lid.stl prints in one piece on the Bambu Lab A1 Mini | 135 × 135 × 11 mm |
-| ✅ | shelf.stl prints in one piece on the Bambu Lab A1 Mini | 93 × 128 × 3 mm |
-| ℹ️ | Sizes still assumed, not measured | Raspberry Pi 4 Model B (item 2), 74AHCT125 level shifter on a scrap of perfboard (item 8), USB-C PD trigger board, 12 V (item 10), 12 V → 5 V 8 A adjustable buck (item 11), INA260 breakout (battery gauge) (item 12), Power latch (P-MOSFET and two transistors on a scrap of perfboard) (item 13a), Panel-mount rocker switch, 10 A (item 13), Panel-mount barrel jack (5 V service tap) (item 18), USB-C PD power bank, 25 000 mAh (item 9), WS2812B 16-LED ring (item 7), Arducam IMX477 PTZ camera, metal pan-tilt base (item 1), 3/8-16 brass insert (item 23) |
+| ✅ | led_diffuser_ring.stl prints in one piece on the Bambu Lab A1 Mini | 141 × 141 × 16 mm |
+| ✅ | lid.stl prints in one piece on the Bambu Lab A1 Mini | 137 × 137 × 11 mm |
+| ✅ | shelf.stl prints in one piece on the Bambu Lab A1 Mini | 119 × 129 × 3 mm |
+| ℹ️ | Still marked MEASURE_TODO in ordered_parts.toml | Raspberry Pi 4 Model B (item 2: heatsink_h); USB-C PD trigger board, 12 V (item 10: l, w, h, port_h, plug_w, plug_h); 12 V → 5 V 8 A adjustable buck (item 11: l, w, h); INA260 breakout (battery gauge) (item 12: l, w, h); Power latch (P-MOSFET and two transistors on a scrap of perfboard) (item 13a: l, w, h); Panel-mount rocker switch, 10 A (item 13: cut_w, cut_h, body_w, body_h, depth, max_panel_t); Panel-mount barrel jack (5 V service tap) (item 18: hole_d, body_d, depth, max_panel_t); USB-C PD power bank, 25 000 mAh (item 9: l, w, h); 3/8-16 brass insert (item 23: od, l) |
+| ℹ️ | Narrower enclosures tried first | Ø135: the Arducam base's standoffs (108.19 mm apart corner to corner) land on the lid's locating ring; Ø135 on risers: the Arducam base's standoffs (108.19 mm apart corner to corner) land on the lid's locating ring |

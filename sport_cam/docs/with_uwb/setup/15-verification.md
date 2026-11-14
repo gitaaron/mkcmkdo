@@ -11,8 +11,8 @@ lists four errors these checks catch.
 ## Before you print
 
 Nine measurements that change the CAD. Procedure: measure the part, enter the
-value in [`cad/ordered_parts.toml`](../../../cad/ordered_parts.toml) with
-`measured = true`, run `python3 cad/fit.py` from `sport_cam/` (re-solves the
+value in [`cad/ordered_parts.toml`](../../../cad/ordered_parts.toml), change
+its `MEASURE_TODO` to `MEASURE_DONE`, run `python3 cad/fit.py` from `sport_cam/` (re-solves the
 layout, re-renders, audits fit).
 [`cad/FIT_REPORT.md`](../../../cad/FIT_REPORT.md) lists the checks and any sizes
 still assumed. Each row's drawing shows the part with every dimension labelled by

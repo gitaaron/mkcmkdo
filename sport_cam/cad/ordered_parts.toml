@@ -2,11 +2,15 @@
 #
 # The CAD, the layout and the fit audit are all built from these numbers.
 # Most are typical figures for the part in the bill of materials, NOT
-# measurements of yours. When a part arrives:
+# measurements of yours. The ones you need to measure are marked MEASURE_TODO
+# (the rest are fixed by the part's spec, or too small an error to matter).
+# When a part arrives:
 #
-#   1. measure it with calipers and edit its entry below,
-#   2. set  measured = true  on it,
+#   1. measure each marked value with calipers and enter it,
+#   2. change its MEASURE_TODO to MEASURE_DONE,
 #   3. run  python3 cad/fit.py  from sport_cam/.
+#
+# fit.py and cad/printer.py list every part that still has a MEASURE_TODO.
 #
 # fit.py re-solves the layout for both builds (where each board sits, which
 # way the Pi faces, how tall the enclosure is, …), regenerates the CAD,
@@ -26,14 +30,13 @@
 [pi]
 name = "Raspberry Pi 4 Model B"
 bom = 2
-measured = false
 l = 85                # board; x runs from the microSD end (0) to the USB/Ethernet end
 w = 56                # y runs from the power/HDMI edge (0) to the GPIO edge
 pcb_t = 1.6
 holes = [[3.5, 3.5], [61.5, 3.5], [3.5, 52.5], [61.5, 52.5]]   # M2.5, from the microSD end / power edge
 hole_d = 2.7
 under_h = 2.5         # solder joints and the microSD socket under the board
-heatsink_h = 10       # stick-on heatsinks (item 3); a fan case is taller — enter its height
+heatsink_h = 10       # MEASURE_TODO  stick-on heatsinks (item 3); a fan case is taller — enter its height
 port_block_l = 24     # USB + Ethernet jacks, measured in from the USB end
 port_h = 16           # their height above the board
 port_overhang = 3     # how far they stick out past the board edge
@@ -50,7 +53,6 @@ standoff_h = 6        # M2.5 nylon standoffs it sits on (item 21)
 [shifter]
 name = "74AHCT125 level shifter on a scrap of perfboard"
 bom = 8
-measured = false
 l = 25
 w = 15
 h = 8
@@ -60,72 +62,64 @@ h = 8
 [pd_trigger]
 name = "USB-C PD trigger board, 12 V"
 bom = 10
-measured = false
-l = 33                # the USB-C socket is at one short end
-w = 14
-h = 6
-port_h = 3.3          # the socket's height, sitting on top of the board at that end
-plug_w = 12.5         # the bank cable's USB-C plug overmould — the wall opening is cut to this
-plug_h = 7
+l = 33                # MEASURE_TODO  the USB-C socket is at one short end
+w = 14                # MEASURE_TODO
+h = 6                 # MEASURE_TODO
+port_h = 3.3          # MEASURE_TODO  the socket's height, sitting on top of the board at that end
+plug_w = 12.5         # MEASURE_TODO  the bank cable's USB-C plug overmould — the wall opening is cut to this
+plug_h = 7            # MEASURE_TODO
 
 [buck]
 name = "12 V → 5 V 8 A adjustable buck"
 bom = 11
-measured = false
-l = 60
-w = 40
-h = 22                # including the inductor / heatsink
+l = 60                # MEASURE_TODO
+w = 40                # MEASURE_TODO
+h = 22                # MEASURE_TODO  including the inductor / heatsink
 
 [gauge]
 name = "INA260 breakout (battery gauge)"
 bom = 12
-measured = false
-l = 22.9
-w = 22.9
-h = 12                # including the screw terminal
+l = 22.9              # MEASURE_TODO
+w = 22.9              # MEASURE_TODO
+h = 12                # MEASURE_TODO  including the screw terminal
 
 [latch]
 name = "Power latch (P-MOSFET and two transistors on a scrap of perfboard)"
 bom = "13a"
-measured = false
-l = 30
-w = 24
-h = 10                # the IRF4905 is bent over flat on the board, not standing up
+l = 30                # MEASURE_TODO
+w = 24                # MEASURE_TODO
+h = 10                # MEASURE_TODO  the IRF4905 is bent over flat on the board, not standing up
 
 [switch]
 name = "Panel-mount rocker switch, 10 A"
 bom = 13
-measured = false
-cut_w = 19.2          # panel cut-out
-cut_h = 13.2
-body_w = 21           # flange / body behind the panel
-body_h = 15
-depth = 24            # body plus terminals behind the panel
-max_panel_t = 2.0     # thickest panel its snap-in clips grip; the wall is thinned round the cut-out if needed
+cut_w = 19.2          # MEASURE_TODO  panel cut-out
+cut_h = 13.2          # MEASURE_TODO
+body_w = 21           # MEASURE_TODO  flange / body behind the panel
+body_h = 15           # MEASURE_TODO
+depth = 24            # MEASURE_TODO  body plus terminals behind the panel
+max_panel_t = 2.0     # MEASURE_TODO  thickest panel its snap-in clips grip; the wall is thinned round the cut-out if needed
 
 [jack]
 name = "Panel-mount barrel jack (5 V service tap)"
 bom = 18
-measured = false
-hole_d = 8.2
-body_d = 11           # nut / body behind the panel
-depth = 16
-max_panel_t = 4.0
+hole_d = 8.2          # MEASURE_TODO
+body_d = 11           # MEASURE_TODO  nut / body behind the panel
+depth = 16            # MEASURE_TODO
+max_panel_t = 4.0     # MEASURE_TODO
 
 [power_bank]
 name = "USB-C PD power bank, 25 000 mAh"
 bom = 9
-measured = false
-l = 150
-w = 72
-h = 30
+l = 150               # MEASURE_TODO
+w = 72                # MEASURE_TODO
+h = 30                # MEASURE_TODO
 
 # ---- status light --------------------------------------------------------
 
 [led_ring]
 name = "WS2812B 16-LED ring"
 bom = 7
-measured = false
 od = 44.5
 id = 31.75
 h = 3.5               # board plus LEDs
@@ -136,35 +130,33 @@ count = 16
 [ptz]
 name = "Arducam IMX477 PTZ camera, metal pan-tilt base"
 bom = 1
-measured = false
 # The base is a round turntable standing on four brass standoffs, with the pan
 # servo hanging underneath between them. It stays on those standoffs: M3 screws
 # come up through the lid's slots into them. Every cable leaves from the camera
 # head at the top (not through the base), so the lid has a cable slot at the back.
 # The four standoffs make a rectangle, lined up with the lens. Look down on the base
 # with the lens pointing straight ahead at mid-pan and measure centre to centre:
-horizontal_bolt_spacing = 64   # side to side — the two standoffs left and right of each other — MEASURE
-vertical_bolt_spacing = 64     # front to back — the two standoffs one behind the other — MEASURE
-                               # (corner to corner, the lid slots take 70–104)
-base_d = 100          # the turntable's bottom disc, across
-standoff_h = 40       # the brass standoffs under it; their bottom ends take an M3 screw (try one before printing)
-servo_drop = 30       # how far the pan servo hangs below the bottom disc
-tilt_axis_h = 49      # underside of the bottom disc up to the tilt axis
-bolt_l = 10           # the M3 screws you fix it with, up through the lid into the standoffs
-head_d = 5.6          # their heads (pan or cap head)
-head_h = 2.4
-ribbon_w = 16         # the camera ribbon (15-pin FFC)
-ribbon_l = 500        # its length, end to end — it has to reach from the camera board, over the base, to the Pi
-lead_bundle_d = 8     # the I2C/5 V lead (and the servo leads, if the Pi drives them), bunched
+horizontal_bolt_spacing = 76.5   # MEASURE_DONE  side to side — the two standoffs left and right of each other
+vertical_bolt_spacing = 76.5     # MEASURE_DONE  front to back — the two standoffs one behind the other
+                                 # (corner to corner, the lid slots take 70–104)
+base_d = 120          # MEASURE_DONE  the turntable's bottom disc, across
+standoff_h = 32       # MEASURE_DONE  the brass standoffs under it; their bottom ends take an M3 screw (try one before printing)
+servo_drop = 30.8       # MEASURE_DONE  how far the pan servo hangs below the bottom disc
+tilt_axis_h = 38      # MEASURE_DONE  underside of the bottom disc up to the tilt axis
+bolt_l = 12           # MEASURE_DONE  the M3 screws you fix it with, up through the lid into the standoffs
+head_d = 5.3          # MEASURE_DONE  their heads (pan or cap head)
+head_h = 3.1          # MEASURE_DONE
+ribbon_w = 16         # MEASURE_DONE  the camera ribbon (15-pin FFC)
+ribbon_l = 500        # MEASURE_DONE  its length, end to end — it has to reach from the camera board, over the base, to the Pi
+lead_bundle_d = 8     # MEASURE_DONE  the I2C/5 V lead (and the servo leads, if the Pi drives them), bunched
 
 # ---- tripod --------------------------------------------------------------
 
 [tripod_insert]
 name = "3/8-16 brass insert"
 bom = 23
-measured = false
-od = 12.7             # the floor boss bore is cut to this — epoxied, so a snug slip fit
-l = 8
+od = 12.7             # MEASURE_TODO  the floor boss bore is cut to this — epoxied, so a snug slip fit
+l = 8                 # MEASURE_TODO
 
 # ---- with UWB only -------------------------------------------------------
 
@@ -172,41 +164,37 @@ l = 8
 name = "Haorutech ULA1 UWB module"
 bom = 6
 builds = ["with_uwb"]
-measured = false
-l = 40
-w = 25
-h = 8
-hole_dx = 32          # corner holes along l
-hole_dy = 17          # and along w
-plug_overhang = 12    # USB-A plug past the board end
-antenna_from_end = 10 # antenna centre from the far (non-USB) end
+l = 40                # MEASURE_TODO
+w = 25                # MEASURE_TODO
+h = 8                 # MEASURE_TODO
+hole_dx = 32          # MEASURE_TODO  corner holes along l
+hole_dy = 17          # MEASURE_TODO  and along w
+plug_overhang = 12    # MEASURE_TODO  USB-A plug past the board end
+antenna_from_end = 10 # MEASURE_TODO  antenna centre from the far (non-USB) end
 
 [usb_extension]
 name = "USB-A male-to-female extension"
 bom = 20
 builds = ["with_uwb"]
-measured = false
-female_l = 40         # rigid female end, strain relief included
-female_w = 14
-female_h = 8
-male_l = 30           # male plug in a Pi USB port: overmould and cable bend beyond the port face
-male_w = 16           # the wall slot the three cables come in through is cut to pass this
-male_h = 8
+female_l = 40         # MEASURE_TODO  rigid female end, strain relief included
+female_w = 14         # MEASURE_TODO
+female_h = 8          # MEASURE_TODO
+male_l = 30           # MEASURE_TODO  male plug in a Pi USB port: overmould and cable bend beyond the port face
+male_w = 16           # MEASURE_TODO  the wall slot the three cables come in through is cut to pass this
+male_h = 8            # MEASURE_TODO
 
 [dowel]
 name = "½-inch hardwood dowel"
 bom = "27a"
 builds = ["with_uwb"]
-measured = false
-d = 12.7
+d = 12.7              # MEASURE_TODO
 stock_l = 914         # 36 in as bought
 
 [tag_bank]
 name = "Slim USB power bank for the wearable"
 bom = 15
 builds = ["with_uwb"]
-measured = false
-l = 95
-w = 23
-h = 23
-input_on_far_end = true   # charging socket at the opposite end to the USB-A output
+l = 95                # MEASURE_TODO
+w = 23                # MEASURE_TODO
+h = 23                # MEASURE_TODO
+input_on_far_end = true   # MEASURE_TODO  charging socket at the opposite end to the USB-A output

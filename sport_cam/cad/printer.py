@@ -14,7 +14,7 @@ What it does, in order:
 
   1. Checks the STLs are rendered from the current CAD and part sizes (the
      same stamp cad/fit.py writes), and warns if the part depends on sizes
-     still marked `measured = false` in cad/ordered_parts.toml.
+     still marked MEASURE_TODO in cad/ordered_parts.toml.
   2. Slices the part with Bambu Studio's command line, using its own A1 mini,
      0.20 mm and PETG profiles plus the part's settings from
      docs/setup/11-3d-printing.md (walls, infill, top/bottom layers, brim,
@@ -182,13 +182,17 @@ def check_fresh(build):
 
 
 def unmeasured(build, parts):
+    """Parts this job is shaped by that still have a MEASURE_TODO in ordered_parts.toml."""
+    sys.path.insert(0, HERE)
+    import fit  # noqa: E402
     with open(os.path.join(HERE, "ordered_parts.toml"), "rb") as f:
         P = tomllib.load(f)
+    todo = fit.measure_todos()
     names = []
     for part in parts:
         for k in PARTS[part]["sizes"]:
             e = P.get(k)
-            if e and not e.get("measured") and build in e.get("builds", BUILDS) and e["name"] not in names:
+            if e and k in todo and build in e.get("builds", BUILDS) and e["name"] not in names:
                 names.append(e["name"])
     return names
 
@@ -728,7 +732,7 @@ def main():
     if info["plates"] > 1:
         print(f"  note: {info['plates']} plates in the file; printing {info['plate']}")
     if warn:
-        print("  sizes still assumed, not measured (docs/*/setup/15-verification.md, 'Before you print'):\n    "
+        print("  sizes still marked MEASURE_TODO in cad/ordered_parts.toml (docs/*/setup/15-verification.md, 'Before you print'):\n    "
               + "\n    ".join(warn))
     if a.slice_only:
         return
