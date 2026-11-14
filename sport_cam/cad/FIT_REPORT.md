@@ -23,7 +23,7 @@ Enclosure Ø141 × 83 mm (floor to lid). Power boards on the floor up to z = 26;
 | ✅ | The Pi's holes have plastic round them on the shelf | nearest edge 5.0 mm |
 | ✅ | The Pi's standoffs clear the parts under the board | 6 mm standoffs, 2.5 mm underneath |
 | ✅ | The tripod insert fits the floor boss | insert 8 mm long, boss 8 mm; bore cut to 12.7 mm |
-| ✅ | The Arducam base's standoffs land on the lid slots | standoffs 90 mm apart; slots take 70–104 |
+| ✅ | The Arducam base's standoffs land on the lid slots | standoffs 64 × 64 mm, 90.51 corner to corner, at 45°, 135°, 225°, 315°; slots take 70–104 |
 | ✅ | The PTZ screws reach into the standoffs | M3 × 10 up through the 5 mm lid: 5 mm of thread in each standoff |
 | ✅ | The pan servo under the base clears the lid | servo hangs 30 mm below the base, on 40 mm standoffs |
 | ✅ | The ribbon and leads fit the lid's cable slot | slot 28×9 mm at 180° (180° = straight behind the lens); ribbon 16 mm wide, leads Ø8 |
@@ -69,7 +69,7 @@ Enclosure Ø135 × 67 mm (floor to lid). Power boards on the floor up to z = 26;
 | ✅ | The Pi's holes have plastic round them on the shelf | nearest edge 5.0 mm |
 | ✅ | The Pi's standoffs clear the parts under the board | 6 mm standoffs, 2.5 mm underneath |
 | ✅ | The tripod insert fits the floor boss | insert 8 mm long, boss 8 mm; bore cut to 12.7 mm |
-| ✅ | The Arducam base's standoffs land on the lid slots | standoffs 90 mm apart; slots take 70–104 |
+| ✅ | The Arducam base's standoffs land on the lid slots | standoffs 64 × 64 mm, 90.51 corner to corner, at 45°, 135°, 225°, 315°; slots take 70–104 |
 | ✅ | The PTZ screws reach into the standoffs | M3 × 10 up through the 5 mm lid: 5 mm of thread in each standoff |
 | ✅ | The pan servo under the base clears the lid | servo hangs 30 mm below the base, on 40 mm standoffs |
 | ✅ | The ribbon and leads fit the lid's cable slot | slot 28×9 mm at 180° (180° = straight behind the lens); ribbon 16 mm wide, leads Ø8 |

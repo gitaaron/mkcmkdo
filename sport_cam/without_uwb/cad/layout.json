@@ -4,10 +4,10 @@
  "base_h": 67,
  "below_lid": 2.4,
  "bolt_angs": [
-  45,
-  135,
-  225,
-  315
+  45.0,
+  135.0,
+  225.0,
+  315.0
  ],
  "boxes": {
   "buck": {
@@ -214,19 +214,19 @@
   },
   "ptz": {
    "base_d": 100,
-   "bolt_ang": 45,
    "bolt_l": 10,
-   "bolt_spacing": 90,
    "bom": 1,
    "head_d": 5.6,
    "head_h": 2.4,
+   "horizontal_bolt_spacing": 64,
    "lead_bundle_d": 8,
    "measured": false,
    "ribbon_l": 500,
    "ribbon_w": 16,
    "servo_drop": 30,
    "standoff_h": 40,
-   "tilt_axis_h": 49
+   "tilt_axis_h": 49,
+   "vertical_bolt_spacing": 64
   },
   "shifter": {
    "bom": 8,

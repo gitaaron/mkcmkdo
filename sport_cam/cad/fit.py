@@ -204,6 +204,16 @@ def polar(r, deg):
     return r * math.cos(a), r * math.sin(a)
 
 
+def ptz_bolts(ptz):
+    """The Arducam base's standoffs from its two spacings: (corner-to-corner spacing, angles).
+
+    They make a rectangle lined up with the lens: 0° is straight ahead at mid-pan,
+    horizontal is side to side, vertical front to back."""
+    h, v = ptz["horizontal_bolt_spacing"], ptz["vertical_bolt_spacing"]
+    a = math.degrees(math.atan2(h, v))
+    return round(math.hypot(h, v), 2), [round(x % 360, 2) for x in (a, 180 - a, 180 + a, -a)]
+
+
 def angdiff(a, b):
     return abs((a - b + 180) % 360 - 180)
 
@@ -359,15 +369,15 @@ def solve_at(build, P, C, base_d, raised=False):
     grip = ptz["bolt_l"] - C["lid_t"]
     screw_recess = 0.0 if grip >= PTZ_ENGAGE else PTZ_ENGAGE - grip
     below_lid = max(ptz["head_h"] - screw_recess, 0.0)
-    r_bolt = ptz["bolt_spacing"] / 2
-    bolt_angs = [(ptz["bolt_ang"] + k * 90) % 360 for k in range(4)]
+    diag, bolt_angs = ptz_bolts(ptz)
+    r_bolt = diag / 2
     # the lid's slots cover the configured range, stretched to your base if needed
-    slot_min = min(C["ptz_bolt_min"], ptz["bolt_spacing"] - 6)
-    slot_max = max(C["ptz_bolt_max"], ptz["bolt_spacing"] + 6)
+    slot_min = min(C["ptz_bolt_min"], diag - 6)
+    slot_max = max(C["ptz_bolt_max"], diag + 6)
     head_r = ptz["head_d"] / 2 + 0.5
     spig_in = R_in - C["clr"] - C["spigot_w"]
     if slot_max / 2 + head_r + 1 > spig_in - 1:
-        raise NoFit(f"the Arducam base's standoffs ({ptz['bolt_spacing']} mm apart) land on the lid's locating ring")
+        raise NoFit(f"the Arducam base's standoffs ({diag:g} mm apart corner to corner) land on the lid's locating ring")
     lid_screw_angs = [45, 135, 225, 315]
     # Cable slot: the ribbon and leads come off the camera head, over the turntable,
     # and in through the lid at the back — as near straight behind the lens (180°)
@@ -926,7 +936,7 @@ def scene(build, P, C, L):
     base_h = L["base_h"]
     printed += [Box("lid spigot pad", *polar(R_in - C["clr"] - C["lid_screw_pad"] / 2, a), C["lid_screw_pad"], 10, a,
                     base_h - C["spigot_h"], base_h) for a in L["lid_screw_angs"]]
-    r_b = P["ptz"]["bolt_spacing"] / 2
+    r_b = ptz_bolts(P["ptz"])[0] / 2
     head_r = P["ptz"]["head_d"] / 2 + 0.5
     printed += [Cyl("PTZ screw head", *polar(r_b, a), head_r, base_h - L["below_lid"], base_h) for a in L["bolt_angs"]]
     cs = L["cable_slot"]
@@ -1039,8 +1049,10 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
     # 7. camera mount
     ptz = P["ptz"]
     cs = L["cable_slot"]
-    A.check(L["ptz_slot_min"] <= ptz["bolt_spacing"] <= L["ptz_slot_max"], "The Arducam base's standoffs land on the lid slots",
-            f"standoffs {ptz['bolt_spacing']} mm apart; slots take {L['ptz_slot_min']:g}–{L['ptz_slot_max']:g}"
+    diag = ptz_bolts(ptz)[0]
+    A.check(L["ptz_slot_min"] <= diag <= L["ptz_slot_max"], "The Arducam base's standoffs land on the lid slots",
+            f"standoffs {ptz['horizontal_bolt_spacing']:g} × {ptz['vertical_bolt_spacing']:g} mm, {diag:g} corner to corner, "
+            f"at {', '.join(f'{a:g}°' for a in L['bolt_angs'])}; slots take {L['ptz_slot_min']:g}–{L['ptz_slot_max']:g}"
             + ("" if (L["ptz_slot_min"], L["ptz_slot_max"]) == (C["ptz_bolt_min"], C["ptz_bolt_max"]) else " (stretched to fit your base)"), ["ptz"])
     grip = ptz["bolt_l"] - C["lid_t"] + L["screw_recess"]
     A.check(L["screw_recess"] <= C["lid_t"] - 2 and grip <= ptz["standoff_h"] - 2, "The PTZ screws reach into the standoffs",

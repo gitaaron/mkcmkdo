@@ -276,14 +276,14 @@ def save(fig, name, builds=("with_uwb", "without_uwb")):
 
 def ptz():
     p = P["ptz"]
-    bs, D, sh, sd, ta = p["bolt_spacing"], p["base_d"], p["standoff_h"], p["servo_drop"], p["tilt_axis_h"]
+    hs, vs, D, sh, sd, ta = p["horizontal_bolt_spacing"], p["vertical_bolt_spacing"], p["base_d"], p["standoff_h"], p["servo_drop"], p["tilt_axis_h"]
     fig, (ax, ax2, ax3) = figure(
         "1 · Arducam pan-tilt base", "[ptz]",
-        ["bolt_spacing — centre to centre of two OPPOSITE standoffs (across the middle, not two neighbours). Measure "
-         "over the outsides of the two standoffs and subtract one standoff's width. If you can only reach two "
-         "neighbours (centre to centre, s), enter s × 1.414.",
-         "bolt_ang — look down on the base with the lens pointing straight ahead at mid-pan: 0 if a standoff is "
-         "directly under the lens, 45 if the standoffs are on the diagonals, or the angle in between.",
+        ["Look down on the base with the lens pointing straight ahead at mid-pan. The four standoffs make a "
+         "rectangle. horizontal_bolt_spacing — side to side, between the two standoffs left and right of each other. "
+         "vertical_bolt_spacing — front to back, between the two standoffs one behind the other.",
+         "Both are centre to centre: measure over the outsides of the two standoffs and subtract one standoff's "
+         "width. A square base has the two equal.",
          "base_d — across the bottom disc.   standoff_h — the brass standoffs, disc to foot.   servo_drop — from the "
          "underside of the bottom disc to the lowest point of the pan servo.   tilt_axis_h — from the underside of "
          "the bottom disc up to the centre of the tilt pivot.",
@@ -297,7 +297,7 @@ def ptz():
         a_.axis("off")
 
     # ---- side view ---------------------------------------------------------
-    r = bs / 2 * 0.7071 if abs(p["bolt_ang"] % 90 - 45) < 1 else bs / 2      # standoffs as seen from the side
+    r = vs / 2                                              # from the side (lens to the right): the front-to-back pair
     ax.plot([-D / 2 - 14, D / 2 + 14], [0, 0], color=NOTE, lw=1.2)
     ax.text(-D / 2 - 14, -1.5, "lid", ha="left", va="top", fontsize=7.6, color=NOTE, style="italic")
     for x in (-r, r):
@@ -339,9 +339,8 @@ def ptz():
     th = np.linspace(0, 2 * np.pi, 120)
     ax2.fill(D / 2 * np.cos(th), D / 2 * np.sin(th), fc="#4a4f57", ec=INK, lw=1)
     ax2.fill((D / 2 - 2) * np.cos(th), (D / 2 - 2) * np.sin(th), fc="#3a3f4a", ec="none")
-    angs = [math.radians(p["bolt_ang"] + 90 * k) for k in range(4)]
-    # +x (lens forward) is drawn pointing up
-    pts = [(-bs / 2 * math.sin(a_), bs / 2 * math.cos(a_)) for a_ in angs]
+    # lens forward is drawn pointing up: standoffs at (±h/2, ±v/2)
+    pts = [(hs / 2, vs / 2), (-hs / 2, vs / 2), (-hs / 2, -vs / 2), (hs / 2, -vs / 2)]
     for x, y in pts:
         ax2.add_patch(Polygon([(x + 3.2 * math.cos(math.radians(60 * i)), y + 3.2 * math.sin(math.radians(60 * i)))
                                for i in range(6)], closed=True, fc=BRASS, ec=INK, lw=0.8, zorder=3))
@@ -349,20 +348,19 @@ def ptz():
     ax2.add_patch(FancyArrowPatch((0, 0), (0, D / 2 + 20), arrowstyle="-|>", mutation_scale=12, color=NOTE, lw=1.4,
                                   zorder=4))
     ax2.text(0, D / 2 + 22, "lens, at mid-pan", ha="center", va="bottom", fontsize=7.6, color=NOTE, style="italic")
-    dim2(ax2, pts[0], pts[2], "bolt_spacing", off=(0, 0))
-    # bolt_ang: from the lens direction to the first standoff
-    a0 = math.radians(p["bolt_ang"])
-    arc = np.linspace(0, a0, 20)
-    ra = bs / 2 * 0.62
-    ax2.plot(-ra * np.sin(arc), ra * np.cos(arc), color=DIM, lw=1.1, zorder=6)
-    ax2.plot([0, pts[0][0]], [0, pts[0][1]], color=DIM, lw=0.8, ls="--", zorder=5)
-    ax2.text(4, ra + 5, "bolt_ang", ha="left", va="bottom", fontsize=8.6,
+    dim2(ax2, pts[1], pts[0], "horizontal_bolt_spacing", off=(0, -9))
+    xv = D / 2 + 7                                          # front to back, down the outside of the disc
+    ext2(ax2, (pts[0][0] + 4, pts[0][1]), (xv + 2, pts[0][1]))
+    ext2(ax2, (pts[3][0] + 4, pts[3][1]), (xv + 2, pts[3][1]))
+    ax2.add_patch(FancyArrowPatch((xv, pts[3][1]), (xv, pts[0][1]), arrowstyle="<|-|>", mutation_scale=9, color=DIM,
+                                  lw=1.1, shrinkA=0, shrinkB=0, zorder=6))
+    ax2.text(xv, 0, "vertical_bolt_spacing", rotation=90, ha="center", va="center", fontsize=8.6,
              family="monospace", color=DIM, fontweight="bold", zorder=7,
              bbox=dict(boxstyle="round,pad=0.22", fc="white", ec=DIM, lw=0.7))
     ext2(ax2, (-D / 2, 0), (-D / 2, -D / 2 - 12))
     ext2(ax2, (D / 2, 0), (D / 2, -D / 2 - 12))
     dim2(ax2, (-D / 2, -D / 2 - 9), (D / 2, -D / 2 - 9), "base_d", off=(0, -5))
-    ax2.set_xlim(-D / 2 - 14, D / 2 + 14)
+    ax2.set_xlim(-D / 2 - 14, D / 2 + 16)
     ax2.set_ylim(-D / 2 - 22, D / 2 + 32)
     ax2.set_title("from above (standoffs under the disc)", fontsize=9, color=INK, pad=2)
 
