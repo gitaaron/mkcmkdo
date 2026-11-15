@@ -237,6 +237,29 @@ What the camera does at 20 % (low) and 7 % (critical):
 [01 — State machine](../product/01-requirements.md#state-machine). The
 estimate carries on below 20 %.
 
+### Swapping banks
+
+Requirement C4a: a flat bank is swapped for a full one in under a minute, plus
+the boot. A spare bank in the bag doubles the runtime.
+
+- **Cold swap.** Switch off at the rocker; the clean shutdown saves any
+  recording in progress and parks the head. Unplug the cable from the bank,
+  pinch the bank out of its tray, clip the full one in, plug in, switch on.
+  The camera is back in about a minute.
+- **The tray** stays strapped to the tripod. The strap goes through tunnels
+  under its floor, not round the bank, and the bank clips in past lips along
+  the top (`battery_tray.scad`; `cad/fit.py` checks the clip).
+- **The gauge** starts again at full when the camera software starts, which a
+  swap always does. So swap only for a *fully charged* bank: a part-used one
+  reads as full, and the camera would run past its 7 % stop without knowing.
+- **The cue to swap** is the low-battery warning at 20 % (the ring blinks
+  orange) or the minutes left in the app. At 7 % the camera saves, parks and
+  sleeps on its own.
+- **Why not a hot swap.** Keeping the camera running through a swap needs a
+  second USB-C inlet and PD trigger, ideal-diode OR-ing on the 12 V rail, and a
+  gauge that can tell which bank is live. That's about C$25 of parts, another
+  wall opening and more wiring, to save a one-minute reboot between sessions.
+
 ### The SD card
 
 Recording: 1080p H.264 at 12 Mbit/s = **5.4 GB/h**. The card is a buffer:

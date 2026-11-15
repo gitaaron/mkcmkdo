@@ -49,7 +49,7 @@ Sizes with the assumed parts (bounding box, mm):
 | Pi shelf | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->132 × 117 × 3<!--/--><!--both--> / <!--/--><!--without_uwb-->128 × 93 × 3<!--/--> | 38+ |
 | Lid | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->141 × 141 × 11<!--/--><!--both--> / <!--/--><!--without_uwb-->135 × 135 × 11<!--/--> | 29+ |
 | LED diffuser band | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->Ø 145 × 16<!--/--><!--both--> / <!--/--><!--without_uwb-->Ø 139 × 16<!--/--> | 25+ |
-| Battery tray | both | 155 × 77 × 12 | 15 |
+| Battery tray | both | 156 × 78 × 40 | 14 |
 | Wearable pod | with UWB | 142 × 74 × 31 | 28 |
 | Anchor arm | with UWB | 142 × 28 × 24 | 28 |
 | Mast foot, mast cradle | with UWB | ≤ 69 mm | 100+ |
@@ -62,7 +62,7 @@ Sizes with the assumed parts (bounding box, mm):
 
 | Material | Qty | Notes |
 | --- | --- | --- |
-| **PETG, 1 kg, any colour** | 1 spool | the structural parts: ≈ <!--with_uwb-->380 g<!--/--><!--both--> with UWB, ≈ <!--/--><!--without_uwb-->240 g<!--/--><!--both--> without<!--/-->. A 1 kg spool leaves plenty for reprints |
+| **PETG, 1 kg, any colour** | 1 spool | the structural parts: ≈ <!--with_uwb-->410 g<!--/--><!--both--> with UWB, ≈ <!--/--><!--without_uwb-->270 g<!--/--><!--both--> without<!--/-->. A 1 kg spool leaves plenty for reprints |
 | **PETG, white or natural** | ≈ 40 g | the LED diffuser band, which has to pass light, and ideally the shelf, whose underside bounces the ring's light out. They can't be your main colour unless that colour is white or natural. A 250 g sample spool is the cheap way to get it |
 | Glue stick (PVA) | 1 | see the warning below — this is a release agent, not an adhesive |
 | TPU 95A *(optional, UWB build)* | ≈ 30 g | nicer wearable pod against the skin. Needs direct drive |
@@ -92,7 +92,7 @@ are the with-UWB ones (camera-only in brackets where they differ).<!--/-->
 | [Pi shelf](../../with_uwb/cad/shelf.scad) | 3 | 20 % | 0.2 | ≈ 32 g | ≈ 2.5 h |
 | [Lid](../../with_uwb/cad/lid.scad) | **5** | **40 %** | 0.2 | <!--with_uwb-->≈ 65 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->60 g<!--/--><!--both-->)<!--/--> | ≈ 4 h |
 | [LED diffuser band](../../with_uwb/cad/led_diffuser_ring.scad) | **2** | **0 %** | 0.2 | ≈ 6 g | ≈ 1.5 h |
-| [Battery tray](../../with_uwb/cad/battery_tray.scad) | 3 | 20 % | 0.2 | ≈ 38 g | ≈ 3.5 h |
+| [Battery tray](../../with_uwb/cad/battery_tray.scad) | 3 | 20 % | 0.2 | ≈ 70 g | ≈ 5.5 h |
 
 Enclosure differences by build: size (solved per build by `fit.py`) and wall. <!--with_uwb-->The UWB one has three bosses for the arms and mast, and
 a slot for the anchor cables<!--/--><!--both-->; the camera-only one is plain all round<!--/--><!--without_uwb: The camera-only one is plain all round-->.
@@ -113,7 +113,7 @@ the UWB enclosure's wall bosses ([below](#with-uwb))<!--/-->.
 | Pi shelf | flat, as modelled | none |
 | Lid | **flip it: top face on the bed**, locating ring up | none |
 | Diffuser band | standing, as modelled | none. **Brim recommended**: it is a tall thin ring with a small footprint |
-| Battery tray | flat, as modelled | none |
+| Battery tray | flat, as modelled | none: the strap tunnels under the floor bridge 27 mm, which PETG does cleanly |
 
 ### Why the lid is different
 

@@ -28,7 +28,8 @@ Enclosure Ø141 × 83 mm (floor to lid). Power boards on the floor up to z = 26;
 | ✅ | The pan servo under the base clears the lid | servo hangs 30.8 mm below the base, on 32 mm standoffs lifted on 2 M3 washers each (1 mm): 2.2 mm above the lid |
 | ✅ | The ribbon and leads fit the lid's cable slot | slot 28×9 mm at 180° (180° = straight behind the lens); ribbon 16 mm wide, leads Ø8 |
 | ✅ | The camera ribbon reaches the Pi | ≈ 268 mm needed (197 outside with a 60 mm loop for pan and tilt, 66 inside); ribbon 500 mm |
-| ✅ | The battery tray (sized to the bank) prints in one piece | tray 155 × 77 mm |
+| ✅ | The battery tray (sized to the bank) prints in one piece | tray 156 × 78 × 40 mm |
+| ✅ | The bank clips into its tray and lifts out at the finger notches | lips reach 1.4 mm over the bank, 56 mm long either side of 34 mm notches; the strap goes under the floor, not round the bank |
 | ✅ | The anchor boards' USB plugs have room for the extension cables | 78 mm between plug and arm root |
 | ✅ | The anchor USB cables have a way into the enclosure, and room to plug into the Pi | slot 18×10 mm at 295°, z = 70, behind the Pi's USB ports; 30 mm kept clear beyond them for the plugs |
 | ✅ | The ULA1 hole pattern is inside the board | 32×17 on 40×25 |
@@ -38,7 +39,7 @@ Enclosure Ø141 × 83 mm (floor to lid). Power boards on the floor up to z = 26;
 | ✅ | STLs are rendered from the current CAD and part sizes |  |
 | ✅ | anchor_arm.stl prints in one piece on the Bambu Lab A1 Mini | 142 × 28 × 24 mm |
 | ✅ | base_housing.stl prints in one piece on the Bambu Lab A1 Mini | 147 × 149 × 83 mm |
-| ✅ | battery_tray.stl prints in one piece on the Bambu Lab A1 Mini | 155 × 77 × 12 mm |
+| ✅ | battery_tray.stl prints in one piece on the Bambu Lab A1 Mini | 156 × 78 × 40 mm |
 | ✅ | led_diffuser_ring.stl prints in one piece on the Bambu Lab A1 Mini | 145 × 145 × 16 mm |
 | ✅ | lid.stl prints in one piece on the Bambu Lab A1 Mini | 141 × 141 × 11 mm |
 | ✅ | mast_cradle.stl prints in one piece on the Bambu Lab A1 Mini | 25 × 52 × 38 mm |
@@ -74,11 +75,12 @@ Enclosure Ø137 × 67 mm (floor to lid). Power boards on the floor up to z = 26;
 | ✅ | The pan servo under the base clears the lid | servo hangs 30.8 mm below the base, on 32 mm standoffs lifted on 2 M3 washers each (1 mm): 2.2 mm above the lid |
 | ✅ | The ribbon and leads fit the lid's cable slot | slot 28×9 mm at 180° (180° = straight behind the lens); ribbon 16 mm wide, leads Ø8 |
 | ✅ | The camera ribbon reaches the Pi | ≈ 290 mm needed (196 outside with a 60 mm loop for pan and tilt, 89 inside); ribbon 500 mm |
-| ✅ | The battery tray (sized to the bank) prints in one piece | tray 155 × 77 mm |
+| ✅ | The battery tray (sized to the bank) prints in one piece | tray 156 × 78 × 40 mm |
+| ✅ | The bank clips into its tray and lifts out at the finger notches | lips reach 1.4 mm over the bank, 56 mm long either side of 34 mm notches; the strap goes under the floor, not round the bank |
 | ✅ | Device config matches the geometry | LED_COUNT = 16 |
 | ✅ | STLs are rendered from the current CAD and part sizes |  |
 | ✅ | base_housing.stl prints in one piece on the Bambu Lab A1 Mini | 141 × 141 × 67 mm |
-| ✅ | battery_tray.stl prints in one piece on the Bambu Lab A1 Mini | 155 × 77 × 12 mm |
+| ✅ | battery_tray.stl prints in one piece on the Bambu Lab A1 Mini | 156 × 78 × 40 mm |
 | ✅ | led_diffuser_ring.stl prints in one piece on the Bambu Lab A1 Mini | 141 × 141 × 16 mm |
 | ✅ | lid.stl prints in one piece on the Bambu Lab A1 Mini | 137 × 137 × 11 mm |
 | ✅ | shelf.stl prints in one piece on the Bambu Lab A1 Mini | 119 × 129 × 3 mm |

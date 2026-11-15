@@ -20,7 +20,7 @@ enclosure or a bracket.
 | # | Item | Description |
 | --- | --- | --- |
 | 1 | **Tripod** | any standard tripod. Floor socket: 3/8-16 insert with removable 1/4-20 reducer bushing |
-| 2 | **Battery tray** | printed saddle for the USB-C bank, strapped low on a leg or the centre column (lowers the centre of mass). Cable to a USB-C inlet low in the enclosure wall |
+| 2 | **Battery tray** | printed clip-in cradle for the USB-C bank, strapped low on a leg or the centre column (lowers the centre of mass) through tunnels under its floor. The bank snaps in past lips along the top and pinches out at finger notches, so it swaps without undoing the strap (C4a). Cable to a USB-C inlet low in the enclosure wall |
 | 3 | **Enclosure** | printed, <!--with_uwb-->Ø 141 × 83 mm<!--/--><!--both--> with UWB, <!--/--><!--without_uwb-->Ø 135 × 67 mm<!--/--><!--both--> without<!--/--> with the assumed part sizes ([layout](#layout-inside-the-enclosure)). No moving parts inside. <!--both-->Wall: three bosses and an anchor-cable slot with UWB; plain without<!--/--><!--with_uwb: Wall: three bosses for the arms and mast, and an anchor-cable slot--><!--without_uwb: Wall: plain all round--> |
 | 4 | **Lid** | printed, 5 mm, structural: carries the whole camera. The Arducam base stands on it on its four brass standoffs; four M3 screws come up through radial slots into them. Ribbon and leads enter through a cable slot at the back |
 | 5 | **Arducam pan-tilt base** | round turntable on four brass standoffs, pan servo hanging underneath between them; tilt bracket and servo on top. Two digital servos, both axes 0–180°. Supplied assembled with the camera. Every cable leaves from the camera head at the top, none through the base |

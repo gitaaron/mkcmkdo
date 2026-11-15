@@ -301,15 +301,16 @@ const STEPS = [
     parts: ["Battery tray", "USB-C PD power bank, 25 000 mAh (92 Wh)", "Hook-and-loop strap", "100 W USB-C cable, 30 cm"],
     tools: [],
     steps: [
-      "Drop the bank into the tray and strap it through the two floor slots.",
-      "Strap the tray to a tripod leg or the centre column, as low as is convenient. The mass ends up low, which is what keeps the rig stable with the camera above it. (There is no sandwich mount: the bolt would have to go through the bank.)",
+      "Thread the hook-and-loop strap through the two tunnels under the tray's floor and strap the empty tray to a tripod leg or the centre column, as low as is convenient. The mass ends up low, which is what keeps the rig stable with the camera above it. The strap never goes round the bank: it stays done up when you swap banks.",
+      "Push the bank down into the tray, USB-C socket towards the end nearer the enclosure, until the lips along the top click over it. To take it out, pinch it at the finger notches half-way along and lift.",
       `Run the USB-C cable from the bank up to the inlet low on the ${where(LY.usbc.ang)} of the enclosure and plug it in. Dress it so it cannot snag a tripod leg.`,
       "Charge the bank fully before the first power-on. The fuel gauge counts what it measures from the moment the camera software starts and assumes a full pack then — it has no way to read the bank's own charge.",
+      "<b>Swapping a flat bank for a full one</b> (under a minute, plus the boot): switch off at the rocker and wait for the ring to go dark — a recording in progress is saved first. Unplug the cable from the bank, pinch the bank out, clip the full one in, plug the cable in and switch on. The gauge starts again at full. Swap only for a <b>fully charged</b> bank: a part-used one reads as full.",
     ],
     note: "Expect about 6.2 hours tracking and recording, 6.5 tracking only, 8 awake, and about 11 asleep. Those allow for the bank's own conversion loss, which is why they are lower than its 92 Wh label suggests. Recording is nearly free on this board: the Pi 4 has a hardware H.264 encoder, which is the reason the design is not on a Pi 5.",
     scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST], add: lift(BATT, -70),
              view: "iso-low", focus: "all", render: "battery",
-             marks: [[0, 0, LY.tray_z + 15, "92 Wh bank, strapped low", 85, -40, -25]] },
+             marks: [[0, 0, LY.tray_z + 15, "92 Wh bank, clipped into a tray strapped low", 85, -40, -25]] },
   },
   {
     id: "cabling", phase: 3, title: "Cabling and service loops", time: "25 min",
@@ -665,10 +666,10 @@ const PARTS = {
     return g;
   } },
   battery_tray: { grp: "static", stl: "battery_tray", color: COL.print,
-                  pos: [-LY.parts.power_bank.l / 2 - 2.4, -LY.parts.power_bank.w / 2 - 2.4, LY.tray_z] },
+                  pos: [-LY.parts.power_bank.l / 2 - LY.tray_side, -LY.parts.power_bank.w / 2 - LY.tray_side, LY.tray_z] },
   bank: { grp: "static", build: () => { const k = LY.parts.power_bank;
-    return group(at(mesh(box(k.l, k.w, k.h), COL.dark, { rough: 0.5 }), 0, 0, LY.tray_z + 2.4 + k.h / 2),
-                 at(mesh(box(26, 10, 2), COL.steel, { metal: 0.4 }), -k.l / 2 + 5, 0, LY.tray_z + 2.4 + k.h)); } },
+    return group(at(mesh(box(k.l, k.w, k.h), COL.dark, { rough: 0.5 }), 0, 0, LY.tray_z + LY.tray_floor + k.h / 2),
+                 at(mesh(box(26, 10, 2), COL.steel, { metal: 0.4 }), -k.l / 2 + 5, 0, LY.tray_z + LY.tray_floor + k.h)); } },
   insert: { grp: "static", build: () => at(mesh(cyl(LY.parts.tripod_insert.od / 2 - 0.05, LY.parts.tripod_insert.l), COL.brass, { metal: 0.6, rough: 0.4 }), 0, 0, LY.parts.tripod_insert.l / 2 + 0.2) },
   base_housing: { grp: "static", stl: "base_housing", color: COL.print, double: true },
 

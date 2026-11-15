@@ -428,7 +428,9 @@ window.SPORTCAM_LAYOUT = {
   "z": 11.5
  },
  "tilt_z": 159.0,
- "tray_z": -52.4,
+ "tray_floor": 7.5,
+ "tray_side": 3.0,
+ "tray_z": -59.5,
  "ula1_radial_room": 77.5,
  "ula1_tangential": false,
  "usb_entry": {

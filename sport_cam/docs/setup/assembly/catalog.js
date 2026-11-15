@@ -216,7 +216,7 @@
     { id: "mastCradle", name: "Mast cradle", kind: "Printed part", match: ["mast\\s+cradle"], img: printed("mast_cradle"),
       desc: "<p>Caps the top of the dowel and carries the third anchor (A3), 250 mm above the other two. A thumb screw clamps it to the dowel.</p>" },
     { id: "tray", name: "Battery tray", kind: "Printed part", match: ["Battery\\s+tray"], img: printed("battery_tray"),
-      desc: "<p>A saddle for the USB-C power bank, sized to it, with slots for a hook-and-loop strap. Strap it to a tripod leg or the centre column, low, to keep the weight down.</p>" },
+      desc: "<p>A clip-in cradle for the USB-C power bank, sized to it. It stays strapped to a tripod leg or the centre column, low, to keep the weight down: the strap goes through two tunnels under its floor. The bank pushes down past sprung lips along the top and pinches out at the finger notches, so a flat bank is swapped for a full one without undoing anything.</p>" },
     { id: "petg", name: "PETG filament", kind: "Consumable", match: ["\\bPETG\\b"], img: pic(DRAW.spool),
       desc: "<p>The plastic all the printed parts are made from. PETG is tougher and more heat-resistant than PLA and doesn't creep under the camera's weight. Prints at about 230–250 °C on an 80 °C bed. The LED diffuser needs <b>white or natural</b> PETG so light passes through.</p><p>Full settings: <a href='../../../../docs/setup/11-3d-printing.md' target='_blank'>3D printing specifications</a>.</p>" },
 

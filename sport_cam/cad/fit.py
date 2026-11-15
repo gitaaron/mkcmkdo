@@ -222,6 +222,13 @@ def polar(r, deg):
     return r * math.cos(a), r * math.sin(a)
 
 
+def tray_size(C, bank):
+    """The battery tray's outside length, width and height (battery_tray.scad)."""
+    return (bank["l"] + 2 * C["tray_clr"] + 2 * C["tray_wall"],
+            bank["w"] + 2 * C["tray_clr"] + 2 * C["tray_wall"],
+            1.6 + C["tray_tunnel_h"] + C["tray_wall"] + bank["h"] + 0.4 + C["tray_lip_t"])
+
+
 def ptz_bolts(ptz):
     """The Arducam base's standoffs from its two spacings: (corner-to-corner spacing, angles).
 
@@ -811,7 +818,9 @@ def gen_json(build, P, C, L) -> dict:
     if build == "with_uwb":
         keep["uwb"] = {k: C[k] for k in ("uwb_half_base", "anchor_board_z", "uwb_v_base", "arm_boss_z", "mast_floor")}
     # the battery tray, strapped to the centre column a little below the head (guide only)
-    keep["tray_z"] = -(C["tray_wall"] + P["power_bank"]["h"]) - 20
+    keep["tray_z"] = -tray_size(C, P["power_bank"])[2] - 20
+    keep["tray_side"] = C["tray_clr"] + C["tray_wall"]                  # outside edge to the bank
+    keep["tray_floor"] = 1.6 + C["tray_tunnel_h"] + C["tray_wall"]      # tray bottom to the bank
     keep["lid_z"] = L["base_h"]
     keep["lid_top"] = L["base_h"] + C["lid_t"]
     # Arducam base: on its standoffs on the lid; the tilt axis is above the bottom disc
@@ -1108,9 +1117,15 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
 
     # 8. battery tray
     bk = P["power_bank"]
-    tray = (bk["l"] + 2 * C["tray_wall"], bk["w"] + 2 * C["tray_wall"])
-    A.check(max(tray) <= PRINT_LIMIT, "The battery tray (sized to the bank) prints in one piece",
-            f"tray {tray[0]:.0f} × {tray[1]:.0f} mm", ["power_bank"])
+    tl, tw, th = tray_size(C, bk)
+    A.check(max(tl, tw, th) <= PRINT_LIMIT, "The battery tray (sized to the bank) prints in one piece",
+            f"tray {tl:.0f} × {tw:.0f} × {th:.0f} mm", ["power_bank"])
+    # quick swap (C4a): the lips must hold the bank, yet let it be pinched out at the notches
+    lip_run = (tl - C["tray_notch_w"]) / 2 - 5
+    A.check(0.8 <= C["tray_snap"] <= 2.5 and lip_run >= 30 and C["tray_notch_w"] >= 25,
+            "The bank clips into its tray and lifts out at the finger notches",
+            f"lips reach {C['tray_snap']:g} mm over the bank, {lip_run:.0f} mm long either side of "
+            f"{C['tray_notch_w']:g} mm notches; the strap goes under the floor, not round the bank", ["power_bank"])
 
     # 9. UWB parts
     if uwb:

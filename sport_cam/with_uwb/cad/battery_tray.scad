@@ -1,15 +1,24 @@
-// Battery tray — carries the USB-C power bank low on the tripod.
+// Battery tray — carries the USB-C power bank low on the tripod, and lets it
+// be swapped for a full one in seconds (requirement C4a).
 //
-// Strap it to a tripod leg or the centre column through the two slots. (An
-// earlier version also had a central 1/4-20 bore for sandwiching the tray
-// between the tripod and the enclosure, but the bolt would have had to pass
-// through the bank, so it's gone.)
+// The tray stays on the tripod: a hook-and-loop strap goes through the two
+// tunnels under the floor and round a leg or the centre column, never round
+// the bank. The bank clips in: push it down between the side walls until the
+// lips along the top snap over it. To take it out, pinch it at the finger
+// notches half-way along and lift. The ends are open for the cable, which
+// leaves from whichever end the bank's USB-C socket is at.
 //
 // Keeping the heaviest single item low is what stops the rig being tippy.
 include <config.scad>
 
-ol = bank_l + 2 * tray_wall;
-ow = bank_w + 2 * tray_wall;
+il = bank_l + 2 * tray_clr;            // the pocket
+iw = bank_w + 2 * tray_clr;
+ih = bank_h + 0.4;                     // floor to the underside of the lips
+skin = 1.6;                            // under the strap tunnels
+base = skin + tray_tunnel_h + tray_wall;   // skin, strap tunnels, floor
+ol = il + 2 * tray_wall;
+ow = iw + 2 * tray_wall;
+oh = base + ih + tray_lip_t;
 
 module rbox(l, w, h, rad) {
     hull() for (x = [rad, l - rad], y = [rad, w - rad])
@@ -18,18 +27,25 @@ module rbox(l, w, h, rad) {
 
 module battery_tray() {
     difference() {
-        rbox(ol, ow, tray_wall + tray_lip, 5);
-        // bank pocket
-        translate([tray_wall, tray_wall, tray_wall])
-            rbox(bank_l, bank_w, tray_lip + 1, 4);
-        // open the ends so a USB cable can leave either side
+        rbox(ol, ow, oh, 5);
+        // the pocket, up to the underside of the lips
+        translate([tray_wall, tray_wall, base]) rbox(il, iw, ih, 3);
+        // the opening between the lips, chamfered out to the wall tops as a lead-in
+        hull() {
+            translate([tray_wall, tray_wall + tray_snap, base + ih - 0.01])
+                cube([il, iw - 2 * tray_snap, 0.01]);
+            translate([tray_wall, tray_wall, oh - 0.01]) cube([il, iw, 0.02]);
+        }
+        // cable openings in both end walls (narrower than the bank, so it can't slide out)
         for (x = [-1, ol - tray_wall - 1])
-            translate([x, tray_wall + 8, tray_wall + 3])
-                cube([tray_wall + 2, bank_w - 16, tray_lip]);
-        // strap slots through the floor, either side of the pocket
-        for (x = [ol * 0.26, ol * 0.74 - tray_strap_w])
-            for (y = [tray_wall / 2 - 1, ow - tray_wall / 2 - 2])
-                translate([x, y, -1]) cube([tray_strap_w, 3, tray_wall + 2]);
+            translate([x, tray_wall + 8, base + 3]) cube([tray_wall + 2, iw - 16, oh]);
+        // finger notches half-way along each long side, down to 40 % of the bank
+        for (y = [-1, ow - tray_wall - 1])
+            translate([(ol - tray_notch_w) / 2, y, base + ih * 0.4])
+                cube([tray_notch_w, tray_wall + 2, oh]);
+        // strap tunnels under the floor, across the tray (closed underneath, so the strap holds it)
+        for (x = [ol * 0.22, ol * 0.78 - tray_strap_w - 1])
+            translate([x, -1, skin]) cube([tray_strap_w + 1, ow + 2, tray_tunnel_h]);
     }
 }
 

@@ -92,11 +92,16 @@ mast_foot_h = 44;              // foot socket depth: long, so the mast stands st
 mast_cap_h  = 30;              // cradle socket depth
 
 // ---- battery tray ----------------------------------------------------------
-// Sized to the power bank in ordered_parts.toml. Straps to a tripod leg or
-// centre column, or sandwiches under the enclosure on a long 1/4-20.
+// Sized to the power bank in ordered_parts.toml. The tray stays strapped to a
+// tripod leg or the centre column; the bank clips in and out of it without
+// touching the strap, so a flat bank is swapped for a full one in seconds.
 tray_wall = 2.4;
-tray_lip = 10;                 // how far the side walls come up the bank
-tray_strap_w = 26;             // hook-and-loop strap slots
+tray_clr = 0.6;                // round the bank, so it drops in
+tray_snap = 1.4;               // how far the lips along the top reach over the bank
+tray_lip_t = 1.6;              // their thickness (the top is chamfered as a lead-in)
+tray_notch_w = 34;             // finger notches half-way along each long side
+tray_strap_w = 26;             // hook-and-loop strap, through two tunnels under the floor
+tray_tunnel_h = 3.5;
 
 // ---- wearable pod ----------------------------------------------------------
 // The tag is a ULA1 plugged straight into a slim USB bank, end to end; fit.py
