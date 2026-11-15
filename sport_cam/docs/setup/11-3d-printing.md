@@ -21,7 +21,7 @@ sufficient.
 | Requirement | Minimum | Why |
 | --- | --- | --- |
 | Technology | FDM / FFF | all parts are designed for it |
-| Build volume | **160 × 155 × 90 mm** | the battery tray is 155 mm long; the with-UWB enclosure is 147 × 149 mm and 83 mm tall |
+| Build volume | **160 × 155 × 95 mm** | the battery tray is 155 mm long; the with-UWB enclosure is 147 × 149 mm and 91 mm tall |
 | Nozzle | 0.4 mm | every setting below assumes it. 0.6 works if you raise wall counts |
 | Hotend temperature | **250 °C** | PETG |
 | Heated bed | **80 °C** | PETG will not stay down without one |
@@ -44,8 +44,8 @@ Sizes with the assumed parts (bounding box, mm):
 
 | Part | Build | Size | Margin to 170 |
 | --- | --- | --- | --- |
-| Enclosure | with UWB | 147 × 149 × 83 | 21 |
-| Enclosure | without UWB | 139 × 139 × 67 | 31 |
+| Enclosure | with UWB | 147 × 149 × 91 | 21 |
+| Enclosure | without UWB | 141 × 141 × 85 | 29 |
 | Pi shelf | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->132 × 117 × 3<!--/--><!--both--> / <!--/--><!--without_uwb-->128 × 93 × 3<!--/--> | 38+ |
 | Lid | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->141 × 141 × 11<!--/--><!--both--> / <!--/--><!--without_uwb-->135 × 135 × 11<!--/--> | 29+ |
 | LED diffuser band | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->Ø 145 × 16<!--/--><!--both--> / <!--/--><!--without_uwb-->Ø 139 × 16<!--/--> | 25+ |
@@ -62,7 +62,7 @@ Sizes with the assumed parts (bounding box, mm):
 
 | Material | Qty | Notes |
 | --- | --- | --- |
-| **PETG, 1 kg, any colour** | 1 spool | the structural parts: ≈ <!--with_uwb-->410 g<!--/--><!--both--> with UWB, ≈ <!--/--><!--without_uwb-->270 g<!--/--><!--both--> without<!--/-->. A 1 kg spool leaves plenty for reprints |
+| **PETG, 1 kg, any colour** | 1 spool | the structural parts: ≈ <!--with_uwb-->425 g<!--/--><!--both--> with UWB, ≈ <!--/--><!--without_uwb-->300 g<!--/--><!--both--> without<!--/-->. A 1 kg spool leaves plenty for reprints |
 | **PETG, white or natural** | ≈ 40 g | the LED diffuser band, which has to pass light, and ideally the shelf, whose underside bounces the ring's light out. They can't be your main colour unless that colour is white or natural. A 250 g sample spool is the cheap way to get it |
 | Glue stick (PVA) | 1 | see the warning below — this is a release agent, not an adhesive |
 | TPU 95A *(optional, UWB build)* | ≈ 30 g | nicer wearable pod against the skin. Needs direct drive |
@@ -88,7 +88,7 @@ are the with-UWB ones (camera-only in brackets where they differ).<!--/-->
 
 | Part | Walls | Infill | Layer | Est. mass | Est. time |
 | --- | --- | --- | --- | --- | --- |
-| [Enclosure](../../with_uwb/cad/base_housing.scad) | 4 | 20 % | 0.2 | <!--with_uwb-->≈ 180 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->145 g<!--/--><!--both-->)<!--/--> | <!--with_uwb-->≈ 18 h<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->14 h<!--/--><!--both-->)<!--/--> |
+| [Enclosure](../../with_uwb/cad/base_housing.scad) | 4 | 20 % | 0.2 | <!--with_uwb-->≈ 195 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->175 g<!--/--><!--both-->)<!--/--> | <!--with_uwb-->≈ 19.5 h<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->17 h<!--/--><!--both-->)<!--/--> |
 | [Pi shelf](../../with_uwb/cad/shelf.scad) | 3 | 20 % | 0.2 | ≈ 32 g | ≈ 2.5 h |
 | [Lid](../../with_uwb/cad/lid.scad) | **5** | **40 %** | 0.2 | <!--with_uwb-->≈ 65 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->60 g<!--/--><!--both-->)<!--/--> | ≈ 4 h |
 | [LED diffuser band](../../with_uwb/cad/led_diffuser_ring.scad) | **2** | **0 %** | 0.2 | ≈ 6 g | ≈ 1.5 h |

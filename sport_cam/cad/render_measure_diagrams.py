@@ -519,65 +519,82 @@ def boards():
 
 def panel_parts():
     fig, (ax1, ax2, ax3) = figure(
-        "3 · Rocker switch and barrel jack", "[switch]  [jack]",
-        ["switch: cut_w × cut_h — the hole it snaps into: the body just behind the flange, across the clips pushed "
-         "in (or the cut-out on its datasheet).   body_w × body_h — the flange on the outside of the panel.",
-         "switch: depth — from the back of the flange to the tips of the terminals.   max_panel_t — from the back "
-         "of the flange to the step on the clips that catches the panel: the thickest wall it can grip.",
+        "3 · Round rocker switch and barrel jack", "[switch]  [jack]",
+        ["switch: flange_d — across the round bezel on the front.   hole_d — across the threaded body behind it "
+         "(the wall hole is cut 0.5 mm bigger).   hole_d_minus_flat — from the thread's key flat straight across to "
+         "the far side; flat_side — where that flat is with ON at the top (top, bottom, left or right).   "
+         "nut_d — the locking ring across its lugs.",
+         "switch: nut_t — the ring's thickness.   thread_l — from the back of the bezel to the end of the thread.   "
+         "depth — from the back of the bezel to the tips of the terminals.",
          "jack: hole_d — the threaded barrel's outside diameter.   body_d — the widest thing behind the panel: the nut "
          "across its corners, or the body, whichever is bigger.   depth — from the back of the front flange to the "
          "tips of the solder tags.   max_panel_t — the thread length left between the flange and the nut fully on."],
-        panels=3, size=(12.0, 4.0), ratios=[1, 1.25, 1.25])
+        panels=3, size=(13.0, 4.0), ratios=[1.45, 1.25, 1.25])
     sw, jk = P["switch"], P["jack"]
 
-    # switch, front
+    # switch, front: round bezel, rocker, and the thread behind it dashed
     for a in (ax1, ax2, ax3):
         a.set_aspect("equal")
         a.axis("off")
-    bw, bh, cw, ch = sw["body_w"], sw["body_h"], sw["cut_w"], sw["cut_h"]
-    rect2(ax1, -bw / 2, -bh / 2, bw, bh, "#2a2d33")
-    rect2(ax1, -bw / 2 + 2, -bh / 2 + 1.8, bw - 4, bh - 3.6, "#d64541", ec="#8a2a28")
-    ax1.plot([-cw / 2, cw / 2, cw / 2, -cw / 2, -cw / 2], [-ch / 2, -ch / 2, ch / 2, ch / 2, -ch / 2],
-             color=BLUE, lw=1.4, ls="--", zorder=4)
-    dim2(ax1, (-bw / 2, bh / 2 + 3), (bw / 2, bh / 2 + 3), "body_w", off=(0, 2.2))
-    dim2(ax1, (-bw / 2 - 3, -bh / 2), (-bw / 2 - 3, bh / 2), "body_h", off=(-1, 0), ha="right")
-    dim2(ax1, (-cw / 2, -bh / 2 - 3.5), (cw / 2, -bh / 2 - 3.5), "cut_w", off=(0, -2.4))
-    dim2(ax1, (bw / 2 + 3, -ch / 2), (bw / 2 + 3, ch / 2), "cut_h", off=(1, 0), ha="left")
-    for x in (-cw / 2, cw / 2):
-        ext2(ax1, (x, -ch / 2), (x, -bh / 2 - 4.5))
-    for y in (-ch / 2, ch / 2):
-        ext2(ax1, (cw / 2, y), (bw / 2 + 4, y))
-    ax1.text(0, -bh / 2 - 10, "front — dashed: the body behind the flange", ha="center", fontsize=7.6,
-             color=NOTE, style="italic")
-    ax1.set_xlim(-bw / 2 - 14, bw / 2 + 14)
-    ax1.set_ylim(-bh / 2 - 12, bh / 2 + 8)
+    fd, hd_s, nd, nt, tl, d = sw["flange_d"], sw["hole_d"], sw["nut_d"], sw["nut_t"], sw["thread_l"], sw["depth"]
+    from matplotlib.patches import Circle
+    ax1.add_patch(Circle((0, 0), fd / 2, fc="#2a2d33", ec=INK, lw=0.8, zorder=2))
+    ax1.add_patch(Circle((0, 0), fd * 0.34, fc="#1c1e22", ec=INK, lw=0.6, zorder=3))
+    ax1.add_patch(Circle((0, 0), fd * 0.24, fc="#3a3d44", ec=INK, lw=0.6, zorder=4))
+    ax1.text(0, fd * 0.08, "ON", ha="center", va="center", fontsize=6.5, color="#e8ecf2", zorder=5)
+    ax1.text(0, -fd * 0.09, "OFF", ha="center", va="center", fontsize=6.5, color="#e8ecf2", zorder=5)
+    fz = sw["hole_d_minus_flat"] - hd_s / 2                              # centre to the key flat
+    fa = math.acos(max(-1.0, min(1.0, fz / (hd_s / 2))))
+    prof = [(hd_s / 2 * math.sin(t), -hd_s / 2 * math.cos(t))
+            for t in [fa + (2 * math.pi - 2 * fa) * i / 96 for i in range(97)]]
+    ax1.add_patch(Polygon(prof, closed=True, fc="none", ec=BLUE, lw=1.4, ls="--", zorder=6))
+    ax1.text(0, -fz + 1.4, "key flat", ha="center", va="bottom", fontsize=6.2, color="#9fc3ff", zorder=6)
+    xd = fd / 2 + 3
+    ext2(ax1, (0, hd_s / 2), (xd + 1, hd_s / 2))
+    ext2(ax1, (0, -fz), (xd + 1, -fz))
+    dim2(ax1, (xd, -fz), (xd, hd_s / 2), "hole_d_minus_flat", off=(1.0, 0), ha="left")
+    dim2(ax1, (-fd / 2, fd / 2 + 3), (fd / 2, fd / 2 + 3), "flange_d", off=(0, 2.4))
+    for x in (-fd / 2, fd / 2):
+        ext2(ax1, (x, 0), (x, fd / 2 + 4))
+    dim2(ax1, (-hd_s / 2, -fd / 2 - 3.5), (hd_s / 2, -fd / 2 - 3.5), "hole_d", off=(0, -2.6))
+    for x in (-hd_s / 2, hd_s / 2):
+        ext2(ax1, (x, 0), (x, -fd / 2 - 4.5))
+    ax1.text(0, -fd / 2 - 11, "front — dashed: the thread behind the bezel, its flat drawn at the bottom",
+             ha="center", fontsize=7.6, color=NOTE, style="italic")
+    ax1.set_xlim(-fd / 2 - 8, fd / 2 + 32)
+    ax1.set_ylim(-fd / 2 - 13, fd / 2 + 9)
 
-    # switch, side section through a panel
-    d, mp = sw["depth"], sw["max_panel_t"]
+    # switch, side: bezel outside (x < 0), thread, the ring screwed up against the wall, terminals
     ax = ax2
-    rect2(ax, -2.5, -bh / 2, 2.5, bh, "#2a2d33")                        # flange (outside, x < 0)
-    rect2(ax, -4.5, -bh / 2 + 1.8, 2.0, bh - 3.6, "#d64541", ec="#8a2a28")
-    rect2(ax, 0, -ch / 2, d - 7, ch, "#2a2d33")                          # body
-    for y in (-ch / 2 + 2, ch / 2 - 3):
-        rect2(ax, d - 7, y, 7, 1, METAL)                                 # terminals
-    # clips with a catch step at mp
-    ax.add_patch(Polygon([(0, ch / 2), (mp, ch / 2 + 1.4), (mp + 5, ch / 2), (mp, ch / 2)], closed=True,
-                         fc="#55595f", ec=INK, lw=0.6, zorder=3))
-    ax.add_patch(Polygon([(0, -ch / 2), (mp, -ch / 2 - 1.4), (mp + 5, -ch / 2), (mp, -ch / 2)], closed=True,
-                         fc="#55595f", ec=INK, lw=0.6, zorder=3))
-    # the panel
-    for y0, y1 in ((ch / 2 + 0.05, bh / 2 + 6), (-bh / 2 - 6, -ch / 2 - 0.05)):
-        rect2(ax, 0, y0, mp, y1 - y0, "#c7cdd8", ec=NOTE, lw=0.6, z=1, hatch="////")
-    ax.text(mp / 2, bh / 2 + 7, "wall", ha="center", fontsize=7.4, color=NOTE, style="italic")
-    ext2(ax, (0, -bh / 2), (0, -bh / 2 - 9))
-    ext2(ax, (d, -ch / 2 + 2), (d, -bh / 2 - 9))
-    dim2(ax, (0, -bh / 2 - 8), (d, -bh / 2 - 8), "depth", off=(0, -2.4))
-    ext2(ax, (mp, ch / 2 + 1.4), (mp, bh / 2 + 3.8))
-    dim2(ax, (0, bh / 2 + 3), (mp, bh / 2 + 3), "max_panel_t", off=(7.5, 2.4), ha="left")
-    ax.text(-3, -bh / 2 - 1.5, "outside", ha="center", va="top", fontsize=7.4, color=NOTE, style="italic")
-    ax.text(d / 2, ch / 2 + 9.5, "switch, side, in the wall", ha="center", fontsize=7.6, color=NOTE, style="italic")
-    ax.set_xlim(-8, d + 14)
-    ax.set_ylim(-bh / 2 - 13, bh / 2 + 12)
+    pt = 3.0                                                              # a wall, for the picture
+    rect2(ax, -3, -fd / 2, 3, fd, "#2a2d33")                              # bezel
+    rect2(ax, -5, -fd * 0.24, 2, fd * 0.48, "#3a3d44")                    # rocker
+    rect2(ax, 0, -hd_s / 2, tl, hd_s, "#2a2d33")                          # threaded body
+    for k in range(int(tl / 1.2)):
+        ax.plot([k * 1.2, k * 1.2 + 0.6], [hd_s / 2, -hd_s / 2], color="#55595f", lw=0.3, zorder=3)
+    rect2(ax, tl, -hd_s / 2 + 2, d - tl - 6, hd_s - 4, "#2a2d33")           # body behind the thread
+    for y in (-3, 1.5):
+        rect2(ax, d - 6, y, 6, 1.4, METAL)                                # spade terminals
+    rect2(ax, pt, -nd / 2, nt, nd, "#55595f")                             # ring, against the wall
+    for y0, y1 in ((hd_s / 2 + 0.05, fd / 2 + 5), (-fd / 2 - 5, -hd_s / 2 - 0.05)):
+        rect2(ax, 0, y0, pt, y1 - y0, "#c7cdd8", ec=NOTE, lw=0.6, z=1, hatch="////")
+    ax.text(pt / 2, fd / 2 + 6.5, "wall", ha="center", fontsize=7.4, color=NOTE, style="italic")
+    ax.text(pt + nt / 2, -nd / 2 - 1.2, "ring", ha="center", va="top", fontsize=7, color=NOTE, style="italic")
+    ext2(ax, (0, -fd / 2 - 3), (0, -fd / 2 - 13))
+    ext2(ax, (d, -3), (d, -fd / 2 - 13))
+    dim2(ax, (0, -fd / 2 - 12), (d, -fd / 2 - 12), "depth", off=(0, -2.4))
+    ext2(ax, (tl, -hd_s / 2), (tl, -fd / 2 - 8))
+    dim2(ax, (0, -fd / 2 - 7), (tl, -fd / 2 - 7), "thread_l", off=(0, -2.4))
+    ext2(ax, (pt, nd / 2), (pt, nd / 2 + 4))
+    ext2(ax, (pt + nt, nd / 2), (pt + nt, nd / 2 + 4))
+    dim2(ax, (pt, nd / 2 + 3), (pt + nt, nd / 2 + 3), "nut_t", off=(5.5, 2.2), ha="left")
+    ext2(ax, (pt + nt, -nd / 2), (d + 6, -nd / 2))
+    ext2(ax, (pt + nt, nd / 2), (d + 6, nd / 2))
+    dim2(ax, (d + 5, -nd / 2), (d + 5, nd / 2), "nut_d", off=(1.2, 0), ha="left")
+    ax.text(-3, -fd / 2 - 1.2, "outside", ha="center", va="top", fontsize=7.4, color=NOTE, style="italic")
+    ax.text(d / 2, fd / 2 + 11, "switch, side, in the wall", ha="center", fontsize=7.6, color=NOTE, style="italic")
+    ax.set_xlim(-9, d + 16)
+    ax.set_ylim(-fd / 2 - 17, fd / 2 + 14)
 
     # jack, side
     ax = ax3

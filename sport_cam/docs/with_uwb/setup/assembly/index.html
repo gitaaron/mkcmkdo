@@ -172,7 +172,7 @@ const STEPS = [
       "<b>Bench-set the buck to 5.1 V under a 4 A dummy load before it goes anywhere near the Pi.</b> Open-circuit voltage tells you nothing; a unit that reads 5.1 V unloaded and 4.8 V loaded will brown the Pi out under load.",
       "Set the PD trigger to <b>12 V</b> on a real bank: press its button until the 12 V LED lights (5 → 9 → 12 → 15 → 20 V, one step per press; it remembers the setting through power cycles and bank swaps), then short its <b>S1</b> key-lock pad with solder so a stray press can't take it to 15 or 20 V. Leave the F1/F2 pads open. Confirm 12 V with a meter at its screw terminal, unplug and replug the bank, and confirm it again, before wiring anything else.",
       `<b>PD trigger:</b> foam-tape it to the floor at the ${where(LY.usbc.ang)} of the enclosure, its USB-C socket hard against the inside of the rectangular inlet low in the wall. The bank's cable plugs in from outside.`,
-      "<b>Switch and jack:</b> the rocker snaps into its cut-out — the wall is thinned round it so the clips grip — and the barrel jack (the 5 V service tap) goes through the round hole and takes its nut inside.",
+      "<b>Switch and jack:</b> the round rocker goes through its hole from outside, the key flat on its thread lined up with the flat in the hole (that keeps ON at the top and stops it turning), its bezel flat on the flat spot cut into the wall; from inside, screw its ring up the thread against the flat boss, hand-tight plus a quarter turn. The barrel jack (the 5 V service tap) goes through the round hole and takes its nut inside.",
       "<b>Latch, gauge and buck:</b> foam-tape them to the floor where the model shows them, clear of the posts and the tripod boss. Everything on the floor stays below the LED window.",
       "Wire the chain: trigger 12 V out → latch <b>IN</b>, latch <b>OUT</b> → gauge <b>VIN+</b>, gauge <b>VOUT+</b> → buck 12 V in. Grounds common. The rocker only signals the latch (S1, S2): it carries under 1 mA, and the latch keeps the power on after you switch off until the Pi has saved the clip and shut down. The gauge has to sit in series on the positive line or it measures nothing. If you couldn't source one, set <code>POWER_MONITOR = \"none\"</code> and skip it — you lose the low-battery warning, nothing else.",
       "Put the 470 µF across the buck output. Leave the buck's 5 V out on 18 AWG, the gauge's SDA/SCL leads and the latch's HOLD and SENSE leads, long enough (≈ 15 cm) to reach up past the shelf to the Pi, the LED ring and the lid.",
@@ -692,10 +692,15 @@ const PARTS = {
       at(mesh(box(b.l, b.w, 1.6), COL.blue), 0, 0, 0.8),
       at(mesh(box(b.l * 0.3, b.w * 0.5, b.z1 - b.z0 - 1.6), COL.black), -b.l * 0.15, 0, (b.z1 - b.z0 + 1.6) / 2),
       at(mesh(cyl(4.5, 12), COL.dark), b.l * 0.3, b.w * 0.2, 7.6)]) },
-  switch: { grp: "static", build: () => placed("switch", (b) => [
-      at(mesh(box(b.l - 3, b.w * 0.8, (b.z1 - b.z0) * 0.8), COL.black), -1.5, 0, 0),
-      at(mesh(box(2, b.w, b.z1 - b.z0), COL.black), b.l / 2 - 0.5, 0, 0),
-      at(mesh(box(2, b.w * 0.6, (b.z1 - b.z0) * 0.6), COL.wire), b.l / 2 + 1, 0, 0)], true) },
+  switch: { grp: "static", build: () => placed("switch", (b) => {
+      // round rocker: body through the wall, bezel on the outer flat, ring on the inner boss
+      const s = LY.parts.switch, S = LY.switch, x0 = Math.hypot(b.cx, b.cy);    // box centre, radially
+      const seat = S.seat_r - x0, ring = S.seat_r - S.panel_t - s.nut_t / 2 - x0;
+      return [at(mesh(cyl(s.hole_d / 2 - 1, s.depth - 4, "x"), COL.black), seat - (s.depth - 4) / 2, 0, 0),
+              at(mesh(cyl(s.nut_d / 2, s.nut_t, "x"), COL.black), ring, 0, 0),
+              at(mesh(cyl(s.flange_d / 2, 2.5, "x"), COL.black), seat + 1.25, 0, 0),
+              at(mesh(cyl(s.hole_d / 2 - 3, 3, "x"), COL.wire), seat + 3, 0, 0)];
+    }, true) },
   jack: { grp: "static", build: () => placed("jack", (b) => [
       at(mesh(cyl(4.4, b.l - 3, "x"), COL.black), -1.5, 0, 0),
       at(mesh(cyl(b.w / 2, 2, "x"), COL.steel, { metal: 0.5 }), -LY.design.base_wall - 1, 0, 0)], true) },

@@ -58,13 +58,6 @@ module shell() {
         at_wall(usbc_ang, usbc_z) cube([base_wall * 4, usbc_w, usbc_h], center = true);
         // 5 V service jack
         at_wall(jack_ang, jack_z) rotate([0, 90, 0]) cylinder(d = jack_d, h = base_wall * 4, center = true);
-        // rocker switch, with the wall thinned from inside so its clips grip
-        at_wall(switch_ang, switch_z) {
-            cube([base_wall * 4, switch_cut_w, switch_cut_h], center = true);
-            if (switch_panel_t < base_wall)
-                translate([(-switch_panel_t - 2) / 2, 0, 0])
-                    cube([base_wall - switch_panel_t + 2, switch_cut_w + 6, switch_cut_h + 6], center = true);
-        }
         // vents: low ones for the buck, high ones for the Pi
         for (a = vents_low) at_wall(a, vent_low_z) vent_slot();
         for (a = vents_high) at_wall(a, vent_high_z) vent_slot();
@@ -77,6 +70,30 @@ module shell() {
     }
 }
 
+// Round rocker switch: its bezel sits on a flat cut into the curved wall
+// outside, and its ring screws up against a flat boss inside, so the two
+// clamp switch_panel_t of plastic between parallel faces.
+module switch_boss() {
+    inner = switch_seat_r - switch_panel_t;
+    if (inner < R_in + 0.5)
+        rotate([0, 0, switch_ang]) translate([inner, 0, switch_z]) rotate([0, 90, 0])
+            cylinder(d = switch_boss_d, h = R_in + 0.5 - inner, $fn = 64);
+}
+
+module switch_cut() {
+    rotate([0, 0, switch_ang]) {
+        translate([switch_seat_r, 0, switch_z]) rotate([0, 90, 0])
+            cylinder(d = switch_flange_d + 1, h = base_wall + 5, $fn = 64);         // flat seat for the bezel
+        // through the wall, with a flat matching the thread's key flat so the switch can't turn
+        translate([switch_seat_r - switch_panel_t - 1, 0, switch_z]) rotate([switch_flat_rot, 0, 0])
+            intersection() {
+                rotate([0, 90, 0]) cylinder(d = switch_hole_d, h = switch_panel_t + base_wall + 6, $fn = 64);
+                translate([0, -switch_hole_d, switch_hole_d / 2 - switch_flat_d])
+                    cube([switch_panel_t + base_wall + 6, 2 * switch_hole_d, switch_flat_d]);
+            }
+    }
+}
+
 module base_housing() {
     difference() {
         union() {
@@ -85,10 +102,13 @@ module base_housing() {
             cylinder(d = tripod_boss_d, h = tripod_boss_h);
             // posts after the window cut, so it doesn't cut them
             for (a = post_angs) shelf_post(a);
+            // flat boss inside the wall for the rocker switch's locking ring
+            switch_boss();
             // risers lifting a board clear of the tripod boss, when fit.py needed them
             for (r = risers) translate([r[0], r[1], base_wall]) rotate([0, 0, r[2]])
                 translate([-3, -3, 0]) cube([6, 6, r[3]]);
         }
+        switch_cut();
         // tripod socket: a 3/8-16 nut dropped into a hex pocket from inside, on a ledge
         // the screw passes up through — tightening pulls the nut onto the ledge
         translate([0, 0, -1]) cylinder(d = tripod_clear_d, h = tripod_ledge + 2, $fn = 48);

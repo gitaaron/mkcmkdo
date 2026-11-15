@@ -91,14 +91,16 @@ w = 24                # MEASURE_TODO
 h = 10                # MEASURE_TODO  the IRF4905 is bent over flat on the board, not standing up
 
 [switch]
-name = "Panel-mount rocker switch, 10 A"
+name = "Round panel-mount rocker switch, threaded, with a locking ring"
 bom = 13
-cut_w = 19.2          # MEASURE_TODO  panel cut-out
-cut_h = 13.2          # MEASURE_TODO
-body_w = 21           # MEASURE_TODO  flange / body behind the panel
-body_h = 15           # MEASURE_TODO
-depth = 24            # MEASURE_TODO  body plus terminals behind the panel
-max_panel_t = 2.0     # MEASURE_TODO  thickest panel its snap-in clips grip; the wall is thinned round the cut-out if needed
+hole_d = 24           # MEASURE_TODO  the threaded body's outside diameter — the wall hole is cut 0.5 mm bigger
+hole_d_minus_flat = 22 # MEASURE_TODO  across the thread from its key flat to the far side — the hole gets a matching flat
+flat_side = "bottom"  # MEASURE_TODO  where the key flat is, looking at the front with ON at the top: top, bottom, left or right
+flange_d = 32         # MEASURE_TODO  the round bezel on the front — a flat seat is cut into the curved wall for it
+nut_d = 32            # MEASURE_TODO  the ring that screws on the back, across its lugs
+nut_t = 6             # MEASURE_TODO  the ring's thickness
+thread_l = 12         # MEASURE_TODO  from the back of the bezel to the end of the thread
+depth = 26            # MEASURE_TODO  from the back of the bezel to the tips of the terminals
 
 [jack]
 name = "Panel-mount barrel jack (5 V service tap)"

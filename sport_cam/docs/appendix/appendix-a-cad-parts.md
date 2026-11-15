@@ -56,7 +56,7 @@ python3 cad/fit.py            # solve, regenerate, render, audit — both builds
    - no two parts overlap, and none hits a post, the boss, the shelf, the
      lid's ring or the screw heads under the lid;
    - the power boards sit below the LED window;
-   - the wall openings can be reached, and the switch's clips can grip;
+   - the wall openings can be reached, and the switch's ring can clamp it to the wall, and its key flat fits its hole;
    - the bolts are long enough;
    - the tray, the pod and the dowel come out of their stock;
    - each STL is one piece no bigger than 170 mm on any side.
@@ -90,7 +90,7 @@ In both builds' `cad/`. Print settings for each are in
 
 | File | Part |
 | --- | --- |
-| `base_housing.scad` | Enclosure: three shelf posts merged into the wall, the LED window all the way round with a ledge below it for the diffuser band, USB-C inlet, switch cut-out (wall thinned for its clips), 5 V jack hole, low and high vents, four radial lid-screw holes, tripod boss with a hex pocket for a 3/8-16 nut, risers when needed. The wall differs by build — see below |
+| `base_housing.scad` | Enclosure: three shelf posts merged into the wall, the LED window all the way round with a ledge below it for the diffuser band, USB-C inlet, round switch hole keyed to the flat on its thread, with a flat seat outside for its bezel and a flat boss inside for its ring, 5 V jack hole, low and high vents, four radial lid-screw holes, tripod boss with a hex pocket for a 3/8-16 nut, risers when needed. The wall differs by build — see below |
 | `shelf.scad` | Pi shelf: rests on the posts (3 × M3 × 8 into inserts), Pi holes for M2.5 nylon standoffs, a cut-away side for the cables, a centre mark for the LED ring underneath |
 | `lid.scad` | Top plate carrying the Arducam pan-tilt base; slotted pattern for the base's standoffs, a cable slot at the back, a locating ring underneath with four radial M3 inserts |
 | `led_diffuser_ring.scad` | Translucent band that slides over the outside of the LED window |

@@ -2,7 +2,7 @@
 window.SPORTCAM_LAYOUT = {
  "R_in": 65.5,
  "base_d": 137,
- "base_h": 67,
+ "base_h": 85,
  "below_lid": 3.1,
  "bolt_angs": [
   45.0,
@@ -23,8 +23,8 @@ window.SPORTCAM_LAYOUT = {
   },
   "gauge": {
    "ang": 0,
-   "cx": -11.0,
-   "cy": -49.0,
+   "cx": -1.0,
+   "cy": -51.0,
    "l": 22.9,
    "name": "battery gauge",
    "w": 22.9,
@@ -42,9 +42,9 @@ window.SPORTCAM_LAYOUT = {
    "z1": 15.0
   },
   "latch": {
-   "ang": 30,
-   "cx": 25.0,
-   "cy": -43.0,
+   "ang": 45,
+   "cx": 33.0,
+   "cy": -37.0,
    "l": 30.0,
    "name": "power latch",
    "w": 24.0,
@@ -58,18 +58,18 @@ window.SPORTCAM_LAYOUT = {
    "l": 25.0,
    "name": "level shifter",
    "w": 15.0,
-   "z0": 43.0,
-   "z1": 51.0
+   "z0": 60.6,
+   "z1": 68.6
   },
   "switch": {
-   "ang": 210,
-   "cx": -47.631,
-   "cy": -27.5,
-   "l": 27.0,
+   "ang": 225,
+   "cx": -38.531,
+   "cy": -38.531,
+   "l": 28.016919445621355,
    "name": "rocker switch",
-   "w": 21.0,
-   "z0": 4.0,
-   "z1": 19.0
+   "w": 36.0,
+   "z0": 2.0,
+   "z1": 38.0
   },
   "trigger": {
    "ang": 180,
@@ -115,9 +115,9 @@ window.SPORTCAM_LAYOUT = {
   225,
   315
  ],
- "lid_screw_z": 64.0,
- "lid_top": 72,
- "lid_z": 67,
+ "lid_screw_z": 82.0,
+ "lid_top": 90,
+ "lid_z": 85,
  "nut_seat": 3,
  "parts": {
   "buck": {
@@ -228,13 +228,15 @@ window.SPORTCAM_LAYOUT = {
    "w": 15
   },
   "switch": {
-   "body_h": 15,
-   "body_w": 21,
    "bom": 13,
-   "cut_h": 13.2,
-   "cut_w": 19.2,
-   "depth": 24,
-   "max_panel_t": 2.0
+   "depth": 26,
+   "flange_d": 32,
+   "flat_side": "bottom",
+   "hole_d": 24,
+   "hole_d_minus_flat": 22,
+   "nut_d": 32,
+   "nut_t": 6,
+   "thread_l": 12
   },
   "tripod_nut": {
    "af": 14.29,
@@ -246,7 +248,7 @@ window.SPORTCAM_LAYOUT = {
   "ang": 60,
   "x": 0,
   "y": 0,
-  "z": 48.0
+  "z": 65.6
  },
  "pi_boxes": [
   {
@@ -256,8 +258,8 @@ window.SPORTCAM_LAYOUT = {
    "l": 85.0,
    "name": "Pi board",
    "w": 56.0,
-   "z0": 48.0,
-   "z1": 49.6
+   "z0": 65.6,
+   "z1": 67.2
   },
   {
    "ang": 60,
@@ -266,8 +268,8 @@ window.SPORTCAM_LAYOUT = {
    "l": 85.0,
    "name": "Pi underside",
    "w": 56.0,
-   "z0": 45.5,
-   "z1": 48.0
+   "z0": 63.1,
+   "z1": 65.6
   },
   {
    "ang": 60,
@@ -276,8 +278,8 @@ window.SPORTCAM_LAYOUT = {
    "l": 85.0,
    "name": "Pi heatsinks",
    "w": 56.0,
-   "z0": 49.6,
-   "z1": 59.6
+   "z0": 67.2,
+   "z1": 77.2
   },
   {
    "ang": 60,
@@ -286,8 +288,8 @@ window.SPORTCAM_LAYOUT = {
    "l": 27.0,
    "name": "Pi USB/Ethernet",
    "w": 54.0,
-   "z0": 49.6,
-   "z1": 65.6
+   "z0": 67.2,
+   "z1": 83.2
   },
   {
    "ang": 60,
@@ -296,8 +298,8 @@ window.SPORTCAM_LAYOUT = {
    "l": 51.0,
    "name": "Pi GPIO leads",
    "w": 7.0,
-   "z0": 49.6,
-   "z1": 65.6
+   "z0": 67.2,
+   "z1": 83.2
   },
   {
    "ang": 60,
@@ -306,8 +308,8 @@ window.SPORTCAM_LAYOUT = {
    "l": 11.999999999999996,
    "name": "Pi USB-C plug",
    "w": 20.0,
-   "z0": 48.0,
-   "z1": 56.6
+   "z0": 65.6,
+   "z1": 74.2
   }
  ],
  "pi_holes": [
@@ -332,32 +334,37 @@ window.SPORTCAM_LAYOUT = {
  "post_angs": [
   40,
   135,
-  240
+  250
  ],
  "post_r": 61.5,
- "power_top": 26.0,
+ "power_top": 38.0,
  "ptz_lift": 1.0,
  "ptz_slot_max": 114.19,
  "ptz_slot_min": 70,
  "ptz_washers": 2,
- "ptz_z": 105.0,
+ "ptz_z": 123.0,
  "raised": false,
- "ring_z0": 34.5,
- "ring_z1": 38.0,
+ "ring_z0": 52.1,
+ "ring_z1": 55.6,
  "risers": [],
  "screw_recess": 0.0,
  "shelf_r": 64.75,
- "shelf_top": 42.0,
- "shelf_z": 39.0,
+ "shelf_top": 59.6,
+ "shelf_z": 56.6,
  "shifter_on": "shelf",
  "switch": {
-  "ang": 210,
-  "cut_h": 13.2,
-  "cut_w": 19.2,
-  "panel_t": 2.0,
-  "z": 11.5
+  "ang": 225,
+  "boss_d": 36,
+  "flange_d": 32,
+  "flat_d": 22.5,
+  "flat_rot": 0,
+  "hole_d": 24.5,
+  "panel_t": 3,
+  "r": 18.0,
+  "seat_r": 66.483,
+  "z": 20.0
  },
- "tilt_z": 143.0,
+ "tilt_z": 161.0,
  "tray_floor": 7.5,
  "tray_side": 3.0,
  "tray_z": -59.5,
@@ -367,7 +374,7 @@ window.SPORTCAM_LAYOUT = {
   "w": 13.5,
   "z": 8.35
  },
- "vent_high_z": 51.5,
+ "vent_high_z": 69.3,
  "vent_low_z": 9.0,
  "vents_high": [
   5,
@@ -416,5 +423,5 @@ window.SPORTCAM_LAYOUT = {
   0.0,
   20.0
  ],
- "window_z": 27.0
+ "window_z": 44.6
 };

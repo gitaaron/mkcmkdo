@@ -59,6 +59,8 @@ BUILDS = ("with_uwb", "without_uwb")
 PRINTER = "Bambu Lab A1 Mini"
 PRINT_LIMIT = 170.0        # its 180 mm cube, less 5 mm a side for a brim
 EPS = 1e-6
+# the switch hole's key flat, by where it is seen from outside with ON at the top: degrees about the hole axis from the bottom
+FLAT_ROT = {"bottom": 0, "right": 90, "top": 180, "left": 270}
 PTZ_ENGAGE = 4.0        # M3 thread each PTZ screw needs in its standoff
 PTZ_HEAD_ARM = 45       # camera board's ribbon socket, out from the tilt axis
 SERVO_CLEAR = 2.0       # air kept under the pan servo, above the lid
@@ -324,14 +326,19 @@ def solve_at(build, P, C, base_d, raised=False):
     board_z = deck_z + riser_h
     usbc_zc = deck_z + tr["h"] - tr["port_h"] / 2
     usbc_w, usbc_h = tr["plug_w"] + 1, tr["plug_h"] + 1
-    sw_zc = FZ + sw["body_h"] / 2 + 1
+    # round switch: bezel outside, locking ring inside on a flat boss; the seat is
+    # as wide as the bigger of the two, and the ring needs room to turn above the floor
+    sw_r = max(sw["flange_d"], sw["nut_d"] + 4) / 2
+    sw_zc = max(FZ + sw["nut_d"] / 2 + 1, sw_r + 0.5)
+    sw_seat_r = math.sqrt(R_out ** 2 - (sw["flange_d"] / 2 + 0.5) ** 2)    # flat for the bezel
+    sw_panel_t = min(C["base_wall"], sw["thread_l"] - sw["nut_t"] - 1)
     jk_zc = FZ + jk["body_d"] / 2 + 1
     feat_half = {   # half-width at the wall, mm
         "usbc": max(tr["w"], usbc_w) / 2,
-        "switch": sw["body_w"] / 2,
+        "switch": sw_r,
         "jack": jk["body_d"] / 2,
     }
-    low_top = max(usbc_zc + usbc_h / 2, sw_zc + sw["body_h"] / 2, jk_zc + jk["body_d"] / 2)
+    low_top = max(usbc_zc + usbc_h / 2, sw_zc + sw_r, jk_zc + jk["body_d"] / 2)
 
     blocked = []    # (angle, half-angle) where low wall features can't go
     if uwb:
@@ -505,8 +512,8 @@ def solve_at(build, P, C, base_d, raised=False):
             tr_r = math.sqrt(R_in ** 2 - (tr["w"] / 2) ** 2) - 0.2 - tr_len / 2
             trig = place("PD trigger", (-tr_len / 2, tr_len / 2, -tr["w"] / 2, tr["w"] / 2, 0, tr["h"]),
                          (*polar(tr_r, ua), deck_z, ua))
-            swb = place("rocker switch", (R_in - sw["depth"], R_in + C["base_wall"], -sw["body_w"] / 2, sw["body_w"] / 2,
-                                          -sw["body_h"] / 2, sw["body_h"] / 2), (0, 0, sw_zc, sa))
+            swb = place("rocker switch", (sw_seat_r - sw["depth"], R_in + C["base_wall"], -sw_r, sw_r,
+                                          -sw_r, sw_r), (0, 0, sw_zc, sa))
             jkb = place("barrel jack", (R_in - jk["depth"], R_in + C["base_wall"], -jk["body_d"] / 2, jk["body_d"] / 2,
                                         -jk["body_d"] / 2, jk["body_d"] / 2), (0, 0, jk_zc, ja))
             wall_parts = [trig, swb, jkb]
@@ -693,8 +700,10 @@ def solve_at(build, P, C, base_d, raised=False):
                 "pi": {"x": px, "y": py, "z": pi_z, "ang": pang}, "pi_holes": holes_w,
                 "usbc": {"ang": ua, "z": usbc_zc, "w": usbc_w, "h": usbc_h},
                 "jack": {"ang": ja, "z": jk_zc, "d": jk["hole_d"]},
-                "switch": {"ang": sa, "z": sw_zc, "cut_w": sw["cut_w"], "cut_h": sw["cut_h"],
-                           "panel_t": min(C["base_wall"], sw["max_panel_t"])},
+                "switch": {"ang": sa, "z": sw_zc, "r": sw_r, "hole_d": sw["hole_d"] + 0.5,
+                           "flat_d": sw["hole_d_minus_flat"] + 0.5, "flat_rot": FLAT_ROT.get(sw["flat_side"], 0),
+                           "flange_d": sw["flange_d"], "boss_d": sw["nut_d"] + 4,
+                           "seat_r": round(sw_seat_r, 3), "panel_t": sw_panel_t},
                 "vents_low": vents_low, "vent_low_z": low_vz or 0, "vents_high": vents_high, "vent_high_z": high_vz,
                 "lid_screw_angs": lid_screw_angs, "lid_screw_z": base_h - C["spigot_h"] / 2,
                 "screw_recess": screw_recess, "below_lid": below_lid,
@@ -781,8 +790,10 @@ def gen_scad(build, P, C, L) -> str:
         "usbc_ang": L["usbc"]["ang"], "usbc_z": L["usbc"]["z"], "usbc_w": L["usbc"]["w"], "usbc_h": L["usbc"]["h"],
         "jack_ang": L["jack"]["ang"], "jack_z": L["jack"]["z"], "jack_d": L["jack"]["d"],
         "switch_ang": L["switch"]["ang"], "switch_z": L["switch"]["z"],
-        "switch_cut_w": L["switch"]["cut_w"], "switch_cut_h": L["switch"]["cut_h"],
+        "switch_hole_d": L["switch"]["hole_d"], "switch_flange_d": L["switch"]["flange_d"],
+        "switch_boss_d": L["switch"]["boss_d"], "switch_seat_r": L["switch"]["seat_r"],
         "switch_panel_t": L["switch"]["panel_t"],
+        "switch_flat_d": L["switch"]["flat_d"], "switch_flat_rot": L["switch"]["flat_rot"],
         "vents_low": L["vents_low"], "vent_low_z": L["vent_low_z"],
         "vents_high": L["vents_high"], "vent_high_z": L["vent_high_z"],
         "lid_screw_angs": L["lid_screw_angs"], "lid_screw_z": L["lid_screw_z"],
@@ -1032,7 +1043,7 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
 
     # 4. wall openings
     feats = [("USB-C inlet", L["usbc"]["ang"], L["usbc"]["z"] + L["usbc"]["h"] / 2, max(L["usbc"]["w"], P["pd_trigger"]["w"]) / 2),
-             ("rocker switch", L["switch"]["ang"], L["switch"]["z"] + P["switch"]["body_h"] / 2, P["switch"]["body_w"] / 2),
+             ("rocker switch", L["switch"]["ang"], L["switch"]["z"] + L["switch"]["r"], L["switch"]["r"]),
              ("barrel jack", L["jack"]["ang"], L["jack"]["z"] + P["jack"]["body_d"] / 2, P["jack"]["body_d"] / 2)]
     ledge_bot = L["window_z"] - C["diffuser_lip"] - C["ledge_h"] - C["diffuser_t"]
     probs = []
@@ -1049,8 +1060,15 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
     A.check(not probs, "Wall openings are reachable and clear of each other",
             "; ".join(probs) or ", ".join(f"{n} at {a}°" for n, a, _, _ in feats), ["pd_trigger", "switch", "jack"])
     sw = P["switch"]
-    A.check(L["switch"]["panel_t"] <= sw["max_panel_t"] + EPS, "The rocker switch's clips can grip the wall",
-            f"wall {C['base_wall']} mm, thinned to {L['switch']['panel_t']} mm round the cut-out (clips take ≤ {sw['max_panel_t']})", ["switch"])
+    pt = L["switch"]["panel_t"]
+    A.check(pt >= 2.0 - EPS and pt + sw["nut_t"] <= sw["thread_l"] + EPS,
+            "The rocker switch's ring clamps it to the wall",
+            f"{pt} mm of wall between the bezel's flat seat and the ring's boss; {sw['nut_t']} mm ring on a "
+            f"{sw['thread_l']} mm thread", ["switch"])
+    A.check(sw["hole_d"] / 2 < sw["hole_d_minus_flat"] < sw["hole_d"] and sw["flat_side"] in FLAT_ROT,
+            "The rocker switch's key flat is keyed into its hole",
+            f"thread Ø{sw['hole_d']}, {sw['hole_d_minus_flat']} across the flat, flat at the {sw['flat_side']}"
+            f" (must be one of {', '.join(FLAT_ROT)})", ["switch"])
     A.check(C["base_wall"] <= P["jack"]["max_panel_t"] + EPS, "The barrel jack's nut reaches through the wall",
             f"wall {C['base_wall']} mm, jack takes ≤ {P['jack']['max_panel_t']}", ["jack"])
     A.check(L["usbc"]["w"] >= P["pd_trigger"]["plug_w"] and L["usbc"]["h"] >= P["pd_trigger"]["plug_h"],
