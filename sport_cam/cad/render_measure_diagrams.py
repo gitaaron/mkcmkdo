@@ -435,8 +435,9 @@ def boards():
          "h — stand the board on the table the way it will sit (on its pins or solder joints if they stick out "
          "underneath) and measure from the table to the top of the tallest part: inductor, heatsink, screw terminal, "
          "capacitor, or a lead bent over the top.",
-         "pd_trigger: port_h — the USB-C socket's height above the board.   plug_w × plug_h — the bank cable's "
-         "USB-C plug: the moulded body behind the metal, not the metal tip (the wall opening is cut to this)."],
+         "pd_trigger: it must have a USB-C SOCKET (a hole the cable plugs into), not a plug sticking out.   "
+         "port_h — the socket's height above the board.   plug_w × plug_h — the bank cable's USB-C plug: the "
+         "moulded body behind the metal, not the metal tip (the wall opening is cut to this)."],
         panels=4, size=(10.0, 7.6), rows=2)
     for ax, t in zip(axes, ("buck converter  [buck]", "PD trigger  [pd_trigger]",
                             "INA260 battery gauge  [gauge]", "power latch  [latch]")):
@@ -453,26 +454,38 @@ def boards():
     S.draw()
     S.fit(pad=16)
 
-    # PD trigger
+    # PD trigger — laid out like the common black ones: USB-C socket at one end,
+    # a blue screw terminal (12 V out) at the other, chip, button and LEDs between
     t = P["pd_trigger"]
+    l, w, top = t["l"], t["w"], 2.8
     S = Scene(axes[1])
-    board_box(S, t["l"], t["w"], color="#1f2f4a")
-    S.box(0, t["w"] / 2 - 4.5, 2.8, 7.5, 9, t["port_h"], METAL, bias=3)             # socket at one end
-    S.box(t["l"] - 7, 1.5, 2.8, 5, t["w"] - 3, t["h"] - 2.8, "#2c8a3a", bias=3)     # output terminal
-    lwh(S, t["l"], t["w"], t["h"])
-    S.dim((7.5, t["w"] / 2 - 4.5, 2.8), (7.5, t["w"] / 2 - 4.5, 2.8 + t["port_h"]), (0, -t["w"] / 2 - 4, 0),
-          "port_h", text_off=(-14, -4), ha="right")
-    # plug, floating off the socket end
-    px = -30
+    board_box(S, l, w, color="#202226")
+    sw, sl = 9.0, 7.5                                                               # USB-C socket
+    S.box(l - sl + 0.6, w / 2 - sw / 2, top, sl, sw, t["port_h"], METAL, bias=3)
+    S.poly([(l + 0.61, w / 2 - sw / 2 + 0.9, top + 0.7), (l + 0.61, w / 2 + sw / 2 - 0.9, top + 0.7),
+            (l + 0.61, w / 2 + sw / 2 - 0.9, top + t["port_h"] - 0.7), (l + 0.61, w / 2 - sw / 2 + 0.9, top + t["port_h"] - 0.7)],
+           "#1b1d22", bias=4, lw=0.4)                                               # its mouth
+    S.box(0.4, 1.0, top, 7.5, w - 2.0, t["h"] - top, "#2f7fd6", bias=3)            # screw terminal
+    for y in (w * 0.3, w * 0.7):
+        S.disc((4.15, y, t["h"]), 2.1, "#7a828f", bias=4)
+    S.box(l * 0.36, w * 0.2, top, l * 0.26, w * 0.32, 1.4, "#15161a", bias=2)      # chip
+    S.box(l * 0.38, w * 0.62, top, 5, 5, 2.2, "#3a3d44", bias=2)                    # button
+    S.cyl((l * 0.38 + 2.5, w * 0.62 + 2.5, top + 2.2), 1.5, 1.2, "#15161a", bias=3)
+    for k in range(5):                                                              # voltage LEDs
+        S.box(l * 0.30 + k * l * 0.07, 0.8, top, 1.2, 0.8, 0.6, "#f2f2f2", lw=0.3, bias=2)
+    lwh(S, l, w, t["h"])
+    S.dim((l + 0.6, w / 2 - sw / 2, top), (l + 0.6, w / 2 - sw / 2, top + t["port_h"]), (0, -5, 0),
+          "port_h", text_off=(5, 6), ha="left")
+    S.text((l + 0.6, w / 2, top + t["port_h"]), "USB-C socket\n(a hole, not a plug)", off=(-2, 20), ha="left")
+    S.text((0.4, w / 2, t["h"]), "screw terminal\n12 V out", off=(-3, 4), ha="right")
+    # the bank cable's plug, off to one side, pointing at the socket's end
     pw, ph = t["plug_w"], t["plug_h"]
-    pz = 14
-    S.box(px, t["w"] / 2 - pw / 2, pz, 18, pw, ph, "#2a2d33", bias=0)
-    S.box(px + 18, t["w"] / 2 - 4.2, pz + ph / 2 - 1.3, 6.5, 8.4, 2.6, METAL, bias=1)
-    S.dim((px + 18, t["w"] / 2 + pw / 2, pz + ph), (px + 18, t["w"] / 2 - pw / 2, pz + ph), (0, 0, 7), "plug_w",
-          text_off=(0, 8), ext=True)
-    S.dim((px, t["w"] / 2 + pw / 2, pz), (px, t["w"] / 2 + pw / 2, pz + ph), (-8, 0, 0), "plug_h",
-          text_off=(-14, 0), ha="right")
-    S.text((px + 9, t["w"] / 2, pz), "bank cable's plug", off=(0, -14))
+    px, py, pz = l + 4, -40, top + 22
+    S.box(px + 16, py - 4.2, pz + ph / 2 - 1.3, 6.5, 8.4, 2.6, METAL, bias=1)              # metal tip
+    S.box(px, py - pw / 2, pz, 16, pw, ph, "#2a2d33", bias=2)                              # moulded body
+    S.dim((px, py + pw / 2, pz + ph), (px, py - pw / 2, pz + ph), (0, 0, 5), "plug_w", text_off=(-3, 3), ha="right")
+    S.dim((px + 16, py + pw / 2, pz), (px + 16, py + pw / 2, pz + ph), (3, 3, 0), "plug_h", text_off=(-3, 0), ha="right")
+    S.text((px + 8, py - pw / 2, pz + ph), "bank cable's plug", off=(4, 6), ha="left")
     S.draw()
     S.fit(pad=16)
 

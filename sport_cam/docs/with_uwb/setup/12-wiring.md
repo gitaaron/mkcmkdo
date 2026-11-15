@@ -281,9 +281,16 @@ Each step points at the assembly-guide step it belongs to.
    the output and trim it to **5.1 V under load**. Open-circuit voltage tells
    you nothing: a unit that reads 5.1 V unloaded can sag to 4.8 V and brown
    the Pi out.
-2. **Set the trigger to 12 V** (solder jumper or resistor, per its
-   silkscreen). Check it with a meter on the real bank and the real cable
-   (P1).
+2. **Set the trigger to 12 V**, on the real bank with the real cable (P1).
+   On the button type (BOM 10), press the button until the **12 V** LED
+   lights: it steps 5 → 9 → 12 → 15 → 20 V, one step per press, and saves
+   the setting, so it comes back at 12 V after every power cycle and bank
+   swap. Then **short its S1 key-lock pad** with a blob of solder, so a
+   stray press can't take it to 15 or 20 V (to change it later, hold the
+   button while plugging the bank in). Leave the F1/F2 test pads open. A
+   jumper or resistor type is set per its silkscreen instead. **Check:**
+   12 V at its screw terminal, and still 12 V after unplugging and
+   replugging the bank.
 3. **Build the 12 V chain**: the [power latch](#power-latch) on its
    perfboard, then P2–P6, S1, S2, and the capacitor (R1). **Check:** rocker
    off, **0 V** at the buck input. Rocker on, **12 V** at the buck input and
