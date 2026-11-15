@@ -140,7 +140,7 @@ SCENES = [
               ("foot", (-60, 0, 0)), ("cradle", (-60, 0, -80)), ("tray", (0, 0, -90))],
          arrows=False),
     dict(id="tripod-insert", title="Enclosure", show=[], add=[("shell", UP)], elev=38,
-         marks=[((0, 0, 8), "3/8-16 insert (1/4-20 via bushing)")]),
+         marks=[((0, 0, 12), "3/8-16 nut (1/4-20 via bushing)")]),
     dict(id="power", title="Power boards on the floor", show=[], add=[("shell", UP)], elev=44,
          marks=[((LY["boxes"]["trigger"]["cx"], LY["boxes"]["trigger"]["cy"], 8), "PD trigger at the USB-C inlet"),
                 ((LY["boxes"]["buck"]["cx"], LY["boxes"]["buck"]["cy"], 20), "buck"),

@@ -27,12 +27,20 @@ Click a drawing for the full size. (Drawn by `python3 cad/render_measure_diagram
 | 4 | **Pi heatsinks or fan case** → `[pi] heatsink_h` | <a href="../images/measure/pi_heatsink.png"><img src="../images/measure/pi_heatsink.png" width="260" alt="Pi: heatsink_h from the board's top surface"></a> | The Pi sits on the shelf under the lid; a fan case is taller than stick-on heatsinks | `fit.py` makes the enclosure taller |
 | 5 | **Camera power bank** → `[power_bank]` | <a href="../images/measure/power_bank.png"><img src="../images/measure/power_bank.png" width="260" alt="Camera power bank: l, w, h of the body"></a> | The battery tray is a pocket sized to it. Banks of the same advertised capacity vary by 15 mm in every direction | Reprint the tray (3.5 h) |
 
-**Tripod insert** (`[tripod_insert]`): floor bore = insert outside diameter
-(12.7 mm assumed); insert length ≤ 8 mm (boss height). If the insert doesn't
-fit, enlarge the bore with a drill rather than reprinting. Check both
-threads: 3/8-16 screw into the insert; 1/4-20 screw with the bushing fitted.
+**Tripod nut** (`[tripod_nut]`): the floor's hex pocket is cut to the nut's
+size across the flats (14.29 mm assumed, a standard 3/8-16 nut) and must be at
+least as deep as the nut is thick (8.33 mm assumed; the pocket is 9 mm). A
+nut that is slightly too big can be filed down on its flats rather than
+reprinting. Check both threads: 3/8-16 screw into the nut; 1/4-20 screw with
+the bushing fitted.
 
-<a href="../images/measure/tripod_insert.png"><img src="../images/measure/tripod_insert.png" width="260" alt="Tripod insert: od and l"></a>
+**Reducer bushing** (BOM item 23): it must screw all the way up into the nut
+and sit flush with the floor — a plain slotted sleeve, not one with a collar or
+flange, or the tripod plate clamps on the collar instead of the enclosure. It
+must be no longer than the ledge plus the nut (3 + 8.33 ≈ 11 mm), or it
+bottoms out before it is flush; most are 8–10 mm.
+
+<a href="../images/measure/tripod_nut.png"><img src="../images/measure/tripod_nut.png" width="260" alt="Tripod nut: af and t"></a>
 
 ## On arrival, before you wire anything
 

@@ -148,11 +148,11 @@ diffuser.
 | --- | --- | --- |
 | Remove brims, clean up strings | flush cutters, deburring tool | all parts |
 | Open every M3 clearance hole | 3.2 mm drill bit, by hand | enclosure lid-screw holes, shelf, lid slots<!--with_uwb--> (and, with UWB, arms and mast foot)<!--/--> |
-| Check the tripod bore fits your 3/8-16 insert | drill or step bit if it is larger than the bore | enclosure floor |
+| Check the 3/8-16 tripod nut drops into its hex pocket | a file on the nut's flats if it is tight | enclosure floor |
 | Fit heat-set inserts | soldering iron, flat tip, ≈ 200 °C | M3: one in the top of each of the three shelf posts, and four pushed sideways into the lid's ring (7 total) |
 | Dry-fit before wiring | — | lid ring in the enclosure mouth; shelf on its posts; diffuser band over the window onto its ledge; the bank in the tray |
 
-The 3/8-16 brass tripod insert is epoxied, not heat-set.<!--with_uwb--> Additional UWB inserts:
+The 3/8-16 tripod nut is epoxied into its pocket, not heat-set.<!--with_uwb--> Additional UWB inserts:
 [below](#with-uwb).<!--/-->
 
 ## Measure before you print

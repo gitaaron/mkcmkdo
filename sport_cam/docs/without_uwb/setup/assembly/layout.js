@@ -118,6 +118,7 @@ window.SPORTCAM_LAYOUT = {
  "lid_screw_z": 64.0,
  "lid_top": 72,
  "lid_z": 67,
+ "nut_seat": 3,
  "parts": {
   "buck": {
    "bom": 11,
@@ -235,10 +236,10 @@ window.SPORTCAM_LAYOUT = {
    "depth": 24,
    "max_panel_t": 2.0
   },
-  "tripod_insert": {
+  "tripod_nut": {
+   "af": 14.29,
    "bom": 23,
-   "l": 8,
-   "od": 12.7
+   "t": 8.33
   }
  },
  "pi": {

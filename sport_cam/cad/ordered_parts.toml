@@ -152,11 +152,11 @@ lead_bundle_d = 8     # MEASURE_DONE  the I2C/5 V lead (and the servo leads, if 
 
 # ---- tripod --------------------------------------------------------------
 
-[tripod_insert]
-name = "3/8-16 brass insert"
+[tripod_nut]
+name = "3/8-16 hex nut"
 bom = 23
-od = 12.7             # MEASURE_TODO  the floor boss bore is cut to this — epoxied, so a snug slip fit
-l = 8                 # MEASURE_TODO
+af = 14.29            # MEASURE_TODO  across the flats (9/16 in on a standard nut) — the floor's hex pocket is cut to this
+t = 8.33              # MEASURE_TODO  its thickness (21/64 in) — the pocket must be at least this deep
 
 # ---- with UWB only -------------------------------------------------------
 

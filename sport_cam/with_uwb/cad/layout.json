@@ -127,6 +127,7 @@
  "lid_z": 83,
  "mast_axis_r": 89.1,
  "mast_bore": 13.2,
+ "nut_seat": 3,
  "parts": {
   "buck": {
    "bom": 11,
@@ -262,10 +263,10 @@
    "l": 95,
    "w": 23
   },
-  "tripod_insert": {
+  "tripod_nut": {
+   "af": 14.29,
    "bom": 23,
-   "l": 8,
-   "od": 12.7
+   "t": 8.33
   },
   "ula1": {
    "antenna_from_end": 10,

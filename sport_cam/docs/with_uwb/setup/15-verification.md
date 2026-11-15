@@ -31,12 +31,20 @@ Click a drawing for the full size. (Drawn by `python3 cad/render_measure_diagram
 | 8 | **USB extension ends** → `[usb_extension]` | <a href="../images/measure/usb_extension.png"><img src="../images/measure/usb_extension.png" width="260" alt="USB extension: socket end and plug end"></a> | The rigid socket end has to fit between each anchor's plug and the enclosure, or `fit.py` turns the boards across the arms; the plug end sets the size of the cable slot | Reprint the arms and cradle |
 | 9 | **Dowel diameter** → `[dowel] d` | <a href="../images/measure/dowel.png"><img src="../images/measure/dowel.png" width="260" alt="Dowel: diameter d"></a> | The A3 mast sockets are bored to it. "½-inch" dowels vary by a few tenths of a millimetre | Reprint the foot and cradle (≈ 1.5 h each). Slightly loose is fine — the pinch screws take it up |
 
-**Tripod insert** (`[tripod_insert]`): floor bore = insert outside diameter
-(12.7 mm assumed); insert length ≤ 8 mm (boss height). If the insert doesn't
-fit, enlarge the bore with a drill rather than reprinting. Check both
-threads: 3/8-16 screw into the insert; 1/4-20 screw with the bushing fitted.
+**Tripod nut** (`[tripod_nut]`): the floor's hex pocket is cut to the nut's
+size across the flats (14.29 mm assumed, a standard 3/8-16 nut) and must be at
+least as deep as the nut is thick (8.33 mm assumed; the pocket is 9 mm). A
+nut that is slightly too big can be filed down on its flats rather than
+reprinting. Check both threads: 3/8-16 screw into the nut; 1/4-20 screw with
+the bushing fitted.
 
-<a href="../images/measure/tripod_insert.png"><img src="../images/measure/tripod_insert.png" width="260" alt="Tripod insert: od and l"></a>
+**Reducer bushing** (BOM item 23): it must screw all the way up into the nut
+and sit flush with the floor — a plain slotted sleeve, not one with a collar or
+flange, or the tripod plate clamps on the collar instead of the enclosure. It
+must be no longer than the ledge plus the nut (3 + 8.33 ≈ 11 mm), or it
+bottoms out before it is flush; most are 8–10 mm.
+
+<a href="../images/measure/tripod_nut.png"><img src="../images/measure/tripod_nut.png" width="260" alt="Tripod nut: af and t"></a>
 
 ## On arrival, before you wire anything
 

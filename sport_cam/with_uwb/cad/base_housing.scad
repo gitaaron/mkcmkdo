@@ -106,8 +106,11 @@ module base_housing() {
             for (r = risers) translate([r[0], r[1], base_wall]) rotate([0, 0, r[2]])
                 translate([-3, -3, 0]) cube([6, 6, r[3]]);
         }
-        // tripod insert bore
-        translate([0, 0, -1]) cylinder(d = tripod_hole_d, h = tripod_boss_h + 1);
+        // tripod socket: a 3/8-16 nut dropped into a hex pocket from inside, on a ledge
+        // the screw passes up through — tightening pulls the nut onto the ledge
+        translate([0, 0, -1]) cylinder(d = tripod_clear_d, h = tripod_ledge + 2, $fn = 48);
+        translate([0, 0, tripod_ledge])
+            cylinder(d = (nut_af + 2 * tripod_nut_clr) / cos(30), h = tripod_boss_h, $fn = 6);
     }
 }
 

@@ -764,7 +764,7 @@ def usb_extension():
 
 
 # ============================================================================
-#  9. Dowel, and the tripod insert
+#  9. Dowel, and the tripod nut
 # ============================================================================
 
 def dowel():
@@ -784,30 +784,26 @@ def dowel():
     save(fig, "dowel.png", ("with_uwb",))
 
 
-def tripod_insert():
-    t = P["tripod_insert"]
-    od, L = t["od"], t["l"]
+def tripod_nut():
+    t = P["tripod_nut"]
+    af, th = t["af"], t["t"]
+    rc = af / math.sqrt(3)                     # centre to a corner
     fig, (ax,) = figure(
-        "Tripod insert", "[tripod_insert]",
-        ["od — across the outside of the insert at its widest: over the knurls or the outer thread, not the hole.",
-         "l — its length, end to end. It must not be longer than the floor boss is tall (8 mm)."],
+        "Tripod nut", "[tripod_nut]",
+        ["af — across the flats: calipers on two opposite flat sides, not the corners. The floor's hex pocket "
+         "is cut to it (a standard 3/8-16 nut is 14.29 mm, 9/16 in).",
+         "t — its thickness, face to face. The pocket is 9 mm deep, so it must not be thicker than that."],
         size=(5.6, 3.8))
     S = Scene(ax)
-    S.cyl((0, 0, 0), od / 2, L, BRASS)
-    S.disc((0, 0, L), 4.76, "#3a2f1a", bias=1)
-    for i in range(16):
-        a = 2 * math.pi * i / 16
-        if math.cos(a - math.pi / 4) > 0.2:    # knurl lines on the visible side
-            x, y = od / 2 * math.cos(a), od / 2 * math.sin(a)
-            S.poly([(x, y, 0.5), (x, y, L - 0.5)], "none", bias=50, edge="#8a6a1c", lw=0.6)
-    S.dim((-od / 2 * 0.7071, od / 2 * 0.7071, L), (od / 2 * 0.7071, -od / 2 * 0.7071, L), (0, 0, 6), "od",
-          text_off=(0, 6))
-    S.dim((od / 2 * 0.7071, -od / 2 * 0.7071, 0), (od / 2 * 0.7071, -od / 2 * 0.7071, L), (5, -5, 0), "l",
-          text_off=(3, 0), ha="left")
-    S.text((-od / 2, od / 2, L / 2), "3/8-16 inside", off=(-10, 0), ha="right")
+    S.cyl((0, 0, 0), rc, th, METAL, n=6)
+    S.disc((0, 0, th), 4.76, "#4a4f5a", bias=1)
+    S.dim((0, -af / 2, 0), (0, af / 2, 0), (8, 0, 0), "af", text_off=(4, -4), ha="left")
+    cx, cy = rc * math.cos(math.radians(-60)), rc * math.sin(math.radians(-60))
+    S.dim((cx, cy, 0), (cx, cy, th), (5, -5, 0), "t", text_off=(3, 0), ha="left")
+    S.text((-rc, 0, th / 2), "3/8-16 inside", off=(-10, 0), ha="right")
     S.draw()
     S.fit(pad=14)
-    save(fig, "tripod_insert.png")
+    save(fig, "tripod_nut.png")
 
 
 if __name__ == "__main__":
@@ -820,4 +816,4 @@ if __name__ == "__main__":
     ula1()
     usb_extension()
     dowel()
-    tripod_insert()
+    tripod_nut()

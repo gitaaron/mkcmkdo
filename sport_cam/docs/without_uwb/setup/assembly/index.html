@@ -137,19 +137,19 @@ const STEPS = [
     },
   },
   {
-    id: "tripod-insert", phase: 1, title: "Tripod insert into the enclosure floor", time: "15 min + cure",
-    parts: ["Enclosure", "3/8-16 brass insert, ≤ 8 mm long", "3/8-16 → 1/4-20 reducer bushing", "2-part epoxy"],
-    tools: ["Drill or step bit, if your insert is larger than the bore", "3/8-16 screw as a plug", "Flat screwdriver (for the bushing's slot)"],
+    id: "tripod-insert", phase: 1, title: "Tripod nut into the enclosure floor", time: "10 min + cure",
+    parts: ["Enclosure", "3/8-16 hex nut", "3/8-16 → 1/4-20 reducer bushing", "2-part epoxy"],
+    tools: ["3/8-16 screw as a plug", "Flat screwdriver (for the bushing's slot)"],
     steps: [
-      "The floor has a 24 mm boss with a 12.7 mm bore. Check your insert slips in snugly; open the bore up to its outside diameter if not.",
-      "Mix epoxy, coat the outside of the insert, and press it in <b>from inside the enclosure</b> so the threads open downward.",
-      "Thread a lightly greased 3/8-16 screw in from below while it cures — it keeps epoxy out of the threads and holds the insert square.",
+      "Inside the enclosure, the floor has a 24 mm boss with a hex pocket in it, and a 10 mm hole through the ledge underneath. Check the nut drops into the pocket and sits flat on the ledge.",
+      "Thread a lightly greased 3/8-16 screw up through the hole from below and a few turns into the nut — it holds the nut square and keeps epoxy out of the threads.",
+      "Mix epoxy, butter the six sides of the nut, and pull it down into the pocket with the screw. Wipe off what squeezes out on top.",
       "Cure 24 h, remove the screw, confirm the enclosure sits flat on a tripod plate.",
-      "<b>Pick the thread for your tripod:</b> most photo tripods and phone-style mini tripods have a 1/4-20 screw — run the reducer bushing into the insert with a flat screwdriver, slot downward. Video heads and heavier tripods with a 3/8-16 screw go straight into the insert; unscrew the bushing for those.",
+      "<b>Pick the thread for your tripod:</b> most photo tripods have a 1/4-20 screw — run the reducer bushing up into the nut with a flat screwdriver, slot downward. Video heads and heavier tripods with a 3/8-16 screw go straight into the nut; unscrew the bushing for those.",
     ],
-    warn: "This single insert carries the camera and the battery. Do not rush the cure, and do not use hot glue. Keep the insert no longer than the 8 mm boss: the Pi sits right above it.",
+    warn: "This one nut carries the camera and the battery. The pocket stops it turning and the ledge takes the pull, but let the epoxy cure: it is what keeps the nut from falling out when the tripod is unscrewed. Do not use hot glue.",
     scene: { show: ["base_housing"], add: [["insert", 0, 0, 60]], view: "iso-high", focus: "all", render: "tripod-insert",
-             marks: [[0, 0, 8, "3/8-16 insert (1/4-20 via bushing)", 45, -45, 45]] },
+             marks: [[0, 0, 12, "3/8-16 nut (1/4-20 via bushing)", 45, -45, 45]] },
   },
   {
     id: "power", phase: 1, title: "Power boards onto the floor", time: "60 min",
@@ -616,7 +616,8 @@ const PARTS = {
   bank: { grp: "static", build: () => { const k = LY.parts.power_bank;
     return group(at(mesh(box(k.l, k.w, k.h), COL.dark, { rough: 0.5 }), 0, 0, LY.tray_z + LY.tray_floor + k.h / 2),
                  at(mesh(box(26, 10, 2), COL.steel, { metal: 0.4 }), -k.l / 2 + 5, 0, LY.tray_z + LY.tray_floor + k.h)); } },
-  insert: { grp: "static", build: () => at(mesh(cyl(LY.parts.tripod_insert.od / 2 - 0.05, LY.parts.tripod_insert.l), COL.brass, { metal: 0.6, rough: 0.4 }), 0, 0, LY.parts.tripod_insert.l / 2 + 0.2) },
+  insert: { grp: "static", build: () => { const n = LY.parts.tripod_nut, g = new THREE.CylinderGeometry(n.af / Math.sqrt(3), n.af / Math.sqrt(3), n.t, 6);
+    g.rotateX(Math.PI / 2); return at(mesh(g, COL.steel, { metal: 0.6, rough: 0.4 }), 0, 0, LY.nut_seat + n.t / 2 + 0.1); } },
   base_housing: { grp: "static", stl: "base_housing", color: COL.print, double: true },
 
   // power boards on the floor, where cad/fit.py put them

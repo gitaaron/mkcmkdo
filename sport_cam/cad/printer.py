@@ -86,7 +86,7 @@ PLATES = {"textured": "Textured PEI Plate", "smooth": "High Temp Plate", "cool":
 # walls, infill %, plus any other Bambu Studio process keys. `sizes` are the
 # ordered_parts.toml entries the part is shaped by (for the "not measured" warning).
 _ALL_INSIDE = ["pi", "shifter", "pd_trigger", "buck", "gauge", "latch", "switch", "jack", "led_ring", "ptz",
-               "tripod_insert"]
+               "tripod_nut"]
 PARTS = {
     "base_housing": dict(aliases=["enclosure", "housing"], walls=4, infill=20, sizes=_ALL_INSIDE,
                          note={"with_uwb": "the three wall bosses print without support and droop a little "

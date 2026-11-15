@@ -791,7 +791,7 @@ def gen_scad(build, P, C, L) -> str:
         "cable_slot_ang": L["cable_slot"]["ang"], "cable_slot_r": L["cable_slot"]["r"],
         "cable_slot_w": L["cable_slot"]["w"], "cable_slot_d": L["cable_slot"]["d"],
         "risers": L["risers"],
-        "insert_od": P["tripod_insert"]["od"], "insert_l": P["tripod_insert"]["l"],
+        "nut_af": P["tripod_nut"]["af"], "nut_t": P["tripod_nut"]["t"],
         "bank_l": P["power_bank"]["l"], "bank_w": P["power_bank"]["w"], "bank_h": P["power_bank"]["h"],
     }
     if build == "with_uwb":
@@ -821,6 +821,7 @@ def gen_json(build, P, C, L) -> dict:
     keep["tray_z"] = -tray_size(C, P["power_bank"])[2] - 20
     keep["tray_side"] = C["tray_clr"] + C["tray_wall"]                  # outside edge to the bank
     keep["tray_floor"] = 1.6 + C["tray_tunnel_h"] + C["tray_wall"]      # tray bottom to the bank
+    keep["nut_seat"] = C["tripod_ledge"]                                # the tripod nut sits on this ledge
     keep["lid_z"] = L["base_h"]
     keep["lid_top"] = L["base_h"] + C["lid_t"]
     # Arducam base: on its standoffs on the lid; the tilt axis is above the bottom disc
@@ -1077,9 +1078,14 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
             f"{P['pi']['standoff_h']} mm standoffs, {P['pi']['under_h']} mm underneath", ["pi"])
 
     # 6. tripod
-    ins = P["tripod_insert"]
-    A.check(ins["l"] <= C["tripod_boss_h"] + EPS, "The tripod insert fits the floor boss",
-            f"insert {ins['l']} mm long, boss {C['tripod_boss_h']} mm; bore cut to {ins['od']} mm", ["tripod_insert"])
+    nut = P["tripod_nut"]
+    pocket = C["tripod_boss_h"] - C["tripod_ledge"]
+    corner_wall = C["tripod_boss_d"] / 2 - (nut["af"] / 2 + C["tripod_nut_clr"]) / math.cos(math.radians(30))
+    A.check(nut["t"] <= pocket + EPS and corner_wall >= 2.5 - EPS and C["tripod_ledge"] >= 2.5 - EPS
+            and C["tripod_clear_d"] < nut["af"] - 2,
+            "The tripod nut fits its pocket in the floor boss",
+            f"nut {nut['af']} mm across the flats × {nut['t']} mm in a {pocket:.1f} mm pocket; "
+            f"{corner_wall:.1f} mm of boss outside its corners, {C['tripod_ledge']} mm ledge under it", ["tripod_nut"])
 
     # 7. camera mount
     ptz = P["ptz"]

@@ -90,7 +90,7 @@ In both builds' `cad/`. Print settings for each are in
 
 | File | Part |
 | --- | --- |
-| `base_housing.scad` | Enclosure: three shelf posts merged into the wall, the LED window all the way round with a ledge below it for the diffuser band, USB-C inlet, switch cut-out (wall thinned for its clips), 5 V jack hole, low and high vents, four radial lid-screw holes, tripod boss for a 3/8-16 insert, risers when needed. The wall differs by build — see below |
+| `base_housing.scad` | Enclosure: three shelf posts merged into the wall, the LED window all the way round with a ledge below it for the diffuser band, USB-C inlet, switch cut-out (wall thinned for its clips), 5 V jack hole, low and high vents, four radial lid-screw holes, tripod boss with a hex pocket for a 3/8-16 nut, risers when needed. The wall differs by build — see below |
 | `shelf.scad` | Pi shelf: rests on the posts (3 × M3 × 8 into inserts), Pi holes for M2.5 nylon standoffs, a cut-away side for the cables, a centre mark for the LED ring underneath |
 | `lid.scad` | Top plate carrying the Arducam pan-tilt base; slotted pattern for the base's standoffs, a cable slot at the back, a locating ring underneath with four radial M3 inserts |
 | `led_diffuser_ring.scad` | Translucent band that slides over the outside of the LED window |
