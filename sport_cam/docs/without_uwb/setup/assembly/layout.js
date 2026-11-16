@@ -18,8 +18,8 @@ window.SPORTCAM_LAYOUT = {
    "l": 60.0,
    "name": "buck converter",
    "w": 40.0,
-   "z0": 4.0,
-   "z1": 26.0
+   "z0": 3.0,
+   "z1": 25.0
   },
   "gauge": {
    "ang": 0,
@@ -82,6 +82,31 @@ window.SPORTCAM_LAYOUT = {
    "z1": 10
   }
  },
+ "buck_holes": [
+  [
+   23.5,
+   51.5
+  ],
+  [
+   23.5,
+   18.5
+  ],
+  [
+   -29.5,
+   51.5
+  ],
+  [
+   -29.5,
+   18.5
+  ]
+ ],
+ "buck_screw": {
+  "d": 3,
+  "head_d": 6.4,
+  "hole_d": 3.4,
+  "l": 8,
+  "through": 3.0
+ },
  "build": "without_uwb",
  "cable_slot": {
   "ang": 180,
@@ -123,7 +148,10 @@ window.SPORTCAM_LAYOUT = {
   "buck": {
    "bom": 11,
    "h": 22,
+   "hole_dx": 53,
+   "hole_dy": 33,
    "l": 60,
+   "screw_d": 3,
    "w": 40
   },
   "gauge": {

@@ -1,5 +1,5 @@
-// Static enclosure. Bottom to top inside: the power boards stuck to the
-// floor, the LED ring hanging under the Pi shelf (which rests on three posts
+// Static enclosure. Bottom to top inside: the power boards on the floor (the
+// buck screwed up into its standoffs from underneath, the rest taped), the LED ring hanging under the Pi shelf (which rests on three posts
 // merged into the wall), the Pi on the shelf. The lid carries the Arducam
 // pan-tilt base; the anchor arms bolt to the bosses at ±Y and the A3 mast
 // foot to the one at −X, behind the lens. Nothing rotates.
@@ -123,9 +123,15 @@ module base_housing() {
             switch_boss();
             // risers lifting a board clear of the tripod boss, when fit.py needed them
             for (r = risers) translate([r[0], r[1], base_wall]) rotate([0, 0, r[2]])
-                translate([-3, -3, 0]) cube([6, 6, r[3]]);
+                translate([-r[4] / 2, -r[4] / 2, 0]) cube([r[4], r[4], r[3]]);
         }
         switch_cut();
+        // the buck stands on four standoffs: countersunk screws come up from
+        // underneath, through the floor (and its risers, if raised), into them
+        for (h = buck_holes) translate([h[0], h[1], 0]) {
+            translate([0, 0, -1]) cylinder(d = buck_hole_d, h = buck_hole_h + 2, $fn = 24);
+            translate([0, 0, -0.01]) cylinder(d1 = buck_head_d, d2 = buck_hole_d, h = (buck_head_d - buck_hole_d) / 2 + 0.01, $fn = 24);
+        }
         // tripod socket: a 3/8-16 nut dropped into a hex pocket from inside, on a ledge
         // the screw passes up through — tightening pulls the nut onto the ledge
         translate([0, 0, -1]) cylinder(d = tripod_clear_d, h = tripod_ledge + 2, $fn = 48);

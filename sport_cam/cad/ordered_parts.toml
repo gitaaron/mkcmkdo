@@ -72,9 +72,14 @@ plug_h = 7            # MEASURE_TODO
 [buck]
 name = "12 V → 5 V 8 A adjustable buck"
 bom = 11
-l = 60                # MEASURE_TODO
+# It stands on four brass standoffs, one in each corner, and M3 countersunk
+# screws come up through the enclosure floor into them (no foam tape).
+l = 60                # MEASURE_TODO  the board outline, or anything hanging over its edge, whichever is bigger
 w = 40                # MEASURE_TODO
-h = 22                # MEASURE_TODO  including the inductor / heatsink
+h = 22                # MEASURE_TODO  from the bottom of the standoffs to the top of the tallest part
+hole_dx = 53          # MEASURE_TODO  standoff centre to centre, along l
+hole_dy = 33          # MEASURE_TODO  and along w
+screw_d = 3           # MEASURE_TODO  the standoffs' thread: 3 for M3, 2.5 for M2.5
 
 [gauge]
 name = "INA260 breakout (battery gauge)"

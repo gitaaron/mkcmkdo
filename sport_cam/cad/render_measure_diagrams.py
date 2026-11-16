@@ -435,6 +435,8 @@ def boards():
          "h — stand the board on the table the way it will sit (on its pins or solder joints if they stick out "
          "underneath) and measure from the table to the top of the tallest part: inductor, heatsink, screw terminal, "
          "capacitor, or a lead bent over the top.",
+         "buck: h from the bottom of its standoffs, which stay on.   hole_dx / hole_dy — standoff centre to centre, "
+         "along l and along w (calipers: outside to outside, minus one standoff's width).   screw_d — their thread, 3 for M3.",
          "pd_trigger: it must have a USB-C SOCKET (a hole the cable plugs into), not a plug sticking out.   "
          "port_h — the socket's height above the board.   plug_w × plug_h — the bank cable's USB-C plug: the "
          "moulded body behind the metal, not the metal tip (the wall opening is cut to this)."],
@@ -446,11 +448,27 @@ def boards():
     # buck
     b = P["buck"]
     S = Scene(axes[0])
-    board_box(S, b["l"], b["w"], color="#2f5fb3")
-    S.cyl((b["l"] * 0.38, b["w"] * 0.5, 2.8), 9, b["h"] - 2.8, DARK, bias=3)          # inductor
-    S.cyl((b["l"] * 0.75, b["w"] * 0.3, 2.8), 4, b["h"] * 0.55, "#1e3f7a", bias=3)    # capacitor
-    S.box(b["l"] * 0.70, b["w"] * 0.62, 2.8, 8, 8, 6, "#3070d8", bias=3)              # trimmer
+    so = min(10.0, b["h"] * 0.45)                                                   # standoff height, drawn
+    x0, y0 = (b["l"] - b["hole_dx"]) / 2, (b["w"] - b["hole_dy"]) / 2
+    for x in (x0, x0 + b["hole_dx"]):                                               # brass standoffs
+        for y in (y0, y0 + b["hole_dy"]):
+            S.cyl((x, y, 0), 2.5, so, "#c9a227", bias=1)
+    S.box(0, 0, so, b["l"], b["w"], 1.6, "#2f5fb3")
+    top = so + 1.6
+    S.layer = 1
+    for x in (x0, x0 + b["hole_dx"]):                                               # screw heads on top
+        for y in (y0, y0 + b["hole_dy"]):
+            S.disc((x, y, top), 2.3, METAL)
+    S.layer = 2
+    S.box(b["l"] * 0.30, b["w"] * 0.25, top, 26, 14, 2.5, "#1e3f7a", bias=3)         # display
+    S.box(1.5, b["w"] / 2 - 4, top, 7, 8, b["h"] - top, "#3070d8", bias=3)          # screw terminals, IN
+    S.box(b["l"] - 8.5, b["w"] / 2 - 4, top, 7, 8, b["h"] - top, "#3070d8", bias=3)   # and OUT
     lwh(S, b["l"], b["w"], b["h"])
+    # hole spacing across the top, screw head to screw head: standoff centre to centre
+    S.layer = 3
+    yf, xr = y0 + b["hole_dy"], x0 + b["hole_dx"]
+    S.dim((x0, yf, top), (xr, yf, top), (0, 0, 0), "hole_dx", text_off=(-6, -8))
+    S.dim((xr, y0, top), (xr, yf, top), (0, 0, 0), "hole_dy", text_off=(10, 4), ha="left")
     S.draw()
     S.fit(pad=16)
 
