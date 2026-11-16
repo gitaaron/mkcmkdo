@@ -109,10 +109,10 @@ over between drivers.
 ## Power
 
 ```
-power bank ──PD trigger (12 V)──► latch ──► INA260 ──► buck 12→5 V 8 A ──┬─► Pi 4 (USB-C)
-                                    ▲                                     ├─► PTZ controller (lens) + servos
-                              rocker switch                               ├─► (with UWB) 3 × UWB anchors (Pi USB)
-                                                                          └─► WS2812B ring
+power bank ──PD trigger (12 V)──► latch ──► INA260 ──►|── buck 12→5 V 8 A ──┬─► Pi 4 (USB-C)
+                                    ▲                                         ├─► PTZ controller (lens) + servos
+                              rocker switch                                   ├─► (with UWB) 3 × UWB anchors (Pi USB)
+                                                                              └─► WS2812B ring
 ```
 
 Power tree diagram: <!--both-->each build's section below<!--/--><!--with_uwb: [With UWB](#with-uwb)--><!--without_uwb: [Without UWB](#without-uwb)-->.
@@ -120,6 +120,14 @@ Power tree diagram: <!--both-->each build's section below<!--/--><!--with_uwb: [
 Rationale for 12 V + local buck rather than the bank's 5 V output: the 5 V
 rail also feeds the servos and ring<!--with_uwb--> (and the three anchors)<!--/-->, and most
 banks cap 5 V at 3 A. The 12 V → 5 V conversion costs ≈ 8 %.
+
+`──►|──` is the Schottky diode that comes with the buck, in series at its
+input, so a reversed 12 V lead can't destroy it. It sits on the 12 V side
+because there it carries under 2 A and the buck regulates its ≈ 0.4 V drop
+away (≈ 3 %). On the 5 V side it would carry up to 4 A and take the Pi's
+5.1 V down to ≈ 4.6 V, under its low-voltage warning. Fitting it: wiring,
+input diode ([with UWB](../with_uwb/setup/12-wiring.md#input-diode),
+[without UWB](../without_uwb/setup/12-wiring.md#input-diode)).
 
 ### Power switch
 
@@ -189,7 +197,8 @@ Energy budget, 92 Wh bank:
 - Bank cells → 12 V output (the bank's own boost, ≈ 91 %): **84 Wh** at the
   12 V rail, where the gauge measures.
 - Usable before the 7 % critical stop: **78 Wh**.
-- Draw figures below include the 12 → 5 V buck (≈ 92 %).
+- Draw figures below include the 12 → 5 V buck (≈ 92 %), but not the
+  buck's input diode: it takes another ≈ 3 % (≈ 0.2 h with UWB).
 
 | Mode | Draw at 12 V, with UWB | Runtime, with UWB | Draw at 12 V, without UWB | Runtime, without UWB |
 | --- | --- | --- | --- | --- |

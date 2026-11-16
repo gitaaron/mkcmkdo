@@ -140,7 +140,7 @@ graph.edges = [
   edge("latch", "la_out", "ina", "ina_in", "12V"),
   edge("pi", "pi_hold", "latch", "la_hold", "keep on until halted"),
   edge("latch", "la_sense", "pi", "pi_sense", "switch off → shutdown"),
-  edge("ina", "ina_out", "buck", "bk_in", "12V sensed"),
+  edge("ina", "ina_out", "buck", "bk_in", "12V sensed, via diode"),
   edge("ina", "ina_i2c", "pi", "pi_i2c_in", "battery I2C"),
   edge("buck", "bk_out", "pi", "pi_5v", "5V 5A"),
   edge("buck", "bk_out", "ptz", "ptz_5v", "5V lens motors"),

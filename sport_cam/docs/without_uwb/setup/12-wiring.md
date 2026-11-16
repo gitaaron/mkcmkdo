@@ -54,9 +54,35 @@ away from the USB ports, and its pad is square.
 | P1 | Power bank USB-C | PD trigger USB-C | 30 cm C-to-C cable (BOM 14) | must be a full C-to-C cable; a charge-only or A-to-C cable leaves the trigger at 5 V |
 | P2 | PD trigger **+12 V** | power latch **IN** | 18 AWG | the latch switches the positive line only. The rocker is wired to the latch, not in this line ([below](#power-latch)) |
 | P3 | power latch **OUT** | gauge **VIN+** (INA260; **IN+** on an INA226) | 18 AWG | the gauge sits in series on the positive line, or it measures nothing |
-| P4 | gauge **VIN−** (**IN−**) | buck **IN+** | 18 AWG | |
+| P4 | gauge **VIN−** (**IN−**) | buck **IN+**, through the Schottky diode | 18 AWG | the diode that comes with the buck, **band toward the buck** ([below](#input-diode)) |
 | P5 | PD trigger **GND** | buck **IN−** | 18 AWG | |
 | P6 | power latch **GND** | buck **IN−** | 22 AWG | the latch draws ≈ 1 mA; GND only references its transistors |
+
+### Input diode
+
+The buck comes with a Schottky diode. It goes in P4, in series on the
+positive line just before the buck's **IN+**, with its **band (the cathode)
+toward the buck**. It's there so that a 12 V lead connected backwards (P4 and
+P5 swapped during assembly, or a bench supply's clips the wrong way round)
+can't destroy the buck: cheap buck modules have no reverse protection of
+their own. With the leads backwards the diode just blocks, and nothing
+happens.
+
+It goes on the 12 V side, not the 5 V side. On the 5 V rail it would carry up
+to 4 A and drop ≈ 0.4–0.5 V, so the 5.1 V you set becomes ≈ 4.6 V at the
+Pi, under the Pi's 4.63 V low-voltage warning, and it would turn ≈ 2 W into
+heat inside the enclosure. On the 12 V side it carries under 2 A, the buck
+regulates its drop away, and it costs ≈ 0.4 V of 12 V (≈ 3 % of the runtime).
+
+- **Check its rating** from the marking on its body: at least **3 A** and
+  **20 V**. The usual 1N5822 (3 A), SS54 or SR560 (5 A) are all fine. A
+  1N4001–1N4007 is a 1 A silicon diode: don't use it here.
+- **Fit it** at the buck end of P4: solder P4 to the anode lead and the
+  cathode (band) lead into the buck's IN+ terminal, or splice it inline.
+  Heat-shrink over the body and both joints.
+- It runs warm (≈ 0.7 W when the camera is tracking and recording). Leave
+  ≈ 5 mm of lead at each end and keep it off the foam tape and the printed
+  floor.
 
 ### Power latch
 
@@ -277,9 +303,11 @@ Each step points at the assembly-guide step it belongs to.
    12 V at its screw terminal, and still 12 V after unplugging and
    replugging the bank.
 3. **Build the 12 V chain**: the [power latch](#power-latch) on its
-   perfboard, then P2–P6, S1, S2, and the capacitor (R1). **Check:** rocker
-   off, **0 V** at the buck input. Rocker on, **12 V** at the buck input and
-   **5.1 V** at its output, with nothing else connected. Measure **2.7–3.0 V**
+   perfboard, then P2–P6 (with the [input diode](#input-diode) in P4), S1,
+   S2, and the capacitor (R1). **Check:** rocker off, **0 V** at the buck
+   input. Rocker on, **≈ 11.6 V** at the buck input (12 V less the diode's
+   ≈ 0.4 V) and **5.1 V** at its output, with nothing else connected. 12 V at
+   the gauge's VIN− but 0 V at the buck input: the diode is in backwards. Measure **2.7–3.0 V**
    on SENSE with the rocker on, and 0 V with it off. Rocker off again:
    the buck input drops to 0 V at once (HOLD isn't connected yet, so nothing
    holds the latch on).
@@ -329,6 +357,7 @@ Then carry on with the [software setup](14-software-setup.md).
 | Symptom | Likely wire | Fix |
 | --- | --- | --- |
 | Pi reboots under load, or shows a lightning bolt | R2, or the buck setting | re-trim to 5.1 V **under load**; shorten R2 and keep it 18 AWG |
+| Buck dead: 12 V at the gauge's VIN−, 0 V at the buck's IN+ | P4's diode | it's in backwards: band toward the buck |
 | Trigger stays at 5 V | P1 | use a full USB-C to USB-C cable; check the bank has a 12 V PD profile |
 | `0c` missing from `i2cdetect` | R3 or I1/I2 | PTZ controller unpowered, or SDA/SCL swapped |
 | `40` missing | I1–I4 | gauge VCC or GND, or swapped SDA/SCL. Or run without it: `POWER_MONITOR = "none"` |

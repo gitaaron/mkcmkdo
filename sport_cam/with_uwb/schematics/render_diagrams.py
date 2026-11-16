@@ -473,7 +473,7 @@ def power_tree():
     box(ax, 3.7, 4.1, 2.4, 1.7, "PD trigger → 12 V", ["+ power latch", "rocker = on/off"], fc="#fdf6e8")
     box(ax, 6.8, 4.1, 2.3, 1.7, "INA260 gauge",
         ["I2C 0x40", "shunt on die", "Wh integration"], fc="#f2fff5")
-    box(ax, 3.7, 2.3, 2.4, 1.3, "Buck 12→5 V 8 A", ["5.1 V under load", "≈ 92 % efficient"], fc="#f2f7ff")
+    box(ax, 3.7, 2.3, 2.4, 1.3, "Buck 12→5 V 8 A", ["5.1 V under load", "≈ 92 %, diode on its input"], fc="#f2f7ff")
     box(ax, 7.0, 1.95, 3.4, 2.05, "5 V rail — 11.5 W avg",
         ["Pi 4 + HW encode + CV  6.0 W", "PTZ servos + lens  1.0 W",
          "3× ULA1 anchors  3.0 W", "LED ring  1.5 W"], fc="#f2f7ff")

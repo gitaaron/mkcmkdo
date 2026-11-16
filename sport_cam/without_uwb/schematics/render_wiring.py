@@ -82,7 +82,7 @@ CONNECTIONS = [
         ("P1", "Power bank USB-C", "PD trigger USB-C", "30 cm C-to-C cable (BOM 14). A charge-only or A-to-C cable leaves the trigger at 5 V"),
         ("P2", "PD trigger +12 V", "power latch IN", "18 AWG. The latch switches the positive line only"),
         ("P3", "power latch OUT", "gauge VIN+ (IN+ on an INA226)", "18 AWG. The gauge sits in series on the positive line"),
-        ("P4", "gauge VIN− (IN−)", "buck IN+", "18 AWG"),
+        ("P4", "gauge VIN− (IN−)", "buck IN+, through the Schottky diode", "18 AWG. Band (cathode) toward the buck"),
         ("P5", "PD trigger GND", "buck IN−", "18 AWG"),
         ("P6", "power latch GND", "buck IN−", "22 AWG. The latch only references its transistors to it"),
     ]),
@@ -256,6 +256,15 @@ def buck(ax, x, y):
     p = {"IN+": pad(ax, (x, y + 15), "IN+", "left", fs=5), "IN-": pad(ax, (x, y + 6), "IN−", "left", fs=5),
          "OUT+": pad(ax, (x + 34, y + h), "OUT+", "top", fs=5), "OUT-": pad(ax, (x + 40, y + h), "OUT−", "top", fs=5)}
     return p
+
+
+def diode(ax, xy):
+    """The buck's Schottky diode, inline in P4: black body, silver band (the
+    cathode) toward the buck on the right."""
+    x, y = xy
+    ax.add_patch(Rectangle((x - 2.6, y - 1.3), 5.2, 2.6, fc="#1c1c1c", ec=INK, lw=0.6, zorder=6.5))
+    ax.add_patch(Rectangle((x + 1.2, y - 1.3), 0.9, 2.6, fc="#d9dde3", ec="none", zorder=6.6))
+    ax.text(x, y - 2.4, "diode", ha="center", va="top", fontsize=4.8, color=INK, zorder=6.6)
 
 
 def capacitor(ax, xy):
@@ -597,7 +606,9 @@ def render(servos="pigpio"):
         o, i = lat["OUT"], gau["VIN+"]
         wire(ax, [o, (134, o[1]), (134, i[1]), i], V12, label="P3", at=0.2)
     with conn(ax, "P4"):
-        wire(ax, [gau["VIN-"], (171, gau["VIN-"][1]), (171, bk["IN+"][1]), bk["IN+"]], V12, label="P4", at=0.3)
+        wire(ax, [gau["VIN-"], (171, gau["VIN-"][1]), (171, bk["IN+"][1]), bk["IN+"]], V12)
+        diode(ax, (173.2, bk["IN+"][1]))
+        tag(ax, (170.5, bk["IN+"][1] + 4), "P4", V12)
     with conn(ax, "P5"):
         g = trg["GND"]
         wire(ax, [g, (82, g[1]), (82, 6), (174, 6), (174, 17), (bk["IN-"][0], 17)], BLACK, label="P5", at=0.3)
