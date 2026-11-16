@@ -12,6 +12,7 @@ adapter and three of the radios, and runs this build's software.
 | 10 | [**Bill of materials**](10-bill-of-materials.md) | every part to order, with prices and Canadian sources, and the printed parts | ≈ 2 weeks of deliveries |
 | 11 | [**3D printing**](../../setup/11-3d-printing.md) | printer requirements, filament, settings, orientation and print order for every printed part | ≈ 41 h of printing |
 | 12 | [**Wiring guide**](12-wiring.md) | every connection, pin by pin, in wiring order with a check after each, linked to the [schematics](../../../with_uwb/schematics/interactive/index.html) | ≈ 2 h, made during the assembly |
+| 12a | [**Power latch**](../../setup/12a-power-latch.md) | building the latch board hole by hole, with a diagram, checks and a bench test, before it goes in. Shared by both builds | ≈ 1¼ h |
 | 13 | [**Assembly guide**](assembly/index.html) (interactive, 3D) | the enclosure, power, LED ring, Pi shelf, camera, anchors and mast, battery, tripod, power-on checks | a weekend |
 | 14 | [**Software setup**](14-software-setup.md) | radio firmware, Raspberry Pi OS, the camera software, bench checks, calibration, services, the app | ≈ 2 h |
 | 15 | [**Verification checklist**](15-verification.md) | what to measure before printing, check on arrival, confirm on the bench and in the first session | used alongside the docs above |

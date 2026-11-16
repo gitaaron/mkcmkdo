@@ -8,7 +8,6 @@ Common to both builds:
 | Motion | **Arducam PTZ controller** (I2C 0x0C) | pan, tilt, zoom, focus |
 | Status | **WS2812B LED ring**, 16 LEDs | state display |
 | Power | **USB-C PD bank** → PD trigger (12 V) → **power latch** → **buck** (5 V) | single 5 V rail; the rocker switch turns the latch on and off ([below](#power-switch)) |
-| Metering | **INA260** battery gauge (I2C 0x40), optional | energy used, time remaining |
 
 <!--with_uwb-->
 
@@ -57,7 +56,6 @@ Common connections:
 | PTZ I2C | Pi GPIO2/3 → PTZ controller | one device at **0x0C** for zoom and focus (and pan/tilt with `SERVO_DRIVER = "arducam"`) |
 | Servo PWM | Pi GPIO12 / GPIO13 (hardware PWM0 / PWM1) → 74AHCT125 gates 2, 3 → pan / tilt servo | [below](#servo-drive) |
 | LED data | Pi GPIO10 (SPI0 MOSI) → 74AHCT125 → WS2812B DIN | [below](#driving-the-ws2812b-ring) |
-| Battery gauge | INA260 (or INA226) on I2C **0x40** | 12 V side, between trigger and buck; optional ([below](#knowing-what-is-left)) |
 | Power switch | rocker → latch; latch HOLD ← Pi GPIO17; SENSE → Pi GPIO27 | off is a clean shutdown ([below](#power-switch)) |
 
 ### The PTZ controller
@@ -109,10 +107,10 @@ over between drivers.
 ## Power
 
 ```
-power bank ──PD trigger (12 V)──► latch ──► INA260 ──►|── buck 12→5 V 8 A ──┬─► Pi 4 (USB-C)
-                                    ▲                                         ├─► PTZ controller (lens) + servos
-                              rocker switch                                   ├─► (with UWB) 3 × UWB anchors (Pi USB)
-                                                                              └─► WS2812B ring
+power bank ──PD trigger (12 V)──► latch ──►|── buck 12→5 V 8 A ──┬─► Pi 4 (USB-C)
+                                    ▲                                ├─► PTZ controller (lens) + servos
+                              rocker switch                          ├─► (with UWB) 3 × UWB anchors (Pi USB)
+                                                                     └─► WS2812B ring
 ```
 
 Power tree diagram: <!--both-->each build's section below<!--/--><!--with_uwb: [With UWB](#with-uwb)--><!--without_uwb: [Without UWB](#without-uwb)-->.
@@ -140,7 +138,7 @@ power cut. A Pi that loses power while recording leaves a clip with no index
 ```
            ┌────────── rocker ──────────┐ SW
            │                            ├──────────► Q3 ─┐
- 12 V ─────┴─── Q1 (P-MOSFET) ──► gauge → buck → Pi      ├─► Q1 on
+ 12 V ─────┴─── Q1 (P-MOSFET) ──► buck → Pi              ├─► Q1 on
                                              GPIO17 HOLD ──► Q2 ─┘
                                              GPIO27 SENSE ◄── SW (÷ to 2.8 V)
 ```
@@ -195,8 +193,9 @@ person detector, ≈ 0.5 W recording.
 Energy budget, 92 Wh bank:
 
 - Bank cells → 12 V output (the bank's own boost, ≈ 91 %): **84 Wh** at the
-  12 V rail, where the gauge measures.
-- Usable before the 7 % critical stop: **78 Wh**.
+  12 V rail.
+- The runtimes below are for **78 Wh** of that, so they keep ≈ 7 % in hand:
+  the bank runs on ≈ 25 min more before it cuts out.
 - Draw figures below include the 12 → 5 V buck (≈ 92 %), but not the
   buck's input diode: it takes another ≈ 3 % (≈ 0.2 h with UWB).
 
@@ -216,35 +215,25 @@ Energy budget, 92 Wh bank:
 - **With UWB**: the three anchors account for ≈ 3 W at 5 V (3.3 W at 12 V):
   about a third of the draw and ≈ 2 h of runtime.
 - **Without UWB**: figures are estimates from the load budget (5 V total ÷
-  92 %), not measurements. Verify with the gauge.
+  92 %), not measurements. Time a session on a full bank to check them.
 - **74 Wh (20 000 mAh) alternative:** ≈ <!--with_uwb-->5.0 h<!--/--><!--both--> with UWB, <!--/--><!--without_uwb-->6.7 h<!--/--><!--both--> without<!--/-->; ≈ C$25
   cheaper, ≈ 200 g lighter. Listed in each BOM. Keep under 100 Wh for air
   travel.
-- **`BATTERY_WH` = 84** for a 92 Wh bank (67 for 74 Wh): the energy at the
-  12 V rail, not the nameplate. Using the nameplate overstates every estimate
-  by ≈ 10 %.
 
 ### Knowing what is left
 
-A PD bank doesn't report its charge, so the camera meters consumption:
+It can't. A PD bank reports nothing about its own charge over USB-C, so the
+camera has no fuel gauge: no low-battery warning, and no automatic save
+before the bank runs flat. A current sensor on the 12 V rail was tried and
+dropped. It could only count the energy used since power-on and assume the
+bank was full then, so any power-on with a part-used bank made every warning
+wrong. Instead:
 
-- Sensor on the 12 V side, read at 1 Hz.
-- `src/<build>/device/sportcam/power.py` integrates Wh and reports fraction
-  remaining, present draw, and minutes left (60 s rolling average).
-- Counting starts when the camera service starts, assuming a full bank, so
-  restarting the service resets it. There is no app control for it.
-
-| `POWER_MONITOR` | Part | Notes |
-| --- | --- | --- |
-| `"ina260"` (default) | INA260 | integrated shunt; nothing to calibrate |
-| `"ina226"` | INA226 + external shunt | set `INA226_SHUNT_OHMS` |
-| `"none"` | — | no low-battery warning or automatic save-and-park; see the BOM ([with UWB](../with_uwb/setup/10-bill-of-materials.md#parts-that-are-hard-to-source-in-canada), [without UWB](../without_uwb/setup/10-bill-of-materials.md#parts-that-are-hard-to-source-in-canada)) |
-
-Both sensors use I2C 0x40.
-
-What the camera does at 20 % (low) and 7 % (critical):
-[01 — State machine](../product/01-requirements.md#state-machine). The
-estimate carries on below 20 %.
+- **Start sessions on a full bank** and plan on the runtimes above.
+- **Watch the bank's own charge indicator** between sessions.
+- **When the bank cuts out** the camera loses power as if unplugged: a
+  recording in progress is lost (no index), and the SD card can be damaged.
+  Switch off at the rocker before the bank runs flat.
 
 ### Swapping banks
 
@@ -258,15 +247,10 @@ the boot. A spare bank in the bag doubles the runtime.
 - **The tray** stays strapped to the tripod. The strap goes through tunnels
   under its floor, not round the bank, and the bank clips in past lips along
   the top (`battery_tray.scad`; `cad/fit.py` checks the clip).
-- **The gauge** starts again at full when the camera software starts, which a
-  swap always does. So swap only for a *fully charged* bank: a part-used one
-  reads as full, and the camera would run past its 7 % stop without knowing.
-- **The cue to swap** is the low-battery warning at 20 % (the ring blinks
-  orange) or the minutes left in the app. At 7 % the camera saves, parks and
-  sleeps on its own.
+- **The cue to swap** is the clock: about the runtime above from a full
+  bank, or the bank's own indicator. There is no low-battery warning.
 - **Why not a hot swap.** Keeping the camera running through a swap needs a
-  second USB-C inlet and PD trigger, ideal-diode OR-ing on the 12 V rail, and a
-  gauge that can tell which bank is live. That's about C$25 of parts, another
+  second USB-C inlet and PD trigger, and ideal-diode OR-ing on the 12 V rail. That's about C$25 of parts, another
   wall opening and more wiring, to save a one-minute reboot between sessions.
 
 ### The SD card
@@ -301,7 +285,6 @@ is there because filesystems corrupt at zero free space.
 | --- | --- | --- |
 | Sleep | sensor, preview and detector off after 30 s awake with no session and no live viewer (automatic) | `AWAKE_TIMEOUT_S` |
 | Detector rate while awake | 0.5 fps when not tracking (automatic) | `DETECT_FPS_AWAKE` |
-| Ring dimming on low battery | automatic | — |
 | Preview frame rate, or stream only while a phone is connected | ≈ 1 W in every mode | `MJPEG_FPS` |
 | 720p recording | lower encode load | `RECORD_SIZE` |
 | CPU clock cap | lower baseline | Pi firmware |

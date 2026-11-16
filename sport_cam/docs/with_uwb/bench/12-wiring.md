@@ -8,7 +8,7 @@ wires it. The lens stays plugged into the controller, as the kit came, and
 the servos <!--both-->stay on it too or move to the Pi's header ([servo drive](#servo-drive))<!--/--><!--arducam: stay on it too--><!--pigpio: come off it onto the Pi's header, on jumper wires ([servo drive](#servo-drive))-->. Two UWB anchors go on the Pi's USB.
 No mains wiring, no soldering, no breadboard.
 Parts are the [bench bill of materials](10-bill-of-materials.md)'s; the
-full build's wiring, with the battery, latch, gauge, buck, ring and the
+full build's wiring, with the battery, latch, buck, ring and the
 third anchor, is the [UWB build's wiring guide](../setup/12-wiring.md).
 
 **Schematics**, if you want the picture first:

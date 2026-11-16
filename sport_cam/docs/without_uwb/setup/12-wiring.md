@@ -38,8 +38,7 @@ carries up to 4 A); 22 AWG or Dupont leads for signals (BOM item 18).
 - **One ground.** Every ground in the camera meets at the buck's output
   negative. A signal with no shared ground is not a signal.
 - **The Pi's GPIO header powers nothing.** The PTZ controller, the servos,
-  the ring and the level shifter all take 5 V from the buck. The header carries signals,
-  plus 3.3 V for the gauge.
+  the ring and the level shifter all take 5 V from the buck. The header carries signals only.
 - **Set the buck before anything is connected to it** (step 1).
 
 ## Connection list
@@ -53,17 +52,16 @@ away from the USB ports, and its pad is square.
 | --- | --- | --- | --- | --- |
 | P1 | Power bank USB-C | PD trigger USB-C | 30 cm C-to-C cable (BOM 14) | must be a full C-to-C cable; a charge-only or A-to-C cable leaves the trigger at 5 V |
 | P2 | PD trigger **+12 V** | power latch **IN** | 18 AWG | the latch switches the positive line only. The rocker is wired to the latch, not in this line ([below](#power-latch)) |
-| P3 | power latch **OUT** | gauge **VIN+** (INA260; **IN+** on an INA226) | 18 AWG | the gauge sits in series on the positive line, or it measures nothing |
-| P4 | gauge **VIN−** (**IN−**) | buck **IN+**, through the Schottky diode | 18 AWG | the diode that comes with the buck, **band toward the buck** ([below](#input-diode)) |
-| P5 | PD trigger **GND** | buck **IN−** | 18 AWG | |
-| P6 | power latch **GND** | buck **IN−** | 22 AWG | the latch draws ≈ 1 mA; GND only references its transistors |
+| P3 | power latch **OUT** | buck **IN+**, through the Schottky diode | 18 AWG | the diode that comes with the buck, **band toward the buck** ([below](#input-diode)) |
+| P4 | PD trigger **GND** | buck **IN−** | 18 AWG | |
+| P5 | power latch **GND** | buck **IN−** | 22 AWG | the latch draws ≈ 1 mA; GND only references its transistors |
 
 ### Input diode
 
-The buck comes with a Schottky diode. It goes in P4, in series on the
+The buck comes with a Schottky diode. It goes in P3, in series on the
 positive line just before the buck's **IN+**, with its **band (the cathode)
-toward the buck**. It's there so that a 12 V lead connected backwards (P4 and
-P5 swapped during assembly, or a bench supply's clips the wrong way round)
+toward the buck**. It's there so that a 12 V lead connected backwards (P3 and
+P4 swapped during assembly, or a bench supply's clips the wrong way round)
 can't destroy the buck: cheap buck modules have no reverse protection of
 their own. With the leads backwards the diode just blocks, and nothing
 happens.
@@ -77,7 +75,7 @@ regulates its drop away, and it costs ≈ 0.4 V of 12 V (≈ 3 % of the runtime)
 - **Check its rating** from the marking on its body: at least **3 A** and
   **20 V**. The usual 1N5822 (3 A), SS54 or SR560 (5 A) are all fine. A
   1N4001–1N4007 is a 1 A silicon diode: don't use it here.
-- **Fit it** at the buck end of P4: solder P4 to the anode lead and the
+- **Fit it** at the buck end of P3: solder P3 to the anode lead and the
   cathode (band) lead into the buck's IN+ terminal, or splice it inline.
   Heat-shrink over the body and both joints.
 - It runs warm (≈ 0.7 W when the camera is tracking and recording). Leave
@@ -91,14 +89,15 @@ so switching off is a clean shutdown and not a power cut: the Pi saves the
 recording, parks the head and halts, and only then does the latch let go.
 Design reasons: [04 — Electronics](../../design/04-electronics.md#power-switch).
 
-Build it on the 3 × 7 cm board from a double-sided perfboard kit (BOM 13a; each part is listed in
+**Build and test it first with the [power latch guide](../../setup/12a-power-latch.md)**: it gives the
+layout hole by hole, with a diagram of both sides, and a bench test. Build it on the 3 × 7 cm board from a double-sided perfboard kit (BOM 13a; each part is listed in
 [its own table](10-bill-of-materials.md#power-latch)), with the IRF4905 bent over flat so it stays below
 the LED window. Keep parts and wires clear of the four corner holes: the board stands on four M3
 standoffs, screwed up through the enclosure floor like the buck.
 
 ```
   IN (+12 V) ───────●────────── Q1 S ┐
-                    │                ├ IRF4905   Q1 D ──── OUT (to the gauge)
+                    │                ├ IRF4905   Q1 D ──── OUT (to the buck)
                  R1 100k   ┌── Q1 G ┘
                     │      │
                     ●──────┘  gate
@@ -148,7 +147,7 @@ lights only while it's on.
 | S3 | latch **HOLD** | Pi **pin 11** (GPIO17) | Dupont | the Pi's "keep the power on" line |
 | S4 | latch **SENSE** | Pi **pin 13** (GPIO27) | Dupont | the switch's position, at 2.8 V. **Check it's under 3.3 V before plugging it in** |
 
-The latch's GND is the camera's one ground (P6), so S3 and S4 need no ground
+The latch's GND is the camera's one ground (P5), so S3 and S4 need no ground
 wire of their own.
 
 ### Power — 5 V rail
@@ -169,18 +168,12 @@ rail are already one net. No separate ground wire to the header is needed.
 
 ### I2C bus — Pi GPIO 2/3
 
-Two devices share it: the PTZ controller at **0x0C** and the gauge at
-**0x40**.
+One device on it: the PTZ controller, at **0x0C**.
 
 | # | From | To | Notes |
 | --- | --- | --- | --- |
-| I1 | Pi **pin 3** (GPIO2, SDA) | PTZ controller **SDA** and gauge **SDA** | |
-| I2 | Pi **pin 5** (GPIO3, SCL) | PTZ controller **SCL** and gauge **SCL** | |
-| I3 | Pi **pin 1** (3.3 V) | gauge **VCC** | 3.3 V, not 5 V: the breakout's pull-ups go to its VCC, and 5 V on SDA/SCL can damage the Pi |
-| I4 | Pi **pin 9** (GND) | gauge **GND** | |
-
-No gauge? Leave out I1–I4 at the gauge end, wire the 12 V straight through
-(P3 to P4), and set `POWER_MONITOR = "none"`.
+| I1 | Pi **pin 3** (GPIO2, SDA) | PTZ controller **SDA** | |
+| I2 | Pi **pin 5** (GPIO3, SCL) | PTZ controller **SCL** | |
 
 ### LED ring — SPI through the level shifter
 
@@ -250,11 +243,11 @@ step by a fraction of a degree.
 <!--pigpio-->
 
 ```
-  I3 gauge VCC    3.3V  [ 1] [ 2]  5V     ← 5 V pins: not used, nothing is powered from the header
+                  3.3V  [ 1] [ 2]  5V     ← 5 V pins: not used, nothing is powered from the header
   I1 SDA         GPIO2  [ 3] [ 4]  5V
   I2 SCL         GPIO3  [ 5] [ 6]  GND
                         [ 7] [ 8]
-  I4 gauge GND     GND  [ 9] [10]
+                   GND  [ 9] [10]
   S3 latch HOLD GPIO17  [11] [12]
   S4 latch SENSE GPIO27 [13] [14]
                         ...
@@ -270,11 +263,11 @@ step by a fraction of a degree.
 <!--arducam-->
 
 ```
-  I3 gauge VCC    3.3V  [ 1] [ 2]  5V     ← 5 V pins: not used, nothing is powered from the header
+                  3.3V  [ 1] [ 2]  5V     ← 5 V pins: not used, nothing is powered from the header
   I1 SDA         GPIO2  [ 3] [ 4]  5V
   I2 SCL         GPIO3  [ 5] [ 6]  GND
                         [ 7] [ 8]
-  I4 gauge GND     GND  [ 9] [10]
+                   GND  [ 9] [10]
   S3 latch HOLD GPIO17  [11] [12]
   S4 latch SENSE GPIO27 [13] [14]
                         ...
@@ -305,19 +298,18 @@ Each step points at the assembly-guide step it belongs to.
    12 V at its screw terminal, and still 12 V after unplugging and
    replugging the bank.
 3. **Build the 12 V chain**: the [power latch](#power-latch) on its
-   perfboard, then P2–P6 (with the [input diode](#input-diode) in P4), S1,
+   perfboard (built and bench-tested with [12a](../../setup/12a-power-latch.md)), then P2–P5 (with the [input diode](#input-diode) in P3), S1,
    S2, and the capacitor (R1). **Check:** rocker off, **0 V** at the buck
    input. Rocker on, **≈ 11.6 V** at the buck input (12 V less the diode's
    ≈ 0.4 V) and **5.1 V** at its output, with nothing else connected. 12 V at
-   the gauge's VIN− but 0 V at the buck input: the diode is in backwards. Measure **2.7–3.0 V**
+   the latch's OUT but 0 V at the buck input: the diode is in backwards. Measure **2.7–3.0 V**
    on SENSE with the rocker on, and 0 V with it off. Rocker off again:
    the buck input drops to 0 V at once (HOLD isn't connected yet, so nothing
    holds the latch on).
 4. **5 V rail out to the Pi** (R2) ([assembly: Pi](assembly/index.html#pi)).
    **Check:** before plugging in the Pi, measure **5.0–5.1 V** at the pigtail
    end, correct polarity. Then boot the Pi.
-5. **Gauge on the bus** (I1–I4), **latch to the Pi** (S3, S4). **Check:**
-   `i2cdetect -y 1` shows **40**. After the
+5. **Latch to the Pi** (S3, S4). **Check:** after the
    [Pi setup for the switch](14-software-setup.md#power-switch), switch off
    while the camera is running: it stays powered for ≈ 10–15 s while the Pi
    shuts down, then everything goes dark.
@@ -330,7 +322,7 @@ Each step points at the assembly-guide step it belongs to.
 
 7. **PTZ controller, servos and camera** (R3, R7, I1, I2, M1–M7, C1, C2) — when the lid goes on
    ([assembly: lid on](assembly/index.html#lid-on)). **Check:**
-   `i2cdetect -y 1` shows **0c** and **40**; `rpicam-hello -t 2000` shows a
+   `i2cdetect -y 1` shows **0c**; `rpicam-hello -t 2000` shows a
    picture. Before powering on, check each servo header with a meter: **5.0–5.1 V**
    between + and −, and nothing between S and + (a backwards lead). The servos
    are checked in the software setup (`ptzcheck`).
@@ -341,7 +333,7 @@ Each step points at the assembly-guide step it belongs to.
 
 7. **PTZ controller, servos and camera** (R3, R7, I1, I2, C1, C2) — when the lid goes on
    ([assembly: lid on](assembly/index.html#lid-on)). **Check:**
-   `i2cdetect -y 1` shows **0c** and **40**; `rpicam-hello -t 2000` shows a
+   `i2cdetect -y 1` shows **0c**; `rpicam-hello -t 2000` shows a
    picture. Before powering on, check R7 with a meter at the controller's
    connector: **5.0–5.1 V** between pins 1 and 2. The servos are checked in
    the software setup (`ptzcheck`).
@@ -359,10 +351,9 @@ Then carry on with the [software setup](14-software-setup.md).
 | Symptom | Likely wire | Fix |
 | --- | --- | --- |
 | Pi reboots under load, or shows a lightning bolt | R2, or the buck setting | re-trim to 5.1 V **under load**; shorten R2 and keep it 18 AWG |
-| Buck dead: 12 V at the gauge's VIN−, 0 V at the buck's IN+ | P4's diode | it's in backwards: band toward the buck |
+| Buck dead: 12 V at the latch's OUT, 0 V at the buck's IN+ | P3's diode | it's in backwards: band toward the buck |
 | Trigger stays at 5 V | P1 | use a full USB-C to USB-C cable; check the bank has a 12 V PD profile |
 | `0c` missing from `i2cdetect` | R3 or I1/I2 | PTZ controller unpowered, or SDA/SCL swapped |
-| `40` missing | I1–I4 | gauge VCC or GND, or swapped SDA/SCL. Or run without it: `POWER_MONITOR = "none"` |
 | Ring dark | L1–L4, R4, R5 | data on DOUT, 1OE not grounded, or the shifter unpowered |
 | Ring flickers random colours | L2, L4 | long data lead, or unused shifter inputs left floating |
 | Pan or tilt doesn't move at all <!--pigpio row--> | M1–M7, R7, or the Pi setup | pigpiod not running (`pigs hwver`), 2OE/3OE not grounded, header unpowered, or the lead backwards |
@@ -373,7 +364,6 @@ Then carry on with the [software setup](14-software-setup.md).
 | Camera dies the instant you switch off | S3, or the Pi setup | HOLD isn't reaching Q2: check S3 is on pin 11, and that `gpio=17=op,dh` is in `config.txt` |
 | Camera never turns off after switching off | S4, or the Pi setup | SENSE isn't reaching the Pi (pin 13, `gpio-shutdown` overlay), or `POWER_OFF_ON_HALT` isn't set, so the halted Pi keeps HOLD high |
 | Switched back on during a shutdown and it stays dark | — | expected: the Pi has halted. Switch off, wait 5 s, switch on |
-| Gauge reads 0 W while the camera runs | P3/P4 | the gauge is wired in parallel or on the ground line, not in series on 12 V+ |
 
 The full bench checklist is in
 [15 — Verification](15-verification.md#on-the-bench-before-the-first-session).

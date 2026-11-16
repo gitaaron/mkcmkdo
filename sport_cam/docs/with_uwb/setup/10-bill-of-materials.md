@@ -11,7 +11,7 @@ Target: delivery to **M2L 2E2 (North York, Toronto) within two weeks**.
 | **Amazon.ca Prime** | 1–3 days | general parts. Links are searches on the exact part name (listings change); choose a Prime-badged match and avoid "ships from China" sellers (3–4 weeks) |
 | **[RobotShop Canada](https://ca.robotshop.com/)** | a few days (Mirabel, QC) | Arducam PTZ kits; ULA1 radios |
 | **[PiShop.ca](https://www.pishop.ca/)** | 1–3 days (Ontario) | official Raspberry Pi reseller; all Pi items |
-| **[Digi-Key Canada](https://www.digikey.ca/)** | 1–3 days | INA260; backstop for out-of-stock items. Free shipping over C$100 |
+| **[Digi-Key Canada](https://www.digikey.ca/)** | 1–3 days | backstop for out-of-stock items. Free shipping over C$100 |
 | **Makerfabs** (China, DHL) | 5–8 days + ≈ C$25 shipping, possible ≈ 13 % HST | only for generic ESP32-UWB boards instead of the ULA1 ([below](#why-the-ula1-radios)) |
 
 Prices: approximate CAD street prices, Oct 2026, ±15 %.
@@ -55,7 +55,6 @@ ordered. Printed-parts table: tick **Acquired** ☐ when printed.
 | 9   | A      | **USB-C PD power bank, 25 000 mAh (92 Wh), 65 W+**     | 1   | $80   | [Amazon.ca](https://www.amazon.ca/s?k=25000mah+power+bank+65w+usb+c+pd)                                                                                          | gives **6.2 h** tracking + recording on a Pi 4, after the bank's own conversion loss ([04](../../design/04-electronics.md#runtime)). A 20 000 mAh (74 Wh) bank makes 5.0 h, saves ≈ C$25 and 200 g, and is the better pick unless you want a full day between charges. Whichever you buy, set `BATTERY_WH` to match. Stay under 100 Wh to keep it flyable                                                 |
 | 10  | O      | USB-C PD trigger board, 12 V                           | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=usb+c+pd+trigger+board+12v+female)                                                                                                | negotiates 12 V out of the bank. It must have a USB-C **socket** (female) for the bank cable to plug into — not a USB-C plug sticking out of its end. The common button type (5/9/12/15/20 V, "Type-C Female to 2pin Terminal") is a good choice: it saves its setting through power cycles, so it comes back at 12 V after every bank swap, and its S1 pad locks the button ([wiring, step 2](12-wiring.md)). Fixed-12 V boards are fine too. 3 A cables are enough: the camera draws ≈ 36 W at most; most banks cap their 5 V profile at 3 A, and the 5 V rail here also feeds the servos, the three anchors and the ring                                                                                                                                                                                                         |
 | 11  | O      | 12 V → 5 V 8 A buck (≥ 40 W), **adjustable**           | 1   | $16   | [Amazon.ca](https://www.amazon.ca/s?k=12v+to+5v+8a+adjustable+buck+converter)                                                                                    | the single 5 V rail. Buy an adjustable unit, not a fixed-5 V one: it must be **trimmed to 5.1 V under a 4 A load before the Pi is ever connected**. Open-circuit voltage tells you nothing — a module that reads 5.1 V unloaded and sags to 4.8 V will brown out a Pi. This is the first bench job in the build. The Schottky diode that comes with it goes on its 12 V input ([12, Input diode](12-wiring.md#input-diode))                                                                             |
-| 12  | A      | **Current/voltage sensor — INA260 breakout preferred** | 1   | $22   | [Digi-Key.ca](https://www.digikey.ca/en/products/result?keywords=adafruit%204226%20ina260) · [Amazon.ca](https://www.amazon.ca/s?k=ina226+current+sensor+module) | the battery gauge, on the 12 V side, I2C 0x40. The **INA260** (Adafruit 4226) has the shunt on the die: nothing to calibrate, no `INA226_SHUNT_OHMS` to get wrong, 36 V and 15 A headroom. A bare **INA226** module works too if you can find one — set `POWER_MONITOR = "ina226"` and the shunt value. **Hard to source in Canada — see [below](#parts-that-are-hard-to-source-in-canada)** |
 | 13  | O      | Round panel-mount rocker switch, threaded              | 1   | $8    | [Amazon.ca](https://www.amazon.ca/s?k=round+rocker+switch+threaded+nut+12v) | the on/off switch, in the enclosure wall. It signals the power latch (13a) rather than carrying the power, so switching off is a clean shutdown: the recording is saved and the head parked before the power goes. A round SPST rocker with a threaded body and a locking ring: the bezel sits on a flat cut into the wall outside and the ring screws up against a flat boss inside. The hole has a flat matching the key flat on the thread, so the switch can't turn. Measure it for `[switch]` before printing; a lit one is fine |
 | 13a |  | **Power latch** — built from the parts in [its own table](#power-latch) | 1 | $34 | [below](#power-latch) | keeps the 12 V on after the switch goes off until the Pi has shut down, then cuts it |
 | 14  | A      | USB-C to USB-C cable, 30 cm                            | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=short+usb+c+to+usb+c+cable+30cm)                                                                                           | bank to trigger board, inside the build. Any standard C-to-C cable works: the trigger draws ≈ 1.7 A at 12 V, inside the 3 A every C-to-C cable carries, and PD negotiates over the CC wire that even charge-only cables have. 30 cm is for fit; a short phone cable you already own will do. **Not USB-A to C**, which carries no PD                                                         |
@@ -72,7 +71,8 @@ Notes:
 
 Item 13a is a small board you build: it keeps the 12 V on after the rocker goes off until the Pi has
 shut down, then cuts it. Circuit, part labels (Q1–Q3, R1–R8) and pinout: [wiring](12-wiring.md#power-latch);
-why: [04](../../design/04-electronics.md#power-switch). Resistors marked *kit* are priced in 13a.9.
+why: [04](../../design/04-electronics.md#power-switch); how to build it, hole by hole: [12a](../../setup/12a-power-latch.md).
+Resistors marked *kit* are priced in 13a.9.
 
 | #      | Status | Part | Qty | ≈ CAD | Source | Notes |
 | ------ | ------ | ---- | --- | ----- | ------ | ----- |
@@ -180,19 +180,18 @@ STLs, previews and the images below are regenerated by `python3 cad/fit.py`
 
 | Configuration | Total |
 | --- | --- |
-| **Full build** (12 MP PTZ + three-anchor ULA1 UWB + 92 Wh battery), own tripod | **≈ C$1136** |
-| Full build + tripod | ≈ C$1171 |
+| **Full build** (12 MP PTZ + three-anchor ULA1 UWB + 92 Wh battery), own tripod | **≈ C$1114** |
+| Full build + tripod | ≈ C$1149 |
 | Two anchors, no A3 mast (`UWB_ANCHORS = 2`; tilt from vision alone) | subtract ≈ C$89 |
 | With a 74 Wh bank instead (5.0 h) | subtract ≈ C$25 |
-| Without the battery gauge (`POWER_MONITOR = "none"`) | subtract ≈ C$22 |
 | Optional charging kit (items 28–29), if your own chargers are too slow | add ≈ C$52 |
 | Generic ESP32-UWB boards instead of ULA1 (`UWB_PROTOCOL = "dual-serial"`) | subtract ≈ C$100 |
 
-(≈ US$818 / US$843 at typical exchange + Canadian markup.)
+(≈ US$802 / US$827 at typical exchange + Canadian markup.)
 
 | Group | Items | ≈ CAD |
 | --- | --- | --- |
-| Camera and power | 1, 9–14b | 481 |
+| Camera and power | 1, 9–11, 13–14b | 459 |
 | Compute and tracking | 2–8 | 369 |
 | Wearable, wiring, fasteners, filament | 15–25b, 27, 27a | 200 |
 
@@ -220,17 +219,6 @@ frame with all ranges) and ranging rate:
 rows 7–8. Why A3 is vertical:
 [05](../design/05-tracking-system.md#why-the-third-anchor-is-vertical).
 
-## Parts that are hard to source in Canada
-
-One item: the battery gauge (item 12).
-
-| Option | Detail |
-| --- | --- |
-| **INA260 (default)** | [Adafruit 4226 via Digi-Key Canada](https://www.digikey.ca/en/products/result?keywords=adafruit%204226%20ina260): duty-free, customs pre-cleared, 1–3 days. Free shipping over C$100 (combine with other parts). `POWER_MONITOR = "ina260"` |
-| INA226 module | grey-market in Canada. `POWER_MONITOR = "ina226"` plus `INA226_SHUNT_OHMS` |
-| **No gauge** | `POWER_MONITOR = "none"`. No low-battery warning or automatic save-and-park at 7 %; runtime ≈ 6.2 h by the clock. Can be added later with no other change |
-| ~~ADS1115 + shunt~~ | **do not use.** Inputs are rated to the supply rail + 0.3 V; 12 V common mode on a high-side shunt exceeds absolute maximum. A low-side shunt plus divider needs three extra parts, breaks the ground path, and measures worse |
-
 ## Two-week delivery plan
 
 Place all orders the same day:
@@ -239,9 +227,8 @@ Place all orders the same day:
 | --- | --- | --- | --- |
 | 1 | Arducam direct | 1 (camera) | **ordered 9 Oct, express** (longest lead item) |
 | 2 | PiShop.ca | 2, 3 | 1–3 days |
-| 3 | Digi-Key.ca | 12 (INA260; [above](#parts-that-are-hard-to-source-in-canada)) | 1–3 days |
-| 4 | RobotShop.ca | 6 (four ULA1s) | a few days |
-| 5 | Amazon.ca Prime | everything else | 1–3 days |
+| 3 | RobotShop.ca | 6 (four ULA1s) | a few days |
+| 4 | Amazon.ca Prime | everything else | 1–3 days |
 
 Listing details to verify:
 

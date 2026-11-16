@@ -81,10 +81,9 @@ CONNECTIONS = [
     ("Power, 12 V side", [
         ("P1", "Power bank USB-C", "PD trigger USB-C", "30 cm C-to-C cable (BOM 14). A charge-only or A-to-C cable leaves the trigger at 5 V"),
         ("P2", "PD trigger +12 V", "power latch IN", "18 AWG. The latch switches the positive line only"),
-        ("P3", "power latch OUT", "gauge VIN+ (IN+ on an INA226)", "18 AWG. The gauge sits in series on the positive line"),
-        ("P4", "gauge VIN− (IN−)", "buck IN+, through the Schottky diode", "18 AWG. Band (cathode) toward the buck"),
-        ("P5", "PD trigger GND", "buck IN−", "18 AWG"),
-        ("P6", "power latch GND", "buck IN−", "22 AWG. The latch only references its transistors to it"),
+        ("P3", "power latch OUT", "buck IN+, through the Schottky diode", "18 AWG. Band (cathode) toward the buck"),
+        ("P4", "PD trigger GND", "buck IN−", "18 AWG"),
+        ("P5", "power latch GND", "buck IN−", "22 AWG. The latch only references its transistors to it"),
     ]),
     ("Switch and Pi signals", [
         ("S1", "latch IN (+12 V, always live)", "rocker terminal 1", "22 AWG, signal only: under 1 mA"),
@@ -102,10 +101,8 @@ CONNECTIONS = [
         ("R7", "buck OUT+ / OUT−", "servo headers + / −", "20–22 AWG. ≈ 0.7 A when both servos stall"),
     ]),
     ("I2C bus", [
-        ("I1", "Pi pin 3 (GPIO2, SDA)", "PTZ controller SDA and gauge SDA", "PTZ controller 0x0C, gauge 0x40"),
-        ("I2", "Pi pin 5 (GPIO3, SCL)", "PTZ controller SCL and gauge SCL", ""),
-        ("I3", "Pi pin 1 (3.3 V)", "gauge VCC", "3.3 V, not 5 V: the gauge's pull-ups go to its VCC"),
-        ("I4", "Pi pin 9 (GND)", "gauge GND", ""),
+        ("I1", "Pi pin 3 (GPIO2, SDA)", "PTZ controller SDA", "PTZ controller 0x0C"),
+        ("I2", "Pi pin 5 (GPIO3, SCL)", "PTZ controller SCL", ""),
     ]),
     ("LED ring", [
         ("L1", "Pi pin 19 (GPIO10, SPI0 MOSI)", "74AHCT125 1A (pin 2)", "3.3 V data in"),
@@ -235,17 +232,6 @@ def latch(ax, x, y):
 def rocker(ax, x, y):
     board(ax, x, y, 20, 9, "#1c1c1c", "Rocker (#13)", fs=6.5, r=1)
     return {"1": pad(ax, (x + 4, y), "1", "bottom"), "2": pad(ax, (x + 16, y), "2", "bottom")}
-
-
-def gauge(ax, x, y):
-    w, h = 26, 18
-    board(ax, x, y, w, h, "#1f3f8a")
-    ax.text(x + w / 2, y + 6.5, "INA260 gauge", ha="center", fontsize=7, fontweight="bold", color="white", zorder=3)
-    ax.text(x + w / 2, y + 3, "(#12) 0x40", ha="center", fontsize=6, color="white", zorder=3)
-    p = {"VIN+": pad(ax, (x, y + 9), "VIN+", "left", fs=5), "VIN-": pad(ax, (x + w, y + 9), "VIN−", "right", fs=5)}
-    for i, n in enumerate(["GND", "SCL", "SDA", "VCC"]):
-        p[n] = pad(ax, (x + 6 + i * 4.6, y + h), n, "top", fs=4.5)
-    return p
 
 
 def buck(ax, x, y):
@@ -415,7 +401,7 @@ PAGE_HTML = """<!DOCTYPE html>
 <main>
   <div id="pic">__SVG__<div id="hint">Click a row or a wire. Drag to pan, wheel to zoom, Esc to clear.</div></div>
   <aside>
-    <div id="tools"><input id="q" type="search" placeholder="Filter: R3, SDA, pin 11, gauge…" aria-label="Filter connections" /></div>
+    <div id="tools"><input id="q" type="search" placeholder="Filter: R3, SDA, pin 11, buck…" aria-label="Filter connections" /></div>
     <div id="list"><table><thead><tr><th>#</th><th>From</th><th>To</th><th>Notes</th></tr></thead><tbody id="rows"></tbody></table></div>
   </aside>
 </main>
@@ -556,7 +542,7 @@ def write_page(svg_text, chips, servos):
 # ----------------------------------------------------------------------------
 # The build
 # ----------------------------------------------------------------------------
-LEGEND = [(V12, "+12 V"), (RED, "+5 V"), (BLACK, "GND"), ("#e67e7e", "+3.3 V (I3)"), (SDA, "I2C SDA"),
+LEGEND = [(V12, "+12 V"), (RED, "+5 V"), (BLACK, "GND"), (SDA, "I2C SDA"),
           (SCL, "I2C SCL"), (SIGNAL, "latch HOLD / SENSE"), (DATA, "ring data"), (PWM, "servo PWM"),
           ("#8d5524", "servo lead"), (RIBBON, "camera ribbon"), (USB, "USB")]
 
@@ -587,7 +573,6 @@ def render(servos="pigpio"):
     trg = trigger(ax, 54, 18)
     lat = latch(ax, 94, 14)
     rck = rocker(ax, 84, 44)
-    gau = gauge(ax, 140, 18)
     bk = buck(ax, 178, 12)
     bj = barrel(ax, 236, 49)
     pz = ptz_ctrl(ax, 24, 140, servos)
@@ -603,18 +588,15 @@ def render(servos="pigpio"):
     with conn(ax, "P2"):
         wire(ax, [trg["+12V"], (86, trg["+12V"][1]), (86, 33), (lat["IN"][0], 33)], V12, label="P2", at=0.25)
     with conn(ax, "P3"):
-        o, i = lat["OUT"], gau["VIN+"]
-        wire(ax, [o, (134, o[1]), (134, i[1]), i], V12, label="P3", at=0.2)
+        o, i = lat["OUT"], bk["IN+"]
+        wire(ax, [o, (134, o[1]), (134, i[1]), i], V12, label="P3", at=0.35)
+        diode(ax, (173.2, i[1]))
     with conn(ax, "P4"):
-        wire(ax, [gau["VIN-"], (171, gau["VIN-"][1]), (171, bk["IN+"][1]), bk["IN+"]], V12)
-        diode(ax, (173.2, bk["IN+"][1]))
-        tag(ax, (170.5, bk["IN+"][1] + 4), "P4", V12)
-    with conn(ax, "P5"):
         g = trg["GND"]
-        wire(ax, [g, (82, g[1]), (82, 6), (174, 6), (174, 17), (bk["IN-"][0], 17)], BLACK, label="P5", at=0.3)
-    with conn(ax, "P6"):
+        wire(ax, [g, (82, g[1]), (82, 6), (174, 6), (174, 17), (bk["IN-"][0], 17)], BLACK, label="P4", at=0.3)
+    with conn(ax, "P5"):
         g = lat["GND"]
-        wire(ax, [g, (90, g[1]), (90, 9), (172, 9), (172, 19.5), (bk["IN-"][0], 19.5)], BLACK, label="P6", at=0.62)
+        wire(ax, [g, (90, g[1]), (90, 9), (172, 9), (172, 19.5), (bk["IN-"][0], 19.5)], BLACK, label="P5", at=0.62)
 
     # --- Switch -----------------------------------------------------------------
     with conn(ax, "S1"):
@@ -623,15 +605,18 @@ def render(servos="pigpio"):
         wire(ax, [rck["2"], (rck["2"][0], 42), (lat["SW"][0], 42), lat["SW"]], V12, lw=1.6)
         tag(ax, (rck["2"][0] + 4.5, 42), "S2", V12)
 
-    # --- Header leads down the corridor left of the Pi, to the gauge and the
-    # latch. Nested so that none cross: (pin, colour, lane above the header,
-    # corridor x, corner y, target, number, tag y)
-    PINK = "#e67e7e"
+    # --- Header leads left of the Pi: I2C across to the PTZ controller, and the
+    # latch's HOLD and SENSE down the corridor. Nested so that none cross:
+    # (pin, colour, lane above the header, corridor x, corner y, target, number, tag y)
+    for num, colour, lane, cx, by, cid in ((3, SDA, 134.8, 144.0, 122, "I1"), (5, SCL, 137.1, 141.5, 125, "I2")):
+        with conn(ax, cid):
+            px, py = pins[num]
+            tx = pz["SDA" if cid == "I1" else "SCL"]
+            wire(ax, [(px, py), (px, lane), (cx, lane), (cx, by), (tx[0], by), tx], colour, lw=1.8)
+            pin_end(ax, (px, py), colour)
+            pin_end(ax, tx, colour)
+            tag(ax, (96 + (8 if cid == "I2" else 0), by), cid, colour)
     corridor = [
-        (1, PINK, 132.5, 146.5, 61, gau["VCC"], "I3", 76),
-        (3, SDA, 134.8, 144.0, 58.5, gau["SDA"], "I1", 73),
-        (5, SCL, 137.1, 141.5, 56, gau["SCL"], "I2", 70),
-        (9, BLACK, 139.4, 139.0, 53.5, gau["GND"], "I4", 67),
         (11, SIGNAL, 141.7, 136.5, 50, lat["HOLD"], "S3", 82),
         (13, SIGNAL, 144.0, 134.0, 52.5, lat["SENSE"], "S4", 88),
     ]
@@ -641,14 +626,6 @@ def render(servos="pigpio"):
             wire(ax, [(px, py), (px, lane), (cx, lane), (cx, corner), (dst[0], corner), dst], colour, lw=1.8)
             pin_end(ax, (px, py), colour)
             tag(ax, (cx, ty), cid, colour)
-            if cid in ("I1", "I2"):
-                # the PTZ controller's branch off the same lead
-                by = 122 if cid == "I1" else 125
-                tx = pz["SDA" if cid == "I1" else "SCL"]
-                wire(ax, [(cx, by), (tx[0], by), tx], colour, lw=1.8)
-                dot(ax, (cx, by), colour)
-                pin_end(ax, tx, colour)
-                tag(ax, (96 + (8 if cid == "I2" else 0), by), cid, colour)
 
     # --- 5 V rail: every lead starts at the buck's OUT+ / OUT− ------------------
     op, om = bk["OUT+"], bk["OUT-"]

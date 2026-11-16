@@ -14,7 +14,8 @@ Runs at once:
   * an optional **Firebase link** (cloud.py) — keeps the camera's Firestore
     document current so the app works from anywhere, and picks up the app's
     commands from it;
-  * the **status ring** and the **battery gauge**;
+  * the **status ring**, and the battery gauge if one is fitted (the build has
+    none: POWER_MONITOR = "none");
   * the **Wi-Fi gate** (wifi_link.py): the camera boots into `connecting`,
     and `pairing` if it has no network it knows, before `awake`;
   * **sleep**: awake AWAKE_TIMEOUT_S with no session started and nobody

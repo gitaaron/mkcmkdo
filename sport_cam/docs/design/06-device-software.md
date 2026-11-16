@@ -30,7 +30,7 @@ Python 3.11+; systemd unit `sportcam-head.service`.
 | `ptz.py` | PTZ controller at I2C 0x0C: pan, tilt, zoom, focus, soft limits, homing; `jog()` for the app's pan and tilt sticks ([09](09-direct-connection-and-app.md#aiming-by-hand)) |
 | `ptzcheck.py` | bench tool: sweeps both axes to their soft limits |
 | `led.py` | WS2812B ring over SPI (no root required) |
-| `power.py` | battery gauge (INA260, INA226 or none): Wh integration, runtime estimate, low/critical levels |
+| `power.py` | battery gauge driver, off by default (`POWER_MONITOR = "none"`): the build has no gauge ([04](04-electronics.md#knowing-what-is-left)) |
 | `storage.py` | SD free space in minutes of recording; low/critical levels |
 | `focuscal.py` | `python3 -m sportcam.focuscal <metres>`: focus sweep at five focal lengths; prints `FOCUS_GRID` |
 | `uploader.py` | background upload to the backend: progress, retry, boot-time backlog drain; sends each clip's session hash as its `claimHash` ([08](08-recordings-and-cloud.md)) |

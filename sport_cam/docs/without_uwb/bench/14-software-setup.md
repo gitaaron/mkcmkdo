@@ -64,7 +64,6 @@ bench lacks, in `sportcam/config.py`:
 | --- | --- | --- |
 | `SERVO_DRIVER` <!--arducam row--> | `"arducam"` | the servos stay on the PTZ controller |
 | `SERVO_DRIVER` <!--pigpio row--> | `"pigpio"` (`--servos pigpio`) | the servos on the Pi's GPIO12 and GPIO13 |
-| `POWER_MONITOR` | `"none"` | no battery gauge: no battery warnings |
 
 **Done when:** it ends with `All set`: the camera found, and `0c` (the PTZ
 controller) on I2C. A failed check names the connection to look at: fix it
@@ -118,7 +117,7 @@ From your Mac:
 
 It waits 15 s for a Wi-Fi portal that isn't installed, then goes **awake**:
 the log shows `[local-api] serving on http://0.0.0.0:8787`. `[led] disabled`
-and the gauge's absence are expected.
+is expected.
 
 **Stopping it:** stop any recording from the app first, then Ctrl-C.
 (Ctrl-C parks the head but doesn't save a clip still recording; the full

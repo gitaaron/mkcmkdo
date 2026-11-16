@@ -27,16 +27,6 @@ window.SPORTCAM_LAYOUT = {
    "z0": 3.0,
    "z1": 25.0
   },
-  "gauge": {
-   "ang": 0,
-   "cx": -53.0,
-   "cy": 1.0,
-   "l": 22.9,
-   "name": "battery gauge",
-   "w": 22.9,
-   "z0": 4.0,
-   "z1": 16.0
-  },
   "jack": {
    "ang": 210,
    "cx": -52.828,
@@ -196,12 +186,6 @@ window.SPORTCAM_LAYOUT = {
    ],
    "d": 12.7,
    "stock_l": 914
-  },
-  "gauge": {
-   "bom": 12,
-   "h": 12,
-   "l": 22.9,
-   "w": 22.9
   },
   "jack": {
    "body_d": 11,

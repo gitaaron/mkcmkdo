@@ -20,7 +20,7 @@ Subsystem docs:
 
 | Subsystem | Compute | Role |
 | --- | --- | --- |
-| **Camera unit** | Raspberry Pi 4 | camera and zoom lens, pan/tilt servos, LED ring, battery gauge, video encode and stream, person detection, tracking control loop<!--with_uwb-->; with UWB, three anchors<!--/--> |
+| **Camera unit** | Raspberry Pi 4 | camera and zoom lens, pan/tilt servos, LED ring, video encode and stream, person detection, tracking control loop<!--with_uwb-->; with UWB, three anchors<!--/--> |
 | **Backend** | Firebase: one Cloud Function (TypeScript), Firestore, Cloud Storage, Hosting | API (Hosting gives it the `web.app` address), per-camera live state and preview, recording library. Shared by both builds |
 | **Phone app** | Flutter (iOS / Android) | live view and control, remotely or direct on the camera's Wi-Fi. Shared by both builds |
 

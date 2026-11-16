@@ -47,7 +47,7 @@ view; camera-only for lower cost, size and power.
 | F1 | **Pan, tilt, zoom.** Pan 160° (±80°); tilt 130° (−45° to +85°); optical zoom 96° → 33° horizontal (≈ 3.5×). All three from the Arducam PTZ base | [03](../design/03-mechanical-design.md) |
 | F2 | **Follow a person** <!--both-->by UWB tag or by vision, per build<!--/--><!--with_uwb: by the UWB tag they wear--><!--without_uwb: by vision alone-->, and zoom to keep them framed | <!--both-->05 tracking ([with UWB](../with_uwb/design/05-tracking-system.md), [without UWB](../without_uwb/design/05-tracking-system.md))<!--/--><!--with_uwb:[05](../with_uwb/design/05-tracking-system.md)--><!--without_uwb:[05](../without_uwb/design/05-tracking-system.md)--> |
 | F3 | **Record unattended.** Recording starts once a found person has stayed in frame for 3 s, and stops at session end. A clip is saved even when the battery runs out | [Ideal path](#ideal-path) |
-| F4 | **LED status ring** showing each state and sub-state (connecting, pairing, sleep, awake with or without a person in frame, search, found, recording), low battery and low card space | [State machine](#state-machine) |
+| F4 | **LED status ring** showing each state and sub-state (connecting, pairing, sleep, awake with or without a person in frame, search, found, recording) and low card space | [State machine](#state-machine) |
 | F5 | **Phone app**: opens into the live view; state-dependent bottom buttons; status ring top right in the LED colours | [09](../design/09-direct-connection-and-app.md#the-apps-screen) |
 | F6 | **Remote use.** State, live preview and control from any internet-connected phone or computer. One backend and one app serve both builds; the camera reports its build | [07](../design/07-backend-and-app.md#tracking-mode) |
 | F7 | **Recordings library.** Each stopped recording uploads to the backend and appears in the app's library. The camera's copy is deleted only once the backend has it whole. Not in v1: watching a recording while it is still being made | [08](../design/08-recordings-and-cloud.md) |
@@ -73,8 +73,8 @@ in the doc that makes it. C1 and C2 differ by build.
 | C2 | **Anchor spacing**, with UWB | A1–A2 **400 mm** horizontal; A3 **250 mm** above them, ≈ 89 mm behind the pan axis | angle noise ∝ 1/spacing: 400 mm gives ≈ 7° RMS filtered (≈ 9° at 250 mm) ([05](../with_uwb/design/05-tracking-system.md#geometry)). Telling the climber from a belayer beside them waits on that noise: at 400 mm someone 1.5 m away is resolved in ≈ 8 s rather than ≈ 17 s, and 1 m away in ≈ 12 s rather than never. Measure it with `bearingcal`. Below 250 mm, error and A3's blind corner grow quickly | `with_uwb/cad/config.scad`; `UWB_BASELINE_M`, `UWB_A3_UP_M`, `UWB_A3_BACK_M` in `src/with_uwb/device/sportcam/config.py` |
 | C2 | **Pan range ±80°**, without UWB | soft limits `PAN_MIN_DEG` / `PAN_MAX_DEG` = ∓80°; no continuous rotation | the base fouls before 180° and can't turn 360°; the search covers this range only | `src/without_uwb/device/sportcam/config.py` |
 | C3 | **Standard tripod mount** | 3/8-16 nut epoxied into a hex pocket in the floor; removable 3/8-16 → 1/4-20 reducer bushing | photo tripods use 1/4-20, video heads 3/8-16; one socket takes both without an adapter plate | `tripod_boss_d`, `tripod_ledge` in `<build>/cad/config.scad`; `[tripod_nut]` in `cad/ordered_parts.toml`; BOM |
-| C4 | **Battery operation** | ≥ 4 h tracking + recording from a USB-C PD bank; remaining-time gauge; clean save and stop at 7 % | no wall socket; no lost clip at end of charge | [04 — Runtime](../design/04-electronics.md#runtime) |
-| C4a | **Quick bank swap** | a flat bank is swapped for a fully charged one in **under a minute** (plus the boot), with no tools and no strap undone: switch off at the rocker, unplug, pinch the bank out of its tray, clip the full one in, plug in, switch on. The gauge starts again at full | sessions outlast one bank (a day at the crag or the gym); a spare bank in the bag doubles the runtime. Cold swap: the clean shutdown saves any recording first, so nothing is lost | `battery_tray.scad` (clip-in tray, strap tunnels under the floor); `cad/fit.py` checks the clip; [04 — Swapping banks](../design/04-electronics.md#swapping-banks) |
+| C4 | **Battery operation** | ≥ 4 h tracking + recording from a USB-C PD bank | no wall socket. No charge reading: a PD bank reports none, so there is no low-battery warning ([04 — Knowing what is left](../design/04-electronics.md#knowing-what-is-left)) | [04 — Runtime](../design/04-electronics.md#runtime) |
+| C4a | **Quick bank swap** | a flat bank is swapped for a fully charged one in **under a minute** (plus the boot), with no tools and no strap undone: switch off at the rocker, unplug, pinch the bank out of its tray, clip the full one in, plug in, switch on. | sessions outlast one bank (a day at the crag or the gym); a spare bank in the bag doubles the runtime. Cold swap: the clean shutdown saves any recording first, so nothing is lost | `battery_tray.scad` (clip-in tray, strap tunnels under the floor); `cad/fit.py` checks the clip; [04 — Swapping banks](../design/04-electronics.md#swapping-banks) |
 | C5 | **Printable on a Bambu Lab A1 Mini** | every part ≤ 170 mm on every axis, as oriented for printing | the printer in use | [11](../setup/11-3d-printing.md#design-rule-every-part-prints-on-a-bambu-lab-a1-mini); `cad/fit.py` |
 | C6 | **Bought parts fit the printed parts** | every part in `cad/ordered_parts.toml` fits with clearance | parts are bought before they can be measured | `cad/fit.py`, on render, commit and Claude Code stop ([Appendix A](../appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)) |
 | C7 | **Operates offline** | tracks, records and shows state with no server and no Wi-Fi | gym Wi-Fi is unreliable | [02](../design/02-system-architecture.md#key-decisions) |
@@ -147,8 +147,7 @@ library. Deviations (dropouts, loss, manual control): <!--both-->[with UWB](#sta
 8. **Sleep.** **Sleep** in the app works from `awake` and `tracking` (a
    recording is stopped first, back to `tracking`): the head turns to look
    straight up (`SLEEP_TILT_DEG`) and the sensor stops. The same happens on its own after 30 s in `awake` with
-   nobody watching the live view, and at
-   7 % battery. To power off, switch it off at the rocker
+   nobody watching the live view. To power off, switch it off at the rocker
    ([F12](#functional-requirements)): it saves any recording, parks, and
    cuts its own power ≈ 15 s later.
 
@@ -239,8 +238,6 @@ Rules:
   lens zooms straight out to wide, still pointing where they were, and looks
   for them in the whole frame ([F14](#functional-requirements)); seen again,
   the zoom closes back in. Next step is build-specific.
-- Battery < 20 %: ring dims and blinks orange at 1 Hz over the state colour.
-  Battery < 7 %: save, park, `sleep`.
 - Card space < 20 min of recording: ring blinks orange at 1 Hz over the
   state colour, and the app warns. < 5 min: no new recording starts, and a
   running one is stopped and saved cleanly. 500 MB is always left free.

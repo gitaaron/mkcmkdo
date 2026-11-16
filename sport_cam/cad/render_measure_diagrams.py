@@ -429,7 +429,7 @@ def lwh(S, l, w, h, text_l=(0, 0), text_w=(0, 0), text_h=(0, 0)):
 
 def boards():
     fig, axes = figure(
-        "2 · Boards on the enclosure floor", "[buck]  [pd_trigger]  [gauge]  [latch]",
+        "2 · Boards on the enclosure floor", "[buck]  [pd_trigger]  [latch]",
         ["l, w — the board's outline, or of anything that hangs over its edge (a terminal block, the USB-C socket), "
          "whichever is bigger.   l is the long side.",
          "h — stand the board on the table the way it will sit (on its pins or solder joints if they stick out "
@@ -443,9 +443,8 @@ def boards():
          "pd_trigger: it must have a USB-C SOCKET (a hole the cable plugs into), not a plug sticking out.   "
          "port_h — the socket's height above the board.   plug_w × plug_h — the bank cable's USB-C plug: the "
          "moulded body behind the metal, not the metal tip (the wall opening is cut to this)."],
-        panels=4, size=(10.0, 7.6), rows=2)
-    for ax, t in zip(axes, ("buck converter  [buck]", "PD trigger  [pd_trigger]",
-                            "INA260 battery gauge  [gauge]", "power latch  [latch]")):
+        panels=3, size=(10.0, 7.6), rows=2)
+    for ax, t in zip(axes, ("buck converter  [buck]", "PD trigger  [pd_trigger]", "power latch  [latch]")):
         ax.set_title(t, fontsize=9.5, color=INK, family="monospace", pad=2)
 
     # buck
@@ -510,19 +509,9 @@ def boards():
     S.draw()
     S.fit(pad=16)
 
-    # gauge
-    g = P["gauge"]
-    S = Scene(axes[2])
-    board_box(S, g["l"], g["w"], color="#3a3a7a")
-    S.box(g["l"] - 8, 2, 2.8, 7, g["w"] - 4, g["h"] - 2.8, "#2c8a3a", bias=3)        # screw terminal
-    S.box(4, 6, 2.8, 6, 6, 1.4, DARK, bias=3)
-    lwh(S, g["l"], g["w"], g["h"])
-    S.draw()
-    S.fit(pad=16)
-
     # latch: the 3 × 7 cm perfboard on four M3 standoffs, like the buck
     la = P["latch"]
-    S = Scene(axes[3])
+    S = Scene(axes[2])
     so = la["standoff_h"]
     x0, y0 = (la["l"] - la["hole_dx"]) / 2, (la["w"] - la["hole_dy"]) / 2
     for x in (x0, x0 + la["hole_dx"]):                                              # nylon standoffs

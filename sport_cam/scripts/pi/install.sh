@@ -100,7 +100,7 @@ export DEBIAN_FRONTEND=noninteractive
 CONFIG_TXT=/boot/firmware/config.txt
 APT="apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
 
-raspi-config nonint do_i2c 0                        # PTZ controller (+ battery gauge)
+raspi-config nonint do_i2c 0                        # PTZ controller
 [[ $BENCH == 1 ]] || raspi-config nonint do_spi 0   # LED ring
 
 apt-get update
@@ -231,8 +231,7 @@ cd "$DEST"
 
 sed -i -e "s/^SERVO_DRIVER = .*/SERVO_DRIVER = \"$SERVOS\"/" sportcam/config.py
 if [[ $BENCH == 1 ]]; then
-  # What the bench lacks: no gauge, no A3
-  sed -i -e 's/^POWER_MONITOR = .*/POWER_MONITOR = "none"/' sportcam/config.py
+  # What the bench lacks: no A3
   [[ $BUILD == without_uwb ]] || sed -i -e 's/^UWB_ANCHORS = .*/UWB_ANCHORS = 2/' sportcam/config.py
 else
   python3 -m sportcam.getmodel      # MobileNet-SSD weights; skips if already there
@@ -271,10 +270,6 @@ check "camera (IMX477)" camera_found \
   "the camera ribbon: contacts the right way round, latches closed (wiring guide, C1)"
 check "PTZ controller at 0x0c" "grep -qE '^00:.* 0c( |$)' <<<\"\$I2C\"" \
   "SDA, SCL, 5V and GND to the PTZ controller (wiring guide)"
-if [[ $BENCH == 0 ]]; then
-  check "battery gauge at 0x40" "grep -qE '^40: 40( |$)' <<<\"\$I2C\"" \
-    "the gauge's I2C (wiring guide, I1-I4)"
-fi
 if [[ $PI_SERVOS == 1 ]]; then
   check "pigpiod running" "on_pi 'pigs hwver' >/dev/null 2>&1" \
     "on the Pi: sudo systemctl status pigpiod"

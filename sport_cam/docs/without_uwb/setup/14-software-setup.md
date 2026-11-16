@@ -110,7 +110,7 @@ what you have.
 
 | It does | Detail |
 | --- | --- |
-| Interfaces | I2C (PTZ controller, battery gauge) and SPI (LED ring) turned on |
+| Interfaces | I2C (PTZ controller) and SPI (LED ring) turned on |
 | OS | upgraded; `python3-picamera2`, `python3-opencv`, `i2c-tools` and `pip` installed |
 | Pan and tilt <!--pigpio row--> | pigpio (from apt, or built from [source](https://github.com/joan2937/pigpio) if apt has none), with `pigpiod` enabled: the servos run off the Pi's hardware PWM through it (`SERVO_DRIVER = "pigpio"`, [04 — Servo drive](../../design/04-electronics.md#servo-drive)), and the service talks to it over a local socket, so it doesn't run as root. Analog audio off: it shares the PWM block |
 | Pan and tilt <!--arducam row--> | `--servos arducam`: no pigpio. The PTZ controller drives the servos from its I2C registers, in whole degrees (`SERVO_DRIVER = "arducam"`, [04 — Servo drive](../../design/04-electronics.md#servo-drive)) |
@@ -118,7 +118,7 @@ what you have.
 | Python packages | `requirements.txt`, system-wide: both services use the system `python3`, the Wi-Fi portal runs as root, and Picamera2 is apt-only |
 | Tests | the offline tests, before anything is put in place |
 | Person detector | MobileNet-SSD's weights (`getmodel`, ≈ 48 MB download, 19 MB kept). HOG works out of the box; MobileNet-SSD finds climbers in poses HOG misses ([06 — The two detectors](../../design/06-device-software.md#the-two-detectors)), and the comparison in [verification](15-verification.md) needs it |
-| Checks, after the reboot | the camera is found (if not, it adds `dtoverlay=imx477` and reboots once more); `0c` (PTZ) and `40` (gauge) on I2C<!--pigpio:; `pigpiod` answers--> |
+| Checks, after the reboot | the camera is found (if not, it adds `dtoverlay=imx477` and reboots once more); `0c` (PTZ) on I2C<!--pigpio:; `pigpiod` answers--> |
 
 **Done when:** it ends with `All set`. A failed check names the connection
 to look at: fix it and run the script again. Every part of it is safe to
@@ -291,7 +291,7 @@ EOF
 
 | Operation | Command / note |
 | --- | --- |
-| Apply a `config.py` change | `./scripts/pi/run sudo systemctl restart sportcam-head`. Also resets the battery gauge to "full" (step 8.6): don't restart mid-session on a part-used bank |
+| Apply a `config.py` change | `./scripts/pi/run sudo systemctl restart sportcam-head`. |
 | Before running `focuscal` or `ptzcheck` | `./scripts/pi/run sudo systemctl stop sportcam-head` (they need exclusive access to the hardware) |
 
 ### Power switch
@@ -406,9 +406,6 @@ tuning steps only mean something once the signs are right.
    about 6 s (`RESEARCH_AFTER_S`) the camera should start sweeping again and follow
    the first person it finds. If nobody is ever found it gives up to awake after
    `SEARCH_GIVE_UP_S` (180 s) when not recording.
-6. **Battery gauge.** Counts energy used since the service started, assuming
-   a full bank at that point. Start on a fully charged bank; compare
-   minutes-left with a stopwatch over the first 30 min. No app reset control.
 
 If it keeps sweeping and the app says it can't find anyone, the camera is
 pointing somewhere you aren't, or the detector can't see you: recheck step 4,

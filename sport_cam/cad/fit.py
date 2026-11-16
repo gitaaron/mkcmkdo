@@ -73,7 +73,7 @@ PI_CSI = (45.0, 11.5)   # Pi 4 camera socket, from the microSD end / power edge
 # (the wearable is printed as body + lid side by side).
 EXPECTED_BODIES = {"wearable_case.stl": 2}
 # Boards taped to the enclosure floor, placed in this order after the PD trigger.
-DECK_BOARDS = (("buck", "buck converter"), ("gauge", "battery gauge"), ("latch", "power latch"))
+DECK_BOARDS = (("buck", "buck converter"), ("latch", "power latch"))
 SCREWED_BOARDS = (("buck", "buck converter"), ("latch", "power latch"))   # on M3 standoffs, screwed up through the floor
 MAX_DECK_TRIES = 40        # floor arrangements tried per enclosure size before going wider
 
@@ -323,7 +323,7 @@ def solve_at(build, P, C, base_d, raised=False):
     # ---- wall features: heights and footprints --------------------------
     tr, sw, jk = P["pd_trigger"], P["switch"], P["jack"]
     deck_z = FZ + C["tape_t"]
-    # buck, gauge and power latch: on the floor, or on risers just clear of the tripod boss
+    # buck and power latch: on the floor, or on risers just clear of the tripod boss
     riser_h = C["tripod_boss_h"] + 1 - FZ if raised else 0.0
     board_z = deck_z + riser_h
     usbc_zc = deck_z + tr["h"] - tr["port_h"] / 2
@@ -731,7 +731,7 @@ def solve_at(build, P, C, base_d, raised=False):
                 "cable_slot": {"ang": cs_ang, "r": cs_r, "w": cs_w, "d": cs_d},
                 "shifter_on": shifter[0],
                 "boxes": {
-                    "trigger": box_d(deck["trigger"]), "buck": box_d(deck["buck"]), "gauge": box_d(deck["gauge"]),
+                    "trigger": box_d(deck["trigger"]), "buck": box_d(deck["buck"]),
                     "latch": box_d(deck["latch"]),
                     "switch": box_d(swb), "jack": box_d(jkb), "shifter": box_d(shifter[1]),
                 },
@@ -995,7 +995,7 @@ class Audit:
 def scene(build, P, C, L):
     """Every bought part and every printed obstacle inside the enclosure."""
     R_in, FZ = L["R_in"], L["floor_z"]
-    objs = [box_from(L["boxes"][k]) for k in ("trigger", "buck", "gauge", "latch", "switch", "jack", "shifter")]
+    objs = [box_from(L["boxes"][k]) for k in ("trigger", "buck", "latch", "switch", "jack", "shifter")]
     objs += [box_from(b) for b in L["pi_boxes"]]
     ring = P["led_ring"]
     objs.append(Cyl("LED ring", 0, 0, ring["od"] / 2, L["ring_z0"], L["ring_z1"]))
@@ -1058,7 +1058,7 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
             "; ".join(sorted(set(clashes))) or f"{len(allp)} envelopes checked pairwise")
 
     # 3. light path
-    deck_names = ["PD trigger", "buck converter", "battery gauge", "power latch", "rocker switch", "barrel jack"]
+    deck_names = ["PD trigger", "buck converter", "power latch", "rocker switch", "barrel jack"]
     deck_top = max(o.z1 for o in objs if o.name in deck_names or (o.name == "level shifter" and L["shifter_on"] == "deck"))
     A.check(deck_top <= L["window_z"] + EPS, "The power boards sit below the LED window",
             f"tallest at z = {deck_top:.1f}; window {L['window_z']:.1f}–{L['window_z'] + C['led_window_h']:.1f}")

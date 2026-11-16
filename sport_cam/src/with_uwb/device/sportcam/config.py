@@ -472,9 +472,12 @@ FOCUS_RATE_LIMIT_S = 0.5
 
 # --- battery -------------------------------------------------------------
 # SportCam runs off a USB-C PD power bank: a PD trigger board pulls 12 V from
-# it, one buck makes the 5 V rail, and an INA226 between them measures what
-# the pack actually delivers. A bank reports no state of charge over PD, so
-# the gauge integrates watt-hours and assumes a full pack at the last reset.
+# it and one buck makes the 5 V rail. A bank reports no state of charge over
+# PD, and the build has no battery gauge: one could only count watt-hours
+# since power-on and assume a full pack then, so any power-on with a part-used
+# bank made its warnings wrong (docs/design/04-electronics.md, "Knowing what
+# is left"). POWER_MONITOR stays "none"; the settings below only matter if
+# you fit an INA260/INA226 on I2C 0x40 yourself.
 # Energy available **at the 12 V rail, where the gauge sits** — not the number
 # on the bank. A 25 000 mAh bank is 92 Wh at its cells, and its own boost to
 # 12 V costs about 9 % before our buck ever sees it. Using the nameplate here
@@ -482,10 +485,9 @@ FOCUS_RATE_LIMIT_S = 0.5
 BATTERY_WH = 84.0
 BATTERY_LOW_FRAC = 0.20        # warn: LED ring flashes orange
 BATTERY_CRITICAL_FRAC = 0.07   # stop recording, park, go to sleep
-# Which current sensor is fitted. "ina260" has the shunt on the die and is
-# the easier part to buy and wire; "ina226" needs an external shunt; "none"
-# builds without a gauge, losing the low-battery warning and the auto-save.
-POWER_MONITOR = "ina260"
+# Which current sensor is fitted: "none" (the build), or "ina260" / "ina226"
+# (external shunt) if you add one.
+POWER_MONITOR = "none"
 POWER_MONITOR_ADDR = 0x40      # both parts default to this
 INA226_SHUNT_OHMS = 0.01       # only used when POWER_MONITOR = "ina226"
 

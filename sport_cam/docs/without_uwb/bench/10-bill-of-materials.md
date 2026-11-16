@@ -12,7 +12,6 @@ list is the [camera-only build's](../setup/10-bill-of-materials.md);
 | --- | --- | --- |
 | power bank, PD trigger, USB-C cable (items 9, 10, 14) | a USB-C wall adapter powers the Pi | — |
 | buck, capacitor, power wire (11, 19, part of 18) | the adapter makes the 5 V, and the PTZ controller takes it from the Pi's header | — |
-| battery gauge (12) | no battery to measure | `POWER_MONITOR = "none"`: no battery warnings |
 | rocker switch and power latch (13, 13a) | you unplug the adapter | the Pi isn't told to shut down: stop the software first ([14](14-software-setup.md)) |
 | LED ring and level shifter (7, 8) | the app shows the same state | the ring code finds nothing to drive and carries on |
 | Pi-driven servos: extension leads and headers (part of 18) <!--arducam row--> | the kit's own servo drive works | `SERVO_DRIVER = "arducam"`: whole-degree steps, a little less smooth |

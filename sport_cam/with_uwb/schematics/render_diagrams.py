@@ -164,7 +164,7 @@ def system_architecture():
     box(ax, 0.4, 2.2, 3.6, 2.6, "Camera unit (one board)",
         ["Raspberry Pi 4 (HW H.264)", "pan + tilt: hardware PWM (pigpio)",
          "zoom + focus: PTZ ctrl (I2C 0x0C)", "3× ULA1 anchors (USB)",
-         "LED ring (SPI) · INA260 gauge"])
+         "LED ring (SPI)"])
     box(ax, 4.6, 0.3, 3.2, 1.8, "Battery", ["USB-C PD bank 92 Wh",
                                             "PD trigger 12 V → buck 5 V",
                                             "6.2 h tracking + recording"], fc="#fdf6e8")
@@ -210,7 +210,7 @@ def mechanical_layout():
     ax.text(cx, 4.2, "ENCLOSURE (static)", ha="center", fontsize=10,
             fontweight="bold", color=INK)
     ax.text(cx, 3.82, "Raspberry Pi 4", ha="center", fontsize=8.5, color=INK)
-    ax.text(cx, 3.5, "PD trigger · buck 5 V · INA226", ha="center", fontsize=8.5, color=INK)
+    ax.text(cx, 3.5, "PD trigger · latch · buck 5 V", ha="center", fontsize=8.5, color=INK)
     ax.add_patch(Rectangle((cx - 1.62, 3.0), 0.12, 0.9, fc=GREEN, ec="none"))
     ax.text(cx - 2.4, 3.45, "WS2812\nLED ring", fontsize=8.5, color=GREEN, ha="center")
 
@@ -471,8 +471,6 @@ def power_tree():
     box(ax, 0.3, 4.1, 2.7, 1.7, "USB-C PD power bank",
         ["25 000 mAh · 92 Wh label", "≈ 84 Wh at 12 V", "65 W+, 100 W cable"], fc="#fdf6e8")
     box(ax, 3.7, 4.1, 2.4, 1.7, "PD trigger → 12 V", ["+ power latch", "rocker = on/off"], fc="#fdf6e8")
-    box(ax, 6.8, 4.1, 2.3, 1.7, "INA260 gauge",
-        ["I2C 0x40", "shunt on die", "Wh integration"], fc="#f2fff5")
     box(ax, 3.7, 2.3, 2.4, 1.3, "Buck 12→5 V 8 A", ["5.1 V under load", "≈ 92 %, diode on its input"], fc="#f2f7ff")
     box(ax, 7.0, 1.95, 3.4, 2.05, "5 V rail — 11.5 W avg",
         ["Pi 4 + HW encode + CV  6.0 W", "PTZ servos + lens  1.0 W",
@@ -484,13 +482,12 @@ def power_tree():
         ["ULA1 on a 2 500 mAh", "USB bank, > 1 day"], fc="#fdf2f2")
 
     arrow(ax, (3.0, 4.95), (3.7, 4.95), "USB-C PD")
-    arrow(ax, (6.1, 4.95), (6.8, 4.95), "12 V")
-    arrow(ax, (7.9, 4.1), (5.5, 3.5), "12 V sensed", lofs=(0.55, 0.2))
+    arrow(ax, (4.9, 4.1), (4.9, 3.6), "12 V", lofs=(0.35, 0))
     arrow(ax, (6.1, 2.95), (7.0, 2.95), "5 V")
     arrow(ax, (8.7, 1.95), (8.7, 1.72), "", color=GREEN)
     ax.text(1.65, 0.25, "independent — never wired to the tripod",
             fontsize=8, color=GREY, ha="center")
-    ax.text(5.4, 0.9, "No mains. The 7 % cutoff\nstops and saves the recording\nbefore the pack dies.\nSwitching off does the same,\nthen the latch cuts the power.",
+    ax.text(5.4, 0.9, "No mains, and no charge\nreading: watch the bank's\nown indicator. Switching off\nsaves the recording, then\nthe latch cuts the power.",
             fontsize=8.5, color=GREY, ha="center")
     save(fig, "power-tree.png")
 

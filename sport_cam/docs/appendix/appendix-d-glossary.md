@@ -14,9 +14,8 @@ Terms that only the UWB build uses are in [their own section](#with-uwb).<!--/--
 | **Firestore** | Firebase's database. Each camera keeps one document there with its state, telemetry and heartbeat |
 | **Focal length (EFL)** | how far the zoom lens is zoomed in, in mm: about 2.8 mm at the wide end, 10.6 mm at full zoom |
 | **FOV** | field of view: how wide an angle the camera sees, 96° across at the wide end |
-| **Gauge** | the INA260 current sensor between the bank and the buck, which works out how much battery is left |
 | **HOG** | OpenCV's classic person detector ("histogram of oriented gradients"), the default (`DETECTOR = "hog"`). It runs about 3 times a second on the Pi |
-| **I2C** | the two-wire bus the Pi uses to talk to the PTZ controller and the gauge |
+| **I2C** | the two-wire bus the Pi uses to talk to the PTZ controller |
 | **Kalman filter** | a smoothing filter that averages noisy measurements while still following real movement |
 | **Level shifter** | the 74AHCT125 chip that lifts the Pi's 3.3 V signals to 5 V: data for the LED ring, and the servos' PWM |
 | **Found** | the second sub-state of `tracking`: a person is in frame (with UWB, the person where the tag is) and the camera follows and frames them as it will while recording. The ring fills with green over 3 s and the app beeps each second; still in frame at the end, recording starts |

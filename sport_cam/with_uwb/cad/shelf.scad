@@ -3,8 +3,8 @@
 // M2.5 nylon standoffs; the LED ring hangs underneath on foam tape, LEDs
 // down, so it lights the window between the power boards and the shelf.
 //
-// One side is cut away along a chord: the Pi's USB-C pigtail, the gauge's
-// I2C leads, the PTZ controller's 5 V and the LED ring's leads pass between
+// One side is cut away along a chord: the Pi's USB-C pigtail, the latch's
+// HOLD and SENSE leads, the PTZ controller's 5 V and the LED ring's leads pass between
 // the floor and the shelf through that gap.
 //
 // The shelf's size, the gap, the posts and the Pi's holes all come from

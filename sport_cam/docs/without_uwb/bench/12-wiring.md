@@ -8,7 +8,7 @@ wires it. The lens stays plugged into the controller, as the kit came, and
 the servos <!--both-->stay on it too or move to the Pi's header ([servo drive](#servo-drive))<!--/--><!--arducam: stay on it too--><!--pigpio: come off it onto the Pi's header, on jumper wires ([servo drive](#servo-drive))-->. No mains wiring, no soldering, no
 breadboard.
 Parts are the [bench bill of materials](10-bill-of-materials.md)'s; the
-full build's wiring, with the battery, latch, gauge, buck and ring, is the
+full build's wiring, with the battery, latch, buck and ring, is the
 [camera-only wiring guide](../setup/12-wiring.md).
 
 **Schematics**, if you want the picture first:

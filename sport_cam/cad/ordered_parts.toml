@@ -81,13 +81,6 @@ hole_dx = 53          # MEASURE_TODO  standoff centre to centre, along l
 hole_dy = 33          # MEASURE_TODO  and along w
 screw_d = 3           # MEASURE_TODO  the standoffs' thread: 3 for M3, 2.5 for M2.5
 
-[gauge]
-name = "INA260 breakout (battery gauge)"
-bom = 12
-l = 22.9              # MEASURE_TODO
-w = 22.9              # MEASURE_TODO
-h = 12                # MEASURE_TODO  including the screw terminal
-
 [latch]
 name = "Power latch (P-MOSFET and two transistors on a 3 × 7 cm double-sided perfboard)"
 bom = "13a"

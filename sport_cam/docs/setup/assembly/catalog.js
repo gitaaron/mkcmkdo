@@ -226,8 +226,6 @@
       desc: "<p>The camera's on/off switch. Round and panel-mount: its threaded body goes through a hole in the enclosure wall, the bezel sits on a flat cut into the wall outside, and a ring screws up the thread from inside to clamp it. A flat on the thread keys into a flat in the hole, so it can't turn. It doesn't carry the power. It tells the power latch to turn on, and the Pi when to shut down, so switching off saves any recording before the power goes.</p>" },
     { id: "latch", name: "Power latch", kind: "Electronics", match: ["Power\\s+latch"], img: model(["latch"], board("power latch")),
       desc: "<p>A small board you build on a 3 × 7 cm perfboard, standing on four M3 standoffs screwed up through the enclosure floor: an IRF4905 P-channel MOSFET switches the camera's 12 V, and two 2N3904 transistors turn it on, one for the rocker switch and one for the Pi. After you switch off, the Pi keeps it on until it has saved the recording and shut down, then lets go.</p><p>Circuit and values: <a href='../12-wiring.md#power-latch' target='_blank'>wiring guide</a>.</p>" },
-    { id: "ina", name: "INA226 / INA260 battery gauge", kind: "Electronics", match: ["INA226\\s+module", "\\bINA2[26]0\\b"], img: model(["ina226"], board("INA226 / INA260")),
-      desc: "<p>A current-and-voltage sensor on the 12 V line, read by the Pi over I2C at address <b>0x40</b>. The camera software uses it to estimate battery time left.</p><p>The bill of materials prefers the <b>INA260</b> (Adafruit 4226), which has the measuring resistor built in, so there is nothing to calibrate. A bare INA226 module works too — set <code>POWER_MONITOR = \"ina226\"</code> and its shunt value. Without either, set <code>POWER_MONITOR = \"none\"</code>.</p>" },
     { id: "buck", name: "12 V → 5 V 8 A buck converter", kind: "Electronics", match: ["12\\s*V\\s*→\\s*5\\s*V\\s*8\\s*A\\s+buck", "\\bbuck\\b"], img: model(["buck"], board("buck converter", C.blue)),
       desc: "<p>A switching regulator that steps 12 V down to 5 V efficiently, for the Pi, the camera's servos and the LED ring. Rated 8 A; the build draws up to about 4 A.</p><p>Its output is adjustable with a small trimmer screw. <b>Set it to 5.1 V while a 4 A load is connected</b> — the voltage with nothing attached tells you little.</p>" },
     { id: "jack", name: "Panel-mount barrel jack", kind: "Electronics", match: ["Panel-mount\\s+barrel\\s+jack", "barrel\\s+jack"], img: model(["jack"], board("barrel jack", C.black, 70, 70)),
@@ -300,8 +298,6 @@
       desc: "<p>For checking distances too long for calipers: the 250 mm anchor spacing, and the 5 m range calibration.</p>" },
     { id: "laptop", name: "Laptop on the same Wi-Fi", kind: "Tool", match: ["Laptop\\s+on\\s+the\\s+same\\s+Wi-Fi"], img: pic(DRAW.laptop),
       desc: "<p>Any computer on the same network as the camera, to open an SSH session to the Pi and run the setup and check commands.</p>" },
-    { id: "stopwatch", name: "Stopwatch", kind: "Tool", match: ["\\bStopwatch\\b"], img: pic(DRAW.stopwatch),
-      desc: "<p>Your phone's is fine — for timing the battery against the gauge's minutes-left estimate.</p>" },
   ];
 
   /* ---- matching -------------------------------------------------------- */
