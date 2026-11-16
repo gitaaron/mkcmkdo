@@ -74,6 +74,7 @@ PI_CSI = (45.0, 11.5)   # Pi 4 camera socket, from the microSD end / power edge
 EXPECTED_BODIES = {"wearable_case.stl": 2}
 # Boards taped to the enclosure floor, placed in this order after the PD trigger.
 DECK_BOARDS = (("buck", "buck converter"), ("gauge", "battery gauge"), ("latch", "power latch"))
+SCREWED_BOARDS = (("buck", "buck converter"), ("latch", "power latch"))   # on M3 standoffs, screwed up through the floor
 MAX_DECK_TRIES = 40        # floor arrangements tried per enclosure size before going wider
 
 
@@ -478,21 +479,22 @@ def solve_at(build, P, C, base_d, raised=False):
                     found.append(b)
         return found
 
-    def board_holes(b):
-        """World x, y of the buck's standoffs, from its placed box."""
-        bk = P["buck"]
+    def board_holes(b, key="buck"):
+        """World x, y of a screwed-down board's standoffs (the buck's or the latch's), from its placed box."""
+        bk = P[key]
         return [(b.cx + x, b.cy + y) for x, y in
                 (rot((sx * bk["hole_dx"] / 2, sy * bk["hole_dy"] / 2), b.ang) for sx, sy in ((1, 1), (1, -1), (-1, 1), (-1, -1)))]
 
     def riser_pads(b):
         """Four printed pads under a raised board: under the buck's standoffs, so its
         screws come up through them, and in from the corners for the taped boards."""
-        if b.name == "buck converter":
-            spots = board_holes(b)
+        screwed = dict((lbl, k) for k, lbl in SCREWED_BOARDS)
+        if b.name in screwed:
+            spots = board_holes(b, screwed[b.name])
         else:
             spots = [(b.cx + x, b.cy + y) for x, y in
                      (rot((sx * (b.l / 2 - 4), sy * (b.w / 2 - 4)), b.ang) for sx, sy in ((1, 1), (1, -1), (-1, 1), (-1, -1)))]
-        return [Box("riser", x, y, 8 if b.name == "buck converter" else 6, 8 if b.name == "buck converter" else 6,
+        return [Box("riser", x, y, 8 if b.name in screwed else 6, 8 if b.name in screwed else 6,
                     b.ang, FZ, FZ + riser_h) for x, y in spots]
 
     def place_deck(obstacles, trig):
@@ -700,15 +702,15 @@ def solve_at(build, P, C, base_d, raised=False):
                 for k, _ in DECK_BOARDS:
                     for pad in riser_pads(deck[k]):
                         risers.append([round(pad.cx, 3), round(pad.cy, 3), pad.ang, round(riser_h, 3), pad.l])
-            bk = P["buck"]
             screw_need = FZ + riser_h + PTZ_ENGAGE
             L = {
                 "build": build, "base_d": base_d, "base_h": base_h, "R_in": R_in, "floor_z": FZ,
                 "raised": raised, "risers": risers,
-                "buck_holes": [[round(x, 3), round(y, 3)] for x, y in board_holes(deck["buck"])],
-                "buck_screw": {"d": bk["screw_d"], "hole_d": bk["screw_d"] + 0.4, "head_d": 2 * bk["screw_d"] + 0.4,
-                               "through": round(FZ + riser_h, 3),
-                               "l": next((s for s in SCREW_LENGTHS if s >= screw_need), SCREW_LENGTHS[-1])},
+                **{f"{k}_holes": [[round(x, 3), round(y, 3)] for x, y in board_holes(deck[k], k)] for k, _ in SCREWED_BOARDS},
+                **{f"{k}_screw": {"d": P[k]["screw_d"], "hole_d": P[k]["screw_d"] + 0.4, "head_d": 2 * P[k]["screw_d"] + 0.4,
+                                  "through": round(FZ + riser_h, 3),
+                                  "l": next((s for s in SCREW_LENGTHS if s >= screw_need), SCREW_LENGTHS[-1])}
+                   for k, _ in SCREWED_BOARDS},
                 "ptz_slot_min": slot_min, "ptz_slot_max": slot_max,
                 "deck_z": deck_z, "power_top": power_top,
                 "window_z": window_z, "shelf_z": shelf_z, "shelf_top": shelf_top, "shelf_r": r_shelf,
@@ -822,6 +824,8 @@ def gen_scad(build, P, C, L) -> str:
         "risers": L["risers"],
         "buck_holes": L["buck_holes"], "buck_hole_d": L["buck_screw"]["hole_d"],
         "buck_head_d": L["buck_screw"]["head_d"], "buck_hole_h": L["buck_screw"]["through"],
+        "latch_holes": L["latch_holes"], "latch_hole_d": L["latch_screw"]["hole_d"],
+        "latch_head_d": L["latch_screw"]["head_d"], "latch_hole_h": L["latch_screw"]["through"],
         "nut_af": P["tripod_nut"]["af"], "nut_t": P["tripod_nut"]["t"],
         "bank_l": P["power_bank"]["l"], "bank_w": P["power_bank"]["w"], "bank_h": P["power_bank"]["h"],
     }
@@ -1090,14 +1094,15 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
             "The rocker switch's key flat is keyed into its hole",
             f"thread Ø{sw['hole_d']}, {sw['hole_d_minus_flat']} across the flat, flat at the {sw['flat_side']}"
             f" (must be one of {', '.join(FLAT_ROT)})", ["switch"])
-    bk, bs = P["buck"], L["buck_screw"]
-    b_ok = 0 < bk["hole_dx"] < bk["l"] and 0 < bk["hole_dy"] < bk["w"]
-    boss_r = C["tripod_boss_d"] / 2 + bs["head_d"] / 2 + 1
-    b_ok &= all(math.hypot(x, y) > boss_r and math.hypot(x, y) < R_in - bs["head_d"] / 2 for x, y in L["buck_holes"])
-    A.check(b_ok, "The buck's standoffs land on the floor, clear of the tripod boss and the wall",
-            f"standoffs {bk['hole_dx']}×{bk['hole_dy']} mm on a {bk['l']}×{bk['w']} board; "
-            f"{len(L['buck_holes'])} × M{bk['screw_d']:g} × {bs['l']} countersunk up through "
-            f"{bs['through']:g} mm of {'floor and riser' if L['raised'] else 'floor'}", ["buck"])
+    for k, label in SCREWED_BOARDS:
+        bk, bs = P[k], L[f"{k}_screw"]
+        b_ok = 0 < bk["hole_dx"] < bk["l"] and 0 < bk["hole_dy"] < bk["w"]
+        boss_r = C["tripod_boss_d"] / 2 + bs["head_d"] / 2 + 1
+        b_ok &= all(math.hypot(x, y) > boss_r and math.hypot(x, y) < R_in - bs["head_d"] / 2 for x, y in L[f"{k}_holes"])
+        A.check(b_ok, f"The {label}'s standoffs land on the floor, clear of the tripod boss and the wall",
+                f"standoffs {bk['hole_dx']}×{bk['hole_dy']} mm on a {bk['l']}×{bk['w']} board; "
+                f"{len(L[f'{k}_holes'])} × M{bk['screw_d']:g} × {bs['l']} countersunk up through "
+                f"{bs['through']:g} mm of {'floor and riser' if L['raised'] else 'floor'}", [k])
     A.check(C["base_wall"] <= P["jack"]["max_panel_t"] + EPS, "The barrel jack's nut reaches through the wall",
             f"wall {C['base_wall']} mm, jack takes ≤ {P['jack']['max_panel_t']}", ["jack"])
     A.check(L["usbc"]["w"] >= P["pd_trigger"]["plug_w"] and L["usbc"]["h"] >= P["pd_trigger"]["plug_h"],

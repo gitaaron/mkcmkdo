@@ -153,16 +153,17 @@ const STEPS = [
   },
   {
     id: "power", phase: 1, title: "Power boards onto the floor", time: "60 min",
-    parts: ["USB-C PD trigger board (12 V)", "Rocker switch", "Power latch, built on perfboard (IRF4905, 2 × 2N3904, 8 resistors)", "INA260 battery gauge", "12 V → 5 V 8 A buck on its standoffs, and the Schottky diode that came with it", "4 × M3 countersunk screws (length in cad/FIT_REPORT.md)", "Panel-mount barrel jack", "18 AWG silicone wire, 470 µF", "Double-sided foam tape"],
+    parts: ["USB-C PD trigger board (12 V)", "Rocker switch", "Power latch, built on a 3 × 7 cm perfboard (IRF4905, 2 × 2N3904, 8 resistors), on 4 × M3 standoffs", "INA260 battery gauge", "12 V → 5 V 8 A buck on its standoffs, and the Schottky diode that came with it", "8 × M3 countersunk screws (4 for the buck, 4 for the latch; length in cad/FIT_REPORT.md), 4 × M3 screws for the top of the latch's standoffs", "Panel-mount barrel jack", "18 AWG silicone wire, 470 µF", "Double-sided foam tape"],
     tools: ["Soldering iron", "Multimeter", "4 A dummy load"],
     steps: [
-      "<b>Wiring:</b> connections P1–P6, S1–S2 and R1 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, steps 1–3. Build the power latch on its scrap of perfboard first, from the <a href='../12-wiring.md#power-latch' target='_blank'>latch circuit</a>.",
+      "<b>Wiring:</b> connections P1–P6, S1–S2 and R1 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, steps 1–3. Build the power latch on the 3 × 7 cm perfboard first, from the <a href='../12-wiring.md#power-latch' target='_blank'>latch circuit</a>, keeping parts and wires clear of its four corner holes.",
       "<b>Bench-set the buck to 5.1 V under a 4 A dummy load before it goes anywhere near the Pi.</b> Open-circuit voltage tells you nothing; a unit that reads 5.1 V unloaded and 4.8 V loaded will brown the Pi out under load.",
       "Set the PD trigger to <b>12 V</b> on a real bank: press its button until the 12 V LED lights (5 → 9 → 12 → 15 → 20 V, one step per press; it remembers the setting through power cycles and bank swaps), then short its <b>S1</b> key-lock pad with solder so a stray press can't take it to 15 or 20 V. Leave the F1/F2 pads open. Confirm 12 V with a meter at its screw terminal, unplug and replug the bank, and confirm it again, before wiring anything else.",
       `<b>PD trigger:</b> foam-tape it to the floor at the ${where(LY.usbc.ang)} of the enclosure, its USB-C socket hard against the inside of the rectangular inlet low in the wall. The bank's cable plugs in from outside.`,
       "<b>Switch and jack:</b> the round rocker goes through its hole from outside, the key flat on its thread lined up with the flat in the hole (that keeps ON at the top and stops it turning), its bezel flat on the flat spot cut into the wall; from inside, screw its ring up the thread against the flat boss, hand-tight plus a quarter turn. The barrel jack (the 5 V service tap) goes through the round hole and takes its nut inside.",
       `<b>Buck:</b> it stays on its four brass standoffs. Take the screws out of their bottom ends, stand it over the four countersunk holes in the floor where the model shows it, and drive ${LY.buck_screw.l ? "4 × M3 × " + LY.buck_screw.l : "4 × M3"} countersunk screws up from underneath into the standoffs. Do it before the other floor boards go in, while you can still hold the standoffs.`,
-      "<b>Latch and gauge:</b> foam-tape them to the floor where the model shows them, clear of the posts and the tripod boss. Everything on the floor stays below the LED window.",
+      `<b>Latch:</b> screw four M3 × ${LY.parts.latch.standoff_h} mm standoffs to its corner holes from the top with short M3 screws (drill the holes to 3.2 mm if a screw won't pass), stand it over its four countersunk holes in the floor where the model shows it, and drive ${LY.latch_screw && LY.latch_screw.l ? "4 × M3 × " + LY.latch_screw.l : "4 × M3"} countersunk screws up from underneath into the standoffs, the same as the buck.`,
+      "<b>Gauge:</b> foam-tape it to the floor where the model shows it, clear of the posts and the tripod boss. Everything on the floor stays below the LED window.",
       "Wire the chain: trigger 12 V out → latch <b>IN</b>, latch <b>OUT</b> → gauge <b>VIN+</b>, gauge <b>VIN−</b> → the buck's Schottky diode, band toward the buck → buck 12 V in (<a href='../12-wiring.md#input-diode' target='_blank'>input diode</a>). Grounds common. The rocker only signals the latch (S1, S2): it carries under 1 mA, and the latch keeps the power on after you switch off until the Pi has saved the clip and shut down. The gauge has to sit in series on the positive line or it measures nothing. If you couldn't source one, set <code>POWER_MONITOR = \"none\"</code> and skip it — you lose the low-battery warning, nothing else.",
       "Put the 470 µF across the buck output. Leave the buck's 5 V out on 18 AWG, the gauge's SDA/SCL leads and the latch's HOLD and SENSE leads, long enough (≈ 15 cm) to reach up past the shelf to the Pi, the LED ring and the lid.",
     ],
@@ -629,12 +630,17 @@ const PARTS = {
       at(mesh(box(b.l, b.w, 1.6), COL.pcb), 0, 0, 0.8),
       at(mesh(box(b.l * 0.35, b.w * 0.8, b.z1 - b.z0 - 1.6), COL.blue), b.l * 0.28, 0, (b.z1 - b.z0 + 1.6) / 2),
       at(mesh(box(4, 4, 1.2), COL.black), -b.l * 0.2, 0, 2.2)]) },
-  latch: { grp: "static", build: () => placed("latch", (b) => [
-      at(mesh(box(b.l, b.w, 1.6), COL.pcb), 0, 0, 0.8),
-      at(mesh(box(10, 15, 4.5), COL.black), -b.l * 0.15, 0, 3.85),                  // IRF4905, bent flat
-      at(mesh(box(10, 6, 1.3), COL.steel, { metal: 0.5 }), -b.l * 0.15 - 9.5, 0, 2.25), // its tab
-      at(mesh(box(4.5, 3.5, 4.5), COL.black), b.l * 0.3, b.w * 0.2, 3.85),         // 2N3904s
-      at(mesh(box(4.5, 3.5, 4.5), COL.black), b.l * 0.3, -b.w * 0.2, 3.85)]) },
+  latch: { grp: "static", build: () => placed("latch", (b) => {
+      // 3 × 7 cm perfboard on four M3 standoffs, screwed up through the floor like the buck
+      const p = LY.parts.latch, z = p.standoff_h, top = z + 1.6;
+      return [...[[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([sx, sy]) =>
+                at(mesh(cyl(2.75, z, "z"), COL.white), sx * p.hole_dx / 2, sy * p.hole_dy / 2, z / 2)),   // nylon standoffs
+              at(mesh(box(b.l, b.w, 1.6), COL.pcb), 0, 0, z + 0.8),
+              at(mesh(box(10, 15, 4.5), COL.black), -b.l * 0.1, 0, top + 2.25),            // IRF4905, bent flat
+              at(mesh(box(10, 6, 1.3), COL.steel, { metal: 0.5 }), -b.l * 0.1 - 9.5, 0, top + 0.65), // its tab
+              at(mesh(box(4.5, 3.5, 4.5), COL.black), b.l * 0.2, b.w * 0.2, top + 2.25),     // 2N3904s
+              at(mesh(box(4.5, 3.5, 4.5), COL.black), b.l * 0.2, -b.w * 0.2, top + 2.25)];
+    }) },
   buck: { grp: "static", build: () => placed("buck", (b) => [
       at(mesh(box(b.l, b.w, 1.6), COL.blue), 0, 0, 0.8),
       at(mesh(box(b.l * 0.3, b.w * 0.5, b.z1 - b.z0 - 1.6), COL.black), -b.l * 0.15, 0, (b.z1 - b.z0 + 1.6) / 2),

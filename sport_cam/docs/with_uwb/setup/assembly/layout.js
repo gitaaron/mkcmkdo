@@ -48,14 +48,14 @@ window.SPORTCAM_LAYOUT = {
    "z1": 15.0
   },
   "latch": {
-   "ang": 90,
-   "cx": -27.0,
-   "cy": -7.0,
-   "l": 30.0,
+   "ang": 60,
+   "cx": 35.0,
+   "cy": -21.0,
+   "l": 70.0,
    "name": "power latch",
-   "w": 24.0,
-   "z0": 4.0,
-   "z1": 14.0
+   "w": 30.0,
+   "z0": 3.0,
+   "z1": 21.0
   },
   "shifter": {
    "ang": 30,
@@ -141,6 +141,31 @@ window.SPORTCAM_LAYOUT = {
   "d": 8.2,
   "z": 9.5
  },
+ "latch_holes": [
+  [
+   40.242,
+   14.079
+  ],
+  [
+   62.758,
+   1.079
+  ],
+  [
+   7.242,
+   -43.079
+  ],
+  [
+   29.758,
+   -56.079
+  ]
+ ],
+ "latch_screw": {
+  "d": 3,
+  "head_d": 6.4,
+  "hole_d": 3.4,
+  "l": 8,
+  "through": 3.0
+ },
  "lid_screw_angs": [
   45,
   135,
@@ -187,9 +212,13 @@ window.SPORTCAM_LAYOUT = {
   },
   "latch": {
    "bom": "13a",
-   "h": 10,
-   "l": 30,
-   "w": 24
+   "h": 18,
+   "hole_dx": 66,
+   "hole_dy": 26,
+   "l": 70,
+   "screw_d": 3,
+   "standoff_h": 8,
+   "w": 30
   },
   "led_ring": {
    "bom": 7,

@@ -91,8 +91,10 @@ so switching off is a clean shutdown and not a power cut: the Pi saves the
 recording, parks the head and halts, and only then does the latch let go.
 Design reasons: [04 — Electronics](../../design/04-electronics.md#power-switch).
 
-Build it on a scrap of perfboard (BOM 13a), ≈ 30 × 24 mm, with the IRF4905
-bent over flat so it stays below the LED window.
+Build it on the 3 × 7 cm board from a double-sided perfboard kit (BOM 13a; each part is listed in
+[its own table](10-bill-of-materials.md#power-latch)), with the IRF4905 bent over flat so it stays below
+the LED window. Keep parts and wires clear of the four corner holes: the board stands on four M3
+standoffs, screwed up through the enclosure floor like the buck.
 
 ```
   IN (+12 V) ───────●────────── Q1 S ┐

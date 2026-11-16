@@ -1,5 +1,5 @@
 // Static enclosure. Bottom to top inside: the power boards on the floor (the
-// buck screwed up into its standoffs from underneath, the rest taped), the LED ring hanging under the Pi shelf (which rests on three posts
+// buck and power latch screwed up into their standoffs from underneath, the rest taped), the LED ring hanging under the Pi shelf (which rests on three posts
 // merged into the wall), the Pi on the shelf. The lid carries the Arducam
 // pan-tilt base. Nothing rotates, and with camera-only tracking there is
 // nothing to mount outside: the wall is plain all the way round.
@@ -109,11 +109,15 @@ module base_housing() {
                 translate([-r[4] / 2, -r[4] / 2, 0]) cube([r[4], r[4], r[3]]);
         }
         switch_cut();
-        // the buck stands on four standoffs: countersunk screws come up from
-        // underneath, through the floor (and its risers, if raised), into them
+        // the buck and the power latch each stand on four standoffs: countersunk screws
+        // come up from underneath, through the floor (and its risers, if raised), into them
         for (h = buck_holes) translate([h[0], h[1], 0]) {
             translate([0, 0, -1]) cylinder(d = buck_hole_d, h = buck_hole_h + 2, $fn = 24);
             translate([0, 0, -0.01]) cylinder(d1 = buck_head_d, d2 = buck_hole_d, h = (buck_head_d - buck_hole_d) / 2 + 0.01, $fn = 24);
+        }
+        for (h = latch_holes) translate([h[0], h[1], 0]) {
+            translate([0, 0, -1]) cylinder(d = latch_hole_d, h = latch_hole_h + 2, $fn = 24);
+            translate([0, 0, -0.01]) cylinder(d1 = latch_head_d, d2 = latch_hole_d, h = (latch_head_d - latch_hole_d) / 2 + 0.01, $fn = 24);
         }
         // tripod socket: a 3/8-16 nut dropped into a hex pocket from inside, on a ledge
         // the screw passes up through — tightening pulls the nut onto the ledge

@@ -89,11 +89,18 @@ w = 22.9              # MEASURE_TODO
 h = 12                # MEASURE_TODO  including the screw terminal
 
 [latch]
-name = "Power latch (P-MOSFET and two transistors on a scrap of perfboard)"
+name = "Power latch (P-MOSFET and two transistors on a 3 × 7 cm double-sided perfboard)"
 bom = "13a"
-l = 30                # MEASURE_TODO
-w = 24                # MEASURE_TODO
-h = 10                # MEASURE_TODO  the IRF4905 is bent over flat on the board, not standing up
+# Built on the 3 × 7 cm board from an ELEGOO double-sided PCB kit (or any perfboard
+# with a hole in each corner). Like the buck, it stands on four M3 standoffs, one in
+# each corner, and M3 countersunk screws come up through the enclosure floor into them.
+l = 70                # MEASURE_TODO  the board's long side
+w = 30                # MEASURE_TODO  its short side
+h = 18                # MEASURE_TODO  from the bottom of the standoffs to the top of the tallest part (IRF4905 bent over flat)
+hole_dx = 66          # MEASURE_TODO  corner hole centre to centre, along l
+hole_dy = 26          # MEASURE_TODO  and along w
+screw_d = 3           # MEASURE_TODO  3 for M3 — drill the board's corner holes to 3.2 mm if an M3 screw won't pass
+standoff_h = 8        # MEASURE_TODO  the M3 standoffs under it (item 21): enough to clear the solder joints underneath
 
 [switch]
 name = "Round panel-mount rocker switch, threaded, with a locking ring"

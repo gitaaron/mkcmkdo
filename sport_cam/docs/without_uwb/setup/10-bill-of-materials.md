@@ -57,7 +57,7 @@ ordered. Printed-parts table: tick **Acquired** ☐ when printed.
 | 11  | A      | 12 V → 5 V 8 A buck (≥ 40 W), **adjustable**           | 1   | $16   | [Amazon.ca](https://www.amazon.ca/s?k=12v+to+5v+8a+adjustable+buck+converter)                                                                                    | the single 5 V rail. Buy an adjustable unit, not a fixed-5 V one: it must be **trimmed to 5.1 V under a 4 A load before the Pi is ever connected**. Open-circuit voltage tells you nothing — a module that reads 5.1 V unloaded and sags to 4.8 V will brown out a Pi. This is the first bench job in the build. The Schottky diode that comes with it goes on its 12 V input ([12, Input diode](12-wiring.md#input-diode))                                                                             |
 | 12  | A      | **Current/voltage sensor — INA260 breakout preferred** | 1   | $22   | [Digi-Key.ca](https://www.digikey.ca/en/products/result?keywords=adafruit%204226%20ina260) · [Amazon.ca](https://www.amazon.ca/s?k=ina226+current+sensor+module) | the battery gauge, on the 12 V side, I2C 0x40. The **INA260** (Adafruit 4226) has the shunt on the die: nothing to calibrate, no `INA226_SHUNT_OHMS` to get wrong, 36 V and 15 A headroom. A bare **INA226** module works too if you can find one — set `POWER_MONITOR = "ina226"` and the shunt value. **Hard to source in Canada — see [below](#parts-that-are-hard-to-source-in-canada)** |
 | 13  | A      | Round panel-mount rocker switch, threaded              | 1   | $8    | [Amazon.ca](https://www.amazon.ca/s?k=round+rocker+switch+threaded+nut+12v) | the on/off switch, in the enclosure wall. It signals the power latch (13a) rather than carrying the power, so switching off is a clean shutdown: the recording is saved and the head parked before the power goes. A round SPST rocker with a threaded body and a locking ring: the bezel sits on a flat cut into the wall outside and the ring screws up against a flat boss inside. The hole has a flat matching the key flat on the thread, so the switch can't turn. Measure it for `[switch]` before printing; a lit one is fine |
-| 13a | O      | **Power latch:** IRF4905 P-MOSFET (TO-220), 2 × 2N3904, resistors 100 k × 3, 47 k, 22 k, 10 k, 6.8 k, 4.7 k, perfboard scrap | 1 | $15 | [Amazon.ca](https://www.amazon.ca/s?k=irf4905) · [Digi-Key.ca](https://www.digikey.ca/en/products/result?keywords=irf4905) | keeps the 12 V on after the switch goes off until the Pi has shut down, then cuts it. Circuit and pinout: [wiring](12-wiring.md#power-latch); why: [04](../../design/04-electronics.md#power-switch). IRF4905 and 2N3904 come in packs of 10; any P-MOSFET rated ≥ 30 V, ≥ 5 A with R<sub>DS(on)</sub> ≤ 0.05 Ω at −10 V works for Q1 |
+| 13a | O | **Power latch** — built from the parts in [its own table](#power-latch) | 1 | $34 | [below](#power-latch) | keeps the 12 V on after the switch goes off until the Pi has shut down, then cuts it |
 | 14  | A      | USB-C to USB-C cable, 30 cm                            | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=short+usb+c+to+usb+c+cable+30cm)                                                                                           | bank to trigger board, inside the build. Any standard C-to-C cable works: the trigger draws ≈ 1.7 A at 12 V, inside the 3 A every C-to-C cable carries, and PD negotiates over the CC wire that even charge-only cables have. 30 cm is for fit; a short phone cable you already own will do. **Not USB-A to C**, which carries no PD                                                         |
 | 14a | O | **USB-C plug power pigtail (USB-C male to bare leads), 20 AWG or heavier** | 1 | $10 | [Amazon.ca](https://www.amazon.ca/s?k=usb+c+male+pigtail+power+cable+20awg) | the buck's 5 V into the Pi's USB-C (connection R2 in the [wiring guide](12-wiring.md)). The Pi 4 needs no PD negotiation, just 5 V on VBUS. Thin "data" pigtails (28 AWG power wires) drop too much voltage: check the listing |
 | 14b | O | **Dummy load: 1.2 Ω 50 W aluminium-housed resistor** (a tool) | 1 | $8 | [Amazon.ca](https://www.amazon.ca/s?k=1.2+ohm+50w+aluminum+resistor) | ≈ 4.2 A at 5.1 V, for trimming the buck under load before the Pi is connected ([wiring, step 1](12-wiring.md#wiring-order-with-checks)). It gets hot: lay it on something metal and connect it for no more than 30 s at a time. Already have an electronic load? Use that |
@@ -67,6 +67,26 @@ Notes:
 - Pi power: 5 V rail via the USB-C pigtail (14a). No `config.txt` current flag on a
   Pi 4 (Pi 5 only).
 - IMX477 not detected on first boot: add `dtoverlay=imx477`.
+
+## Power latch
+
+Item 13a is a small board you build: it keeps the 12 V on after the rocker goes off until the Pi has
+shut down, then cuts it. Circuit, part labels (Q1–Q3, R1–R8) and pinout: [wiring](12-wiring.md#power-latch);
+why: [04](../../design/04-electronics.md#power-switch). Resistors marked *kit* are priced in 13a.9.
+
+| #      | Status | Part | Qty | ≈ CAD | Source | Notes |
+| ------ | ------ | ---- | --- | ----- | ------ | ----- |
+| 13a.1 | O | **IRF4905 P-channel MOSFET**, TO-220 | 1 | $9 | [Amazon.ca](https://www.amazon.ca/s?k=irf4905) · [Digi-Key.ca](https://www.digikey.ca/en/products/result?keywords=irf4905) | Q1: carries the camera's 12 V (≈ 1.7 A). 0.02 Ω, so it stays cool with no heatsink — leave off the one many packs include. Sold in packs of 10–20. Any P-MOSFET rated ≥ 30 V, ≥ 5 A with R<sub>DS(on)</sub> ≤ 0.05 Ω at −10 V will do |
+| 13a.2 | O | **2N3904 NPN transistor**, TO-92 | 2 | $5 | [Amazon.ca](https://www.amazon.ca/s?k=2n3904) · [Digi-Key.ca](https://www.digikey.ca/en/products/result?keywords=2n3904) | Q2 (the Pi's HOLD) and Q3 (the rocker). Sold in packs; a general-purpose NPN kit usually has them |
+| 13a.3 | O | Resistor **100 kΩ**, ¼ W metal film | 3 | kit | [Amazon.ca](https://www.amazon.ca/s?k=100k+ohm+resistor+1%2F4w) | R1 (holds Q1 off), R4 and R6 (pull Q3's and Q2's bases down) |
+| 13a.4 | O | Resistor **47 kΩ**, ¼ W metal film | 1 | kit | [Amazon.ca](https://www.amazon.ca/s?k=47k+ohm+resistor+1%2F4w) | R3: the rocker's 12 V into Q3's base |
+| 13a.5 | O | Resistor **22 kΩ**, ¼ W metal film | 1 | kit | [Amazon.ca](https://www.amazon.ca/s?k=22k+ohm+resistor+1%2F4w) | R7: top half of the SENSE divider (12 V → 2.8 V for the Pi) |
+| 13a.6 | O | Resistor **10 kΩ**, ¼ W metal film | 1 | kit | [Amazon.ca](https://www.amazon.ca/s?k=10k+ohm+resistor+1%2F4w) | R2: pulls Q1's gate down when either transistor is on |
+| 13a.7 | O | Resistor **6.8 kΩ**, ¼ W metal film | 1 | kit | [Amazon.ca](https://www.amazon.ca/s?k=6.8k+ohm+resistor+1%2F4w) | R8: bottom half of the SENSE divider |
+| 13a.8 | O | Resistor **4.7 kΩ**, ¼ W metal film | 1 | kit | [Amazon.ca](https://www.amazon.ca/s?k=4.7k+ohm+resistor+1%2F4w) | R5: the Pi's 3.3 V HOLD into Q2's base |
+| 13a.9 | O | ¼ W metal-film resistor assortment kit | 1 | $10 | [Amazon.ca](https://www.amazon.ca/s?k=metal+film+resistor+assortment+kit+1%2F4w) | covers 13a.3–13a.8 in one buy; check the listing has all six values (6.8 k is the one some kits skip). Or buy each value on its own |
+| 13a.10 | A | **Double-sided perfboard kit** (ELEGOO or similar: 2×8, 3×7, 4×6, 5×7, 7×9 cm, with a hole in each corner) | 1 | $10 | [Amazon.ca](https://www.amazon.ca/s?k=elegoo+double+sided+pcb+kit) | the latch is built on the **3 × 7 cm** board. It stands on four M3 standoffs (13a.11), and countersunk screws come up through the enclosure floor into them, like the buck. If an M3 screw won't pass its corner holes, drill them to 3.2 mm. Measure it for `[latch]` (`hole_dx`, `hole_dy`). The kit's other boards do for the level shifter (item 8) |
+| 13a.11 | O | M3 standoffs, female–female, 8 mm | 4 | — | item 21 | under the latch's corners: M3 screws down through the board into their tops, M3 countersunk screws (item 22) up through the floor into their bottoms. Any length that clears the solder joints underneath works; put it in `[latch] standoff_h` |
 
 ## Charging
 
@@ -104,8 +124,8 @@ charger exceeds that, by a few minutes.
 | --- | ------ | ----------------------------------------------------------------------- | --- | ----- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 18  |        | Barrel jack, JST kit, 18/22 AWG silicone wire, heatshrink, Dupont leads, 2 × 30 cm servo extension leads, male header strip | —   | $25   | [Amazon.ca](https://www.amazon.ca/s?k=jst+connector+kit+22awg+silicone+wire)      | 18 AWG on the 5 V rail — it carries 4 A. The extension leads and two 3-pin headers move the servos onto the Pi's PWM ([12, Servos](12-wiring.md#servos))<!--arducam:: not needed with the servos left on the PTZ controller-->                                                                                                                                                                                                           |
 | 19  |        | 470 µF electrolytic capacitor, 10 V or higher (small pack)              | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=470uf+16v+electrolytic+capacitor)           | across the buck output, stripe (−) to OUT− — connection R1 in the [wiring guide](12-wiring.md).                                                                       |
-| 21  |        | Nylon standoff kit, M2.5 + M3                                           | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=m2.5+m3+nylon+standoff+kit)                 | Pi on four 6 mm M2.5 standoffs on the shelf. The buck keeps the brass standoffs it comes with; the other power boards are foam-taped down, so no M3 standoffs are needed |
-| 22  |        | M2.5/M3 screw + nut + brass heat-set insert kit | 1   | $20   | [Amazon.ca](https://www.amazon.ca/s?k=m3+m2.5+screw+nut+assortment) | ≈ 15 × M3: buck 4 × M3 × 8 countersunk (up through the floor into its standoffs; the length is in `cad/FIT_REPORT.md`), PTZ base 4 × M3 × 10–12 (up through the lid into its standoffs, no nuts; `bolt_l` in `ordered_parts.toml`) and the M3 washers under its standoffs if `cad/FIT_REPORT.md` asks for them, lid 4 × M3 × 8 countersunk (in sideways through the wall), shelf 3 × M3 × 8. 8 × M2.5. Inserts: 7 × M3 — 1 in each shelf post, 4 in the lid's ring. Kit price kept at the UWB build's figure |
+| 21  |        | Nylon standoff kit, M2.5 + M3                                           | 1   | $10   | [Amazon.ca](https://www.amazon.ca/s?k=m2.5+m3+nylon+standoff+kit)                 | Pi on four 6 mm M2.5 standoffs on the shelf. The buck keeps the brass standoffs it comes with; the power latch stands on four 8 mm M3 standoffs from this kit (13a.11); the other power boards are foam-taped down |
+| 22  |        | M2.5/M3 screw + nut + brass heat-set insert kit | 1   | $20   | [Amazon.ca](https://www.amazon.ca/s?k=m3+m2.5+screw+nut+assortment) | ≈ 23 × M3: buck and power latch 4 + 4 × M3 × 8 countersunk (up through the floor into their standoffs; the length is in `cad/FIT_REPORT.md`) and 4 × M3 × 6 down through the latch board into its standoffs, PTZ base 4 × M3 × 10–12 (up through the lid into its standoffs, no nuts; `bolt_l` in `ordered_parts.toml`) and the M3 washers under its standoffs if `cad/FIT_REPORT.md` asks for them, lid 4 × M3 × 8 countersunk (in sideways through the wall), shelf 3 × M3 × 8. 8 × M2.5. Inserts: 7 × M3 — 1 in each shelf post, 4 in the lid's ring. Kit price kept at the UWB build's figure |
 | 23  |        | 3/8-16 hex nut + 3/8-16 → 1/4-20 reducer bushing                      | 1   | $12   | [Amazon.ca](https://www.amazon.ca/s?k=3%2F8-16+to+1%2F4-20+brass+tripod+bushing) + any hardware store for the nut | tripod interface: the nut is epoxied into a hex pocket in the floor (≈ 14.3 mm across the flats, ≈ 8.3 mm thick — a standard 3/8-16 nut; stainless or zinc-plated). 3/8-16 tripods screw into the nut, 1/4-20 ones into the bushing — so it fits any standard tripod ([C3](../../product/01-requirements.md#non-functional-requirements)). |
 | 24  |        | Hook-and-loop strap, 25 mm                                              | 1   | $8    | [Amazon.ca](https://www.amazon.ca/s?k=hook+and+loop+cinch+strap+25mm)             | through the tunnels under the battery tray, round a tripod leg or the centre column. It holds the tray only: the bank clips in, so it stays done up for a swap |
 | 25  |        | PETG filament 1 kg                                                      | 1   | $25   | [Amazon.ca](https://www.amazon.ca/s?k=petg+filament+1kg)                          | ~300 g used across the structural parts. Full settings, times and printer requirements: **[3D printing specifications](../../setup/11-3d-printing.md)** |
@@ -140,20 +160,20 @@ STLs, previews and the images below are regenerated by `python3 cad/fit.py`
 
 | Configuration | Total |
 | --- | --- |
-| **Full build** (12 MP PTZ + 92 Wh battery, camera-only), own tripod | **≈ C$754** |
-| Full build + tripod (item 26) | ≈ C$789 |
+| **Full build** (12 MP PTZ + 92 Wh battery, camera-only), own tripod | **≈ C$773** |
+| Full build + tripod (item 26) | ≈ C$808 |
 | With a 74 Wh bank instead (6.7 h) | subtract ≈ C$25 |
 | Without the battery gauge (`POWER_MONITOR = "none"`) | subtract ≈ C$22 |
 | Optional charging kit (items 28–29), if your own chargers are too slow | add ≈ C$52 |
 
-(≈ US$540 / US$565 at typical exchange + Canadian markup.)
+(≈ US$553 / US$578 at typical exchange + Canadian markup.)
 
 | Group | Items | ≈ CAD |
 | --- | --- | --- |
-| Camera and power | 1, 9–14b (293 + 80 + 10 + 16 + 22 + 8 + 15 + 10 + 10 + 8) | 472 |
+| Camera and power | 1, 9–14b (293 + 80 + 10 + 16 + 22 + 8 + 34 + 10 + 10 + 8) | 491 |
 | Compute and status | 2–4, 7, 8 (95 + 12 + 14 + 14 + 6) | 141 |
 | Wiring, fasteners, filament | 18, 19, 21–25b, 27 (25 + 10 + 10 + 20 + 12 + 8 + 25 + 12 + 4 + 15) | 141 |
-| **Total** | | **754** |
+| **Total** | | **773** |
 
 Optional charging items 28–29 excluded.
 
@@ -170,7 +190,7 @@ One item: the battery gauge (item 12).
 
 ## Compared with the UWB build
 
-[UWB build](../../with_uwb/setup/10-bill-of-materials.md): ≈ C$1117
+[UWB build](../../with_uwb/setup/10-bill-of-materials.md): ≈ C$1136
 excluding tripod. Omitted here:
 
 | Removed | ≈ CAD |
@@ -182,7 +202,7 @@ excluding tripod. Omitted here:
 | ½-inch hardwood dowel (item 27a) | $5 |
 | **Total saved** | **$363** |
 
-C$1117 − C$363 = **C$754**.
+C$1136 − C$363 = **C$773**.
 
 Also omitted, not itemised (kit prices unchanged): heat-set inserts, M3
 hardware for the arms and mast, the radios' M2.5 standoffs. Printed parts: 5

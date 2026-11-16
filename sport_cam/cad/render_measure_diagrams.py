@@ -437,6 +437,9 @@ def boards():
          "capacitor, or a lead bent over the top.",
          "buck: h from the bottom of its standoffs, which stay on.   hole_dx / hole_dy — standoff centre to centre, "
          "along l and along w (calipers: outside to outside, minus one standoff's width).   screw_d — their thread, 3 for M3.",
+         "latch: the 3 × 7 cm perfboard on four M3 standoffs.   hole_dx / hole_dy — corner hole centre to centre "
+         "(calipers: the holes' outside edges, minus one hole's width).   standoff_h — the standoffs' length.   "
+         "h from the bottom of the standoffs.",
          "pd_trigger: it must have a USB-C SOCKET (a hole the cable plugs into), not a plug sticking out.   "
          "port_h — the socket's height above the board.   plug_w × plug_h — the bank cable's USB-C plug: the "
          "moulded body behind the metal, not the metal tip (the wall opening is cut to this)."],
@@ -517,15 +520,31 @@ def boards():
     S.draw()
     S.fit(pad=16)
 
-    # latch
+    # latch: the 3 × 7 cm perfboard on four M3 standoffs, like the buck
     la = P["latch"]
     S = Scene(axes[3])
-    board_box(S, la["l"], la["w"], color="#c9a46a")
-    S.box(4, 5, 2.8, 16, 10, la["h"] - 2.8, DARK, bias=3)                             # MOSFET lying flat
-    S.box(15, 5 + 2, 2.8 + la["h"] - 2.8 - 1.2, 9, 6, 1.2, METAL, bias=4)            # its tab
-    S.box(22, 16, 2.8, 4, 3, 4, DARK, bias=3)
-    S.box(22, 9, 2.8, 4, 3, 4, DARK, bias=3)
+    so = la["standoff_h"]
+    x0, y0 = (la["l"] - la["hole_dx"]) / 2, (la["w"] - la["hole_dy"]) / 2
+    for x in (x0, x0 + la["hole_dx"]):                                              # nylon standoffs
+        for y in (y0, y0 + la["hole_dy"]):
+            S.cyl((x, y, 0), 2.5, so, "#e8e4da", bias=1)
+    S.box(0, 0, so, la["l"], la["w"], 1.6, "#3f9a4a")
+    top = so + 1.6
+    S.layer = 1
+    for x in (x0, x0 + la["hole_dx"]):                                              # screw heads on top
+        for y in (y0, y0 + la["hole_dy"]):
+            S.disc((x, y, top), 2.3, METAL)
+    S.layer = 2
+    S.box(14, 8, top, 16, 10, la["h"] - top, DARK, bias=3)                            # MOSFET lying flat
+    S.box(30, 10, top, 7, 6, 1.2, METAL, bias=4)                                       # its tab
+    S.box(44, 18, top, 4, 3, 5, DARK, bias=3)                                          # 2N3904s
+    S.box(44, 9, top, 4, 3, 5, DARK, bias=3)
     lwh(S, la["l"], la["w"], la["h"])
+    S.layer = 3
+    yf, xr = y0 + la["hole_dy"], x0 + la["hole_dx"]
+    S.dim((x0, yf, top), (xr, yf, top), (0, 0, 0), "hole_dx", text_off=(-6, -8))
+    S.dim((xr, y0, top), (xr, yf, top), (0, 0, 0), "hole_dy", text_off=(10, 4), ha="left")
+    S.dim((x0, yf, 0), (x0, yf, so), (0, 8, 0), "standoff_h", text_off=(-4, 0), ha="right")
     S.draw()
     S.fit(pad=16)
     save(fig, "boards.png")
