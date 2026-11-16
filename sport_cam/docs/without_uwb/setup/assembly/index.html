@@ -678,8 +678,9 @@ const PARTS = {
   lid: { grp: "static", stl: "lid", color: COL.print, pos: [0, 0, LID_Z] },
   // fixed half: four brass standoffs, the bottom disc and bearing ring, the pan servo hanging under it
   ptz_plate: { grp: "static", build: () => { const p = LY.parts.ptz, R = p.base_d / 2;
+    const rb = Math.hypot(p.horizontal_bolt_spacing, p.vertical_bolt_spacing) / 2;   // standoffs: a rectangle, corner to corner
     return group(...LY.bolt_angs.map(a => at(mesh(cyl(2.75, p.standoff_h), COL.brass, { metal: 0.6, rough: 0.4 }),
-                   p.bolt_spacing / 2 * Math.cos(a * Math.PI / 180), p.bolt_spacing / 2 * Math.sin(a * Math.PI / 180), LID_TOP + p.standoff_h / 2)),
+                   rb * Math.cos(a * Math.PI / 180), rb * Math.sin(a * Math.PI / 180), LID_TOP + p.standoff_h / 2)),
                  at(mesh(cyl(R, 3), COL.black, { rough: 0.6 }), 0, 0, PTZ_Z + 1.5),
                  at(mesh(cyl(R - 2, 11), COL.steel, { metal: 0.55, rough: 0.45 }), 0, 0, PTZ_Z + 8.5),
                  at(mesh(box(40, 20, p.servo_drop), COL.black), 10, 0, PTZ_Z - p.servo_drop / 2)); } },
@@ -772,7 +773,12 @@ function build(id) {
   obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; mats.push(o.material); o.material.userData.base = { opacity: o.material.opacity, transparent: o.material.transparent, depthWrite: o.material.depthWrite }; } });
   groups[def.grp].add(obj);
   obj.updateWorldMatrix(true, true);
-  const bb = new THREE.Box3().setFromObject(obj);  // world (three) coords at seat
+  let bb = new THREE.Box3().setFromObject(obj);  // world (three) coords at seat
+  if (![bb.min.x, bb.min.y, bb.min.z, bb.max.x, bb.max.y, bb.max.z].every(Number.isFinite)) {
+    // a model built from a missing layout value; leave it out of the framing so it can't blank every step
+    console.error(`assembly viewer: part "${id}" has non-finite geometry; a layout value it uses is missing`);
+    bb = new THREE.Box3();
+  }
   const rec = { obj, seat: obj.position.clone(), mats, box: bb, def };
   built[id] = rec;
   obj.visible = false;
