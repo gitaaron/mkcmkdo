@@ -159,7 +159,6 @@ wire of their own.
 | R3 | buck OUT+ / OUT− | Arducam PTZ controller **5V / GND** | 18–22 AWG | the zoom and focus motors. Not the Pi's 5 V pin |
 | R4 | buck OUT+ / OUT− | WS2812B ring **5V / GND** | 22 AWG | ≈ 1 A at full white; ≈ 0.45 A at the `LED_BRIGHTNESS = 0.45` the code uses |
 | R5 | buck OUT+ / OUT− | 74AHCT125 **VCC (pin 14) / GND (pin 7)** | 22 AWG | |
-| R6 | buck OUT+ / OUT− | panel barrel jack (in the wall, low) | 22 AWG | optional 5 V service tap, centre positive |
 | R7 <!--pigpio row--> | buck OUT+ / OUT− | servo headers **+ / −** on the shifter's perfboard ([below](#servos)) | 20–22 AWG | the two servos: ≈ 0.7 A when both stall. Not the Pi's 5 V pin |
 | R7 <!--arducam row--> | buck OUT+ / OUT− | PTZ controller **servo VCC / GND**: pins 1 and 2 of its 6-pin connector (Arducam's red and black) ([below](#servos)) | 20–22 AWG | the two servos, through the controller's sockets: ≈ 0.7 A when both stall. Not the Pi's 5 V pin |
 
@@ -176,6 +175,9 @@ One device on it: the PTZ controller, at **0x0C**.
 | I2 | Pi **pin 5** (GPIO3, SCL) | PTZ controller **SCL** | |
 
 ### LED ring — SPI through the level shifter
+
+**Build and test the shifter first with the [level shifter guide](../../setup/12b-level-shifter.md)**: it
+gives the board hole by hole, with its links (W1–W18), checks and a bench test.
 
 | # | From | To | Notes |
 | --- | --- | --- | --- |
@@ -282,12 +284,12 @@ step by a fraction of a degree.
 
 Each step points at the assembly-guide step it belongs to.
 
-1. **Set the buck, alone** ([assembly: power](assembly/index.html#power)).
+1. **Set the buck, alone** ([12c](../../setup/12c-power-boards.md), [assembly: power](assembly/index.html#power)).
    Feed it 12 V from a bench supply or the trigger. Put the 4 A dummy load on
    the output and trim it to **5.1 V under load**. Open-circuit voltage tells
    you nothing: a unit that reads 5.1 V unloaded can sag to 4.8 V and brown
    the Pi out.
-2. **Set the trigger to 12 V**, on the real bank with the real cable (P1).
+2. **Set the trigger to 12 V**, on the real bank with the real cable (P1) ([12c](../../setup/12c-power-boards.md)).
    On the button type (BOM 10), press the button until the **12 V** LED
    lights: it steps 5 → 9 → 12 → 15 → 20 V, one step per press, and saves
    the setting, so it comes back at 12 V after every power cycle and bank

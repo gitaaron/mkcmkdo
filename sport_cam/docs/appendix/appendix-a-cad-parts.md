@@ -30,8 +30,8 @@ python3 cad/fit.py            # solve, regenerate, render, audit — both builds
    - Floor: power boards clear of the tripod boss, shelf posts and each
      other; PD trigger socket at the wall USB-C inlet.
    - LED ring under the shelf, within the LED window band; Pi on the shelf.
-   - Search space: Pi orientation and position, wall positions of inlet,
-     switch and jack, post positions. Objective: minimum enclosure height.
+   - Search space: Pi orientation and position, wall positions of inlet
+     and switch, post positions. Objective: minimum enclosure height.
 2. **Falls back when parts don't fit**, in order:
    - boards raised on printed risers over the tripod boss;
    - taller enclosure;
@@ -90,7 +90,7 @@ In both builds' `cad/`. Print settings for each are in
 
 | File | Part |
 | --- | --- |
-| `base_housing.scad` | Enclosure: three shelf posts merged into the wall, the LED window all the way round with a ledge below it for the diffuser band, USB-C inlet, round switch hole keyed to the flat on its thread, with a flat seat outside for its bezel and a flat boss inside for its ring, 5 V jack hole, low and high vents, four radial lid-screw holes, tripod boss with a hex pocket for a 3/8-16 nut, risers when needed. The wall differs by build — see below |
+| `base_housing.scad` | Enclosure: three shelf posts merged into the wall, the LED window all the way round with a ledge below it for the diffuser band, USB-C inlet, round switch hole keyed to the flat on its thread, with a flat seat outside for its bezel and a flat boss inside for its ring, low and high vents, four radial lid-screw holes, tripod boss with a hex pocket for a 3/8-16 nut, risers when needed. The wall differs by build — see below |
 | `shelf.scad` | Pi shelf: rests on the posts (3 × M3 × 8 into inserts), Pi holes for M2.5 nylon standoffs, a cut-away side for the cables, a centre mark for the LED ring underneath |
 | `lid.scad` | Top plate carrying the Arducam pan-tilt base; slotted pattern for the base's standoffs, a cable slot at the back, a locating ring underneath with four radial M3 inserts |
 | `led_diffuser_ring.scad` | Translucent band that slides over the outside of the LED window |

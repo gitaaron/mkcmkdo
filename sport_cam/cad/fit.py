@@ -75,6 +75,28 @@ EXPECTED_BODIES = {"wearable_case.stl": 2}
 # Boards taped to the enclosure floor, placed in this order after the PD trigger.
 DECK_BOARDS = (("buck", "buck converter"), ("latch", "power latch"))
 SCREWED_BOARDS = (("buck", "buck converter"), ("latch", "power latch"))   # on M3 standoffs, screwed up through the floor
+# Every board on standoffs, screwed up from underneath: the floor boards above, plus the
+# PD trigger (two holes at its socket end, a printed rest under the other) and the level
+# shifter (on the shelf, or on the floor when the shelf has no room).
+STANDOFF_BOARDS = (("buck", "buck", "buck converter"), ("latch", "latch", "power latch"),
+                   ("pd_trigger", "trigger", "PD trigger"), ("shifter", "shifter", "level shifter"))
+
+
+def local_holes(part):
+    """A board's standoff positions, from its centre, x along l. Four corner holes
+    from hole_dx × hole_dy; or, with hole_x, two holes hole_dy apart, hole_x in from
+    the +x end (the PD trigger's socket end)."""
+    if "hole_x" in part:
+        return [(part["l"] / 2 - part["hole_x"], s * part["hole_dy"] / 2) for s in (1, -1)]
+    return [(sx * part["hole_dx"] / 2, sy * part["hole_dy"] / 2) for sx, sy in ((1, 1), (1, -1), (-1, 1), (-1, -1))]
+
+
+def screw_for(part, through):
+    """The countersunk screw up through `through` mm of plastic into a standoff."""
+    d = part["screw_d"]
+    need = through + PTZ_ENGAGE
+    return {"d": d, "hole_d": d + 0.4, "head_d": 2 * d + 0.4, "through": round(through, 3),
+            "l": next((x for x in SCREW_LENGTHS if x >= need), SCREW_LENGTHS[-1])}
 MAX_DECK_TRIES = 40        # floor arrangements tried per enclosure size before going wider
 
 
@@ -321,12 +343,14 @@ def solve_at(build, P, C, base_d, raised=False):
     pi = P["pi"]
 
     # ---- wall features: heights and footprints --------------------------
-    tr, sw, jk = P["pd_trigger"], P["switch"], P["jack"]
+    tr, sw = P["pd_trigger"], P["switch"]
     deck_z = FZ + C["tape_t"]
-    # buck and power latch: on the floor, or on risers just clear of the tripod boss
-    riser_h = C["tripod_boss_h"] + 1 - FZ if raised else 0.0
+    # buck and power latch: on the floor, or on risers that lift them clear of the
+    # tripod boss by the same gap fit.py keeps between any two parts
+    riser_h = C["tripod_boss_h"] + gap - FZ if raised else 0.0
     board_z = deck_z + riser_h
-    usbc_zc = deck_z + tr["h"] - tr["port_h"] / 2
+    # the trigger stands on its standoffs; its socket sits on top of the board, at the wall end
+    usbc_zc = FZ + tr["standoff_h"] + tr.get("pcb_t", 1.6) + tr["port_h"] / 2
     usbc_w, usbc_h = tr["plug_w"] + 1, tr["plug_h"] + 1
     # round switch: bezel outside, locking ring inside on a flat boss; the seat is
     # as wide as the bigger of the two, and the ring needs room to turn above the floor
@@ -334,13 +358,11 @@ def solve_at(build, P, C, base_d, raised=False):
     sw_zc = max(FZ + sw["nut_d"] / 2 + 1, sw_r + 0.5)
     sw_seat_r = math.sqrt(R_out ** 2 - (sw["flange_d"] / 2 + 0.5) ** 2)    # flat for the bezel
     sw_panel_t = min(C["base_wall"], sw["thread_l"] - sw["nut_t"] - 1)
-    jk_zc = FZ + jk["body_d"] / 2 + 1
     feat_half = {   # half-width at the wall, mm
         "usbc": max(tr["w"], usbc_w) / 2,
         "switch": sw_r,
-        "jack": jk["body_d"] / 2,
     }
-    low_top = max(usbc_zc + usbc_h / 2, sw_zc + sw_r, jk_zc + jk["body_d"] / 2)
+    low_top = max(usbc_zc + usbc_h / 2, sw_zc + sw_r)
 
     blocked = []    # (angle, half-angle) where low wall features can't go
     if uwb:
@@ -360,17 +382,13 @@ def solve_at(build, P, C, base_d, raised=False):
         if not ang_ok(u, feat_half["usbc"]):
             continue
         hu = (u, math.degrees((feat_half["usbc"] + 3) / R_out))
-        for j in sorted(cand, key=pref, reverse=True):
-            if not ang_ok(j, feat_half["jack"], [hu]):
+        for s in sorted(cand, key=pref, reverse=True):
+            if not ang_ok(s, feat_half["switch"], [hu]):
                 continue
-            hj = (j, math.degrees((feat_half["jack"] + 3) / R_out))
-            for s in sorted(cand, key=pref, reverse=True):
-                if not ang_ok(s, feat_half["switch"], [hu, hj]):
-                    continue
-                combos.append((u, j, s))
-    combos.sort(key=lambda c: -(pref(c[0]) + pref(c[1]) + 0.5 * pref(c[2])))
+            combos.append((u, s))
+    combos.sort(key=lambda c: -(pref(c[0]) + 0.5 * pref(c[1])))
     if not combos:
-        raise NoFit("no room on the wall for the USB-C inlet, the jack and the switch")
+        raise NoFit("no room on the wall for the USB-C inlet and the switch")
 
     # ---- Pi poses on the shelf, best (lowest ceiling) first --------------
     pi_local_boxes = pi_local(pi, P["usb_extension"] if uwb else None)
@@ -481,9 +499,7 @@ def solve_at(build, P, C, base_d, raised=False):
 
     def board_holes(b, key="buck"):
         """World x, y of a screwed-down board's standoffs (the buck's or the latch's), from its placed box."""
-        bk = P[key]
-        return [(b.cx + x, b.cy + y) for x, y in
-                (rot((sx * bk["hole_dx"] / 2, sy * bk["hole_dy"] / 2), b.ang) for sx, sy in ((1, 1), (1, -1), (-1, 1), (-1, -1)))]
+        return [(b.cx + x, b.cy + y) for x, y in (rot(h, b.ang) for h in local_holes(P[key]))]
 
     def riser_pads(b):
         """Four printed pads under a raised board: under the buck's standoffs, so its
@@ -519,18 +535,16 @@ def solve_at(build, P, C, base_d, raised=False):
     for pose_i, (px, py, pang, gap_d, gap_ang, pi_boxes) in enumerate(poses[:40]):
         u = (math.cos(math.radians(gap_ang)), math.sin(math.radians(gap_ang)))
         holes_w = [(px + hx, py + hy) for hx, hy in (rot(h, pang) for h in holes_l)]
-        for (ua, ja, sa) in combos[:60]:
-            feats = {"usbc": ua, "jack": ja, "switch": sa}
+        for (ua, sa) in combos[:60]:
+            feats = {"usbc": ua, "switch": sa}
             # bodies of the wall-mounted parts, inside the wall
             tr_len = tr["l"]
             tr_r = math.sqrt(R_in ** 2 - (tr["w"] / 2) ** 2) - 0.2 - tr_len / 2
             trig = place("PD trigger", (-tr_len / 2, tr_len / 2, -tr["w"] / 2, tr["w"] / 2, 0, tr["h"]),
-                         (*polar(tr_r, ua), deck_z, ua))
+                         (*polar(tr_r, ua), FZ, ua))
             swb = place("rocker switch", (sw_seat_r - sw["depth"], R_in + C["base_wall"], -sw_r, sw_r,
                                           -sw_r, sw_r), (0, 0, sw_zc, sa))
-            jkb = place("barrel jack", (R_in - jk["depth"], R_in + C["base_wall"], -jk["body_d"] / 2, jk["body_d"] / 2,
-                                        -jk["body_d"] / 2, jk["body_d"] / 2), (0, 0, jk_zc, ja))
-            wall_parts = [trig, swb, jkb]
+            wall_parts = [trig, swb]
             if any(collide(a, b, gap) for a, b in itertools.combinations(wall_parts, 2)):
                 last_err = "the wall-mounted parts collide"
                 continue
@@ -566,7 +580,7 @@ def solve_at(build, P, C, base_d, raised=False):
             posts = [Cyl(f"shelf post {i + 1}", *polar(post_r, a), C["post_d"] / 2, FZ, 999) for i, a in enumerate(post_angs)]
 
             # ---- the power deck ----------------------------------------
-            key = (ua, ja, sa, tuple(post_angs))
+            key = (ua, sa, tuple(post_angs))
             if key not in deck_cache:
                 attempts += 1
                 if attempts > MAX_DECK_TRIES:
@@ -606,7 +620,7 @@ def solve_at(build, P, C, base_d, raised=False):
                     for x in range(-int(R_in), int(R_in) + 1, 2):
                         for y in range(-int(R_in), int(R_in) + 1, 2):
                             b = place("level shifter", (-sh["l"] / 2, sh["l"] / 2, -sh["w"] / 2, sh["w"] / 2, 0, sh["h"]),
-                                      (x, y, deck_z, ang))
+                                      (x, y, FZ, ang))
                             if b.rmax() <= R_in - wgap and not any(collide(b, o, gap) for o in obstacles):
                                 shifter = ("deck", b)
                                 break
@@ -619,7 +633,7 @@ def solve_at(build, P, C, base_d, raised=False):
                 continue
 
             # ---- heights -----------------------------------------------
-            deck_objs = list(deck.values()) + [swb, jkb] + ([shifter[1]] if shifter[0] == "deck" else [])
+            deck_objs = list(deck.values()) + [swb] + ([shifter[1]] if shifter[0] == "deck" else [])
             power_top = max(o.z1 for o in deck_objs)
             win_h, lip = C["led_window_h"], C["diffuser_lip"]
             ledge_h = C["ledge_h"]
@@ -642,7 +656,7 @@ def solve_at(build, P, C, base_d, raised=False):
             shelf_objs = list(pi_world)
             if shifter[0] == "shelf":
                 b = shifter[1]
-                shifter = ("shelf", Box(b.name, b.cx, b.cy, b.l, b.w, b.ang, shelf_top + C["tape_t"], shelf_top + C["tape_t"] + sh["h"]))
+                shifter = ("shelf", Box(b.name, b.cx, b.cy, b.l, b.w, b.ang, shelf_top, shelf_top + sh["h"]))
                 shelf_objs.append(shifter[1])
             base_h = max(C["base_h_min"], ceiling_need(shelf_objs),
                          shelf_top + C["vent_h"] + 4 + C["spigot_h"])
@@ -703,9 +717,21 @@ def solve_at(build, P, C, base_d, raised=False):
                     for pad in riser_pads(deck[k]):
                         risers.append([round(pad.cx, 3), round(pad.cy, 3), pad.ang, round(riser_h, 3), pad.l])
             screw_need = FZ + riser_h + PTZ_ENGAGE
+            # every board on standoffs: its holes, and the countersunk screw up into each one
+            boxes_by = {"buck": deck["buck"], "latch": deck["latch"], "trigger": trig, "shifter": shifter[1]}
+            mounts = {}
+            for pk, bkey, _ in STANDOFF_BOARDS:
+                on_shelf = bkey == "shifter" and shifter[0] == "shelf"
+                through = C["shelf_t"] if on_shelf else FZ + (riser_h if pk in ("buck", "latch") else 0)
+                mounts[pk] = {"on": "shelf" if on_shelf else "floor",
+                              "holes": [[round(x, 3), round(y, 3)] for x, y in board_holes(boxes_by[bkey], pk)],
+                              **screw_for(P[pk], through)}
+            # a printed rest under the PD trigger's terminal end: its two holes are at the socket end
+            rx, ry = rot((-tr["l"] / 2 + 4, 0), trig.ang)
+            rests = [[round(trig.cx + rx, 3), round(trig.cy + ry, 3), trig.ang, 6, max(4, tr["w"] - 4), tr["standoff_h"]]]
             L = {
                 "build": build, "base_d": base_d, "base_h": base_h, "R_in": R_in, "floor_z": FZ,
-                "raised": raised, "risers": risers,
+                "raised": raised, "risers": risers, "mounts": mounts, "rests": rests,
                 **{f"{k}_holes": [[round(x, 3), round(y, 3)] for x, y in board_holes(deck[k], k)] for k, _ in SCREWED_BOARDS},
                 **{f"{k}_screw": {"d": P[k]["screw_d"], "hole_d": P[k]["screw_d"] + 0.4, "head_d": 2 * P[k]["screw_d"] + 0.4,
                                   "through": round(FZ + riser_h, 3),
@@ -719,7 +745,6 @@ def solve_at(build, P, C, base_d, raised=False):
                 "ring_z0": ring_z0, "ring_z1": ring_z1,
                 "pi": {"x": px, "y": py, "z": pi_z, "ang": pang}, "pi_holes": holes_w,
                 "usbc": {"ang": ua, "z": usbc_zc, "w": usbc_w, "h": usbc_h},
-                "jack": {"ang": ja, "z": jk_zc, "d": jk["hole_d"]},
                 "switch": {"ang": sa, "z": sw_zc, "r": sw_r, "hole_d": sw["hole_d"] + 0.5,
                            "flat_d": sw["hole_d_minus_flat"] + 0.5, "flat_rot": FLAT_ROT.get(sw["flat_side"], 0),
                            "flange_d": sw["flange_d"], "boss_d": sw["nut_d"] + 4,
@@ -733,7 +758,7 @@ def solve_at(build, P, C, base_d, raised=False):
                 "boxes": {
                     "trigger": box_d(deck["trigger"]), "buck": box_d(deck["buck"]),
                     "latch": box_d(deck["latch"]),
-                    "switch": box_d(swb), "jack": box_d(jkb), "shifter": box_d(shifter[1]),
+                    "switch": box_d(swb), "shifter": box_d(shifter[1]),
                 },
                 "pi_boxes": [box_d(b) for b in pi_world],
                 "pose_rank": pose_i,
@@ -808,7 +833,6 @@ def gen_scad(build, P, C, L) -> str:
         "post_r": L["post_r"], "post_angs": L["post_angs"], "window_ribs": L["window_ribs"],
         "pi_holes": [list(h) for h in L["pi_holes"]], "pi_hole_d": P["pi"]["hole_d"] + 0.2,
         "usbc_ang": L["usbc"]["ang"], "usbc_z": L["usbc"]["z"], "usbc_w": L["usbc"]["w"], "usbc_h": L["usbc"]["h"],
-        "jack_ang": L["jack"]["ang"], "jack_z": L["jack"]["z"], "jack_d": L["jack"]["d"],
         "switch_ang": L["switch"]["ang"], "switch_z": L["switch"]["z"],
         "switch_hole_d": L["switch"]["hole_d"], "switch_flange_d": L["switch"]["flange_d"],
         "switch_boss_d": L["switch"]["boss_d"], "switch_seat_r": L["switch"]["seat_r"],
@@ -822,10 +846,12 @@ def gen_scad(build, P, C, L) -> str:
         "cable_slot_ang": L["cable_slot"]["ang"], "cable_slot_r": L["cable_slot"]["r"],
         "cable_slot_w": L["cable_slot"]["w"], "cable_slot_d": L["cable_slot"]["d"],
         "risers": L["risers"],
-        "buck_holes": L["buck_holes"], "buck_hole_d": L["buck_screw"]["hole_d"],
-        "buck_head_d": L["buck_screw"]["head_d"], "buck_hole_h": L["buck_screw"]["through"],
-        "latch_holes": L["latch_holes"], "latch_hole_d": L["latch_screw"]["hole_d"],
-        "latch_head_d": L["latch_screw"]["head_d"], "latch_hole_h": L["latch_screw"]["through"],
+        # [x, y, hole Ø, countersink Ø, depth through]: screws up into each board's standoffs
+        "floor_holes": [[x, y, m["hole_d"], m["head_d"], m["through"]]
+                        for m in L["mounts"].values() if m["on"] == "floor" for x, y in m["holes"]],
+        "shelf_holes": [[x, y, m["hole_d"], m["head_d"]]
+                        for m in L["mounts"].values() if m["on"] == "shelf" for x, y in m["holes"]],
+        "rests": L["rests"],
         "nut_af": P["tripod_nut"]["af"], "nut_t": P["tripod_nut"]["t"],
         "bank_l": P["power_bank"]["l"], "bank_w": P["power_bank"]["w"], "bank_h": P["power_bank"]["h"],
     }
@@ -995,7 +1021,7 @@ class Audit:
 def scene(build, P, C, L):
     """Every bought part and every printed obstacle inside the enclosure."""
     R_in, FZ = L["R_in"], L["floor_z"]
-    objs = [box_from(L["boxes"][k]) for k in ("trigger", "buck", "latch", "switch", "jack", "shifter")]
+    objs = [box_from(L["boxes"][k]) for k in ("trigger", "buck", "latch", "switch", "shifter")]
     objs += [box_from(b) for b in L["pi_boxes"]]
     ring = P["led_ring"]
     objs.append(Cyl("LED ring", 0, 0, ring["od"] / 2, L["ring_z0"], L["ring_z1"]))
@@ -1005,6 +1031,7 @@ def scene(build, P, C, L):
     printed.append(Cyl("shelf", 0, 0, L["shelf_r"], L["shelf_z"], L["shelf_top"]))
     printed += [Box("riser", r[0], r[1], r[4] if len(r) > 4 else 6, r[4] if len(r) > 4 else 6, r[2], FZ, FZ + r[3])
                 for r in L.get("risers", [])]
+    printed += [Box("trigger rest", r[0], r[1], r[3], r[4], r[2], FZ, FZ + r[5]) for r in L.get("rests", [])]
     base_h = L["base_h"]
     printed += [Box("lid spigot pad", *polar(R_in - C["clr"] - C["lid_screw_pad"] / 2, a), C["lid_screw_pad"], 10, a,
                     base_h - C["spigot_h"], base_h) for a in L["lid_screw_angs"]]
@@ -1024,7 +1051,7 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
     uwb = build == "with_uwb"
     R_in, R_out, FZ = L["R_in"], L["base_d"] / 2, L["floor_z"]
     objs, printed, standoffs, heads = scene(build, P, C, L)
-    through_wall = {"PD trigger", "rocker switch", "barrel jack"}
+    through_wall = {"PD trigger", "rocker switch"}
 
     # 1. inside the enclosure
     bad = [f"{o.name} reaches r={o.rmax():.1f}" for o in objs
@@ -1044,6 +1071,8 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
         names = {a.name, b.name}
         if names <= {"shelf", "LED ring"} or ("shelf" in names and ("post" in a.name + b.name)):
             continue
+        if names == {"PD trigger", "trigger rest"}:     # the rest is under the board, holding it up
+            continue
         if "Pi standoff" in names and ("Pi board" in names or "Pi underside" in names or "shelf" in names):
             continue
         if "shelf screw head" in names and ("shelf" in names or "post" in (a.name + b.name)):
@@ -1058,7 +1087,7 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
             "; ".join(sorted(set(clashes))) or f"{len(allp)} envelopes checked pairwise")
 
     # 3. light path
-    deck_names = ["PD trigger", "buck converter", "power latch", "rocker switch", "barrel jack"]
+    deck_names = ["PD trigger", "buck converter", "power latch", "rocker switch"]
     deck_top = max(o.z1 for o in objs if o.name in deck_names or (o.name == "level shifter" and L["shifter_on"] == "deck"))
     A.check(deck_top <= L["window_z"] + EPS, "The power boards sit below the LED window",
             f"tallest at z = {deck_top:.1f}; window {L['window_z']:.1f}–{L['window_z'] + C['led_window_h']:.1f}")
@@ -1068,8 +1097,7 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
 
     # 4. wall openings
     feats = [("USB-C inlet", L["usbc"]["ang"], L["usbc"]["z"] + L["usbc"]["h"] / 2, max(L["usbc"]["w"], P["pd_trigger"]["w"]) / 2),
-             ("rocker switch", L["switch"]["ang"], L["switch"]["z"] + L["switch"]["r"], L["switch"]["r"]),
-             ("barrel jack", L["jack"]["ang"], L["jack"]["z"] + P["jack"]["body_d"] / 2, P["jack"]["body_d"] / 2)]
+             ("rocker switch", L["switch"]["ang"], L["switch"]["z"] + L["switch"]["r"], L["switch"]["r"])]
     ledge_bot = L["window_z"] - C["diffuser_lip"] - C["ledge_h"] - C["diffuser_t"]
     probs = []
     for name, a, ztop, half in feats:
@@ -1083,7 +1111,7 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
         if angdiff(a1, a2) < math.degrees((h1 + h2 + 2) / R_out):
             probs.append(f"{n1} and {n2} overlap on the wall")
     A.check(not probs, "Wall openings are reachable and clear of each other",
-            "; ".join(probs) or ", ".join(f"{n} at {a}°" for n, a, _, _ in feats), ["pd_trigger", "switch", "jack"])
+            "; ".join(probs) or ", ".join(f"{n} at {a}°" for n, a, _, _ in feats), ["pd_trigger", "switch"])
     sw = P["switch"]
     pt = L["switch"]["panel_t"]
     A.check(pt >= 2.0 - EPS and pt + sw["nut_t"] <= sw["thread_l"] + EPS,
@@ -1094,17 +1122,26 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
             "The rocker switch's key flat is keyed into its hole",
             f"thread Ø{sw['hole_d']}, {sw['hole_d_minus_flat']} across the flat, flat at the {sw['flat_side']}"
             f" (must be one of {', '.join(FLAT_ROT)})", ["switch"])
-    for k, label in SCREWED_BOARDS:
-        bk, bs = P[k], L[f"{k}_screw"]
-        b_ok = 0 < bk["hole_dx"] < bk["l"] and 0 < bk["hole_dy"] < bk["w"]
-        boss_r = C["tripod_boss_d"] / 2 + bs["head_d"] / 2 + 1
-        b_ok &= all(math.hypot(x, y) > boss_r and math.hypot(x, y) < R_in - bs["head_d"] / 2 for x, y in L[f"{k}_holes"])
-        A.check(b_ok, f"The {label}'s standoffs land on the floor, clear of the tripod boss and the wall",
-                f"standoffs {bk['hole_dx']}×{bk['hole_dy']} mm on a {bk['l']}×{bk['w']} board; "
-                f"{len(L[f'{k}_holes'])} × M{bk['screw_d']:g} × {bs['l']} countersunk up through "
-                f"{bs['through']:g} mm of {'floor and riser' if L['raised'] else 'floor'}", [k])
-    A.check(C["base_wall"] <= P["jack"]["max_panel_t"] + EPS, "The barrel jack's nut reaches through the wall",
-            f"wall {C['base_wall']} mm, jack takes ≤ {P['jack']['max_panel_t']}", ["jack"])
+    for k, _, label in STANDOFF_BOARDS:
+        bk, m = P[k], L["mounts"][k]
+        if "hole_x" in bk:
+            b_ok = 0 < bk["hole_x"] < bk["l"] and 0 < bk["hole_dy"] < bk["w"]
+            pattern = f"2 holes {bk['hole_dy']} mm apart, {bk['hole_x']} mm in from the socket end, and a printed rest under the other"
+        else:
+            b_ok = 0 < bk["hole_dx"] < bk["l"] and 0 < bk["hole_dy"] < bk["w"]
+            pattern = f"standoffs {bk['hole_dx']}×{bk['hole_dy']} mm"
+        if m["on"] == "floor":
+            boss_r = C["tripod_boss_d"] / 2 + m["head_d"] / 2 + 1
+            b_ok &= all(math.hypot(x, y) > boss_r and math.hypot(x, y) < R_in - m["head_d"] / 2 for x, y in m["holes"])
+            where = "the floor, clear of the tripod boss and the wall"
+            through = f"{m['through']:g} mm of {'floor and riser' if L['raised'] and k in ('buck', 'latch') else 'floor'}"
+        else:
+            b_ok &= all(math.hypot(x, y) < L["shelf_r"] - m["head_d"] / 2 for x, y in m["holes"])
+            where = "the shelf"
+            through = f"the {m['through']:g} mm shelf"
+        A.check(b_ok, f"The {label}'s standoffs land on {where}",
+                f"{pattern} on a {bk['l']}×{bk['w']} board; {len(m['holes'])} × M{bk['screw_d']:g} × {m['l']} "
+                f"countersunk up through {through}", [k])
     A.check(L["usbc"]["w"] >= P["pd_trigger"]["plug_w"] and L["usbc"]["h"] >= P["pd_trigger"]["plug_h"],
             "The bank's USB-C plug fits through its wall opening",
             f"opening {L['usbc']['w']}×{L['usbc']['h']} mm for a {P['pd_trigger']['plug_w']}×{P['pd_trigger']['plug_h']} plug", ["pd_trigger"])
@@ -1287,7 +1324,7 @@ def deep_check(build, L, P, C) -> list:
                 f"cube([{max(o.l - 2 * shrink, 0.1):.3f},{max(o.w - 2 * shrink, 0.1):.3f},{max(o.z1 - o.z0 - 2 * shrink, 0.1):.3f}], center=false);"
                 .replace("cube(", f"translate([{-(o.l / 2 - shrink):.3f},{-(o.w / 2 - shrink):.3f},0]) cube("))
     # through-wall parts legitimately pass through their openings
-    envelopes = [o for o in objs if o.name not in ("rocker switch", "barrel jack", "PD trigger", "Pi USB-C plug")]
+    envelopes = [o for o in objs if o.name not in ("rocker switch", "PD trigger", "Pi USB-C plug")]
     parts = {
         "base_housing": f'import("{cad}/stl/base_housing.stl");',
         "shelf": f'translate([0,0,{L["shelf_z"]}]) import("{cad}/stl/shelf.stl");',
@@ -1399,7 +1436,7 @@ def run(builds, check=False, do_render=True, deep=False, force_render=False) -> 
                     f.write(new)
                 changed.append(os.path.relpath(path, ROOT))
             print(f"  layout: Ø{L['base_d']} × {L['base_h']} mm, Pi at {L['pi']['ang']}°, "
-                  f"inlet {L['usbc']['ang']}°, jack {L['jack']['ang']}°, switch {L['switch']['ang']}°"
+                  f"inlet {L['usbc']['ang']}°, switch {L['switch']['ang']}°"
                   + (", anchor boards turned across the arms" if L.get("ula1_tangential") else ""))
             if changed:
                 print("  wrote " + ", ".join(changed))

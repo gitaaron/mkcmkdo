@@ -68,6 +68,8 @@ class Scene:
         self.ax = ax
         self.faces = []    # (layer, depth, verts3d, color, edge, lw)
         self.pts = []
+        self.segs = []     # dimension and extension lines, 2D, for label placement
+        self.labels = []   # placed by fit()
         self.layer = 0     # raise it for things that sit on a surface (holes, parts on a board)
 
     def _add(self, f):
@@ -159,6 +161,11 @@ class Scene:
                                       joinstyle="round", zorder=2))
 
     # ---- dimensions --------------------------------------------------------
+    #
+    # Labels aren't drawn where they're asked for: they're collected, and fit()
+    # places each one after the panel is laid out (see place_labels), so none
+    # covers another, a dimension line or a note. A label that ends up off the
+    # line or point it names gets a dashed, curved leader back to it.
 
     def dim(self, p1, p2, off, key, note=None, text_off=(0, 0), ha="center", ext=True):
         """A dimension from p1 to p2, drawn displaced by `off` (3D), with
@@ -172,34 +179,33 @@ class Scene:
                 s = tuple(pp + 0.15 * oo / L * 2 for pp, oo in zip(p, off))
                 e = tuple(qq + o for qq, o in zip(q, over))
                 self.ax.plot(*zip(iso(s), iso(e)), color=DIM, lw=0.8, zorder=5)
+                self.segs.append((iso(s), iso(e)))
         self.ax.add_patch(FancyArrowPatch(iso(a), iso(b), arrowstyle="<|-|>", mutation_scale=9,
                                           color=DIM, lw=1.1, shrinkA=0, shrinkB=0, zorder=6))
+        self.segs.append((iso(a), iso(b)))
         self.pts += [a, b]
         m = iso(tuple((u + v) / 2 for u, v in zip(a, b)))
-        self.label(m, key, note, text_off, ha)
+        self.label(m, key, note, text_off, ha, line=(iso(a), iso(b)))
 
-    def label(self, xy, key, note=None, text_off=(0, 0), ha="center", leader=False):
-        x, y = xy[0] + text_off[0], xy[1] + text_off[1]
-        if leader:
-            self.ax.annotate("", xy=xy, xytext=(x, y), zorder=6,
-                             arrowprops=dict(arrowstyle="-|>", color=DIM, lw=0.9, mutation_scale=9,
-                                             shrinkA=2, shrinkB=1))
+    def label(self, xy, key, note=None, text_off=(0, 0), ha="center", leader=False, line=None):
         s = key if not note else f"{key}\n{note}"
-        self.ax.text(x, y, s, ha=ha, va="center", fontsize=8.6, family="monospace",
-                     color=DIM, fontweight="bold", zorder=7,
-                     bbox=dict(boxstyle="round,pad=0.22", fc="white", ec=DIM, lw=0.7))
+        self.labels.append(dict(anchor=xy, text=s, off=text_off, ha=ha, line=line, arrow=leader,
+                                kw=dict(fontsize=8.6, family="monospace", color=DIM, fontweight="bold",
+                                        bbox=dict(boxstyle="round,pad=0.22", fc="white", ec=DIM, lw=0.7))))
 
     def callout(self, p3, key, note=None, text_off=(10, 10), ha="left"):
         self.label(iso(p3), key, note, text_off, ha, leader=True)
         self.pts.append(p3)
 
-    def text(self, p3, s, off=(0, 0), **kw):
-        x, y = iso(p3)
+    def text(self, p3, s, off=(0, 0), fixed=False, **kw):
+        """A note. `fixed` keeps it exactly where it's put (text printed on the part)."""
         kw.setdefault("fontsize", 7.6)
         kw.setdefault("color", NOTE)
-        kw.setdefault("ha", "center")
-        kw.setdefault("va", "center")
-        self.ax.text(x + off[0], y + off[1], s, zorder=7, style="italic", **kw)
+        ha = kw.pop("ha", "center")
+        kw.pop("va", None)
+        kw["style"] = "italic"
+        self.labels.append(dict(anchor=iso(p3), text=s, off=off, ha=ha, line=None, arrow=False, kw=kw,
+                                fixed=fixed))
 
     def fit(self, pad=12):
         xs = [iso(p)[0] for p in self.pts]
@@ -208,6 +214,281 @@ class Scene:
         self.ax.set_ylim(min(ys) - pad, max(ys) + pad)
         self.ax.set_aspect("equal")
         self.ax.axis("off")
+        place_labels(self)
+
+
+class Scene2:
+    """A flat side view with the same labelling as Scene: rectangles, dimensions
+    with extension lines, and labels placed by place_labels."""
+    proj = staticmethod(lambda p: p)
+
+    def __init__(self, ax):
+        self.ax, self.faces, self.segs, self.labels, self.pts = ax, [], [], [], []
+
+    def rect(self, x0, y0, x1, y1, fc, ec=INK, lw=0.8, hatch=None, z=2):
+        v = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+        self.ax.add_patch(Polygon(v, closed=True, fc=fc, ec=ec, lw=lw, hatch=hatch, zorder=z))
+        self.faces.append((0, 0, v))
+        self.pts += v
+
+    def line(self, a, b, **kw):
+        kw.setdefault("color", DIM)
+        kw.setdefault("lw", 0.8)
+        kw.setdefault("zorder", 5)
+        self.ax.plot(*zip(a, b), **kw)
+        self.segs.append((a, b))
+        self.pts += [a, b]
+
+    def dim(self, a, b, off, key, text_off=(0, 0), ha="center"):
+        """From a to b, drawn displaced by `off`, extension lines back to a and b."""
+        A = (a[0] + off[0], a[1] + off[1])
+        Bp = (b[0] + off[0], b[1] + off[1])
+        L = math.hypot(*off)
+        if L > 1e-9:
+            ux, uy = off[0] / L, off[1] / L
+            for p, q in ((a, A), (b, Bp)):
+                self.line((p[0] + ux * 0.4, p[1] + uy * 0.4), (q[0] + ux * 1.2, q[1] + uy * 1.2))
+        self.ax.add_patch(FancyArrowPatch(A, Bp, arrowstyle="<|-|>", mutation_scale=9, color=DIM, lw=1.1,
+                                          shrinkA=0, shrinkB=0, zorder=6))
+        self.segs.append((A, Bp))
+        self.pts += [A, Bp]
+        m = ((A[0] + Bp[0]) / 2, (A[1] + Bp[1]) / 2)
+        Scene.label(self, m, key, None, text_off, ha, line=(A, Bp))
+
+    def text(self, p, s, off=(0, 0), fixed=False, **kw):
+        kw.setdefault("fontsize", 7.6)
+        kw.setdefault("color", NOTE)
+        ha = kw.pop("ha", "center")
+        kw["style"] = "italic"
+        self.labels.append(dict(anchor=p, text=s, off=off, ha=ha, line=None, arrow=False, kw=kw, fixed=fixed))
+
+    def fit(self, pad=4, right=None):
+        xs = [p[0] for p in self.pts]
+        ys = [p[1] for p in self.pts]
+        self.ax.set_xlim(min(xs) - pad, max(xs) + (pad if right is None else right))
+        self.ax.set_ylim(min(ys) - pad, max(ys) + pad)
+        self.ax.set_aspect("equal")
+        self.ax.axis("off")
+        place_labels(self)
+
+
+# ---- label placement -------------------------------------------------------
+#
+# Everything is worked out in display pixels, on a grid of CELL-pixel cells that
+# covers the whole figure, so a label in one panel also keeps off the labels and
+# drawings of the panels placed before it.
+
+CELL = 2
+
+
+class _Board:
+    """What's already on a figure: part faces, dimension lines and placed labels."""
+
+    def __init__(self, fig):
+        fig.canvas.draw()        # so titles and the notes strip have their sizes
+        self.r = fig.canvas.get_renderer()
+        W, H = fig.canvas.get_width_height()
+        self.W, self.H = W, H
+        self.nx, self.ny = W // CELL + 1, H // CELL + 1
+        import numpy as np
+        self.np = np
+        self.part = np.zeros((self.ny, self.nx), bool)
+        self.line = np.zeros((self.ny, self.nx), bool)
+        self.boxes = []          # placed labels and titles: (x0, y0, x1, y1) in pixels
+        for ax in fig.axes:
+            t = ax.title
+            if t.get_text():
+                e = t.get_window_extent(self.r)
+                self.boxes.append((e.x0, e.y0, e.x1, e.y1))
+            for txt in ax.texts:  # the notes strip under the panels
+                e = txt.get_window_extent(self.r)
+                self.boxes.append((e.x0, e.y0, e.x1, e.y1))
+        for txt in fig.texts:
+            e = txt.get_window_extent(self.r)
+            self.boxes.append((e.x0, e.y0, e.x1, e.y1))
+
+    @staticmethod
+    def get(fig):
+        if not hasattr(fig, "_label_board"):
+            fig._label_board = _Board(fig)
+        return fig._label_board
+
+    def cells(self, x0, y0, x1, y1):
+        np = self.np
+        i0, i1 = max(0, int(y0 // CELL)), min(self.ny, int(y1 // CELL) + 1)
+        j0, j1 = max(0, int(x0 // CELL)), min(self.nx, int(x1 // CELL) + 1)
+        return slice(i0, max(i0, i1)), slice(j0, max(j0, j1))
+
+    def add_poly(self, pix):
+        from matplotlib.path import Path
+        np = self.np
+        x0, y0 = pix.min(axis=0)
+        x1, y1 = pix.max(axis=0)
+        si, sj = self.cells(x0, y0, x1, y1)
+        if si.stop <= si.start or sj.stop <= sj.start:
+            return
+        jj, ii = np.meshgrid(np.arange(sj.start, sj.stop), np.arange(si.start, si.stop))
+        pts = np.column_stack([(jj.ravel() + 0.5) * CELL, (ii.ravel() + 0.5) * CELL])
+        inside = Path(pix).contains_points(pts).reshape(ii.shape)
+        self.part[si, sj] |= inside
+
+    def seg_cells(self, a, b, grow=1):
+        """The cells a segment (in pixels) passes through, grown by `grow` cells."""
+        np = self.np
+        n = int(max(abs(b[0] - a[0]), abs(b[1] - a[1])) / CELL) + 2
+        t = np.linspace(0, 1, n)
+        jx = ((a[0] + (b[0] - a[0]) * t) // CELL).astype(int)
+        iy = ((a[1] + (b[1] - a[1]) * t) // CELL).astype(int)
+        out = set()
+        for i, j in zip(iy, jx):
+            for di in range(-grow, grow + 1):
+                for dj in range(-grow, grow + 1):
+                    if 0 <= i + di < self.ny and 0 <= j + dj < self.nx:
+                        out.add((i + di, j + dj))
+        return out
+
+    def add_seg(self, a, b):
+        for i, j in self.seg_cells(a, b):
+            self.line[i, j] = True
+
+
+def _overlap(a, b):
+    w = min(a[2], b[2]) - max(a[0], b[0])
+    h = min(a[3], b[3]) - max(a[1], b[1])
+    return max(0.0, w) * max(0.0, h)
+
+
+def _nearest_on(seg, p):
+    (ax_, ay), (bx, by) = seg
+    dx, dy = bx - ax_, by - ay
+    L2 = dx * dx + dy * dy or 1e-9
+    t = max(0.0, min(1.0, ((p[0] - ax_) * dx + (p[1] - ay) * dy) / L2))
+    return (ax_ + t * dx, ay + t * dy), t
+
+
+def place_labels(S):
+    """Put each of the scene's labels where it covers the least: other labels
+    first, then dimension lines, then the drawing, as near as it can to where it
+    was asked for and, for a dimension, to its own line."""
+    import numpy as np
+    ax, fig = S.ax, S.ax.figure
+    ax.apply_aspect()
+    B = _Board.get(fig)
+    T = ax.transData
+    proj = getattr(S, "proj", iso)
+    for v in [f[2] for f in S.faces]:
+        B.add_poly(T.transform([proj(p) for p in v]))
+    for a, b in S.segs:
+        B.add_seg(*T.transform([a, b]))
+    abox = ax.get_window_extent(B.r)
+    inv = T.inverted()
+
+    # labels on a line first: they have the least room to move
+    # fixed notes first, so the others keep off them; then labels on a line
+    for lab in sorted(S.labels, key=lambda d: (not d.get("fixed"), d["line"] is None)):
+        t = ax.text(0, 0, lab["text"], ha="center", va="center", zorder=7, **lab["kw"])
+        e = t.get_window_extent(B.r)
+        w, h = e.width + 4, e.height + 4                     # a little air round each box
+        anc = T.transform([lab["anchor"]])[0]
+        # where it was asked for, as a box centre in pixels
+        px = anc + np.array(lab["off"]) * (T.transform([(1, 1)])[0] - T.transform([(0, 0)])[0])
+        if lab["ha"] == "left":
+            px[0] += e.width / 2
+        elif lab["ha"] == "right":
+            px[0] -= e.width / 2
+        own, line_px = set(), None
+        if lab["line"] is not None:
+            line_px = tuple(map(tuple, T.transform(list(lab["line"]))))
+            # a label may sit on its own line only if the line shows past it
+            # both ends; a shorter one it would hide, so it goes beside it
+            short = math.dist(*line_px) < max(w, h) + 30
+            own = set() if short else B.seg_cells(*line_px, grow=2)
+            # the extension lines at each end count as the dimension's own too
+            for a, b in ([] if short else S.segs):
+                pa, pb = T.transform([a, b])
+                if min(np.hypot(*(np.array(_nearest_on((tuple(pa), tuple(pb)), q)[0]) - np.array(q)))
+                       for q in line_px) < 3:
+                    own |= B.seg_cells(pa, pb, grow=2)
+        if lab.get("fixed"):
+            B.boxes.append((px[0] - w / 2, px[1] - h / 2, px[0] + w / 2, px[1] + h / 2))
+            t.set_position(inv.transform([px])[0])
+            continue
+        cands = [px]
+        if line_px is not None and not short:                # slide along its own line
+            for f in (0.5, 0.35, 0.65, 0.25, 0.75):
+                q = np.array(line_px[0]) + f * (np.array(line_px[1]) - np.array(line_px[0]))
+                cands.append(q)
+        for r in (10, 18, 28, 40, 54, 70, 88, 110):
+            for k in range(24):
+                a = 2 * math.pi * k / 24
+                cands += [px + r * np.array([math.cos(a), math.sin(a)]),
+                          anc + r * np.array([math.cos(a), math.sin(a) * 0.8])]
+        # a note has no white box behind it, so over the drawing it can't be read
+        part_w = 60 if "bbox" in lab["kw"] else 1500
+        own_arr = np.array(sorted(own)) if own else np.zeros((0, 2), int)
+        best = None
+        for c in cands:
+            box = (c[0] - w / 2, c[1] - h / 2, c[0] + w / 2, c[1] + h / 2)
+            area = w * h
+            hit = sum(_overlap(box, o) for o in B.boxes) / area
+            si, sj = B.cells(*box)
+            ncell = max(1, (si.stop - si.start) * (sj.stop - sj.start))
+            lines = int(B.line[si, sj].sum())
+            if len(own_arr):
+                m = ((own_arr[:, 0] >= si.start) & (own_arr[:, 0] < si.stop) &
+                     (own_arr[:, 1] >= sj.start) & (own_arr[:, 1] < sj.stop))
+                lines -= int(B.line[own_arr[m, 0], own_arr[m, 1]].sum())
+            lines = max(0, lines)                            # cells of line covered
+            part = B.part[si, sj].sum() / ncell
+            outside = (max(0, abox.x0 - box[0]) + max(0, box[2] - abox.x1) +
+                       max(0, abox.y0 - box[1]) + max(0, box[3] - abox.y1))
+            if line_px is not None:
+                # from the line to the nearest edge of the box, not its centre, so
+                # a wide label beside a short line counts as next to it
+                q = _nearest_on(line_px, c)[0]
+                d = math.hypot(max(box[0] - q[0], 0, q[0] - box[2]), max(box[1] - q[1], 0, q[1] - box[3]))
+            elif lab["arrow"]:                               # a callout keeps its arrow long enough to see
+                d = np.hypot(*(px - c)) + 20 * max(0, 30 - np.hypot(*(anc - c)))
+            else:
+                d = np.hypot(*(anc - c))
+            score = 5000 * hit + 25 * lines + part_w * part + 2 * outside + 0.9 * d + 0.15 * np.hypot(*(c - px))
+            if best is None or score < best[0]:
+                best = (score, c, box)
+        _, c, box = best
+        B.boxes.append(box)
+        t.set_position(inv.transform([c])[0])
+        # does it still touch what it names?
+        if line_px is not None:
+            target, _ = _nearest_on(line_px, c)
+            q, tt = _nearest_on(line_px, c)
+            tt = min(0.8, max(0.2, tt))                      # aim at the line, not an arrowhead
+            target = (line_px[0][0] + tt * (line_px[1][0] - line_px[0][0]),
+                      line_px[0][1] + tt * (line_px[1][1] - line_px[0][1]))
+            gap = math.hypot(max(box[0] - q[0], 0, q[0] - box[2]), max(box[1] - q[1], 0, q[1] - box[3]))
+            touching = gap <= (4 if short else 1)
+        else:
+            target = tuple(anc)
+            touching = box[0] - 2 <= anc[0] <= box[2] + 2 and box[1] - 2 <= anc[1] <= box[3] + 2
+        if lab["arrow"]:
+            touching = False
+        if not touching:
+            # start on the edge of the label's box, on the side facing what it names
+            vx, vy = target[0] - c[0], target[1] - c[1]
+            k = min((w / 2 - 1) / abs(vx) if abs(vx) > 1e-9 else 1e9,
+                    (h / 2 - 1) / abs(vy) if abs(vy) > 1e-9 else 1e9, 1.0)
+            start = (c[0] + vx * k, c[1] + vy * k)
+            rad = 0.3 if vx * vy >= 0 else -0.3
+            props = (dict(arrowstyle="-|>", color=DIM, lw=0.9, mutation_scale=9, shrinkA=0, shrinkB=1)
+                     if lab["arrow"] else
+                     dict(arrowstyle="-", color=lab["kw"].get("color", DIM), lw=0.8, ls=(0, (3, 2)),
+                          shrinkA=0, shrinkB=2, connectionstyle=f"arc3,rad={rad}"))
+            ax.annotate("", xy=inv.transform([target])[0], xytext=inv.transform([start])[0], zorder=6,
+                        arrowprops=props)
+            if not lab["arrow"]:
+                ax.plot(*inv.transform([target])[0], marker="o", ms=2.4, color=lab["kw"].get("color", DIM),
+                        zorder=6)
+            # the leader is a line too: later labels keep off it
+            B.add_seg(start, target)
 
 
 # ---- 2D side-view helpers (for the panel parts, where a section says more) --
@@ -429,7 +710,7 @@ def lwh(S, l, w, h, text_l=(0, 0), text_w=(0, 0), text_h=(0, 0)):
 
 def boards():
     fig, axes = figure(
-        "2 · Boards on the enclosure floor", "[buck]  [pd_trigger]  [latch]",
+        "2 · Boards on standoffs", "[buck]  [pd_trigger]  [latch]  [shifter]",
         ["l, w — the board's outline, or of anything that hangs over its edge (a terminal block, the USB-C socket), "
          "whichever is bigger.   l is the long side.",
          "h — stand the board on the table the way it will sit (on its pins or solder joints if they stick out "
@@ -440,11 +721,18 @@ def boards():
          "latch: the 3 × 7 cm perfboard on four M3 standoffs.   hole_dx / hole_dy — corner hole centre to centre "
          "(calipers: the holes' outside edges, minus one hole's width).   standoff_h — the standoffs' length.   "
          "h from the bottom of the standoffs.",
+         "shifter: the 2 × 8 cm perfboard on four M3 standoffs, measured as the latch, with the servo plugs on their headers for h.",
          "pd_trigger: it must have a USB-C SOCKET (a hole the cable plugs into), not a plug sticking out.   "
+         "Two standoffs, through the holes at the socket end: hole_x — from that end of the board to the holes' centres; "
+         "hole_dy — the two holes centre to centre.   standoff_h — the standoffs' length: it lifts the socket, so "
+         "standoff_h + pcb_t + port_h ÷ 2 sets the height of the USB-C inlet in the wall, and the printed rest under "
+         "the terminal end is made this tall.   pcb_t — the board's thickness.   "
          "port_h — the socket's height above the board.   plug_w × plug_h — the bank cable's USB-C plug: the "
          "moulded body behind the metal, not the metal tip (the wall opening is cut to this)."],
-        panels=3, size=(10.0, 7.6), rows=2)
-    for ax, t in zip(axes, ("buck converter  [buck]", "PD trigger  [pd_trigger]", "power latch  [latch]")):
+        panels=6, size=(13.0, 7.6), rows=2)
+    for ax, t in zip(axes, ("buck converter  [buck]", "PD trigger: outline and holes  [pd_trigger]",
+                            "PD trigger: heights, from the side  [pd_trigger]", "the bank cable's plug  [pd_trigger]",
+                            "power latch  [latch]", "level shifter  [shifter]")):
         ax.set_title(t, fontsize=9.5, color=INK, family="monospace", pad=2)
 
     # buck
@@ -477,9 +765,17 @@ def boards():
     # PD trigger — laid out like the common black ones: USB-C socket at one end,
     # a blue screw terminal (12 V out) at the other, chip, button and LEDs between
     t = P["pd_trigger"]
-    l, w, top = t["l"], t["w"], 2.8
+    so, pt = t["standoff_h"], t.get("pcb_t", 1.6)
+    l, w, top = t["l"], t["w"], t["standoff_h"] + t.get("pcb_t", 1.6)
+    hx, hy0 = l - t["hole_x"], (w - t["hole_dy"]) / 2
     S = Scene(axes[1])
-    board_box(S, l, w, color="#202226")
+    for y in (hy0, hy0 + t["hole_dy"]):                                             # two standoffs at the socket end
+        S.cyl((hx, y, 0), 2.5, so, "#e8e4da", bias=1)
+    S.box(0, 0, so, l, w, pt, "#202226")
+    S.layer = 1
+    for y in (hy0, hy0 + t["hole_dy"]):
+        S.disc((hx, y, top), 2.0, METAL)
+    S.layer = 0
     sw, sl = 9.0, 7.5                                                               # USB-C socket
     S.box(l - sl + 0.6, w / 2 - sw / 2, top, sl, sw, t["port_h"], METAL, bias=3)
     S.poly([(l + 0.61, w / 2 - sw / 2 + 0.9, top + 0.7), (l + 0.61, w / 2 + sw / 2 - 0.9, top + 0.7),
@@ -493,25 +789,52 @@ def boards():
     S.cyl((l * 0.38 + 2.5, w * 0.62 + 2.5, top + 2.2), 1.5, 1.2, "#15161a", bias=3)
     for k in range(5):                                                              # voltage LEDs
         S.box(l * 0.30 + k * l * 0.07, 0.8, top, 1.2, 0.8, 0.6, "#f2f2f2", lw=0.3, bias=2)
-    lwh(S, l, w, t["h"])
-    S.dim((l + 0.6, w / 2 - sw / 2, top), (l + 0.6, w / 2 - sw / 2, top + t["port_h"]), (0, -5, 0),
-          "port_h", text_off=(5, 6), ha="left")
-    S.text((l + 0.6, w / 2, top + t["port_h"]), "USB-C socket\n(a hole, not a plug)", off=(-2, 20), ha="left")
+    S.dim((0, w, 0), (l, w, 0), (0, 9, 0), "l")
+    S.dim((l, 0, 0), (l, w, 0), (9, 0, 0), "w")
+    S.layer = 3
+    S.dim((hx, hy0, top), (l, hy0, top), (0, -hy0 - 7, 0), "hole_x", text_off=(16, -22), ha="left")
+    S.dim((hx, hy0, top), (hx, hy0 + t["hole_dy"], top), (0, 0, 0), "hole_dy", text_off=(-10, 8), ha="right")
+    S.text((l + 0.61, w / 2, top + t["port_h"] / 2), "USB-C socket\n(a hole, not a plug)", off=(6, 20), ha="left")
     S.text((0.4, w / 2, t["h"]), "screw terminal\n12 V out", off=(-3, 4), ha="right")
-    # the bank cable's plug, off to one side, pointing at the socket's end
+    S.text((hx, hy0, 0), "2 standoffs,\nsocket end only", off=(10, -18), ha="left")
+    S.draw()
+    S.fit(pad=16)
+
+    # PD trigger from the side: the stack of heights that sets the USB-C inlet in the wall
+    S = Scene2(axes[2])
+    ph_ = t["port_h"]
+    S.line((-3, 0), (l + 3, 0), color=NOTE, lw=1.2)                                   # the floor
+    S.rect(hx - 2.5, 0, hx + 2.5, so, "#e8e4da")                                    # a standoff
+    S.rect(0.8, 0, 7.2, so, "#f1e3c4", ec=NOTE, lw=0.7, hatch="////")               # the printed rest
+    S.rect(0, so, l, top, "#202226")                                                # the board
+    S.rect(l - sl + 0.6, top, l + 0.6, top + ph_, METAL)                            # USB-C socket
+    S.rect(0.4, top, 7.9, t["h"], "#2f7fd6")                                        # screw terminal
+    S.rect(l * 0.36, top, l * 0.62, top + 1.4, "#15161a")                           # chip
+    S.ax.plot([hx, hx], [-1, top + 1.5], color=NOTE, lw=0.6, ls=(0, (6, 2, 1, 2)), zorder=4)   # hole centre
+    S.dim((l + 0.6, 0), (l + 0.6, so), (5, 0), "standoff_h", text_off=(4, 0), ha="left")
+    S.dim((l + 0.6, so), (l + 0.6, top), (5, 0), "pcb_t", text_off=(4, 0), ha="left")
+    S.dim((l + 0.6, top), (l + 0.6, top + ph_), (5, 0), "port_h", text_off=(4, 0), ha="left")
+    S.dim((0, 0), (0, t["h"]), (-4, 0), "h", text_off=(-3, 0), ha="right")
+    S.dim((hx, 0), (l, 0), (0, -4), "hole_x", text_off=(0, -3))
+    S.text((4, so / 2), "printed\nrest", off=(0, -16))
+    S.text((l + 0.6, top + ph_ / 2), "socket's centre sets\nthe wall inlet's height", off=(10, 14), ha="left")
+    S.fit(pad=6, right=20)
+
+    # the bank cable's plug, on its own: the wall opening is cut to it
     pw, ph = t["plug_w"], t["plug_h"]
-    px, py, pz = l + 4, -40, top + 22
+    px, py, pz = 0, 0, 0
+    S = Scene(axes[3])
     S.box(px + 16, py - 4.2, pz + ph / 2 - 1.3, 6.5, 8.4, 2.6, METAL, bias=1)              # metal tip
     S.box(px, py - pw / 2, pz, 16, pw, ph, "#2a2d33", bias=2)                              # moulded body
     S.dim((px, py + pw / 2, pz + ph), (px, py - pw / 2, pz + ph), (0, 0, 5), "plug_w", text_off=(-3, 3), ha="right")
     S.dim((px + 16, py + pw / 2, pz), (px + 16, py + pw / 2, pz + ph), (3, 3, 0), "plug_h", text_off=(-3, 0), ha="right")
-    S.text((px + 8, py - pw / 2, pz + ph), "bank cable's plug", off=(4, 6), ha="left")
+    S.text((px + 8, py - pw / 2, pz + ph), "moulded body, not the metal tip", off=(4, 6), ha="left")
     S.draw()
     S.fit(pad=16)
 
     # latch: the 3 × 7 cm perfboard on four M3 standoffs, like the buck
     la = P["latch"]
-    S = Scene(axes[2])
+    S = Scene(axes[4])
     so = la["standoff_h"]
     x0, y0 = (la["l"] - la["hole_dx"]) / 2, (la["w"] - la["hole_dy"]) / 2
     for x in (x0, x0 + la["hole_dx"]):                                              # nylon standoffs
@@ -536,30 +859,55 @@ def boards():
     S.dim((x0, yf, 0), (x0, yf, so), (0, 8, 0), "standoff_h", text_off=(-4, 0), ha="right")
     S.draw()
     S.fit(pad=16)
+
+    # level shifter: the 2 × 8 cm perfboard on four M3 standoffs, like the latch
+    sh = P["shifter"]
+    S = Scene(axes[5])
+    so = sh["standoff_h"]
+    x0, y0 = (sh["l"] - sh["hole_dx"]) / 2, (sh["w"] - sh["hole_dy"]) / 2
+    for x in (x0, x0 + sh["hole_dx"]):
+        for y in (y0, y0 + sh["hole_dy"]):
+            S.cyl((x, y, 0), 2.5, so, "#e8e4da", bias=1)
+    S.box(0, 0, so, sh["l"], sh["w"], 1.6, "#3f9a4a")
+    top = so + 1.6
+    S.layer = 1
+    for x in (x0, x0 + sh["hole_dx"]):
+        for y in (y0, y0 + sh["hole_dy"]):
+            S.disc((x, y, top), 2.3, METAL)
+    S.layer = 2
+    S.box(16, sh["w"] / 2 - 3.5, top, 19, 7, 3.5, DARK, bias=3)                      # 74AHCT125
+    for k in range(2):                                                              # servo plugs on their headers
+        S.box(48 + k * 10, sh["w"] / 2 - 1.5, top, 8, 3, sh["h"] - top, "#2a2d33", bias=3)
+    lwh(S, sh["l"], sh["w"], sh["h"])
+    S.layer = 3
+    yf, xr = y0 + sh["hole_dy"], x0 + sh["hole_dx"]
+    S.dim((x0, yf, top), (xr, yf, top), (0, 0, 0), "hole_dx", text_off=(-6, -8))
+    S.dim((xr, y0, top), (xr, yf, top), (0, 0, 0), "hole_dy", text_off=(10, 4), ha="left")
+    S.dim((x0, yf, 0), (x0, yf, so), (0, 8, 0), "standoff_h", text_off=(-4, 0), ha="right")
+    S.text((48, sh["w"] / 2, sh["h"]), "servo plugs", off=(4, 6), ha="left")
+    S.draw()
+    S.fit(pad=16)
     save(fig, "boards.png")
 
 
 # ============================================================================
-#  3. Rocker switch and barrel jack
+#  3. Rocker switch
 # ============================================================================
 
 def panel_parts():
-    fig, (ax1, ax2, ax3) = figure(
-        "3 · Round rocker switch and barrel jack", "[switch]  [jack]",
+    fig, (ax1, ax2) = figure(
+        "3 · Round rocker switch", "[switch]",
         ["switch: flange_d — across the round bezel on the front.   hole_d — across the threaded body behind it "
          "(the wall hole is cut 0.5 mm bigger).   hole_d_minus_flat — from the thread's key flat straight across to "
          "the far side; flat_side — where that flat is with ON at the top (top, bottom, left or right).   "
          "nut_d — the locking ring across its lugs.",
          "switch: nut_t — the ring's thickness.   thread_l — from the back of the bezel to the end of the thread.   "
-         "depth — from the back of the bezel to the tips of the terminals.",
-         "jack: hole_d — the threaded barrel's outside diameter.   body_d — the widest thing behind the panel: the nut "
-         "across its corners, or the body, whichever is bigger.   depth — from the back of the front flange to the "
-         "tips of the solder tags.   max_panel_t — the thread length left between the flange and the nut fully on."],
-        panels=3, size=(13.0, 4.0), ratios=[1.45, 1.25, 1.25])
-    sw, jk = P["switch"], P["jack"]
+         "depth — from the back of the bezel to the tips of the terminals."],
+        panels=2, size=(9.6, 4.0), ratios=[1.45, 1.25])
+    sw = P["switch"]
 
     # switch, front: round bezel, rocker, and the thread behind it dashed
-    for a in (ax1, ax2, ax3):
+    for a in (ax1, ax2):
         a.set_aspect("equal")
         a.axis("off")
     fd, hd_s, nd, nt, tl, d = sw["flange_d"], sw["hole_d"], sw["nut_d"], sw["nut_t"], sw["thread_l"], sw["depth"]
@@ -622,38 +970,7 @@ def panel_parts():
     ax.set_xlim(-9, d + 16)
     ax.set_ylim(-fd / 2 - 17, fd / 2 + 14)
 
-    # jack, side
-    ax = ax3
-    hd, bd, jd, jp = jk["hole_d"], jk["body_d"], jk["depth"], jk["max_panel_t"]
-    fl = hd + 3
-    rect2(ax, -1.5, -fl / 2, 1.5, fl, METAL)                             # front flange
-    thr = jp + 2.5
-    rect2(ax, 0, -hd / 2, thr, hd, METAL)                                # threaded barrel
-    for i in range(int(thr / 0.7)):
-        ax.plot([i * 0.7, i * 0.7 + 0.35], [hd / 2, -hd / 2], color=DARK, lw=0.25, zorder=3)
-    rect2(ax, jp, -bd / 2, 2.5, bd, "#9aa1ad")                           # nut, screwed fully on
-    rect2(ax, thr, -hd / 2 + 1, jd - thr - 3, hd - 2, "#2a2d33")          # body
-    rect2(ax, jd - 3.5, -0.6, 3.5, 1.2, BRASS)                           # solder tag
-    rect2(ax, jd - 5.5, hd / 2 - 2.2, 5.5, 1.0, BRASS)
-    for y0, y1 in ((hd / 2 + 0.05, bd / 2 + 6), (-bd / 2 - 6, -hd / 2 - 0.05)):
-        rect2(ax, 0, y0, jp, y1 - y0, "#c7cdd8", ec=NOTE, lw=0.6, z=1, hatch="////")
-    dim2(ax, (-4, -hd / 2), (-4, hd / 2), "hole_d", off=(-1, 0), ha="right")
-    ext2(ax, (-1.5, -hd / 2), (-5, -hd / 2))
-    ext2(ax, (-1.5, hd / 2), (-5, hd / 2))
-    ext2(ax, (jp + 2.5, bd / 2), (jd + 6, bd / 2))
-    ext2(ax, (jp + 2.5, -bd / 2), (jd + 6, -bd / 2))
-    dim2(ax, (jd + 5, -bd / 2), (jd + 5, bd / 2), "body_d", off=(1.2, 0), ha="left")
-    ext2(ax, (0, -bd / 2 - 0), (0, -bd / 2 - 9))
-    ext2(ax, (jd, -0.6), (jd, -bd / 2 - 9))
-    dim2(ax, (0, -bd / 2 - 8), (jd, -bd / 2 - 8), "depth", off=(0, -2.4))
-    ext2(ax, (jp, bd / 2), (jp, bd / 2 + 4))
-    dim2(ax, (0, bd / 2 + 3.2), (jp, bd / 2 + 3.2), "max_panel_t", off=(6.5, 2.4), ha="left")
-    ax.text(jd / 2, bd / 2 + 10, "barrel jack, side, in the wall", ha="center", fontsize=7.6, color=NOTE,
-            style="italic")
-    ax.text(jp + 1.25, -bd / 2 - 1.2, "nut", ha="center", va="top", fontsize=7, color=NOTE, style="italic")
-    ax.set_xlim(-14, jd + 20)
-    ax.set_ylim(-bd / 2 - 13, bd / 2 + 12)
-    save(fig, "switch_jack.png")
+    save(fig, "switch.png")
 
 
 # ============================================================================
@@ -719,7 +1036,7 @@ def bank(section, title, name, d, far_input=False, builds=("with_uwb", "without_
     S.dim((0, w, 0), (l, w, 0), (0, max(10, w * 0.2), 0), "l")
     S.dim((l, 0, 0), (l, w, 0), (max(10, l * 0.06), 0, 0), "w")
     S.dim((l, 0, 0), (l, 0, h), (6, -6, 0), "h", text_off=(6, 0), ha="left")
-    S.text((l / 2, w / 2, h), name, fontsize=8.5, color="white")
+    S.text((l / 2, w / 2, h), name, fontsize=8.5, color="white", fixed=True)
     S.draw()
     S.fit(pad=16)
     fname = section.strip("[]") + ".png"
@@ -800,7 +1117,7 @@ def usb_extension():
     S.dim((fl, 0, 0), (fl, fw, 0), (8, 0, 0), "female_w", text_off=(4, -2), ha="left")
     S.dim((fl, 0, 0), (fl, 0, fh), (5, -5, 0), "female_h", text_off=(4, 0), ha="left")
     S.callout((fl, fw / 2, fh / 2), "open face", text_off=(10, 12))
-    S.text((0, 0, fh), "socket end", off=(0, 12), fontsize=9, color=INK)
+    S.text((0, 0, fh), "socket end", off=(0, 12), fontsize=9, color=INK, fixed=True)
     S.draw()
     S.fit(pad=10)
 
@@ -813,7 +1130,7 @@ def usb_extension():
     S.dim((ml, 0, 0), (ml, mw, 0), (20, 0, 0), "male_w", text_off=(4, -2), ha="left")
     S.dim((0, mw, 0), (0, mw, mh), (-6, 0, 0), "male_h", text_off=(-4, 0), ha="right")
     S.callout((ml, mw / 2 + 6, mh / 2 - 2.25), "port face\n(metal starts)", text_off=(8, 22))
-    S.text((0, 0, mh), "plug end", off=(0, 12), fontsize=9, color=INK)
+    S.text((0, 0, mh), "plug end", off=(0, 12), fontsize=9, color=INK, fixed=True)
     S.draw()
     S.fit(pad=10)
     save(fig, "usb_extension.png", ("with_uwb",))

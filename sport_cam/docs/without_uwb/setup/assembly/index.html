@@ -107,7 +107,7 @@ const PHASES = ["Prepare", "Enclosure", "Camera", "Power & cables", "Finish"];
 
 // part groups, in assembly order
 const SHELL = ["base_housing", "insert"];
-const POWER = ["jack", "trigger", "switch", "latch", "buck", ...(LY.shifter_on === "deck" ? ["shifter"] : [])];
+const POWER = ["trigger", "switch", "latch", "buck", ...(LY.shifter_on === "deck" ? ["shifter"] : [])];
 const SHELF = ["shelf", "ledring", ...(LY.shifter_on === "shelf" ? ["shifter"] : [])];
 const PI = ["pi", "cooler"];
 const LED = ["led_diffuser_ring"];
@@ -153,39 +153,38 @@ const STEPS = [
   },
   {
     id: "power", phase: 1, title: "Power boards onto the floor", time: "60 min",
-    parts: ["USB-C PD trigger board (12 V)", "Rocker switch", "Power latch, built on a 3 × 7 cm perfboard (IRF4905, 2 × 2N3904, 8 resistors), on 4 × M3 standoffs", "12 V → 5 V 8 A buck on its standoffs, and the Schottky diode that came with it", "8 × M3 countersunk screws (4 for the buck, 4 for the latch; length in cad/FIT_REPORT.md), 4 × M3 screws for the top of the latch's standoffs", "Panel-mount barrel jack", "18 AWG silicone wire, 470 µF", "Double-sided foam tape"],
+    parts: ["USB-C PD trigger board (12 V)", "Rocker switch", "Power latch, built on a 3 × 7 cm perfboard (IRF4905, 2 × 2N3904, 8 resistors), on 4 × M3 standoffs", "12 V → 5 V 8 A buck on its standoffs, and the Schottky diode that came with it", "M3 countersunk screws up through the floor: 4 for the buck, 4 for the latch, 2 for the PD trigger (length in cad/FIT_REPORT.md)", "M3 × 6 screws for the top of the latch's 4 standoffs and the trigger's 2", "2 × M3 standoffs for the PD trigger", "18 AWG silicone wire, 470 µF", "Double-sided foam tape"],
     tools: ["Soldering iron", "Multimeter", "4 A dummy load"],
     steps: [
-      "<b>Wiring:</b> connections P1–P6, S1–S2 and R1 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, steps 1–3. Build the power latch on the 3 × 7 cm perfboard first, from the <a href='../12-wiring.md#power-latch' target='_blank'>latch circuit</a>, keeping parts and wires clear of its four corner holes.",
+      "<b>Wiring:</b> connections P1–P5, S1–S2 and R1 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, steps 1–3. Build the power latch on the 3 × 7 cm perfboard first, from the <a href='../12-wiring.md#power-latch' target='_blank'>latch circuit</a>, keeping parts and wires clear of its four corner holes.",
       "<b>Bench-set the buck to 5.1 V under a 4 A dummy load before it goes anywhere near the Pi.</b> Open-circuit voltage tells you nothing; a unit that reads 5.1 V unloaded and 4.8 V loaded will brown the Pi out under load.",
       "Set the PD trigger to <b>12 V</b> on a real bank: press its button until the 12 V LED lights (5 → 9 → 12 → 15 → 20 V, one step per press; it remembers the setting through power cycles and bank swaps), then short its <b>S1</b> key-lock pad with solder so a stray press can't take it to 15 or 20 V. Leave the F1/F2 pads open. Confirm 12 V with a meter at its screw terminal, unplug and replug the bank, and confirm it again, before wiring anything else.",
-      `<b>PD trigger:</b> foam-tape it to the floor at the ${where(LY.usbc.ang)} of the enclosure, its USB-C socket hard against the inside of the rectangular inlet low in the wall. The bank's cable plugs in from outside.`,
-      "<b>Switch and jack:</b> the round rocker goes through its hole from outside, the key flat on its thread lined up with the flat in the hole (that keeps ON at the top and stops it turning), its bezel flat on the flat spot cut into the wall; from inside, screw its ring up the thread against the flat boss, hand-tight plus a quarter turn. The barrel jack (the 5 V service tap) goes through the round hole and takes its nut inside.",
+      `<b>PD trigger:</b> screw its two standoffs onto the holes at its socket end from the top (M3 × 6). Stand it at the ${where(LY.usbc.ang)} of the enclosure on its standoffs and the small printed rest under its terminal end, its USB-C socket hard against the inside of the rectangular inlet low in the wall, and drive ${LY.mounts ? '2 × M3 × ' + LY.mounts.pd_trigger.l : '2 × M3'} countersunk screws up from underneath into the standoffs. The bank's cable plugs in from outside (<a href='../../../setup/12c-power-boards.md' target='_blank'>preparing the trigger and buck</a>).`,
+      "<b>Switch:</b> the round rocker goes through its hole from outside, the key flat on its thread lined up with the flat in the hole (that keeps ON at the top and stops it turning), its bezel flat on the flat spot cut into the wall; from inside, screw its ring up the thread against the flat boss, hand-tight plus a quarter turn.",
       `<b>Buck:</b> it stays on its four brass standoffs. Take the screws out of their bottom ends, stand it over the four countersunk holes in the floor where the model shows it, and drive ${LY.buck_screw.l ? "4 × M3 × " + LY.buck_screw.l : "4 × M3"} countersunk screws up from underneath into the standoffs. Do it before the other floor boards go in, while you can still hold the standoffs.`,
       `<b>Latch:</b> build and bench-test it first with the <a href='../../../setup/12a-power-latch.md' target='_blank'>power latch guide</a>. Then screw four M3 × ${LY.parts.latch.standoff_h} mm standoffs to its corner holes from the top with short M3 screws (drill the holes to 3.2 mm if a screw won't pass), stand it over its four countersunk holes in the floor where the model shows it, and drive ${LY.latch_screw && LY.latch_screw.l ? "4 × M3 × " + LY.latch_screw.l : "4 × M3"} countersunk screws up from underneath into the standoffs, the same as the buck.`,
       "Wire the chain: trigger 12 V out → latch <b>IN</b>, latch <b>OUT</b> → the buck's Schottky diode, band toward the buck → buck 12 V in (<a href='../12-wiring.md#input-diode' target='_blank'>input diode</a>). Grounds common. The rocker only signals the latch (S1, S2): it carries under 1 mA, and the latch keeps the power on after you switch off until the Pi has saved the clip and shut down.",
       "Put the 470 µF across the buck output. Leave the buck's 5 V out on 18 AWG and the latch's HOLD and SENSE leads, long enough (≈ 15 cm) to reach up past the shelf to the Pi, the LED ring and the lid.",
     ],
     warn: "Use the USB-C cable from the bill of materials. Before closing anything up, check the trigger really negotiates 12 V from your bank through the wall inlet.",
-    scene: { show: SHELL, add: [["trigger", 0, 0, 60], ["switch", 0, 0, 60], ["jack", 0, 0, 60], ["latch", 0, 0, 70], ["buck", 0, 0, 70]],
+    scene: { show: SHELL, add: [["trigger", 0, 0, 60], ["switch", 0, 0, 60], ["latch", 0, 0, 70], ["buck", 0, 0, 70]],
              view: "iso-high", focus: "all", render: "power",
              marks: [[bx("trigger").cx, bx("trigger").cy, bx("trigger").z1, "PD trigger → 12 V, at the USB-C inlet", 30, 30, 45],
                      [bx("buck").cx, bx("buck").cy, bx("buck").z1, "buck → 5.1 V @ 8 A", 40, -30, 40],
                      [bx("latch").cx, bx("latch").cy, bx("latch").z1, "power latch", -40, 30, 40],
-                     [bx("switch").cx, bx("switch").cy, bx("switch").z1, "rocker switch", -30, -30, 35],
-                     [bx("jack").cx, bx("jack").cy, bx("jack").z1, "5 V service jack", -40, 20, 30]] },
+                     [bx("switch").cx, bx("switch").cy, bx("switch").z1, "rocker switch", -30, -30, 35]] },
   },
   {
     id: "led", phase: 1, title: "LED ring under the shelf, diffuser band", time: "30 min",
-    parts: ["Shelf", "WS2812B 16-LED ring", "74AHCT125 level shifter", "LED diffuser ring (white PETG)", "Double-sided foam tape", "CA or hot glue"],
+    parts: ["Shelf", "WS2812B 16-LED ring", "74AHCT125 level shifter, built on a 2 × 8 cm perfboard (12b), on 4 × M3 standoffs", "4 × M3 countersunk screws for the shifter (length in cad/FIT_REPORT.md)", "LED diffuser ring (white PETG)", "Double-sided foam tape", "CA or hot glue"],
     tools: ["Soldering iron"],
     steps: [
       "<b>Wiring:</b> connections R4, R5 and L1–L4 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, with the 74AHCT125 pin numbers.",
       "Data comes out of <b>SPI0 MOSI, GPIO10</b>, not the classic <code>rpi_ws281x</code> PWM/DMA pin. A Pi 4 can do it either way, but the PWM driver needs the whole camera service to run as root and SPI does not.",
       "<b>Ring:</b> foam-tape it to the <b>underside</b> of the shelf, <b>LEDs facing down</b>, centred on the shelf's small centre hole. It then sits in the band of the LED window, between the power boards and the shelf, and lights the window all the way round. Take its leads round the edge of the shelf through the cut-away side.",
       LY.shifter_on === "shelf"
-        ? "<b>Shifter:</b> foam-tape it to the top of the shelf where the model shows, beside the Pi's place. Wire GPIO10 → 74AHCT125 input, its output → ring DIN. Leave room beside it for two 3-pin servo headers (gates 2 and 3 drive the servos, wired in the cabling step); tie the last gate's input and enable to ground and power it from 5 V. Ring 5 V and ground come from the buck, not the Pi."
-        : "<b>Shifter:</b> foam-tape it to the floor where the model shows. Wire GPIO10 → 74AHCT125 input, its output → ring DIN. Leave room beside it for two 3-pin servo headers (gates 2 and 3 drive the servos, wired in the cabling step); tie the last gate's input and enable to ground and power it from 5 V. Ring 5 V and ground come from the buck, not the Pi.",
+        ? `<b>Shifter:</b> build it first, on the 2 × 8 cm perfboard (<a href='../../../setup/12b-level-shifter.md' target='_blank'>building the level shifter</a>). Screw its four standoffs on from the top (M3 × 6), stand it on the shelf over the four countersunk holes beside the Pi's place, and drive ${LY.mounts ? '4 × M3 × ' + LY.mounts.shifter.l : '4 × M3'} countersunk screws up from underneath the shelf into them, before the ring goes on. Ring 5 V and ground come from the buck, not the Pi.`
+        : `<b>Shifter:</b> build it first, on the 2 × 8 cm perfboard (<a href='../../../setup/12b-level-shifter.md' target='_blank'>building the level shifter</a>). Screw its four standoffs on from the top (M3 × 6), stand it over its four countersunk holes in the floor where the model shows, and drive ${LY.mounts ? '4 × M3 × ' + LY.mounts.shifter.l : '4 × M3'} countersunk screws up from underneath into them. Ring 5 V and ground come from the buck, not the Pi.`,
       "<b>Diffuser band:</b> slide it down over the outside of the enclosure until it rests on the small ledge below the window, then fix it with four dabs of glue.",
       "Power up and run the three state colours with the shelf held in place. The band should glow evenly all the way round; the three posts behind the window cast faint shadows.",
     ],
@@ -575,7 +574,7 @@ function stlGeometry(name) {
 /* ---- parts placed by cad/fit.py ----------------------------------------
    placed(key, fn): a board from LY.boxes, drawn in its own frame (centre
    origin, z = 0 on the floor tape, +x along its length) and moved to where
-   the solver put it. `mid` centres it vertically (switch, jack). */
+   the solver put it. `mid` centres it vertically (the switch). */
 function placed(key, fn, mid) {
   const b = LY.boxes[key], g = group(...fn(b));
   g.position.set(b.cx, b.cy, mid ? (b.z0 + b.z1) / 2 : b.z0);
@@ -620,9 +619,14 @@ const PARTS = {
   base_housing: { grp: "static", stl: "base_housing", color: COL.print, double: true },
 
   // power boards on the floor, where cad/fit.py put them
-  trigger: { grp: "static", build: () => placed("trigger", (b) => [
-      at(mesh(box(b.l, b.w, 1.6), COL.blue), 0, 0, 0.8),
-      at(mesh(box(8, 9, 3.3), COL.steel, { metal: 0.4 }), b.l / 2 - 4, 0, b.z1 - b.z0 - 1.65)]) },
+  trigger: { grp: "static", build: () => placed("trigger", (b) => {
+      // two M3 standoffs through the holes at its socket end; the printed rest (in the housing) holds up the other end
+      const p = LY.parts.pd_trigger, z = p.standoff_h, t = p.pcb_t || 1.6;
+      return [...[1, -1].map((sy) => at(mesh(cyl(2.75, z, "z"), COL.white), b.l / 2 - p.hole_x, sy * p.hole_dy / 2, z / 2)),
+              at(mesh(box(b.l, b.w, t), COL.dark), 0, 0, z + t / 2),
+              at(mesh(box(8, 9, p.port_h), COL.steel, { metal: 0.4 }), b.l / 2 - 4, 0, z + t + p.port_h / 2),
+              at(mesh(box(7, b.w - 2, b.z1 - b.z0 - z - t), COL.blue), -b.l / 2 + 4, 0, (b.z1 - b.z0 + z + t) / 2)];
+    }) },
   latch: { grp: "static", build: () => placed("latch", (b) => {
       // 3 × 7 cm perfboard on four M3 standoffs, screwed up through the floor like the buck
       const p = LY.parts.latch, z = p.standoff_h, top = z + 1.6;
@@ -647,9 +651,6 @@ const PARTS = {
               at(mesh(cyl(s.flange_d / 2, 2.5, "x"), COL.black), seat + 1.25, 0, 0),
               at(mesh(cyl(s.hole_d / 2 - 3, 3, "x"), COL.wire), seat + 3, 0, 0)];
     }, true) },
-  jack: { grp: "static", build: () => placed("jack", (b) => [
-      at(mesh(cyl(4.4, b.l - 3, "x"), COL.black), -1.5, 0, 0),
-      at(mesh(cyl(b.w / 2, 2, "x"), COL.steel, { metal: 0.5 }), -LY.design.base_wall - 1, 0, 0)], true) },
 
   // the shelf, with the LED ring under it and the Pi on top
   shelf: { grp: "static", stl: "shelf", color: COL.white, pos: [0, 0, SHELF_Z] },
@@ -658,9 +659,16 @@ const PARTS = {
     for (let i = 0; i < r.count; i++) { const a = i / r.count * Math.PI * 2; g.add(at(mesh(box(5, 5, 1.6), COL.cream), (r.od + r.id) / 4 * Math.cos(a), (r.od + r.id) / 4 * Math.sin(a), LY.ring_z0 + 0.8, 0, 0, a)); }
     return g;
   } },
-  shifter: { grp: "static", build: () => placed("shifter", (b) => [
-      at(mesh(box(b.l, b.w, 1.6), COL.pcb), 0, 0, 0.8),
-      at(mesh(box(19, 6.5, 3), COL.black), 0, 0, 3.1)]) },
+  shifter: { grp: "static", build: () => placed("shifter", (b) => {
+      // 2 × 8 cm perfboard on four M3 standoffs, screwed up through the shelf (or the floor)
+      const p = LY.parts.shifter, z = p.standoff_h, top = z + 1.6;
+      return [...[[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([sx, sy]) =>
+                at(mesh(cyl(2.75, z, "z"), COL.white), sx * p.hole_dx / 2, sy * p.hole_dy / 2, z / 2)),
+              at(mesh(box(b.l, b.w, 1.6), COL.pcb), 0, 0, z + 0.8),
+              at(mesh(box(19, 6.5, 3.5), COL.black), -b.l * 0.15, 0, top + 1.75),        // 74AHCT125
+              at(mesh(box(7.5, 2.5, 8.5), COL.black), b.l * 0.25, 2.5, top + 4.25),      // servo headers
+              at(mesh(box(7.5, 2.5, 8.5), COL.black), b.l * 0.25, -2.5, top + 4.25)];
+    }) },
   pi: { grp: "static", build: () => piPlaced((p, hl, hw) => [
       at(mesh(box(p.l, p.w, 1.6), COL.pcb), 0, 0, 0.8),
       at(mesh(box(p.gpio_x1 - p.gpio_x0, 5, 8.5), COL.black), (p.gpio_x0 + p.gpio_x1) / 2 - hl, hw - 3.5, 5.85),

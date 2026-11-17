@@ -23,6 +23,11 @@ module shelf() {
             cylinder(d = 3.4, h = shelf_t + 2, $fn = 24);
         for (p = pi_holes) translate([p[0], p[1], -1])
             cylinder(d = pi_hole_d, h = shelf_t + 2, $fn = 24);
+        // the level shifter's standoffs, when it is on the shelf: countersunk screws up from underneath
+        for (h = shelf_holes) translate([h[0], h[1], 0]) {
+            translate([0, 0, -1]) cylinder(d = h[2], h = shelf_t + 2, $fn = 24);
+            translate([0, 0, -0.01]) cylinder(d1 = h[3], d2 = h[2], h = (h[3] - h[2]) / 2 + 0.01, $fn = 24);
+        }
         // centre mark for sticking the LED ring on concentric
         translate([0, 0, -1]) cylinder(d = 4, h = shelf_t + 2, $fn = 24);
     }

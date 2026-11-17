@@ -70,8 +70,6 @@ module shell() {
             }
         // USB-C inlet for the bank cable; the PD trigger's socket sits behind it
         at_wall(usbc_ang, usbc_z) cube([base_wall * 4, usbc_w, usbc_h], center = true);
-        // 5 V service jack
-        at_wall(jack_ang, jack_z) rotate([0, 90, 0]) cylinder(d = jack_d, h = base_wall * 4, center = true);
         // slot the three anchor USB cables come in through, behind the Pi's
         // USB ports; pass the plugs through one at a time
         at_wall(usb_entry_ang, usb_entry_z) cube([base_wall * 4, usb_entry_w, usb_entry_h], center = true);
@@ -124,17 +122,17 @@ module base_housing() {
             // risers lifting a board clear of the tripod boss, when fit.py needed them
             for (r = risers) translate([r[0], r[1], base_wall]) rotate([0, 0, r[2]])
                 translate([-r[4] / 2, -r[4] / 2, 0]) cube([r[4], r[4], r[3]]);
+            // the PD trigger's rest: its two standoffs are at the socket end, this holds up the other
+            for (r = rests) translate([r[0], r[1], base_wall]) rotate([0, 0, r[2]])
+                translate([-r[3] / 2, -r[4] / 2, 0]) cube([r[3], r[4], r[5]]);
         }
         switch_cut();
-        // the buck and the power latch each stand on four standoffs: countersunk screws
-        // come up from underneath, through the floor (and its risers, if raised), into them
-        for (h = buck_holes) translate([h[0], h[1], 0]) {
-            translate([0, 0, -1]) cylinder(d = buck_hole_d, h = buck_hole_h + 2, $fn = 24);
-            translate([0, 0, -0.01]) cylinder(d1 = buck_head_d, d2 = buck_hole_d, h = (buck_head_d - buck_hole_d) / 2 + 0.01, $fn = 24);
-        }
-        for (h = latch_holes) translate([h[0], h[1], 0]) {
-            translate([0, 0, -1]) cylinder(d = latch_hole_d, h = latch_hole_h + 2, $fn = 24);
-            translate([0, 0, -0.01]) cylinder(d1 = latch_head_d, d2 = latch_hole_d, h = (latch_head_d - latch_hole_d) / 2 + 0.01, $fn = 24);
+        // the boards on standoffs (buck, power latch, PD trigger, and the level shifter
+        // when it is on the floor): countersunk screws come up from underneath, through
+        // the floor (and its risers, if raised), into them
+        for (h = floor_holes) translate([h[0], h[1], 0]) {
+            translate([0, 0, -1]) cylinder(d = h[2], h = h[4] + 2, $fn = 24);
+            translate([0, 0, -0.01]) cylinder(d1 = h[3], d2 = h[2], h = (h[3] - h[2]) / 2 + 0.01, $fn = 24);
         }
         // tripod socket: a 3/8-16 nut dropped into a hex pocket from inside, on a ledge
         // the screw passes up through — tightening pulls the nut onto the ledge

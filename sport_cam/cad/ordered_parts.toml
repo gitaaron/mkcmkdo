@@ -51,21 +51,35 @@ plug_l = 20           # plug and strain relief, before the cable bends down thro
 standoff_h = 6        # M2.5 nylon standoffs it sits on (item 21)
 
 [shifter]
-name = "74AHCT125 level shifter on a scrap of perfboard"
+name = "74AHCT125 level shifter on a 2 × 8 cm perfboard"
 bom = 8
-l = 25
-w = 15
-h = 8
+# Built on a 2 × 8 cm board (6 × 28 holes) from the ELEGOO kit (13a.10), like the
+# power latch on its 3 × 7. It stands on four M3 standoffs, and countersunk screws
+# come up through the shelf (or the floor, if fit.py puts it there) into them.
+l = 80                # MEASURE_TODO  the board's long side
+w = 20                # MEASURE_TODO  its short side
+h = 22                # MEASURE_TODO  from the bottom of the standoffs to the top of the tallest part: the servo plugs on their headers
+hole_dx = 76          # MEASURE_TODO  corner hole centre to centre, along l
+hole_dy = 16          # MEASURE_TODO  and along w
+screw_d = 3           # MEASURE_TODO  3 for M3 — drill the corner holes to 3.2 mm if an M3 screw won't pass
+standoff_h = 6        # MEASURE_TODO  the M3 standoffs under it (item 21): enough to clear the solder joints underneath
 
 # ---- power ---------------------------------------------------------------
 
 [pd_trigger]
 name = "USB-C PD trigger board, 12 V"
 bom = 10
+# It stands on two M3 standoffs through the holes at its socket end, screwed up
+# through the floor; a printed rest under the floor holds up the terminal end.
 l = 33                # MEASURE_TODO  the USB-C socket is at one short end
 w = 14                # MEASURE_TODO
-h = 6                 # MEASURE_TODO
+h = 18                # MEASURE_TODO  from the bottom of the standoffs to the top of the tallest part (the screw terminal)
+pcb_t = 1.6           # MEASURE_TODO  the board's thickness
 port_h = 3.3          # MEASURE_TODO  the socket's height, sitting on top of the board at that end
+hole_x = 4            # MEASURE_TODO  from the socket end of the board to the centres of its two holes
+hole_dy = 9           # MEASURE_TODO  the two holes, centre to centre, across the board
+screw_d = 3           # MEASURE_TODO  3 for M3, 2.5 for M2.5: the biggest that passes the holes
+standoff_h = 6        # MEASURE_TODO  the standoffs under it (item 21): enough to clear the solder joints underneath
 plug_w = 12.5         # MEASURE_TODO  the bank cable's USB-C plug overmould — the wall opening is cut to this
 plug_h = 7            # MEASURE_TODO
 
@@ -74,12 +88,12 @@ name = "12 V → 5 V 8 A adjustable buck"
 bom = 11
 # It stands on four brass standoffs, one in each corner, and M3 countersunk
 # screws come up through the enclosure floor into them (no foam tape).
-l = 60                # MEASURE_TODO  the board outline, or anything hanging over its edge, whichever is bigger
-w = 40                # MEASURE_TODO
-h = 22                # MEASURE_TODO  from the bottom of the standoffs to the top of the tallest part
-hole_dx = 53          # MEASURE_TODO  standoff centre to centre, along l
-hole_dy = 33          # MEASURE_TODO  and along w
-screw_d = 3           # MEASURE_TODO  the standoffs' thread: 3 for M3, 2.5 for M2.5
+l = 80                # MEASURE_DONE  the board outline, or anything hanging over its edge, whichever is bigger
+w = 50                # MEASURE_DONE
+h = 28.2              # MEASURE_DONE  from the bottom of the standoffs to the top of the tallest part
+hole_dx = 73.74       # MEASURE_DONE  standoff centre to centre, along l
+hole_dy = 44.35       # MEASURE_DONE  and along w
+screw_d = 3           # MEASURE_DONE  the standoffs' thread: 3 for M3, 2.5 for M2.5
 
 [latch]
 name = "Power latch (P-MOSFET and two transistors on a 3 × 7 cm double-sided perfboard)"
@@ -107,20 +121,12 @@ nut_t = 6             # MEASURE_TODO  the ring's thickness
 thread_l = 12         # MEASURE_TODO  from the back of the bezel to the end of the thread
 depth = 26            # MEASURE_TODO  from the back of the bezel to the tips of the terminals
 
-[jack]
-name = "Panel-mount barrel jack (5 V service tap)"
-bom = 18
-hole_d = 8.2          # MEASURE_TODO
-body_d = 11           # MEASURE_TODO  nut / body behind the panel
-depth = 16            # MEASURE_TODO
-max_panel_t = 4.0     # MEASURE_TODO
-
 [power_bank]
 name = "USB-C PD power bank, 25 000 mAh"
 bom = 9
-l = 150               # MEASURE_TODO
-w = 72                # MEASURE_TODO
-h = 30                # MEASURE_TODO
+l = 114.8               # MEASURE_DONE
+w = 75.5                # MEASURE_DONE
+h = 36.2                # MEASURE_DONE
 
 # ---- status light --------------------------------------------------------
 

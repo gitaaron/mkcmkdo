@@ -189,10 +189,13 @@ switch on through SW, and check that Q1 stays cool. At the camera's 1.7 A it war
 
 1. **Screw the four standoffs on from the top.** Each 8 mm M3 female–female nylon standoff
    (BOM 13a.11) goes under a corner hole, held by an M3 × 6 screw from the parts side.
-2. **Fit the board in the enclosure.** Set it on the floor where the 3D model shows,
-   Q1's tab clear of the buck and of the wall.
-3. **Screw it down from underneath.** Four M3 × 8 countersunk screws go up through
-   the floor into the standoffs.
+2. **Fit the board in the enclosure.** Set it where the 3D model shows, Q1's tab clear
+   of the buck and of the wall. If `fit.py` has raised the floor boards over the tripod
+   boss, each standoff stands on a printed riser.
+3. **Screw it down from underneath.** Four M3 countersunk screws go up through the
+   floor (and the risers, if there are any) into the standoffs. Their length is in
+   `cad/FIT_REPORT.md`: M3 × 8 through the floor alone, M3 × 20 through the floor and
+   the risers.
 4. **Make the connections.** Do the rest in the order of the wiring guide's step 3:
    P2, P3, P5, then S1–S4 when the rocker and Pi are in.
 

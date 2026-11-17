@@ -97,7 +97,6 @@ CONNECTIONS = [
         ("R3", "buck OUT+ / OUT−", "PTZ controller 5V / GND", "18–22 AWG. Not the Pi's 5 V pin"),
         ("R4", "buck OUT+ / OUT−", "LED ring 5V / GND", "22 AWG"),
         ("R5", "buck OUT+ / OUT−", "74AHCT125 VCC (pin 14) / GND (pin 7)", "22 AWG"),
-        ("R6", "buck OUT+ / OUT−", "panel barrel jack", "22 AWG. Optional 5 V service tap, centre positive"),
         ("R7", "buck OUT+ / OUT−", "servo headers + / −", "20–22 AWG. ≈ 0.7 A when both servos stall"),
     ]),
     ("I2C bus", [
@@ -265,14 +264,6 @@ def pigtail(ax, xy):
     ax.add_patch(FancyBboxPatch((xy[0] - 3, xy[1] - 8), 6, 8, boxstyle="round,pad=0,rounding_size=1",
                                 fc="#2b2f36", ec=INK, lw=1, zorder=8))
     return (xy[0], xy[1] - 8)
-
-
-def barrel(ax, x, y):
-    ax.add_patch(FancyBboxPatch((x, y), 14, 10, boxstyle="round,pad=0,rounding_size=1.5",
-                                fc="#2b2f36", ec=INK, lw=1, zorder=3))
-    ax.add_patch(Circle((x + 7, y + 5), 2.5, fc="#14181f", ec=METAL, lw=1, zorder=3.1))
-    note(ax, x + 16, y + 5, "barrel jack,\noptional (#18)", fs=6, va="center")
-    return {"+": (x + 4, y), "-": (x + 10, y)}
 
 
 def shifter(ax, x, y, headers=True):
@@ -574,7 +565,6 @@ def render(servos="pigpio"):
     lat = latch(ax, 94, 14)
     rck = rocker(ax, 84, 44)
     bk = buck(ax, 178, 12)
-    bj = barrel(ax, 236, 49)
     pz = ptz_ctrl(ax, 24, 140, servos)
     cam = camera(ax, 45, 204)
     sh = shifter(ax, 168, 142, headers=on_pi)
@@ -644,9 +634,6 @@ def render(servos="pigpio"):
     with conn(ax, "R3"):
         pair(ax, [(209, 44), (209, 62), (14, 62), (14, 130), (pz["5V"][0] + 2, 130), (pz["5V"][0] + 2, 136)],
              d=(-0.9, 0.9), head=heads, tail=((pz["5V"],), (pz["GND"],)), label="R3", at=0.3)
-    with conn(ax, "R6"):
-        pair(ax, [(224, 46.5), (243, 46.5), (243, 47.5)], d=(-0.9, 0.9), head=heads, tail=((bj["+"],), (bj["-"],)))
-        tag(ax, (232, 46.5), "R6", RED)
     with conn(ax, "R7"):
         if on_pi:
             hp, hm = sh[("pan", "+")], sh[("pan", "-")]
