@@ -70,7 +70,7 @@ standoff_h = 6        # MEASURE_TODO  the M3 standoffs under it (item 21): enoug
 name = "USB-C PD trigger board, 12 V"
 bom = 10
 # It stands on two M3 standoffs through the holes at its socket end, screwed up
-# through the floor; a printed rest under the floor holds up the terminal end.
+# through the power drum's floor; a printed rest holds up the terminal end.
 l = 33                # MEASURE_TODO  the USB-C socket is at one short end
 w = 14                # MEASURE_TODO
 h = 18                # MEASURE_TODO  from the bottom of the standoffs to the top of the tallest part (the screw terminal)
@@ -80,14 +80,15 @@ hole_x = 4            # MEASURE_TODO  from the socket end of the board to the ce
 hole_dy = 9           # MEASURE_TODO  the two holes, centre to centre, across the board
 screw_d = 3           # MEASURE_TODO  3 for M3, 2.5 for M2.5: the biggest that passes the holes
 standoff_h = 6        # MEASURE_TODO  the standoffs under it (item 21): enough to clear the solder joints underneath
-plug_w = 12.5         # MEASURE_TODO  the bank cable's USB-C plug overmould — the wall opening is cut to this
+plug_w = 12.5         # MEASURE_TODO  the bank cable's USB-C plug overmould — room is kept for it in front of the socket
 plug_h = 7            # MEASURE_TODO
 
 [buck]
 name = "12 V → 5 V 8 A adjustable buck"
 bom = 11
-# It stands on four brass standoffs, one in each corner, and M3 countersunk
-# screws come up through the enclosure floor into them (no foam tape).
+# It stands on edge on four brass standoffs, one in each corner, against a wall of
+# the bank pocket in the power drum; M3 countersunk screws come through the wall
+# into them. On edge, w is its height and h how far it stands out from the wall.
 l = 80                # MEASURE_DONE  the board outline, or anything hanging over its edge, whichever is bigger
 w = 50                # MEASURE_DONE
 h = 28.2              # MEASURE_DONE  from the bottom of the standoffs to the top of the tallest part
@@ -99,8 +100,8 @@ screw_d = 3           # MEASURE_DONE  the standoffs' thread: 3 for M3, 2.5 for M
 name = "Power latch (P-MOSFET and two transistors on a 3 × 7 cm double-sided perfboard)"
 bom = "13a"
 # Built on the 3 × 7 cm board from an ELEGOO double-sided PCB kit (or any perfboard
-# with a hole in each corner). Like the buck, it stands on four M3 standoffs, one in
-# each corner, and M3 countersunk screws come up through the enclosure floor into them.
+# with a hole in each corner). Like the buck, it stands on edge on four M3 standoffs,
+# one in each corner, against a wall of the bank pocket, screwed through the wall.
 l = 70                # MEASURE_TODO  the board's long side
 w = 30                # MEASURE_TODO  its short side
 h = 18                # MEASURE_TODO  from the bottom of the standoffs to the top of the tallest part (IRF4905 bent over flat)
@@ -168,8 +169,8 @@ lead_bundle_d = 8     # MEASURE_DONE  the I2C/5 V lead (and the servo leads, if 
 [tripod_nut]
 name = "3/8-16 hex nut"
 bom = 23
-af = 14.29            # MEASURE_TODO  across the flats (9/16 in on a standard nut) — the floor's hex pocket is cut to this
-t = 8.33              # MEASURE_TODO  its thickness (21/64 in) — the pocket must be at least this deep
+af = 14.29            # MEASURE_TODO  across the flats (9/16 in on a standard nut) — the bank plate's hex hole is cut to this
+t = 8.33              # MEASURE_TODO  its thickness (21/64 in) — the plate is made at least this thick
 
 # ---- with UWB only -------------------------------------------------------
 

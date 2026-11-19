@@ -1,6 +1,6 @@
 # 03 — Mechanical design
 
-Shared head: tripod, battery tray, enclosure, lid, PTZ base, camera. <!--with_uwb-->The UWB build adds two anchor arms, a mast and a wearable pod
+Shared head: tripod, power drum, enclosure, lid, PTZ base, camera. <!--with_uwb-->The UWB build adds two anchor arms, a mast and a wearable pod
 ([With UWB](#with-uwb)).<!--/--><!--both--> <!--/--><!--without_uwb-->The camera-only build adds nothing
 ([Without UWB](#without-uwb)).<!--/-->
 
@@ -19,9 +19,9 @@ enclosure or a bracket.
 
 | # | Item | Description |
 | --- | --- | --- |
-| 1 | **Tripod** | any standard tripod. Floor socket: a 3/8-16 nut epoxied into a hex pocket, on a ledge the tripod screw pulls it against, with a removable 1/4-20 reducer bushing |
-| 2 | **Battery tray** | printed clip-in cradle for the USB-C bank, strapped low on a leg or the centre column (lowers the centre of mass) through tunnels under its floor. The bank snaps in past lips along the top and pinches out at finger notches, so it swaps without undoing the strap (C4a). Cable to a USB-C inlet low in the enclosure wall |
-| 3 | **Enclosure** | printed, <!--with_uwb-->Ø 141 × 91 mm<!--/--><!--both--> with UWB, <!--/--><!--without_uwb-->Ø 137 × 85 mm<!--/--><!--both--> without<!--/--> with the assumed part sizes ([layout](#layout-inside-the-enclosure)). No moving parts inside. <!--both-->Wall: three bosses and an anchor-cable slot with UWB; plain without<!--/--><!--with_uwb: Wall: three bosses for the arms and mast, and an anchor-cable slot--><!--without_uwb: Wall: plain all round--> |
+| 1 | **Tripod** | any standard tripod rated for 2 kg or more. It screws into the power drum: a 3/8-16 nut epoxied into a hex hole in the bank plate, which the tripod screw pulls down onto the drum floor, with a removable 1/4-20 reducer bushing |
+| 2 | **Power drum** | printed, open-topped, the enclosure's own diameter and 55 mm tall, screwed up under the enclosure floor (3–4 × M3 down through the floor from inside, into heat-set inserts in posts in the drum); the floor is its lid, so the two read as one cylinder. Everything to do with power is in it ([layout](#layout-in-the-power-drum)). The bank slides into a pocket across it from one side; a sprung catch on the bank plate snaps up behind it, and to swap it you press the catch and pinch the bank out through the finger windows (C4a)<!--with_uwb-->. The anchor arms and the mast foot bolt to three bosses on its wall<!--/--> |
+| 3 | **Enclosure** | printed, Ø 162 × 54 mm with the assumed part sizes ([layout](#layout-inside-the-enclosure)): only the LED ring, the shelf and the Pi. No moving parts inside. <!--both-->Wall: an anchor-cable slot with UWB; plain without<!--/--><!--with_uwb: Wall: an anchor-cable slot behind the Pi's USB ports--><!--without_uwb: Wall: plain all round--> |
 | 4 | **Lid** | printed, 5 mm, structural: carries the whole camera. The Arducam base stands on it on its four brass standoffs; four M3 screws come up through radial slots into them. Ribbon and leads enter through a cable slot at the back |
 | 5 | **Arducam pan-tilt base** | round turntable on four brass standoffs, pan servo hanging underneath between them; tilt bracket and servo on top. Two digital servos, both axes 0–180°. Supplied assembled with the camera. Every cable leaves from the camera head at the top, none through the base |
 | 6 | **Camera and lens** | IMX477 12 MP sensor, motorized zoom lens. Zoom and focus steppers on the kit's I2C controller; the servos are driven by the Pi's PWM ([04](04-electronics.md#servo-drive)) |
@@ -32,16 +32,35 @@ The UWB build adds anchor arms and a mast to this stack ([below](#with-uwb)).
 
 <!--/-->
 
+From the tripod plate to the top of the lid it is 114 mm: 55 for the drum, 54
+for the enclosure, 5 for the lid. Putting the power parts in a drum under the
+floor, rather than on it, took 30 mm off the earlier design (a bank sleeve
+under an enclosure with a power deck inside it), at the cost of 15–23 mm more
+diameter.
+
+## Layout in the power drum
+
+| Part | Where | Mounting |
+| --- | --- | --- |
+| USB-C power bank | in a pocket across the drum, open at one side, on a drop-in **bank plate** | slides in USB-C socket out; a catch on the plate's sprung front crossbar snaps up behind it; finger windows either side of the opening |
+| Buck converter, power latch | **on edge**, components out, against the pocket's walls (one on a side wall, one on the closed end, as `cad/fit.py` finds room) | on their standoffs; M3 countersunk screws through the 3 mm pocket wall from inside the pocket, flush, driven before the plate goes in |
+| USB-C PD trigger | on the drum floor beside the opening | two standoffs, screwed up through the floor, and a printed rest under its other end. The bank's cable (right-angle plug in the bank) comes back to it through a finger window |
+| Rocker switch (on/off) | in the drum wall | panel-mount: bezel on a flat outside, ring on a boss inside |
+| Tripod nut | in the bank plate, under the bank | the tripod screw pulls it down onto the 3 mm drum floor |
+
+The 5 V and the latch's HOLD and SENSE leads go up into the enclosure through
+a hole in its floor, over the buck. The drum has vents in its wall beside the
+buck.
+
 ## Layout inside the enclosure
 
 | Layer | Contents | Mounting |
 | --- | --- | --- |
-| Floor | USB-C PD trigger (socket at the wall inlet), rocker switch (on/off) in the wall, power latch, buck converter | the buck, latch and PD trigger on standoffs, M3 countersunk screws up through the floor into them (the trigger on two, with a printed rest under its other end); switch panel-mount |
-| LED window | WS2812B ring, LEDs down, lighting a 12 mm window all round; translucent band over the window outside | ring foam-taped under the shelf; band slides onto a ledge |
+| LED window | WS2812B ring, LEDs down, lighting a 12 mm window all round, just above the floor; translucent band over the window outside | ring foam-taped under the shelf; band slides onto a ledge |
 | Shelf | Raspberry Pi 4, level shifter | Pi on M2.5 nylon standoffs; shelf on three wall posts, M3 into inserts |
 | Lid | Arducam base, on its standoffs | four M3 up through the lid into the standoffs. Ring under the lid drops into the mouth; four M3 through the wall into inserts in the ring |
 
-Board positions, Pi orientation, wall openings and enclosure size are
+Board positions, Pi orientation, the drum's layout and the diameter are
 generated, not hand-drawn: `cad/fit.py` solves them from the bought-part sizes
 (`cad/ordered_parts.toml`) and the design parameters
 (`<build>/cad/config.scad`), then audits fit and printability. See
@@ -93,8 +112,12 @@ subject fills `5.4 / d` of it:
 - **The lid is the structure:** 5 walls, 40 % infill. Everything above it is
   cantilevered off four standoffs.
 - **Stability:** the pan axis carries only the camera, so head balance is
-  irrelevant; tripod stability is not. Hence the battery tray sits low on a
-  leg or the centre column<!--with_uwb-->, and the UWB arms and mast make the head top-heavy<!--/-->.
+  irrelevant; tripod stability is not. The bank and the power parts ride in
+  the drum right on the tripod plate: about 0.6 kg, well inside any tripod
+  rated for 2 kg, and lower than everything else in the head. Spread the legs
+  fully<!--with_uwb-->; the UWB arms and mast make the head top-heavy<!--/-->. (The first design
+  strapped a tray low on a leg instead; it moved the mass lower but left the
+  bank and its cable loose on the tripod.)
 - **Cable route:** the ribbon and the leads start on the camera head, which
   pans and tilts, and the pan servo fills the middle of the base. So they run
   outside: down behind the turntable and in through the lid's cable slot,
@@ -106,7 +129,7 @@ subject fills `5.4 / d` of it:
 
 | Build | Printed parts |
 | --- | --- |
-| both | enclosure, Pi shelf, LED diffuser band, lid, battery tray |
+| both | enclosure, Pi shelf, LED diffuser band, lid, power drum, bank plate |
 | with UWB | + 2 anchor arms, mast foot, mast cradle, wearable pod |
 
 Every part prints in one piece on a Bambu Lab A1 Mini (≤ 170 mm per axis),
@@ -128,10 +151,10 @@ Additions to the stack:
 
 | # | Item | Description |
 | --- | --- | --- |
-| 7 | **UWB anchor arms** | two printed arms on the ±Y wall bosses, each carrying a ULA1 on a USB extension. Extensions enter through a slot high in the wall, behind the Pi's USB ports. **Static:** they don't rotate with the camera ([05](../with_uwb/design/05-tracking-system.md)) |
-| 8 | **A3 mast** | ½-inch hardwood dowel, 246 mm, in a printed foot on the −X boss behind the lens. A printed cradle holds the third ULA1 **250 mm above A1/A2** (elevation). Out of shot at every tilt angle |
+| 7 | **UWB anchor arms** | two printed arms on the ±Y bosses on the drum wall, each carrying a ULA1 on a USB extension. Extensions enter through a slot high in the wall, behind the Pi's USB ports. **Static:** they don't rotate with the camera ([05](../with_uwb/design/05-tracking-system.md)) |
+| 8 | **A3 mast** | ½-inch hardwood dowel, 246 mm, in a printed foot on the drum's −X boss behind the lens. A printed cradle holds the third ULA1 **250 mm above A1/A2** (elevation). Out of shot at every tilt angle |
 
-Head envelope: ≈ **42 cm across the arms, 28 cm tall** to the mast top
+Head envelope: ≈ **42 cm across the arms, 26 cm tall** from the tripod plate to the mast top
 ([C1](../product/01-requirements.md#non-functional-requirements)).
 
 **Tilt and the mast.** Top frame edge at +85°, full wide: ≈ 27° past
@@ -160,8 +183,8 @@ shot. A taller mast enters the shot; lower `TILT_MAX_DEG` to compensate.
 
 ![Mechanical layout, without UWB](../without_uwb/images/mechanical-layout.png)
 
-The common stack is the whole head. Enclosure wall plain all round; no side
-protrusions
+The common stack is the whole head. Enclosure and drum walls plain all round
+but for the switch and the bank's opening; no side protrusions
 ([C1](../product/01-requirements.md#non-functional-requirements)).
 
 **Tilt and the search.** The search uses two tilt rows (5° and 22°); the

@@ -2,8 +2,10 @@
 
 The two power boards you buy, rather than build: the **PD trigger** (BOM 10), which
 asks the bank for 12 V, and the **buck** (BOM 11), which turns that 12 V into the
-camera's 5 V rail. Each needs setting up on the bench **before** it goes in, and both
-stand on standoffs screwed up through the enclosure floor, like the power latch.
+camera's 5 V rail. Each needs setting up on the bench **before** it goes in. Both go
+in the power drum under the enclosure: the trigger on standoffs screwed up through the
+drum's floor, the buck standing on edge against a wall of the bank pocket, screwed
+through it, like the power latch.
 
 They're the same in both builds. This guide is steps 1 and 2 of the wiring guide
 ([with UWB](../with_uwb/setup/12-wiring.md#wiring-order-with-checks) ·
@@ -14,17 +16,17 @@ each board is mounted.
 | --- | --- |
 | Time | ≈ 30 min |
 | Parts | BOM 10, 11 and 14 (the bank cable); the buck's own standoffs and Schottky diode; 2 × M3 standoffs for the trigger (item 21); M3 screws (item 22) |
-| Tools | multimeter, small flat screwdriver for the buck's trimmer, soldering iron; the 4 A dummy load (BOM 14b); the power bank |
+| Tools | multimeter, small flat screwdriver for the buck's trimmer, soldering iron; the 4 A dummy load (BOM 14b); the power bank; a stubby Phillips screwdriver (≤ 70 mm long) |
 
 ## The PD trigger
 
 ### 1 · Check it has a socket
 
-The bank's cable plugs into the trigger through the inlet in the enclosure wall, so
-the trigger needs a USB-C **socket**: a slot the cable's plug goes into. Some
-trigger boards have a USB-C **plug** sticking out of one end instead, made to plug
-straight into a charger. That kind won't work here, short of a USB-C female-to-female
-adapter, which the wall inlet isn't sized for. Look at the end of the metal shell: a
+The bank's cable plugs into the trigger inside the drum, so the trigger needs a
+USB-C **socket**: a slot the cable's plug goes into. Some trigger boards have a USB-C
+**plug** sticking out of one end instead, made to plug straight into a charger. That
+kind won't work here, short of a USB-C female-to-female adapter, which there is no
+room for. Look at the end of the metal shell: a
 socket has an opening with a tongue inside it, a plug is closed at the tip.
 
 ### 2 · Set it to 12 V and lock it
@@ -46,17 +48,19 @@ still reads 12 V.
 
 ### 3 · Mount it
 
-It stands on **two** M3 standoffs, through the two holes at its socket end. A small
-block printed into the floor holds up the other end, under the screw terminal.
+It lies on the power drum's floor beside the bank's opening, on **two** M3 standoffs
+through the two holes at its socket end. A small block printed into the floor holds up
+the other end, under the screw terminal.
 
 1. **Screw the two standoffs on from the top**, through the holes at the socket end,
    with M3 × 6 screws. If an M3 screw won't pass, use M2.5 and set `screw_d = 2.5`.
-2. **Stand it in the enclosure** at the USB-C inlet, the socket hard against the inside
-   of the opening, the terminal end on the printed rest.
+2. **Stand it in the drum** where the 3D model shows it, the terminal end on the
+   printed rest.
 3. **Screw it down from underneath** with two M3 countersunk screws up through the
-   floor into the standoffs. The length is in `cad/FIT_REPORT.md`.
-4. **Check the bank's cable plugs in from outside**, all the way, without pushing the
-   board back.
+   drum floor into the standoffs. The length is in `cad/FIT_REPORT.md`.
+4. **Plug in the bank cable** (BOM 14, right-angle at one end): its straight end into
+   the trigger, then lead it out through the nearer finger window beside the bank's
+   opening. The right-angle end plugs into the bank's face.
 
 ## The buck
 
@@ -87,22 +91,23 @@ rating to check, and how to fit it ([with UWB](../with_uwb/setup/12-wiring.md#in
 
 ### 6 · Mount it
 
-It stays on the four brass standoffs it comes with.
+It stays on the four brass standoffs it comes with, and stands **on its long edge**
+against a wall of the bank pocket in the power drum, components facing out.
 
 1. **Take the screws out of the standoffs' bottom ends.** Leave the top ones in.
-2. **Stand it over its four countersunk holes in the floor** (on its four printed
-   risers, if `fit.py` has raised it over the tripod boss), where the 3D model
-   shows it.
-3. **Drive four M3 countersunk screws up from underneath** into the standoffs; the
-   length is in `cad/FIT_REPORT.md`. Do it before the other floor boards go in, while
-   you can still get at the standoffs.
+2. **Hold it against the pocket wall** over its four countersunk holes, where the 3D
+   model shows it. The bank plate must be out of the pocket.
+3. **Drive four M3 countersunk screws through the wall from inside the pocket** into
+   the standoffs; the length is in `cad/FIT_REPORT.md`. On a side wall, use a stubby
+   screwdriver across the pocket; on the closed end, reach in through the open end.
+   The heads sit flush, so the bank slides past them.
 
-If the standoffs' bottom ends have a threaded stud rather than a hole, use a nut on
-each from underneath instead.
+If the standoffs' ends have a threaded stud rather than a hole, use a nut on each from
+inside the pocket instead, and file it flush if the bank catches on it.
 
 ## Measure them first
 
-The floor's holes are cut from the sizes in
+The drum's holes are cut from the sizes in
 [`cad/ordered_parts.toml`](../../cad/ordered_parts.toml). Before you print, measure:
 
 - **`[pd_trigger]`**: `hole_x` (from the socket end to the two holes' centres),

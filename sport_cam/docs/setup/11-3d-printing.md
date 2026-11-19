@@ -6,12 +6,12 @@ sufficient.
 
 | Build | Parts | PETG | Machine time |
 | --- | --- | --- | --- |
-| [With UWB](#with-uwb) | 10 (5 common + 2 arms, mast foot, mast cradle, wearable pod) | ≈ 430 g | ≈ 41 h |
-| [Without UWB](#without-uwb) | 5 (the common parts) | ≈ 280 g | ≈ 26 h |
+| [With UWB](#with-uwb) | 11 (6 common + 2 arms, mast foot, mast cradle, wearable pod) | ≈ 570 g | ≈ 55 h |
+| [Without UWB](#without-uwb) | 6 (the common parts) | ≈ 500 g | ≈ 46 h |
 
 | Topic | Reference |
 | --- | --- |
-| Sizes | for the part sizes assumed in [`cad/ordered_parts.toml`](../../cad/ordered_parts.toml). `cad/fit.py` resizes the enclosure, shelf, lid and diffuser to measured parts; current figures in [`cad/FIT_REPORT.md`](../../cad/FIT_REPORT.md) |
+| Sizes | for the part sizes assumed in [`cad/ordered_parts.toml`](../../cad/ordered_parts.toml). `cad/fit.py` resizes the enclosure, power drum, shelf, lid and diffuser to measured parts; current figures in [`cad/FIT_REPORT.md`](../../cad/FIT_REPORT.md) |
 | Sources | `<build>/cad/` ([with UWB](../../with_uwb/cad/), [without UWB](../../without_uwb/cad/)); STL workflow in [Appendix A](../appendix/appendix-a-cad-parts.md) |
 | Part roles | [03 — Mechanical design](../design/03-mechanical-design.md) |
 | Croc charms (separate project, same printer) | [Croc charms](#croc-charms-jibbitz), [One printer for both](#one-printer-for-both) |
@@ -21,7 +21,7 @@ sufficient.
 | Requirement | Minimum | Why |
 | --- | --- | --- |
 | Technology | FDM / FFF | all parts are designed for it |
-| Build volume | **160 × 155 × 95 mm** | the battery tray is 155 mm long; the with-UWB enclosure is 147 × 149 mm and 91 mm tall |
+| Build volume | **170 × 170 × 60 mm** | the with-UWB power drum is 166 × 170 mm across its arm bosses and 55 mm tall; the enclosures are Ø 162 (166 over the diffuser band's ledge) and 54 mm tall |
 | Nozzle | 0.4 mm | every setting below assumes it. 0.6 works if you raise wall counts |
 | Hotend temperature | **250 °C** | PETG |
 | Heated bed | **80 °C** | PETG will not stay down without one |
@@ -38,31 +38,34 @@ printed part in both builds must fit on it in one piece** (requirement C5).
 | --- | --- |
 | **≤ 170 mm on every axis** | 180 mm bed minus 5 mm per side for brim/skirt. Cubic volume: any orientation fits |
 | **No split parts** | redesign instead; a glued seam in the enclosure or lid is a structural weak point |
-| **Automated check** | `python3 cad/fit.py` measures every STL in both builds; fails on oversize or multi-piece parts. Caps the enclosure diameter (162 mm with UWB, where the arm bosses add 8 mm). Runs on every render, on CAD commits, and when a Claude Code session ends with CAD changes ([Appendix A](../appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)) |
+| **Automated check** | `python3 cad/fit.py` measures every STL in both builds; fails on oversize or multi-piece parts. Caps the diameter (162 mm with UWB, where the arm bosses on the power drum add 8 mm). Runs on every render, on CAD commits, and when a Claude Code session ends with CAD changes ([Appendix A](../appendix/appendix-a-cad-parts.md#fit-the-layout-to-your-parts)) |
 
 Sizes with the assumed parts (bounding box, mm):
 
 | Part | Build | Size | Margin to 170 |
 | --- | --- | --- | --- |
-| Enclosure | with UWB | 147 × 149 × 91 | 21 |
-| Enclosure | without UWB | 141 × 141 × 85 | 29 |
-| Pi shelf | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->132 × 117 × 3<!--/--><!--both--> / <!--/--><!--without_uwb-->128 × 93 × 3<!--/--> | 38+ |
-| Lid | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->141 × 141 × 11<!--/--><!--both--> / <!--/--><!--without_uwb-->135 × 135 × 11<!--/--> | 29+ |
-| LED diffuser band | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->Ø 145 × 16<!--/--><!--both--> / <!--/--><!--without_uwb-->Ø 139 × 16<!--/--> | 25+ |
-| Battery tray | both | 156 × 78 × 40 | 14 |
+| Enclosure | both | 166 × 166 × 54 (Ø 162, and the band's ledge) | 4 |
+| Power drum | with UWB | 166 × 170 × 55 (the arm bosses) | 0 |
+| Power drum | without UWB | 162 × 162 × 55 | 8 |
+| Bank plate | both | 127 × 76 × 12 | 43 |
+| Pi shelf | <!--both-->with UWB / without<!--/--><!--with_uwb: with UWB--><!--without_uwb: without UWB--> | <!--with_uwb-->154 × 123 × 3<!--/--><!--both--> / <!--/--><!--without_uwb-->154 × 107 × 3<!--/--> | 16 |
+| Lid | both | 162 × 162 × 11 | 8 |
+| LED diffuser band | both | Ø 166 × 16 | 4 |
 | Wearable pod | with UWB | 142 × 74 × 31 | 28 |
 | Anchor arm | with UWB | 142 × 28 × 24 | 28 |
 | Mast foot, mast cradle | with UWB | ≤ 69 mm | 100+ |
 
-- **Build volume is the only hard requirement:** 160 × 155 mm clears every
-  part at the assumed sizes; the A1 Mini's 180 × 180 leaves margin.
+- **Build volume is the only hard requirement:** 170 × 170 mm clears every
+  part at the assumed sizes, the A1 Mini's 180 × 180 with a brim. The
+  with-UWB drum fills it: `cad/fit.py` won't let the diameter grow past
+  162 mm there.
 - Resin printers are unsuitable (structural parts).
 
 ## What to buy
 
 | Material | Qty | Notes |
 | --- | --- | --- |
-| **PETG, 1 kg, any colour** | 1 spool | the structural parts: ≈ <!--with_uwb-->425 g<!--/--><!--both--> with UWB, ≈ <!--/--><!--without_uwb-->300 g<!--/--><!--both--> without<!--/-->. A 1 kg spool leaves plenty for reprints |
+| **PETG, 1 kg, any colour** | 1 spool | the structural parts: ≈ <!--with_uwb-->525 g<!--/--><!--both--> with UWB, ≈ <!--/--><!--without_uwb-->455 g<!--/--><!--both--> without<!--/-->. A 1 kg spool leaves enough for a reprint of the big parts |
 | **PETG, white or natural** | ≈ 40 g | the LED diffuser band, which has to pass light, and ideally the shelf, whose underside bounces the ring's light out. They can't be your main colour unless that colour is white or natural. A 250 g sample spool is the cheap way to get it |
 | Glue stick (PVA) | 1 | see the warning below — this is a release agent, not an adhesive |
 | TPU 95A *(optional, UWB build)* | ≈ 30 g | nicer wearable pod against the skin. Needs direct drive |
@@ -81,21 +84,22 @@ Material choice:
 
 ## The common parts
 
-Every build prints these five; their sizes are in the
+Every build prints these six; their sizes are in the
 [table above](#design-rule-every-part-prints-on-a-bambu-lab-a1-mini).<!--both--> Links go to the UWB build's sources; the
 camera-only build has the same files in `without_uwb/cad/`. Masses and times
 are the with-UWB ones (camera-only in brackets where they differ).<!--/-->
 
 | Part | Walls | Infill | Layer | Est. mass | Est. time |
 | --- | --- | --- | --- | --- | --- |
-| [Enclosure](../../with_uwb/cad/base_housing.scad) | 4 | 20 % | 0.2 | <!--with_uwb-->≈ 195 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->175 g<!--/--><!--both-->)<!--/--> | <!--with_uwb-->≈ 19.5 h<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->17 h<!--/--><!--both-->)<!--/--> |
-| [Pi shelf](../../with_uwb/cad/shelf.scad) | 3 | 20 % | 0.2 | ≈ 32 g | ≈ 2.5 h |
-| [Lid](../../with_uwb/cad/lid.scad) | **5** | **40 %** | 0.2 | <!--with_uwb-->≈ 65 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->60 g<!--/--><!--both-->)<!--/--> | ≈ 4 h |
-| [LED diffuser band](../../with_uwb/cad/led_diffuser_ring.scad) | **2** | **0 %** | 0.2 | ≈ 6 g | ≈ 1.5 h |
-| [Battery tray](../../with_uwb/cad/battery_tray.scad) | 3 | 20 % | 0.2 | ≈ 70 g | ≈ 5.5 h |
+| [Enclosure](../../with_uwb/cad/base_housing.scad) | 4 | 20 % | 0.2 | ≈ 140 g | ≈ 14 h |
+| [Power drum](../../with_uwb/cad/power_drum.scad) | 4 | 25 % | 0.2 | <!--with_uwb-->≈ 190 g<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->180 g<!--/--><!--both-->)<!--/--> | <!--with_uwb-->≈ 19 h<!--/--><!--both--> (<!--/--><!--without_uwb: ≈ --><!--without_uwb-->18 h<!--/--><!--both-->)<!--/--> |
+| [Bank plate](../../with_uwb/cad/bank_plate.scad) | 3 | 40 % | 0.2 | ≈ 50 g | ≈ 4 h |
+| [Pi shelf](../../with_uwb/cad/shelf.scad) | 3 | 20 % | 0.2 | ≈ 39 g | ≈ 3 h |
+| [Lid](../../with_uwb/cad/lid.scad) | **5** | **40 %** | 0.2 | ≈ 80 g | ≈ 5 h |
+| [LED diffuser band](../../with_uwb/cad/led_diffuser_ring.scad) | **2** | **0 %** | 0.2 | ≈ 7 g | ≈ 1.5 h |
 
-Enclosure differences by build: size (solved per build by `fit.py`) and wall. <!--with_uwb-->The UWB one has three bosses for the arms and mast, and
-a slot for the anchor cables<!--/--><!--both-->; the camera-only one is plain all round<!--/--><!--without_uwb: The camera-only one is plain all round-->.
+Differences by build: <!--with_uwb-->the UWB enclosure has a slot for the anchor cables, and the UWB
+drum three bosses for the arms and mast<!--/--><!--both-->; the camera-only ones are plain all round<!--/--><!--without_uwb: the camera-only enclosure and drum are plain all round-->.
 
 Estimates: mass from STL volume at 1.27 g/cm³ (PETG), scaled for walls and
 infill; time for a 0.4 mm nozzle at 0.2 mm layers, default speeds. **The
@@ -104,16 +108,16 @@ slicer's figures take precedence.**
 ### Orientation and supports
 
 Every part is modelled in print orientation. Printed as exported from
-OpenSCAD, **no supports are needed**<!--with_uwb--> — except under
-the UWB enclosure's wall bosses ([below](#with-uwb))<!--/-->.
+OpenSCAD, **no supports are needed**.
 
 | Part | Orientation | Supports |
 | --- | --- | --- |
-| Enclosure | open end up, as modelled | <!--without_uwb-->none<!--/--><!--both--> without UWB<!--/--><!--with_uwb: see [below](#with-uwb) for the bosses; otherwise none-->. The LED window is cut in bays with a thin rib every 22 mm, so the wall above it bridges short spans; the ledge under the window has a 45° underside; the shelf posts grow straight up out of the wall<!--both-->. With UWB, see below<!--/--> |
+| Enclosure | open end up, as modelled | none. The LED window is cut in bays with a thin rib every 22 mm, so the wall above it bridges short spans; the ledge under the window has a 45° underside; the shelf posts grow straight up out of the wall |
+| Power drum | floor down, open top up, as modelled | none. The bank's opening and the finger windows are cut to the top of the wall, so nothing bridges over them; the switch hole and vents are small<!--with_uwb-->; the arm bosses run down to the bed<!--/--> |
+| Bank plate | flat, underside down, as modelled | none: the only bridge is the 50 mm crossbar at its front edge, thinned underneath so the catch on it flexes; PETG bridges it cleanly at default bridge settings |
 | Pi shelf | flat, as modelled | none |
 | Lid | **flip it: top face on the bed**, locating ring up | none |
 | Diffuser band | standing, as modelled | none. **Brim recommended**: it is a tall thin ring with a small footprint |
-| Battery tray | flat, as modelled | none: the strap tunnels under the floor bridge 27 mm, which PETG does cleanly |
 
 ### Why the lid is different
 
@@ -148,16 +152,16 @@ diffuser.
 | --- | --- | --- |
 | Remove brims, clean up strings | flush cutters, deburring tool | all parts |
 | Open every M3 clearance hole | 3.2 mm drill bit, by hand | enclosure lid-screw holes, shelf, lid slots<!--with_uwb--> (and, with UWB, arms and mast foot)<!--/--> |
-| Check the 3/8-16 tripod nut drops into its hex pocket | a file on the nut's flats if it is tight | enclosure floor |
-| Fit heat-set inserts | soldering iron, flat tip, ≈ 200 °C | M3: one in the top of each of the three shelf posts, and four pushed sideways into the lid's ring (7 total) |
-| Dry-fit before wiring | — | lid ring in the enclosure mouth; shelf on its posts; diffuser band over the window onto its ledge; the bank in the tray |
+| Check the 3/8-16 tripod nut drops into its hex hole | a file on the nut's flats if it is tight | bank plate |
+| Fit heat-set inserts | soldering iron, flat tip, ≈ 200 °C | M3: one in the top of each of the three shelf posts, four pushed sideways into the lid's ring, one in the top of each of the power drum's posts (3 or 4, as `fit.py` placed them), and two in the underside of the bank plate (12–13 total) |
+| Dry-fit before wiring | — | lid ring in the enclosure mouth; shelf on its posts; diffuser band over the window onto its ledge; the bank plate in the drum's pocket and the bank slid in over it until the catch clicks; the enclosure on the drum |
 
-The 3/8-16 tripod nut is epoxied into its pocket, not heat-set.<!--with_uwb--> Additional UWB inserts:
+The 3/8-16 tripod nut is epoxied into the bank plate, not heat-set.<!--with_uwb--> Additional UWB inserts:
 [below](#with-uwb).<!--/-->
 
 ## Measure before you print
 
-Before printing (lid ≈ 4 h, enclosure ≈ 18 h): measure the bought parts,
+Before printing (lid ≈ 5 h, enclosure ≈ 14 h, drum ≈ 18 h): measure the bought parts,
 enter the values in [`cad/ordered_parts.toml`](../../cad/ordered_parts.toml),
 run `python3 cad/fit.py` (re-solves the layout, re-renders, checks fit). What
 to measure: first table of **15 — Verification checklist**
@@ -170,11 +174,12 @@ For building in parallel with printing:
 
 | # | Part | Reason |
 | --- | --- | --- |
-| 1 | **Enclosure** | longest print; required for all assembly |
-| 2 | **Shelf** | carries the LED ring and the Pi |
-| 3 | **Lid** | needed when the Arducam base arrives |
-| 4 | **Diffuser band** | needed after the LED ring is fitted |
-| 5 | **Battery tray** | last; measure the bank first |
+| 1 | **Power drum** | longest print, and the power parts go in first; measure the bank, buck, latch and switch before printing it |
+| 2 | **Bank plate** | the tripod nut is epoxied into it and needs a day to cure |
+| 3 | **Enclosure** | the drum screws up under it |
+| 4 | **Shelf** | carries the LED ring and the Pi |
+| 5 | **Lid** | needed when the Arducam base arrives |
+| 6 | **Diffuser band** | needed after the LED ring is fitted |
 
 <!--with_uwb-->
 
@@ -227,7 +232,6 @@ Additional parts:
 
 | Part | Orientation | Supports |
 | --- | --- | --- |
-| Enclosure | open end up, as modelled | **Yes, but only under the three wall bosses.** They are 6 mm ledges on the outside wall at ±Y and −X, starting 10 mm up. Paint-on or support-blocker supports just there, or accept a slightly droopy underside nobody sees |
 | Anchor arm | flat, as modelled | none |
 | Mast foot, mast cradle | socket opening up, as modelled | none |
 | Wearable pod | body and lid side by side, as modelled | none |
@@ -236,7 +240,7 @@ Additional parts:
 
 | Step | Tool | Where |
 | --- | --- | --- |
-| Fit heat-set inserts | soldering iron, flat tip, ≈ 200 °C | 2 × M3 in each of the three wall bosses, 1 × M3 in each mast socket (8 more, 15 in all) |
+| Fit heat-set inserts | soldering iron, flat tip, ≈ 200 °C | 2 × M3 in each of the three bosses on the drum wall, 1 × M3 in each mast socket (8 more) |
 | Dry-fit | — | an arm on each side boss; the foot on the back boss and the dowel in both sockets |
 
 ### Print order, with UWB
@@ -248,7 +252,7 @@ Additional parts:
 
 ## Without UWB
 
-Common parts only: ≈ 280 g PETG, ≈ 26 h. No supports. Sources:
+Common parts only: ≈ 500 g PETG, ≈ 46 h. No supports. Sources:
 [`without_uwb/cad/`](../../without_uwb/cad/).
 
 ---
@@ -287,7 +291,7 @@ Combined requirement (stricter of each):
 
 | Spec | SportCam | Croc charms | Buy |
 | --- | --- | --- | --- |
-| Build volume | 160 × 155 × 90 mm | 150 × 150 × 150 mm | **≥ 160 × 155 × 150 mm** — a 150 × 150 bed is too small for the SportCam battery tray (155 mm long) |
+| Build volume | 155 × 155 × 90 mm | 150 × 150 × 150 mm | **≥ 155 × 155 × 150 mm** — a 150 × 150 bed is too small for the with-UWB enclosure (153 × 155 mm) |
 | Nozzle | 0.4 mm | 0.4 mm, 0.2 mm swappable is ideal | 0.4 mm, with swappable nozzles |
 | Extruder | either | direct drive | **direct drive** |
 | Materials | PETG (TPU optional for the UWB wearable pod) | PLA, PETG, TPU | PLA, PETG, TPU — hotend to **250 °C** for PETG |

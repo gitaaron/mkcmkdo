@@ -129,7 +129,7 @@ input diode ([with UWB](../with_uwb/setup/12-wiring.md#input-diode),
 
 ### Power switch
 
-A rocker switch in the enclosure wall is the camera's on/off
+A rocker switch in the power drum's wall is the camera's on/off
 ([F12](../product/01-requirements.md#functional-requirements)). It doesn't
 carry the power. A latch does, so that off can be a clean shutdown and not a
 power cut. A Pi that loses power while recording leaves a clip with no index
@@ -242,16 +242,22 @@ the boot. A spare bank in the bag doubles the runtime.
 
 - **Cold swap.** Switch off at the rocker; the clean shutdown saves any
   recording in progress and parks the head. Unplug the cable from the bank,
-  pinch the bank out of its tray, clip the full one in, plug in, switch on.
-  The camera is back in about a minute.
-- **The tray** stays strapped to the tripod. The strap goes through tunnels
-  under its floor, not round the bank, and the bank clips in past lips along
-  the top (`battery_tray.scad`; `cad/fit.py` checks the clip).
+  press the catch down and pinch the bank out, slide the full one in
+  until it clicks, plug in, switch on. The camera is back in about a minute,
+  and never leaves the tripod.
+- **The power drum** is screwed under the enclosure floor and the tripod
+  screws into it. The bank slides into a pocket across it, USB-C socket out;
+  a catch on a sprung crossbar at the front of the bank plate snaps up behind
+  it, and finger windows either side of the opening let you pinch it out. Its
+  cable (a right-angle plug in the bank) stays in the drum, led back to the
+  PD trigger through a finger window (`power_drum.scad`, `bank_plate.scad`;
+  `cad/fit.py` checks the bank fits, the catch's flex, and that the cable
+  reaches).
 - **The cue to swap** is the clock: about the runtime above from a full
   bank, or the bank's own indicator. There is no low-battery warning.
 - **Why not a hot swap.** Keeping the camera running through a swap needs a
-  second USB-C inlet and PD trigger, and ideal-diode OR-ing on the 12 V rail. That's about C$25 of parts, another
-  wall opening and more wiring, to save a one-minute reboot between sessions.
+  second bank, a second PD trigger, and ideal-diode OR-ing on the 12 V rail. That's about C$25 of parts, a
+  second pocket and more wiring, to save a one-minute reboot between sessions.
 
 ### The SD card
 

@@ -99,21 +99,23 @@ const TILT_Z = LY.tilt_z;         // tilt axis of the Arducam base
 const PTZ = LY.parts.ptz;         // its measured sizes, from cad/ordered_parts.toml
 const SHELF_Z = LY.shelf_z;       // underside of the Pi shelf
 const BAND_Z = LY.window_z - LY.design.diffuser_lip;   // bottom of the diffuser band
-const ARM_R = LY.arm_boss_r;       // enclosure wall boss the anchor arms bolt to
+const ARM_R = LY.arm_boss_r;       // drum wall boss the anchor arms bolt to
 const MAST_R = LY.mast_axis_r;    // A3 mast axis behind the pan axis, at −X
 const UWB_HALF = LY.uwb.uwb_half_base;   // A1/A2 board centres either side of the pan axis
-const BOARD_Z = LY.uwb.anchor_board_z;   // A1/A2 board height
-const DOWEL_Z0 = LY.uwb.arm_boss_z + LY.uwb.mast_floor;
+const ARM_Z = LY.drum_z + LY.uwb.arm_boss_z;   // the arms' root plates, on the drum's bosses
+const BOARD_Z = LY.anchor_z;               // A1/A2 board height
+const DOWEL_Z0 = ARM_Z + LY.uwb.mast_floor;
 const MAST_TOP = DOWEL_Z0 + LY.dowel_l;  // dowel top
 const A3_Z = BOARD_Z + LY.uwb.uwb_v_base;    // A3 board, uwb_v_base above A1/A2
 // where a wall feature is, in words: +X is the lens, +Y is on your left behind the camera
 const where = (a) => ["front", "front-left", "left side", "back-left", "back", "back-right", "right side", "front-right"][Math.round((((a % 360) + 360) % 360) / 45) % 8];
 const bx = (k) => LY.boxes[k];
+const polarXY = (r, a) => [r * Math.cos(a * Math.PI / 180), r * Math.sin(a * Math.PI / 180)];
 
 const PHASES = ["Prepare", "Enclosure", "Camera", "Tracking", "Finish"];
 
 // part groups, in assembly order
-const SHELL = ["base_housing", "insert"];
+const SHELL = ["base_housing", "power_drum", "bank_plate", "insert"];
 const POWER = ["trigger", "switch", "latch", "buck", ...(LY.shifter_on === "deck" ? ["shifter"] : [])];
 const SHELF = ["shelf", "ledring", ...(LY.shifter_on === "shelf" ? ["shifter"] : [])];
 const PI = ["pi", "cooler"];
@@ -121,21 +123,21 @@ const LED = ["led_diffuser_ring"];
 const HEAD = ["lid", "ptz_plate", "ptz_pan", "ptz_yoke", "camera", "lens"];
 const ARMS = ["arm_p", "arm_n", "uwb_p", "uwb_n"];
 const MAST = ["mast_foot", "dowel", "mast_cradle", "uwb_m"];
-const BATT = ["battery_tray", "bank"];
-const CABLES = ["ffc", "usb_p", "usb_n", "usb_m", "pwr_pi"];
+const BATT = ["bank"];
+const CABLES = ["ffc", "usb_p", "usb_n", "usb_m", "pwr_pi", "bank_cable"];
 const lift = (ids, dz) => ids.map((id) => [id, 0, 0, dz]);
 
 const STEPS = [
   {
-    id: "prep", phase: 0, title: "Print, measure and prepare the parts", time: "≈ 33 h print · 60 min prep",
-    parts: ["All 9 printed bodies (≈ 400 g PETG) — settings and filament in <a href='../../../setup/11-3d-printing.md' target='_blank'>printer specifications</a>", "M2.5 / M3 screw kit + brass heat-set inserts", "Calipers"],
+    id: "prep", phase: 0, title: "Print, measure and prepare the parts", time: "≈ 55 h print · 60 min prep",
+    parts: ["All 10 printed bodies (≈ 530 g PETG) — settings and filament in <a href='../../../setup/11-3d-printing.md' target='_blank'>printer specifications</a>", "M2.5 / M3 screw kit + brass heat-set inserts", "Calipers"],
     tools: ["3D printer", "Calipers", "Soldering iron (for inserts)", "3.2 mm drill bit, flush cutters"],
     steps: [
       "<b>Measure before printing.</b> Measure what you've bought and put the numbers in <code>cad/ordered_parts.toml</code> — above all the Arducam base's <b>standoff spacing</b> (the lid's slots take 70–104 mm), the power bank, the buck converter, and your ULA1 boards. Then run <code>python3 cad/fit.py</code> from <code>sport_cam/</code>: it works out where everything goes, re-renders the parts and checks that they all fit together and print on an A1 Mini. This guide follows its layout. The full list is in the <a href='../15-verification.md' target='_blank'>verification checklist</a>.",
-      "<b>Print:</b> enclosure — PETG, 4 walls, 20 %, no supports · <b>lid — 5 walls, 40 %</b>, it carries the whole camera · shelf — 3 walls, 20 %, white or natural if you have it · diffuser band — white PETG, 2 walls, 0 % infill · anchor arms ×2 — flat, 4+ walls · mast foot and mast cradle — socket up, 4+ walls · battery tray — 3 walls, 20 % · wearable pod — 2 walls, 20 %.",
+      "<b>Print:</b> enclosure — PETG, 4 walls, 20 %, no supports · <b>lid — 5 walls, 40 %</b>, it carries the whole camera · shelf — 3 walls, 20 %, white or natural if you have it · diffuser band — white PETG, 2 walls, 0 % infill · anchor arms ×2 — flat, 4+ walls · mast foot and mast cradle — socket up, 4+ walls · power drum — 4 walls, 25 %, floor down · bank plate — 3 walls, 40 %, flat · wearable pod — 2 walls, 20 %.",
       "<b>Clean up.</b> Remove brims, run a 3.2 mm drill through every M3 clearance hole, and check the lid's slots and its cable slot are clear.",
-      "<b>Dry-fit</b> the lid ring in the enclosure mouth, the shelf on its three posts, the diffuser band over the window, an arm on each side boss, the mast foot on the back boss, the dowel in both sockets, and the bank in the tray.",
-      "<b>Heat-set inserts</b> (M3, 15 in all): 2 in each of the three wall bosses for the arm and mast-foot bolts, 1 in the side of each mast socket for its pinch screw, 1 in the top of each shelf post, and 4 pushed in sideways into the lid's ring, lined up with the holes in the wall.",
+      "<b>Dry-fit</b> the lid ring in the enclosure mouth, the shelf on its three posts, the diffuser band over the window, an arm on each side boss, the mast foot on the back boss, the dowel in both sockets, and the bank on its plate in the drum's pocket (it should slide in and click).",
+      `<b>Heat-set inserts</b> (M3, ${13 + LY.drum.screws.length} in all, and 2 more in the bank plate in the next step): 2 in each of the three bosses on the drum wall for the arm and mast-foot bolts, 1 in the side of each mast socket for its pinch screw, 1 in the top of each shelf post, 4 pushed in sideways into the lid's ring, lined up with the holes in the wall, and 1 in the top of each of the drum's ${LY.drum.screws.length} posts.`,
       `<b>Cut the dowel</b> to <b>${Math.round(LY.dowel_l)} mm</b> — a ½-inch (12.7 mm) hardwood dowel, square-ended. That length puts A3 exactly 250 mm above A1 and A2; <code>cad/anchor_mast.scad</code> prints the figure if you change <code>uwb_v_base</code>.`,
     ],
     note: "The layout is solved, not drawn: if a part you measure is bigger than assumed, <code>cad/fit.py</code> moves things around — or makes the enclosure taller or wider, up to what the A1 Mini can print — and this guide follows. <code>cad/FIT_REPORT.md</code> says what it checked.",
@@ -144,47 +146,52 @@ const STEPS = [
       add: [["base_housing", 0, 0, 0], ["shelf", 0, 0, 60], ["led_diffuser_ring", 0, 0, 105],
             ["lid", 0, 0, 160], ["arm_p", 0, 0, 60], ["arm_n", 0, 0, 60],
             ["mast_foot", -60, 0, 0], ["mast_cradle", -60, 0, -80],
-            ["battery_tray", 0, 0, -90]],
+            ["power_drum", 0, 0, -70], ["bank_plate", 0, 0, -150]],
       view: "iso", render: "prep",
     },
   },
   {
-    id: "tripod-insert", phase: 1, title: "Tripod nut into the enclosure floor", time: "10 min + cure",
-    parts: ["Enclosure", "3/8-16 hex nut", "3/8-16 → 1/4-20 reducer bushing", "2-part epoxy"],
-    tools: ["3/8-16 screw as a plug", "Flat screwdriver (for the bushing's slot)"],
+    id: "tripod-insert", phase: 1, title: "Tripod nut into the bank plate", time: "10 min + cure",
+    parts: ["Bank plate", "3/8-16 hex nut", "3/8-16 → 1/4-20 reducer bushing", "2-part epoxy", "2 × M3 heat-set inserts"],
+    tools: ["Soldering iron (for the inserts)", "3/8-16 screw as a plug", "Flat screwdriver (for the bushing's slot)"],
     steps: [
-      "Inside the enclosure, the floor has a 24 mm boss with a hex pocket in it, and a 10 mm hole through the ledge underneath. Check the nut drops into the pocket and sits flat on the ledge.",
-      "Thread a lightly greased 3/8-16 screw up through the hole from below and a few turns into the nut — it holds the nut square and keeps epoxy out of the threads.",
-      "Mix epoxy, butter the six sides of the nut, and pull it down into the pocket with the screw. Wipe off what squeezes out on top.",
-      "Cure 24 h, remove the screw, confirm the enclosure sits flat on a tripod plate.",
-      "<b>Pick the thread for your tripod:</b> most photo tripods have a 1/4-20 screw — run the reducer bushing up into the nut with a flat screwdriver, slot downward. Video heads and heavier tripods with a 3/8-16 screw go straight into the nut; unscrew the bushing for those.",
+      "The tripod screws into the <b>power drum</b> under the enclosure: the stack is tripod → drum → enclosure. The nut sits in a hex hole through the <b>bank plate</b>, the flat part the bank slides in on, which drops into the bottom of the drum's bank pocket; the tripod screw comes up through a 10 mm hole in the drum floor and pulls the nut down onto it. The plate only stops the nut turning.",
+      "Turn the plate over and press the two M3 heat-set inserts into the holes in its underside. Two screws up through the drum floor hold it in later.",
+      "Lay the plate flat, top up. Butter the six sides of the nut with epoxy and press it into the hex hole until it is flush with the underside: nothing may stand proud of the top or the bank catches on it, and nothing below or the plate won't sit flat. A lightly greased 3/8-16 screw through it keeps the threads clean.",
+      "Cure 24 h and remove the screw.",
+      "<b>Pick the thread for your tripod:</b> most photo tripods have a 1/4-20 screw — run the reducer bushing into the nut with a flat screwdriver, slot downward. Video heads and heavier tripods with a 3/8-16 screw go straight into the nut; unscrew the bushing for those.",
     ],
-    warn: "This one nut carries the camera, the arms and the battery. The pocket stops it turning and the ledge takes the pull, but let the epoxy cure: it is what keeps the nut from falling out when the tripod is unscrewed. Do not use hot glue.",
-    scene: { show: ["base_housing"], add: [["insert", 0, 0, 60]], view: "iso-high", focus: "all", render: "tripod-insert",
-             marks: [[0, 0, 12, "3/8-16 nut (1/4-20 via bushing)", 45, -45, 45]] },
+    warn: "This one nut carries the whole head: the camera, the enclosure, the drum and the battery. The tripod screw pulls it down onto the drum floor, so the floor takes the load; the epoxy keeps it in the plate when the tripod is unscrewed. Do not use hot glue.",
+    scene: { show: ["bank_plate"], add: [["insert", 0, 0, 60]], view: "iso-high", focus: "all", render: "tripod-insert",
+             marks: [[0, 0, LY.nut_seat, "3/8-16 nut (1/4-20 via bushing)", 45, -45, 45]] },
   },
   {
-    id: "power", phase: 1, title: "Power boards onto the floor", time: "60 min",
-    parts: ["USB-C PD trigger board (12 V)", "Rocker switch", "Power latch, built on a 3 × 7 cm perfboard (IRF4905, 2 × 2N3904, 8 resistors), on 4 × M3 standoffs", "12 V → 5 V 8 A buck on its standoffs, and the Schottky diode that came with it", "M3 countersunk screws up through the floor: 4 for the buck, 4 for the latch, 2 for the PD trigger (length in cad/FIT_REPORT.md)", "M3 × 6 screws for the top of the latch's 4 standoffs and the trigger's 2", "2 × M3 standoffs for the PD trigger", "18 AWG silicone wire, 470 µF", "Double-sided foam tape"],
-    tools: ["Soldering iron", "Multimeter", "4 A dummy load"],
+    id: "power", phase: 1, title: "Power parts into the drum, drum under the enclosure", time: "75 min",
+    parts: ["Power drum", "Bank plate, its tripod nut cured in", "USB-C PD trigger board (12 V)", "Rocker switch", "Power latch, built on a 3 × 7 cm perfboard (IRF4905, 2 × 2N3904, 8 resistors), on 4 × M3 standoffs", "12 V → 5 V 8 A buck on its standoffs, and the Schottky diode that came with it", `M3 × ${LY.mounts.buck.l} countersunk through the pocket walls: 4 for the buck, 4 for the latch`, `2 × M3 × ${LY.mounts.pd_trigger.l} countersunk up through the drum floor for the PD trigger, 2 × M3 × 8 for the plate`, "M3 × 6 screws for the top of the latch's 4 standoffs and the trigger's 2", "2 × M3 standoffs for the PD trigger", "Right-angle USB-C to USB-C cable, 30 cm", "18 AWG silicone wire, 470 µF", `${LY.drum.screws.length} × M3 × ${LY.drum.screw_l} countersunk for the drum`],
+    tools: ["Soldering iron", "Multimeter", "4 A dummy load", "Stubby Phillips screwdriver (≤ 70 mm long)"],
     steps: [
       "<b>Wiring:</b> connections P1–P5, S1–S2 and R1 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, steps 1–3. Build the power latch on the 3 × 7 cm perfboard first, from the <a href='../12-wiring.md#power-latch' target='_blank'>latch circuit</a>, keeping parts and wires clear of its four corner holes.",
       "<b>Bench-set the buck to 5.1 V under a 4 A dummy load before it goes anywhere near the Pi.</b> Open-circuit voltage tells you nothing; a unit that reads 5.1 V unloaded and 4.8 V loaded will brown the Pi out under load.",
       "Set the PD trigger to <b>12 V</b> on a real bank: press its button until the 12 V LED lights (5 → 9 → 12 → 15 → 20 V, one step per press; it remembers the setting through power cycles and bank swaps), then short its <b>S1</b> key-lock pad with solder so a stray press can't take it to 15 or 20 V. Leave the F1/F2 pads open. Confirm 12 V with a meter at its screw terminal, unplug and replug the bank, and confirm it again, before wiring anything else.",
-      `<b>PD trigger:</b> screw its two standoffs onto the holes at its socket end from the top (M3 × 6). Stand it at the ${where(LY.usbc.ang)} of the enclosure on its standoffs and the small printed rest under its terminal end, its USB-C socket hard against the inside of the rectangular inlet low in the wall, and drive ${LY.mounts ? '2 × M3 × ' + LY.mounts.pd_trigger.l : '2 × M3'} countersunk screws up from underneath into the standoffs. The bank's cable plugs in from outside (<a href='../../../setup/12c-power-boards.md' target='_blank'>preparing the trigger and buck</a>).`,
-      "<b>Switch:</b> the round rocker goes through its hole from outside, the key flat on its thread lined up with the flat in the hole (that keeps ON at the top and stops it turning), its bezel flat on the flat spot cut into the wall; from inside, screw its ring up the thread against the flat boss, hand-tight plus a quarter turn.",
-      `<b>Buck:</b> it stays on its four brass standoffs. Take the screws out of their bottom ends, stand it over the four countersunk holes in the floor where the model shows it, and drive ${LY.buck_screw.l ? "4 × M3 × " + LY.buck_screw.l : "4 × M3"} countersunk screws up from underneath into the standoffs. Do it before the other floor boards go in, while you can still hold the standoffs.`,
-      `<b>Latch:</b> build and bench-test it first with the <a href='../../../setup/12a-power-latch.md' target='_blank'>power latch guide</a>. Then screw four M3 × ${LY.parts.latch.standoff_h} mm standoffs to its corner holes from the top with short M3 screws (drill the holes to 3.2 mm if a screw won't pass), stand it over its four countersunk holes in the floor where the model shows it, and drive ${LY.latch_screw && LY.latch_screw.l ? "4 × M3 × " + LY.latch_screw.l : "4 × M3"} countersunk screws up from underneath into the standoffs, the same as the buck.`,
+      "<b>The drum:</b> a round open-topped box the enclosure's diameter. A pocket for the bank runs across it, open at one side, and the power parts go round the pocket. Work with the bank plate out: the board screws go through the pocket's walls from inside, low down where the plate will lie.",
+      `<b>Buck:</b> it stands <b>on its long edge</b> against the pocket's ${LY.drum.edge.buck.wall === "back" ? "closed end" : "side wall"}, components facing out, on its four brass standoffs. Take the screws out of the standoffs' bottom ends, hold it against the wall over the four countersunk holes, and drive 4 × M3 × ${LY.mounts.buck.l} through the wall from inside the pocket into the standoffs, ${LY.drum.edge.buck.wall === "back" ? "reaching in through the pocket's open end" : "with a stubby screwdriver across the pocket"}. The heads sit flush, so the bank slides past them.`,
+      `<b>Latch:</b> build and bench-test it first with the <a href='../../../setup/12a-power-latch.md' target='_blank'>power latch guide</a>. Screw four M3 × ${LY.parts.latch.standoff_h} mm standoffs to its corner holes from the top with short M3 screws (drill the holes to 3.2 mm if a screw won't pass), stand it on edge against the pocket's ${LY.drum.edge.latch.wall === "back" ? "closed end" : "other side wall"}, components out, and drive 4 × M3 × ${LY.mounts.latch.l} through the wall from inside the pocket into the standoffs, ${LY.drum.edge.latch.wall === "back" ? "reaching in through the open end" : "with the stubby screwdriver"}.`,
+      `<b>PD trigger:</b> screw its two standoffs onto the holes at its socket end from the top (M3 × 6). Stand it on the drum floor where the model shows, beside the ${where(LY.drum.ang)} opening, on its standoffs and the small printed rest under its terminal end, and drive 2 × M3 × ${LY.mounts.pd_trigger.l} countersunk screws up from underneath into the standoffs (<a href='../../../setup/12c-power-boards.md' target='_blank'>preparing the trigger and buck</a>).`,
+      "<b>Switch:</b> the round rocker goes through its hole in the drum wall from outside, the key flat on its thread lined up with the flat in the hole (that keeps ON at the top and stops it turning), its bezel flat on the flat spot cut into the wall; from inside, screw its ring up the thread against the flat boss, hand-tight plus a quarter turn.",
       "Wire the chain: trigger 12 V out → latch <b>IN</b>, latch <b>OUT</b> → the buck's Schottky diode, band toward the buck → buck 12 V in (<a href='../12-wiring.md#input-diode' target='_blank'>input diode</a>). Grounds common. The rocker only signals the latch (S1, S2): it carries under 1 mA, and the latch keeps the power on after you switch off until the Pi has saved the clip and shut down.",
-      "Put the 470 µF across the buck output. Leave the buck's 5 V out on 18 AWG and the latch's HOLD and SENSE leads, long enough (≈ 15 cm) to reach up past the shelf to the Pi, the LED ring and the lid.",
+      "Put the 470 µF across the buck output. Leave the buck's 5 V out on 18 AWG and the latch's HOLD and SENSE leads long enough (≈ 20 cm) to reach up through the enclosure floor and past the shelf to the Pi, the LED ring and the lid.",
+      "<b>Bank cable:</b> plug the straight end of the right-angle USB-C cable into the trigger and lead it out through the nearer finger window beside the pocket's opening. Its right-angle end plugs into the bank later.",
+      "<b>Bank plate:</b> drop it into the pocket, catch at the open end, nut down over the hole in the floor, and drive 2 × M3 × 8 countersunk up from underneath the drum into its inserts.",
+      `<b>Drum under the enclosure:</b> feed the 5 V, HOLD and SENSE leads up through the round hole in the enclosure floor, set the enclosure on the drum with the outlines matching, and drive ${LY.drum.screws.length} × M3 × ${LY.drum.screw_l} countersunk screws <b>down from inside</b> the enclosure through its floor into the inserts in the drum's posts. The layout keeps a screwdriver's way clear above each one; the shelf isn't in yet. To get at a board later, take the shelf out and these screws, and lift the enclosure off.`,
     ],
-    warn: "Use the USB-C cable from the bill of materials. Before closing anything up, check the trigger really negotiates 12 V from your bank through the wall inlet.",
-    scene: { show: SHELL, add: [["trigger", 0, 0, 60], ["switch", 0, 0, 60], ["latch", 0, 0, 70], ["buck", 0, 0, 70]],
+    warn: "Use a right-angle USB-C cable: the bank's front face sits a little inside the drum's outline, and a straight plug would stick out and get knocked. Before closing up, check the trigger really negotiates 12 V from your bank through it.",
+    scene: { show: [], add: [["power_drum", 0, 0, 0], ["bank_plate", 0, 0, 40], ["insert", 0, 0, 40], ["trigger", 0, 0, 30], ["switch", 0, 0, 30], ["latch", 0, 0, 50], ["buck", 0, 0, 50]],
              view: "iso-high", focus: "all", render: "power",
-             marks: [[bx("trigger").cx, bx("trigger").cy, bx("trigger").z1, "PD trigger → 12 V, at the USB-C inlet", 30, 30, 45],
-                     [bx("buck").cx, bx("buck").cy, bx("buck").z1, "buck → 5.1 V @ 8 A", 40, -30, 40],
-                     [bx("latch").cx, bx("latch").cy, bx("latch").z1, "power latch", -40, 30, 40],
-                     [bx("switch").cx, bx("switch").cy, bx("switch").z1, "rocker switch", -30, -30, 35]] },
+             marks: [[bx("trigger").cx, bx("trigger").cy, bx("trigger").z1, "PD trigger → 12 V", 30, 30, 45],
+                     [bx("buck").cx, bx("buck").cy, bx("buck").z1, "buck on edge → 5.1 V @ 8 A", 40, -30, 40],
+                     [bx("latch").cx, bx("latch").cy, bx("latch").z1, "power latch on edge", -40, 30, 40],
+                     [bx("switch").cx, bx("switch").cy, bx("switch").z1, "rocker switch", -30, -30, 35],
+                     [...polarXY(LY.base_d / 2, LY.drum.ang), LY.drum_z + 20, "bank pocket, open this side", 50, -50, 20]] },
   },
   {
     id: "led", phase: 1, title: "LED ring under the shelf, diffuser band", time: "30 min",
@@ -193,7 +200,7 @@ const STEPS = [
     steps: [
       "<b>Wiring:</b> connections R4, R5 and L1–L4 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>, with the 74AHCT125 pin numbers.",
       "Data comes out of <b>SPI0 MOSI, GPIO10</b>, not the classic <code>rpi_ws281x</code> PWM/DMA pin. A Pi 4 can do it either way, but the PWM driver needs the whole camera service to run as root and SPI does not.",
-      "<b>Ring:</b> foam-tape it to the <b>underside</b> of the shelf, <b>LEDs facing down</b>, centred on the shelf's small centre hole. It then sits in the band of the LED window, between the power boards and the shelf, and lights the window all the way round. Take its leads round the edge of the shelf through the cut-away side.",
+      "<b>Ring:</b> foam-tape it to the <b>underside</b> of the shelf, <b>LEDs facing down</b>, centred on the shelf's small centre hole. It then sits in the band of the LED window, just above the floor, and lights the window all the way round. Take its leads round the edge of the shelf through the cut-away side.",
       LY.shifter_on === "shelf"
         ? `<b>Shifter:</b> build it first, on the 2 × 8 cm perfboard (<a href='../../../setup/12b-level-shifter.md' target='_blank'>building the level shifter</a>). Screw its four standoffs on from the top (M3 × 6), stand it on the shelf over the four countersunk holes beside the Pi's place, and drive ${LY.mounts ? '4 × M3 × ' + LY.mounts.shifter.l : '4 × M3'} countersunk screws up from underneath the shelf into them, before the ring goes on. Ring 5 V and ground come from the buck, not the Pi.`
         : `<b>Shifter:</b> build it first, on the 2 × 8 cm perfboard (<a href='../../../setup/12b-level-shifter.md' target='_blank'>building the level shifter</a>). Screw its four standoffs on from the top (M3 × 6), stand it over its four countersunk holes in the floor where the model shows, and drive ${LY.mounts ? '4 × M3 × ' + LY.mounts.shifter.l : '4 × M3'} countersunk screws up from underneath into them. Ring 5 V and ground come from the buck, not the Pi.`,
@@ -214,7 +221,7 @@ const STEPS = [
       "Fit the heatsinks to the Pi <b>before</b> mounting it. It sits in a closed enclosure and you won't reach the chips afterwards. A fan case is taller: put its height in <code>ordered_parts.toml</code> and re-run <code>fit.py</code> first.",
       "Flash the card and enable I2C and SPI in <code>raspi-config</code>. If the camera is not detected on first boot, add <code>dtoverlay=imx477</code> to <code>/boot/firmware/config.txt</code>. The <code>usb_max_current_enable</code> flag is a Pi 5 thing and is not needed here.",
       "Screw the four 6 mm nylon standoffs into the shelf's Pi holes from underneath and mount the Pi on them with M2.5 × 6 — USB-C socket towards the shelf's cut-away side — and its USB ports towards the cable slot high in the wall, where the anchor leads come in.",
-      "Feed the buck's 5 V pigtail and the PTZ controller's 5 V up through the cut-away side, lower the shelf onto its three posts, and fix it with 3 × M3 × 8 into the inserts in their tops.",
+      "Feed the buck's 5 V pigtail, the PTZ controller's 5 V and the latch's HOLD and SENSE leads (up from the drum through the floor) past the cut-away side, lower the shelf onto its three posts, and fix it with 3 × M3 × 8 into the inserts in their tops.",
       "Plug the pigtail into the Pi's USB-C. Keep the 5 V run short and on 18 AWG; it carries 4 A.",
       "Power up on the bench and confirm the Pi boots before the lid ever goes on.",
     ],
@@ -263,14 +270,14 @@ const STEPS = [
     tools: ["2.5 mm hex key"],
     steps: [
       "<b>Wiring:</b> connections U1–U3 in the <a href='../12-wiring.md' target='_blank'>wiring guide</a>.",
-      "Bolt an arm to each wall boss at ±Y, pointing straight out, rib up and the board pad outboard. Two M3 each, through the boss into the inserts in the arm root.",
+      "Bolt an arm to each boss on the drum wall at ±Y, pointing straight out, rib up and the board pad outboard. Two M3 each, through the boss into the inserts in the arm root.",
       LY.ula1_tangential
         ? "Mount a ULA1 module at each tip on 3 mm standoffs, lying <b>across</b> the arm: USB-A plug towards the back (−X), antenna towards the front. Along the arm there is no room between the plug and the enclosure for the extension's socket end; across, it hangs off the side."
         : "Mount a ULA1 module at each tip on 3 mm standoffs, DWM1000 antenna at the very end and clear of the printed pad, USB-A plug facing inward.",
       "USB-A extension from each arm back to the Pi, in through the slot high in the wall behind its USB ports — pass the plugs through one at a time. Only <b>one</b> anchor carries data — it reports every range in a single frame — the others just need 5 V. Make the data one A1 or A2, not the mast's, so the data cable stays short. Note which arm is which, because the sign convention depends on it.",
       "Check the geometry: board centres <b>250 mm apart</b>, symmetric about the pan axis, and both at the <b>same height</b>.",
     ],
-    note: "The anchors sit well below the lens here, and that is fine. Both are at the same height, so the vertical offset is common to both ranges and cancels out of the bearing. What matters is that they are level with <i>each other</i> and that the baseline is right.",
+    note: "The anchors sit well below the lens here, on the drum, and that is fine. Both are at the same height, so the vertical offset is common to both ranges and cancels out of the bearing. What matters is that they are level with <i>each other</i> and that the baseline is right.",
     warn: "These anchors are <b>static</b> — they do not turn with the camera. That is the one real consequence of the PTZ base, and the tracker handles it by subtracting the commanded pan angle. If you ever swap the arms left for right, flip <code>UWB_THETA_SIGN</code>.",
     scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD], add: lift(ARMS, 60),
              view: "iso", focus: "all", render: "arms",
@@ -281,7 +288,7 @@ const STEPS = [
     parts: ["Mast foot and mast cradle (M3 insert in each socket)", `½-inch hardwood dowel, cut to ${Math.round(LY.dowel_l)} mm`, "1 × Haorutech ULA1 module", "2 × M3 × 12, 2 × M3 thumb screws, 4 × M2.5 × 6 + 3 mm standoffs", "USB-A extension, ≈ 50 cm"],
     tools: ["2.5 mm hex key", "Small level or phone level app", "Tape measure"],
     steps: [
-      "Bolt the mast foot to the boss at <b>−X</b>, directly behind the lens, socket outboard and opening up. Two M3, through the root plate into the inserts in the boss — the same as the arms.",
+      "Bolt the mast foot to the drum's boss at <b>−X</b>, directly behind the lens, socket outboard and opening up. Two M3, through the root plate into the inserts in the boss — the same as the arms.",
       LY.ula1_tangential
         ? "Mount the third ULA1 on the cradle pad on 3 mm standoffs, oriented like the other two: plug towards the back (−X), antenna towards the front."
         : "Mount the third ULA1 on the cradle pad on 3 mm standoffs, oriented like the other two: long axis parallel to the anchor bar (±Y), antenna end toward +Y.",
@@ -293,23 +300,22 @@ const STEPS = [
     warn: "Wood, not metal. A metal tube running up to a UWB antenna detunes it and skews A3's range, which reads as a wrong elevation. If you must use aluminium, stand the board well clear of the tube's end.",
     scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS], add: [["mast_foot", -60, 0, 0], ["dowel", 0, 0, 140], ["mast_cradle", 0, 0, 90], ["uwb_m", 0, 0, 90]],
              view: "iso-back", focus: "all", render: "mast",
-             marks: [[-MAST_R, 0, A3_Z, "anchor A3 — 250 mm above A1/A2", -70, -40, 20], [-MAST_R, 0, 30, "mast foot on the −X boss", -70, -50, 10], [0, UWB_HALF, BOARD_Z, "A1", 0, 40, 40]] },
+             marks: [[-MAST_R, 0, A3_Z, "anchor A3 — 250 mm above A1/A2", -70, -40, 20], [-MAST_R, 0, ARM_Z + 20, "mast foot on the −X boss", -70, -50, 10], [0, UWB_HALF, BOARD_Z, "A1", 0, 40, 40]] },
   },
   {
-    id: "battery", phase: 3, title: "Battery tray and power bank", time: "15 min",
-    parts: ["Battery tray", "USB-C PD power bank, 25 000 mAh (92 Wh)", "Hook-and-loop strap", "100 W USB-C cable, 30 cm"],
+    id: "battery", phase: 3, title: "Power bank into the drum", time: "5 min",
+    parts: ["USB-C PD power bank, 25 000 mAh (92 Wh)"],
     tools: [],
     steps: [
-      "Thread the hook-and-loop strap through the two tunnels under the tray's floor and strap the empty tray to a tripod leg or the centre column, as low as is convenient. The mass ends up low, which is what keeps the rig stable with the camera above it. The strap never goes round the bank: it stays done up when you swap banks.",
-      "Push the bank down into the tray, USB-C socket towards the end nearer the enclosure, until the lips along the top click over it. To take it out, pinch it at the finger notches half-way along and lift.",
-      `Run the USB-C cable from the bank up to the inlet low on the ${where(LY.usbc.ang)} of the enclosure and plug it in. Dress it so it cannot snag a tripod leg.`,
+      `Slide the bank into the pocket in the drum from its opening (the ${where(LY.drum.ang)}), <b>USB-C socket outwards</b>, flat side down. Near the end it rides over the catch on the bank plate and pushes it down; push until the catch clicks up behind it. The bank is then held: it can't slide out with the tripod tilted or carried.`,
+      "Plug the right-angle end of the cable waiting in the finger window into the bank's USB-C socket, and tuck the loop back into the window.",
       "Charge the bank fully before a session. The camera can't tell how much charge the bank has (a bank reports nothing over USB-C PD), so it gives no low-battery warning: watch the bank's own charge indicator, and plan on about the runtime in the <a href='../../../design/04-electronics.md#runtime' target='_blank'>runtime table</a> from a full bank.",
-      "<b>Swapping a flat bank for a full one</b> (under a minute, plus the boot): switch off at the rocker and wait for the ring to go dark — a recording in progress is saved first. Unplug the cable from the bank, pinch the bank out, clip the full one in, plug the cable in and switch on.",
+      "<b>Swapping a flat bank for a full one</b> (under a minute, plus the boot): switch off at the rocker and wait for the ring to go dark — a recording in progress is saved first. Unplug the cable from the bank, press the catch down with a thumb, pinch the bank by its sides through the finger windows and slide it out. Slide the full one in until it clicks, plug the cable in and switch on. The camera stays on the tripod throughout.",
     ],
     note: "Expect about 6.2 hours tracking and recording, 6.5 tracking only, 8 awake, and about 11 asleep. Those allow for the bank's own conversion loss, which is why they are lower than its 92 Wh label suggests. Recording is nearly free on this board: the Pi 4 has a hardware H.264 encoder, which is the reason the design is not on a Pi 5.",
-    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST], add: lift(BATT, -70),
-             view: "iso-low", focus: "all", render: "battery",
-             marks: [[0, 0, LY.tray_z + 15, "92 Wh bank, clipped into a tray strapped low", 85, -40, -25]] },
+    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST], add: [["bank", ...polarXY(70, LY.drum.ang), 0]],
+             view: [...polarXY(1.3, LY.drum.ang + 35), 0.35], focus: "all", render: "battery",
+             marks: [[...polarXY(LY.base_d / 2, LY.drum.ang), LY.drum_z / 2, "92 Wh bank slides in here, USB-C out", ...polarXY(55, LY.drum.ang - 50), -35]] },
   },
   {
     id: "cabling", phase: 3, title: "Cabling and service loops", time: "25 min",
@@ -332,8 +338,8 @@ const STEPS = [
     parts: ["Any photo or video tripod — 1/4-20 screw (bushing in) or 3/8-16 (bushing out)"],
     tools: [],
     steps: [
-      "Check the bushing matches the tripod's screw (step 2), then screw the enclosure on and tighten by hand.",
-      "<b>Spread the legs.</b> The whole head is about 30 cm across the arms and 28 cm tall to the top of the mast, so a small tripod is fine — but the camera sits high, and a narrow stance with a bank hanging off it tips over.",
+      "Check the bushing matches the tripod's screw (step 2), then screw the head on by the drum and tighten by hand. The bank can stay in: the tripod plate only meets the drum floor.",
+      `<b>Spread the legs.</b> The whole head is about 30 cm across the arms and ${Math.round((MAST_TOP - LY.drum_z) / 10)} cm tall from the tripod plate to the top of the mast, with the bank and the power parts in the drum at the bottom of it, so any tripod rated for 2 kg or more is fine. Spread the legs fully all the same: the camera sits high.`,
       "For transport, loosen the foot's thumb screw and lift the mast out with the cradle and board still on it. Push it back to the bottom of the socket when you set up — its height is part of the calibration.",
       "Level the enclosure, then point the lens at the middle of what you are filming. At 8 m back the ±80° sweep covers about 22 m of wall, so aim it once and the limits never come up.",
       "Switch on. The ring should come up solid blue.",
@@ -630,7 +636,20 @@ function stlGeometry(name) {
    origin, z = 0 on the floor tape, +x along its length) and moved to where
    the solver put it. `mid` centres it vertically (the switch). */
 function placed(key, fn, mid) {
-  const b = LY.boxes[key], g = group(...fn(b));
+  const b = LY.boxes[key];
+  if (b.edge) {
+    // standing on edge against a pocket wall: drawn flat in its own frame (z up from the standoffs'
+    // ends), then stood up so the standoffs meet the wall and the components face away from it
+    const flat = { ...b, w: b.z1 - b.z0, z0: 0, z1: b.w };
+    const inner = group(...fn(flat));
+    inner.rotation.x = b.edge > 0 ? -Math.PI / 2 : Math.PI / 2;
+    inner.position.set(0, -b.edge * b.w / 2, (b.z0 + b.z1) / 2);
+    const g = new THREE.Group(); g.add(inner);
+    g.position.set(b.cx, b.cy, 0);
+    g.rotation.z = THREE.MathUtils.degToRad(b.ang);
+    return g;
+  }
+  const g = group(...fn(b));
   g.position.set(b.cx, b.cy, mid ? (b.z0 + b.z1) / 2 : b.z0);
   g.rotation.z = THREE.MathUtils.degToRad(b.ang);
   return g;
@@ -661,18 +680,24 @@ const PARTS = {
       const lean = new THREE.Group(); lean.rotation.y = THREE.MathUtils.degToRad(24);
       leg.position.set(0, 0, -220); lean.add(leg); lean.position.set(0, 0, -62); tilt.add(lean); g.add(tilt);
     }
+    g.position.z = LY.drum_z;        // its plate against the bottom of the power drum
     return g;
   } },
-  battery_tray: { grp: "static", stl: "battery_tray", color: COL.print,
-                  pos: [-LY.parts.power_bank.l / 2 - LY.tray_side, -LY.parts.power_bank.w / 2 - LY.tray_side, LY.tray_z] },
-  bank: { grp: "static", build: () => { const k = LY.parts.power_bank;
-    return group(at(mesh(box(k.l, k.w, k.h), COL.dark, { rough: 0.5 }), 0, 0, LY.tray_z + LY.tray_floor + k.h / 2),
-                 at(mesh(box(26, 10, 2), COL.steel, { metal: 0.4 }), -k.l / 2 + 5, 0, LY.tray_z + LY.tray_floor + k.h)); } },
+  // the drum hangs under the floor; the plate lies in its pocket, the bank home on the plate
+  power_drum: { grp: "static", stl: "power_drum", color: COL.print, pos: [0, 0, LY.drum_z] },
+  bank_plate: { grp: "static", stl: "bank_plate", color: COL.white, pos: [0, 0, LY.drum_z + LY.drum.floor], rot: [0, 0, LY.drum.ang * Math.PI / 180] },
+  bank: { grp: "static", build: () => { const k = LY.parts.power_bank, D = LY.drum;
+    const g = group(at(mesh(box(k.l, k.w, k.h), COL.dark, { rough: 0.5 }), 0, 0, 0),
+                    at(mesh(box(1, 9, 3.5), COL.steel, { metal: 0.4 }), k.l / 2 + 0.3, 0, 0));      // its USB-C socket, at the open end
+    const c = polarXY(1, D.ang), cx = (D.x0 + D.x1) / 2, cy = (D.y0 + D.y1) / 2;
+    g.position.set(cx * c[0] - cy * c[1], cx * c[1] + cy * c[0], LY.drum_z + D.bank_z + k.h / 2);
+    g.rotation.z = D.ang * Math.PI / 180;
+    return g; } },
   insert: { grp: "static", build: () => { const n = LY.parts.tripod_nut, g = new THREE.CylinderGeometry(n.af / Math.sqrt(3), n.af / Math.sqrt(3), n.t, 6);
     g.rotateX(Math.PI / 2); return at(mesh(g, COL.steel, { metal: 0.6, rough: 0.4 }), 0, 0, LY.nut_seat + n.t / 2 + 0.1); } },
   base_housing: { grp: "static", stl: "base_housing", color: COL.print, double: true },
 
-  // power boards on the floor, where cad/fit.py put them
+  // the power parts in the drum, where cad/fit.py put them: buck and latch on edge against the pocket's walls
   trigger: { grp: "static", build: () => placed("trigger", (b) => {
       // two M3 standoffs through the holes at its socket end; the printed rest (in the housing) holds up the other end
       const p = LY.parts.pd_trigger, z = p.standoff_h, t = p.pcb_t || 1.6;
@@ -682,23 +707,28 @@ const PARTS = {
               at(mesh(box(7, b.w - 2, b.z1 - b.z0 - z - t), COL.blue), -b.l / 2 + 4, 0, (b.z1 - b.z0 + z + t) / 2)];
     }) },
   latch: { grp: "static", build: () => placed("latch", (b) => {
-      // 3 × 7 cm perfboard on four M3 standoffs, screwed up through the floor like the buck
+      // 3 × 7 cm perfboard on four M3 standoffs, screwed through a pocket wall like the buck
       const p = LY.parts.latch, z = p.standoff_h, top = z + 1.6;
       return [...[[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([sx, sy]) =>
-                at(mesh(cyl(2.75, z, "z"), COL.white), sx * p.hole_dx / 2, sy * p.hole_dy / 2, z / 2)),   // nylon standoffs
+                at(mesh(cyl(2.75, z, "z"), COL.black), sx * p.hole_dx / 2, sy * p.hole_dy / 2, z / 2)),   // black nylon standoffs, wall to board
               at(mesh(box(b.l, b.w, 1.6), COL.pcb), 0, 0, z + 0.8),
               at(mesh(box(10, 15, 4.5), COL.black), -b.l * 0.1, 0, top + 2.25),            // IRF4905, bent flat
               at(mesh(box(10, 6, 1.3), COL.steel, { metal: 0.5 }), -b.l * 0.1 - 9.5, 0, top + 0.65), // its tab
               at(mesh(box(4.5, 3.5, 4.5), COL.black), b.l * 0.2, b.w * 0.2, top + 2.25),     // 2N3904s
               at(mesh(box(4.5, 3.5, 4.5), COL.black), b.l * 0.2, -b.w * 0.2, top + 2.25)];
     }) },
-  buck: { grp: "static", build: () => placed("buck", (b) => [
-      at(mesh(box(b.l, b.w, 1.6), COL.blue), 0, 0, 0.8),
-      at(mesh(box(b.l * 0.3, b.w * 0.5, b.z1 - b.z0 - 1.6), COL.black), -b.l * 0.15, 0, (b.z1 - b.z0 + 1.6) / 2),
-      at(mesh(cyl(4.5, 12), COL.dark), b.l * 0.3, b.w * 0.2, 7.6)]) },
+  buck: { grp: "static", build: () => placed("buck", (b) => {
+      // on the four brass standoffs it comes with, wall to board; its h runs from their ends to the tallest part
+      const p = LY.parts.buck, z = p.standoff_h || 6, top = z + 1.6, H = b.z1 - b.z0;
+      return [...[[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([sx, sy]) =>
+                at(mesh(cyl(2.75, z, "z"), COL.brass, { metal: 0.6, rough: 0.4 }), sx * p.hole_dx / 2, sy * p.hole_dy / 2, z / 2)),
+              at(mesh(box(b.l, b.w, 1.6), COL.blue), 0, 0, z + 0.8),
+              at(mesh(box(b.l * 0.3, b.w * 0.5, H - top), COL.black), -b.l * 0.15, 0, (H + top) / 2),
+              at(mesh(cyl(4.5, Math.min(12, H - top)), COL.dark), b.l * 0.3, b.w * 0.2, top + Math.min(12, H - top) / 2)];
+    }) },
   switch: { grp: "static", build: () => placed("switch", (b) => {
       // round rocker: body through the wall, bezel on the outer flat, ring on the inner boss
-      const s = LY.parts.switch, S = LY.switch, x0 = Math.hypot(b.cx, b.cy);    // box centre, radially
+      const s = LY.parts.switch, S = LY.drum.switch, x0 = Math.hypot(b.cx, b.cy);    // box centre, radially
       const seat = S.seat_r - x0, ring = S.seat_r - S.panel_t - s.nut_t / 2 - x0;
       return [at(mesh(cyl(s.hole_d / 2 - 1, s.depth - 4, "x"), COL.black), seat - (s.depth - 4) / 2, 0, 0),
               at(mesh(cyl(s.nut_d / 2, s.nut_t, "x"), COL.black), ring, 0, 0),
@@ -760,13 +790,13 @@ const PARTS = {
                                           at(mesh(cyl(13.5, 1.2, "x"), COL.lensGlass, { metal: 0.5, rough: 0.2 }), 53, 0, TILT_Z)) },
 
   // static anchor arms
-  arm_p: { grp: "static", stl: "anchor_arm", color: COL.print, pos: [15, ARM_R, 10], rot: [0, 0, Math.PI / 2] },
-  arm_n: { grp: "static", stl: "anchor_arm", color: COL.print, pos: [-15, -ARM_R, 10], rot: [0, 0, -Math.PI / 2] },
+  arm_p: { grp: "static", stl: "anchor_arm", color: COL.print, pos: [15, ARM_R, ARM_Z], rot: [0, 0, Math.PI / 2] },
+  arm_n: { grp: "static", stl: "anchor_arm", color: COL.print, pos: [-15, -ARM_R, ARM_Z], rot: [0, 0, -Math.PI / 2] },
   uwb_p: { grp: "static", build: () => uwbBoard(0, UWB_HALF, BOARD_Z, 1) },
   uwb_n: { grp: "static", build: () => uwbBoard(0, -UWB_HALF, BOARD_Z, -1) },
 
   // A3 mast, behind the lens at −X
-  mast_foot: { grp: "static", stl: "mast_foot", color: COL.print, pos: [-ARM_R, -9, 10], rot: [0, 0, Math.PI / 2] },
+  mast_foot: { grp: "static", stl: "mast_foot", color: COL.print, pos: [-ARM_R, -9, ARM_Z], rot: [0, 0, Math.PI / 2] },
   dowel: { grp: "static", build: () => at(mesh(cyl(LY.parts.dowel.d / 2, MAST_TOP - DOWEL_Z0), COL.cream, { rough: 0.8 }), -MAST_R, 0, (MAST_TOP + DOWEL_Z0) / 2) },
   mast_cradle: { grp: "static", stl: "mast_cradle", color: COL.print, pos: [-MAST_R, 0, A3_Z - 4], rot: [Math.PI, 0, 0] },
   uwb_m: { grp: "static", build: () => uwbBoard(-MAST_R, 0, A3_Z, 1) },
@@ -780,9 +810,20 @@ const PARTS = {
   pwr_pi: { grp: "static", build: () => {
     const p = LY.parts.pi, u = [Math.cos(LY.gap_ang * Math.PI / 180), Math.sin(LY.gap_ang * Math.PI / 180)];
     const gp = [u[0] * (LY.gap_d + 8), u[1] * (LY.gap_d + 8)], plug = piPoint(p.usbc_x - p.l / 2, -p.w / 2 - 12, 3);
-    const B = bx("buck"), T = bx("trigger"), L = bx("latch");
-    return group(cable([[B.cx, B.cy, B.z1], [gp[0], gp[1], (B.z1 + SHELF_Z) / 2], [gp[0], gp[1], LY.shelf_top + 2], plug], 2.2, COL.wire),
-                 cable([[T.cx, T.cy, T.z1], [L.cx, L.cy, L.z1 + 2], [B.cx, B.cy, B.z1 - 4]], 2.0, COL.wire));
+    const B = bx("buck"), T = bx("trigger"), L = bx("latch"), w = LY.drum.wire_hole;
+    return group(cable([[B.cx, B.cy, B.z1 - 2], [w[0], w[1], -2], [w[0], w[1], LY.floor_z + 4], [gp[0], gp[1], (LY.floor_z + SHELF_Z) / 2], [gp[0], gp[1], LY.shelf_top + 2], plug], 2.2, COL.wire),
+                 cable([[T.cx, T.cy, T.z1], [L.cx, L.cy, L.z1 - 4], [B.cx, B.cy, B.z1 - 6]], 2.0, COL.wire));
+  } },
+  // the bank's cable: right-angle plug in the bank's face, round through the finger window to the trigger
+  bank_cable: { grp: "static", build: () => {
+    const D = LY.drum, T = bx("trigger"), yc = (D.y0 + D.y1) / 2;
+    const toW = (x, y) => { const c = polarXY(1, D.ang); return [x * c[0] - y * c[1], x * c[1] + y * c[0]]; };
+    const ts = polarXY(T.l / 2, T.ang), sock = [T.cx + ts[0], T.cy + ts[1]];
+    const sides = [1, -1].map((s) => toW(D.x1 - 12, yc + s * (D.iw / 2 + D.pw + 7)));
+    const win = sides.reduce((a, b) => Math.hypot(a[0] - sock[0], a[1] - sock[1]) < Math.hypot(b[0] - sock[0], b[1] - sock[1]) ? a : b);
+    const zb = LY.drum_z + D.bank_z + LY.parts.power_bank.h / 2;
+    return cable([[...toW(D.x1 + 4, yc), zb], [...toW(D.x1 + 6, yc + (win === sides[0] ? 1 : -1) * D.iw / 2), zb],
+                  [win[0], win[1], zb], [sock[0], sock[1], T.z1 + 4], [sock[0], sock[1], T.z0 + 12]], 2.2, COL.wire);
   } },
   usb_p: { grp: "static", build: () => usbLead([-LY.parts.ula1.l / 2 - 14, UWB_HALF, BOARD_Z + 2]) },
   usb_n: { grp: "static", build: () => usbLead([-LY.parts.ula1.l / 2 - 14, -UWB_HALF, BOARD_Z + 2]) },

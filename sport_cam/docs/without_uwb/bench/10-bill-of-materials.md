@@ -15,7 +15,7 @@ list is the [camera-only build's](../setup/10-bill-of-materials.md);
 | rocker switch and power latch (13, 13a) | you unplug the adapter | the Pi isn't told to shut down: stop the software first ([14](14-software-setup.md)) |
 | LED ring and level shifter (7, 8) | the app shows the same state | the ring code finds nothing to drive and carries on |
 | Pi-driven servos: extension leads and headers (part of 18) <!--arducam row--> | the kit's own servo drive works | `SERVO_DRIVER = "arducam"`: whole-degree steps, a little less smooth |
-| standoffs, screws, inserts, tripod, filament, strap, epoxy (18, 21–27) | no enclosure | the head stands on the bench on its own metal base |
+| standoffs, screws, inserts, tripod, filament, epoxy (18, 21–27) | no enclosure | the head stands on the bench on its own metal base |
 
 Prices: approximate CAD street prices, Oct 2026, ±15 %.
 

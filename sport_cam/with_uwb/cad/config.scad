@@ -21,12 +21,12 @@ $fn = 96;
 clr = 0.25;                    // general printed-fit clearance per side
 
 // ---- enclosure -------------------------------------------------------------
-// Bottom to top: the power boards stuck to the floor; the LED ring under a
+// Bottom to top: the power drum under the floor (below); the LED ring under a
 // printed shelf, shining out through the LED window; the Raspberry Pi on the
 // shelf; the lid with the camera. Every part must print in one piece on a
 // Bambu Lab A1 Mini (≤ 170 mm on every axis); fit.py keeps it that way.
-base_d_min    = 135;           // narrowest enclosure (outer Ø); fit.py widens it only if the parts need it
-base_h_min    = 66;            // lowest floor-to-lid height; fit.py raises it to clear the stack
+base_d_min    = 150;           // narrowest enclosure (outer Ø); fit.py widens it only if the parts need it
+base_h_min    = 40;            // lowest floor-to-lid height; fit.py raises it to clear the stack
 base_wall     = 3;
 lid_t         = 5;             // lid is structural: it carries the whole camera
 spigot_h      = 6;             // locating ring under the lid that drops into the mouth
@@ -39,12 +39,6 @@ window_rib_w  = 3;
 diffuser_t    = 1.6;           // translucent band slid over the outside of the window
 diffuser_lip  = 2;             // how far it overlaps the wall above and below
 ledge_h       = 2;             // the band rests on this outside ledge
-
-tripod_boss_d = 24;            // floor boss with a hex pocket for a 3/8-16 nut (size from ordered_parts.toml)
-tripod_boss_h = 12;
-tripod_ledge = 3;              // plastic under the nut: the tripod screw pulls the nut down onto it
-tripod_clear_d = 10.2;         // through the ledge, for the bushing or a 3/8-16 screw
-tripod_nut_clr = 0.2;          // round the nut in its pocket, each side (epoxied)
 
 tape_t        = 1;             // foam tape under the power boards and the LED ring
 part_gap      = 2;             // clearance fit.py keeps between parts
@@ -71,13 +65,13 @@ ptz_slot_w    = 3.4;           // M3 clearance
 ptz_loop      = 60;            // free ribbon kept outside for the pan and tilt travel
 
 // ---- UWB anchor arms (static) ----------------------------------------------
-// The anchors don't rotate with the camera, so the arms bolt to the enclosure
-// wall. Board centres land `uwb_half_base` either side of the pan axis; the
+// The anchors don't rotate with the camera, so the arms bolt to bosses on the
+// power drum's wall. Board centres land `uwb_half_base` either side of the pan axis; the
 // tracker subtracts the commanded pan angle (docs/04).
 uwb_half_base = 190;           // board centre; the antenna sits 10 mm further out → 400 mm
 arm_w = 18; arm_t = 8;
 arm_root_h = 24;               // bracket height where the arm meets the wall
-arm_boss_z = 10;               // bottom of the wall bosses
+arm_boss_z = 10;               // the arm's root plate, above the drum's bottom (its boss runs down to the bed)
 arm_insert_d = 4.0;            // M3 heat-set inserts in the bosses
 ula1_standoff_h = 3;
 
@@ -87,24 +81,44 @@ ula1_standoff_h = 3;
 // −X — directly behind the lens, where pan (±80°) never points it — with a
 // printed cradle carrying the board at the top. Wood, not metal: a metal
 // tube right under a UWB antenna detunes it.
-anchor_board_z = 22;           // A1/A2 board height above the enclosure floor
+anchor_board_z = 22;           // A1/A2 board height above the drum's bottom
 uwb_v_base  = 250;             // A3 board this far above A1/A2 (= σφ baseline)
 mast_wall   = 4;               // socket wall
 mast_floor  = 2;               // closed socket bottom; sets the dowel's height
 mast_foot_h = 44;              // foot socket depth: long, so the mast stands still
 mast_cap_h  = 30;              // cradle socket depth
 
-// ---- battery tray ----------------------------------------------------------
-// Sized to the power bank in ordered_parts.toml. The tray stays strapped to a
-// tripod leg or the centre column; the bank clips in and out of it without
-// touching the strap, so a flat bank is swapped for a full one in seconds.
-tray_wall = 2.4;
-tray_clr = 0.6;                // round the bank, so it drops in
-tray_snap = 1.4;               // how far the lips along the top reach over the bank
-tray_lip_t = 1.6;              // their thickness (the top is chamfered as a lead-in)
-tray_notch_w = 34;             // finger notches half-way along each long side
-tray_strap_w = 26;             // hook-and-loop strap, through two tunnels under the floor
-tray_tunnel_h = 3.5;
+// ---- power drum ------------------------------------------------------------
+// A round, open-topped box the enclosure's own diameter, screwed under its
+// floor (the floor is its lid), so the two make one cylinder. The tripod screws
+// into it, and it holds everything to do with power, which leaves the
+// enclosure only the LED ring, the shelf and the Pi, and makes the whole thing
+// lower. Across the middle, a pocket the power bank slides into from one side;
+// the buck and the power latch stand on edge against the pocket's two side
+// walls, screwed through them from inside the pocket; the PD trigger and the
+// rocker switch are on the drum wall. A drop-in plate under the bank holds the
+// tripod nut and carries the sprung catch. fit.py places it all.
+drum_wall = 2.4;               // outer wall
+drum_floor = 3;                // also the ledge the tripod screw pulls the nut down onto
+pocket_wall = 3;               // the bank pocket's walls; the boards' screws are countersunk flush on the bank's side
+pocket_clr = 0.6;              // round the bank, each side, so it slides
+pocket_head = 1.0;             // air over the bank, under the enclosure floor
+board_clear = 1.5;             // under a board standing on edge
+drum_post_d = 10;              // four posts merged into the wall, an M3 heat-set insert in each top
+drum_insert_d = 4.0;
+drum_insert_h = 6;
+wire_hole_d = 12;              // in the enclosure floor, for the leads up from the drum
+catch_l = 6;                   // the catch's ramp, beyond the bank's front face
+catch_h = 2.5;                 // how far it stands up in front of the bank
+catch_w = 30;                  // its width, across the open end
+bar_span = 50;                 // it sits on a crossbar along the plate's front edge, held at both ends,
+bar_t = 2.4;                   // thinned from underneath so it flexes down as the bank goes over
+finger_l = 24;                 // finger windows beside the bank's front: how far in from the open end,
+finger_z = 10;                 // their bottom above the bank's underside,
+finger_d = 14;                 // and how far past the pocket walls they reach
+tripod_clear_d = 10.2;         // through the drum floor, for the bushing or a 3/8-16 screw
+tripod_nut_clr = 0.2;          // round the nut in its hex hole, each side (epoxied)
+plate_clr = 0.3;               // round the drop-in plate in the pocket, each side
 
 // ---- wearable pod ----------------------------------------------------------
 // The tag is a ULA1 plugged straight into a slim USB bank, end to end; fit.py

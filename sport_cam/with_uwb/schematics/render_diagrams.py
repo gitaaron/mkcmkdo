@@ -199,20 +199,20 @@ def mechanical_layout():
     ax.plot([cx, cx], [1.9, 0.2], color=GREY, lw=3)
     ax.text(cx + 2.75, 0.3, "any standard tripod\n(3/8-16, or 1/4-20\nvia bushing)", fontsize=9, color=GREY)
 
-    # battery tray, slung low
-    ax.add_patch(Rectangle((cx - 1.7, 1.9), 3.4, 0.75, fc="#fdf6e8", ec=INK, lw=1.4))
-    ax.text(cx, 2.27, "BATTERY TRAY — 92 Wh USB-C bank", ha="center",
-            fontsize=8.5, color=INK)
-    ax.text(cx - 2.6, 2.25, "heaviest item\nlowest", fontsize=8, color=GREY, ha="center")
+    # power drum, screwed under the enclosure floor; the tripod screws into it
+    ax.add_patch(Rectangle((cx - 1.5, 1.9), 3.0, 1.35, fc="#fdf6e8", ec=INK, lw=1.4))
+    ax.text(cx, 2.88, "POWER DRUM", ha="center", fontsize=9.5, fontweight="bold", color=INK)
+    ax.text(cx, 2.55, "92 Wh USB-C bank slides in", ha="center", fontsize=8.5, color=INK)
+    ax.text(cx, 2.22, "buck · latch · PD trigger · switch", ha="center", fontsize=8.5, color=INK)
+    ax.text(cx + 2.6, 2.95, "screwed under the\nfloor; the tripod\nscrews into it", fontsize=8, color=GREY, ha="center")
 
     # enclosure
-    ax.add_patch(Rectangle((cx - 1.5, 2.75), 3.0, 1.9, fc=BGBOX, ec=INK, lw=1.5))
-    ax.text(cx, 4.2, "ENCLOSURE (static)", ha="center", fontsize=10,
+    ax.add_patch(Rectangle((cx - 1.5, 3.25), 3.0, 1.4, fc=BGBOX, ec=INK, lw=1.5))
+    ax.text(cx, 4.25, "ENCLOSURE (static)", ha="center", fontsize=10,
             fontweight="bold", color=INK)
-    ax.text(cx, 3.82, "Raspberry Pi 4", ha="center", fontsize=8.5, color=INK)
-    ax.text(cx, 3.5, "PD trigger · latch · buck 5 V", ha="center", fontsize=8.5, color=INK)
-    ax.add_patch(Rectangle((cx - 1.62, 3.0), 0.12, 0.9, fc=GREEN, ec="none"))
-    ax.text(cx - 2.4, 3.45, "WS2812\nLED ring", fontsize=8.5, color=GREEN, ha="center")
+    ax.text(cx, 3.9, "Raspberry Pi 4 on a shelf", ha="center", fontsize=8.5, color=INK)
+    ax.add_patch(Rectangle((cx - 1.62, 3.38), 0.12, 0.4, fc=GREEN, ec="none"))
+    ax.text(cx - 2.4, 3.55, "WS2812\nLED ring", fontsize=8.5, color=GREEN, ha="center")
 
     # lid
     ax.add_patch(Rectangle((cx - 1.5, 4.65), 3.0, 0.3, fc="#dde3ef", ec=INK, lw=1.5))
@@ -221,20 +221,19 @@ def mechanical_layout():
 
     # anchor arms
     for sx in (-1, 1):
-        ax.plot([cx + sx * 1.5, cx + sx * 2.8], [4.1, 4.1], color=BLUE, lw=3)
-        ax.add_patch(Rectangle((cx + sx * 2.8 - 0.18, 4.0), 0.36, 0.26,
+        ax.plot([cx + sx * 1.5, cx + sx * 2.8], [2.45, 2.45], color=BLUE, lw=3)
+        ax.add_patch(Rectangle((cx + sx * 2.8 - 0.18, 2.35), 0.36, 0.26,
                                fc=BLUE, ec="none"))
-    ax.annotate("", xy=(cx - 2.8, 3.72), xytext=(cx + 2.8, 3.72),
+    ax.annotate("", xy=(cx - 2.8, 1.62), xytext=(cx + 2.8, 1.62),
                 arrowprops=dict(arrowstyle="<|-|>", color=BLUE, lw=1.4))
-    ax.text(cx, 3.5, "", ha="center")
-    ax.text(cx, 4.45, "UWB anchors — 400 mm, STATIC", ha="center",
+    ax.text(cx, 1.4, "UWB anchors on the drum — 400 mm, STATIC", ha="center",
             fontsize=8.5, color=BLUE)
 
     # A3 mast behind the camera (drawn to the left: the lens faces right)
     mx = cx - 1.85
-    ax.plot([mx, mx], [3.05, 7.55], color="#b08a4a", lw=3)
-    ax.add_patch(Rectangle((mx - 0.2, 2.95), 0.35, 0.6, fc=BLUE, ec="none"))
-    ax.add_patch(Rectangle((mx - 0.3, 7.55), 0.6, 0.16, fc=BLUE, ec="none"))
+    ax.plot([mx, mx], [2.2, 7.05], color="#b08a4a", lw=3)
+    ax.add_patch(Rectangle((mx - 0.2, 2.1), 0.35, 0.6, fc=BLUE, ec="none"))
+    ax.add_patch(Rectangle((mx - 0.3, 7.05), 0.6, 0.16, fc=BLUE, ec="none"))
     ax.text(mx - 0.4, 7.25, "A3 — 250 mm up,\nbehind the lens\n(elevation)", fontsize=8.5,
             color=BLUE, ha="right")
 

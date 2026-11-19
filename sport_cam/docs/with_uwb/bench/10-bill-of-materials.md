@@ -18,7 +18,7 @@ list is the [UWB build's](../setup/10-bill-of-materials.md);
 | Pi-driven servos: extension leads and headers (part of 18) <!--arducam row--> | the kit's own servo drive works | `SERVO_DRIVER = "arducam"`: whole-degree steps, a little less smooth |
 | the third anchor, A3, and its mast (one of the four item 6 radios, 27a) | it only adds elevation: the bearing, and whose tag it is, come from A1 and A2 | `UWB_ANCHORS = 2`: tilt follows the person detector alone |
 | the tag's armband (17) | you hold the tag, or put it in a pocket | — |
-| standoffs, screws, inserts, tripod, filament, strap, epoxy (18, 21–27) | no enclosure | the head stands on the bench on its own metal base, and the anchors are taped to a stick (B3) |
+| standoffs, screws, inserts, tripod, filament, epoxy (18, 21–27) | no enclosure | the head stands on the bench on its own metal base, and the anchors are taped to a stick (B3) |
 
 Prices: approximate CAD street prices, Oct 2026, ±15 %.
 

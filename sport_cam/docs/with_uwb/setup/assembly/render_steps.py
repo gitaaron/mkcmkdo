@@ -55,8 +55,10 @@ BAND_Z = LY["window_z"] - LY["design"]["diffuser_lip"]
 ARM_R = LY["arm_boss_r"]
 UWB_HALF = LY["uwb"]["uwb_half_base"]   # A1/A2 board centres either side of the pan axis
 MAST_R = LY["mast_axis_r"]               # A3 mast axis, behind the pan axis at −X
-A3_Z = LY["uwb"]["anchor_board_z"] + LY["uwb"]["uwb_v_base"]   # A3 board height; the cradle's pad top is 4 mm below
-DOWEL_Z0 = LY["uwb"]["arm_boss_z"] + LY["uwb"]["mast_floor"]
+ARM_Z = LY["drum_z"] + LY["uwb"]["arm_boss_z"]                # the arms' root plates, on the drum's bosses
+BOARD_Z = LY["anchor_z"]                                      # A1/A2 board height
+A3_Z = BOARD_Z + LY["uwb"]["uwb_v_base"]   # A3 board height; the cradle's pad top is 4 mm below
+DOWEL_Z0 = ARM_Z + LY["uwb"]["mast_floor"]
 
 
 def rot_z(deg):
@@ -75,11 +77,12 @@ PARTS = {
     "diffuser": ("led_diffuser_ring.stl", None,        (0, 0, BAND_Z)),
     "shelf":    ("shelf.stl",             None,        (0, 0, SHELF_Z)),
     "lid":      ("lid.stl",               None,        (0, 0, LID_Z)),
-    "arm_p":    ("anchor_arm.stl",        rot_z(90),   (15, ARM_R, 10)),
-    "arm_n":    ("anchor_arm.stl",        rot_z(-90),  (-15, -ARM_R, 10)),
-    "foot":     ("mast_foot.stl",         rot_z(90),   (-ARM_R, -9, 10)),
+    "arm_p":    ("anchor_arm.stl",        rot_z(90),   (15, ARM_R, ARM_Z)),
+    "arm_n":    ("anchor_arm.stl",        rot_z(-90),  (-15, -ARM_R, ARM_Z)),
+    "foot":     ("mast_foot.stl",         rot_z(90),   (-ARM_R, -9, ARM_Z)),
     "cradle":   ("mast_cradle.stl",       rot_x(180),  (-MAST_R, 0, A3_Z - 4)),
-    "tray":     ("battery_tray.stl",      None,        (-77.4, -38.4, -20)),
+    "drum":     ("power_drum.stl",        None,        (0, 0, LY["drum_z"])),
+    "plate":    ("bank_plate.stl",        rot_z(LY["drum"]["ang"]), (0, 0, LY["drum_z"] + LY["drum"]["floor"])),
 }
 _cache: dict[str, np.ndarray] = {}
 
@@ -132,19 +135,20 @@ def shade(tris: np.ndarray, base_hex: str) -> np.ndarray:
 # field of the steps in index.html.
 # ---------------------------------------------------------------------------
 UP = (0, 0, 0)
-ALL = ["tray", "shell", "shelf", "diffuser", "lid", "arm_p", "arm_n", "foot", "dowel", "cradle"]
+ALL = ["drum", "plate", "shell", "shelf", "diffuser", "lid", "arm_p", "arm_n", "foot", "dowel", "cradle"]
 SCENES = [
     dict(id="prep", title="Printed parts overview", show=[],
          add=[("shell", UP), ("shelf", (0, 0, 60)), ("diffuser", (0, 0, 95)), ("lid", (0, 0, 150)),
               ("arm_p", (0, 0, 60)), ("arm_n", (0, 0, 60)),
-              ("foot", (-60, 0, 0)), ("cradle", (-60, 0, -80)), ("tray", (0, 0, -90))],
+              ("foot", (-60, 0, 0)), ("cradle", (-60, 0, -80)), ("drum", (0, 0, -70)), ("plate", (0, 0, -150))],
          arrows=False),
-    dict(id="tripod-insert", title="Enclosure", show=[], add=[("shell", UP)], elev=38,
-         marks=[((0, 0, 12), "3/8-16 nut (1/4-20 via bushing)")]),
-    dict(id="power", title="Power boards on the floor", show=[], add=[("shell", UP)], elev=44,
-         marks=[((LY["boxes"]["trigger"]["cx"], LY["boxes"]["trigger"]["cy"], 8), "PD trigger at the USB-C inlet"),
-                ((LY["boxes"]["buck"]["cx"], LY["boxes"]["buck"]["cy"], 20), "buck"),
-                ((LY["boxes"]["latch"]["cx"], LY["boxes"]["latch"]["cy"], 14), "power latch")]),
+    dict(id="tripod-insert", title="Bank plate", show=[], add=[("plate", UP)], elev=38,
+         marks=[((0, 0, LY["nut_seat"]), "3/8-16 nut (1/4-20 via bushing)")]),
+    dict(id="power", title="Power parts into the drum, drum under the enclosure", show=[],
+         add=[("drum", UP), ("plate", (0, 0, 40))], elev=30,
+         marks=[((LY["boxes"]["trigger"]["cx"], LY["boxes"]["trigger"]["cy"], LY["boxes"]["trigger"]["z1"]), "PD trigger"),
+                ((LY["boxes"]["buck"]["cx"], LY["boxes"]["buck"]["cy"], LY["boxes"]["buck"]["z1"]), "buck, on edge"),
+                ((LY["boxes"]["latch"]["cx"], LY["boxes"]["latch"]["cy"], LY["boxes"]["latch"]["z1"]), "power latch, on edge")]),
     dict(id="led", title="LED ring under the shelf, diffuser band", show=["shell"],
          add=[("shelf", (0, 0, 60)), ("diffuser", (0, 0, 80))],
          marks=[((0, 0, SHELF_Z - 2), "ring under the shelf"), ((0, -LY["base_d"] / 2, BAND_Z + 8), "band over the window")]),
@@ -158,13 +162,14 @@ SCENES = [
          add=[("lid", (0, 0, 95))]),
     dict(id="arms", title="UWB anchor arms", show=["shell", "shelf", "diffuser", "lid"],
          add=[("arm_p", (0, 0, 60)), ("arm_n", (0, 0, 60))],
-         marks=[((0, UWB_HALF, 22), "anchor A1"), ((0, -UWB_HALF, 22), "anchor A2")]),
+         marks=[((0, UWB_HALF, BOARD_Z), "anchor A1"), ((0, -UWB_HALF, BOARD_Z), "anchor A2")]),
     dict(id="mast", title="Third anchor mast (A3)", show=["shell", "shelf", "diffuser", "lid", "arm_p", "arm_n"],
          add=[("foot", (-60, 0, 0)), ("dowel", (0, 0, 140)), ("cradle", (0, 0, 90))],
-         marks=[((-MAST_R, 0, A3_Z), "anchor A3, 250 mm up"), ((0, UWB_HALF, 22), "A1")]),
-    dict(id="battery", title="Battery tray", show=["shell", "shelf", "diffuser", "lid", "arm_p", "arm_n", "foot", "dowel", "cradle"],
-         add=[("tray", (0, 0, -70))],
-         marks=[((0, 0, -14), "92 Wh bank, slung low")]),
+         marks=[((-MAST_R, 0, A3_Z), "anchor A3, 250 mm up"), ((0, UWB_HALF, BOARD_Z), "A1")]),
+    dict(id="battery", title="Power bank into the drum", show=ALL,
+         add=[],
+         marks=[((*(LY["base_d"] / 2 * np.array([math.cos(math.radians(LY["drum"]["ang"])), math.sin(math.radians(LY["drum"]["ang"]))])), LY["drum_z"] / 2),
+                 "bank slides in here, USB-C out")]),
     dict(id="complete", title="Completed assembly", show=ALL, add=[]),
 ]
 

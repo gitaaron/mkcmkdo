@@ -21,7 +21,8 @@ render shelf.scad             shelf.stl
 render anchor_arm.scad        anchor_arm.stl
 render anchor_mast.scad       mast_foot.stl   -D 'part="foot"'
 render anchor_mast.scad       mast_cradle.stl -D 'part="cradle"'
-render battery_tray.scad      battery_tray.stl
+render power_drum.scad        power_drum.stl
+render bank_plate.scad        bank_plate.stl
 render wearable_case.scad     wearable_case.stl
 
 echo "done — STLs in cad/stl/"

@@ -85,12 +85,9 @@ PLATES = {"textured": "Textured PEI Plate", "smooth": "High Temp Plate", "cool":
 # ----------------------------------------------------------------------------
 # walls, infill %, plus any other Bambu Studio process keys. `sizes` are the
 # ordered_parts.toml entries the part is shaped by (for the "not measured" warning).
-_ALL_INSIDE = ["pi", "shifter", "pd_trigger", "buck", "latch", "switch", "led_ring", "ptz",
-               "tripod_nut"]
+_ALL_INSIDE = ["pi", "shifter", "pd_trigger", "buck", "latch", "switch", "led_ring", "ptz"]
 PARTS = {
-    "base_housing": dict(aliases=["enclosure", "housing"], walls=4, infill=20, sizes=_ALL_INSIDE,
-                         note={"with_uwb": "the three wall bosses print without support and droop a little "
-                                           "underneath (nobody sees it); --supports adds tree supports from the plate"}),
+    "base_housing": dict(aliases=["enclosure", "housing"], walls=4, infill=20, sizes=_ALL_INSIDE),
     "shelf": dict(aliases=[], walls=3, infill=20, sizes=["pi", "shifter", "led_ring"],
                   note="white or natural PETG if you have it: its underside bounces the LED ring's light out"),
     "lid": dict(aliases=[], walls=5, infill=40, flip=True, sizes=["ptz"] + _ALL_INSIDE,
@@ -101,7 +98,13 @@ PARTS = {
                                      "brim_type": "outer_only", "brim_width": "5"},
                               sizes=_ALL_INSIDE, white=True,
                               note="needs WHITE or natural PETG loaded — it has to pass the LEDs' light"),
-    "battery_tray": dict(aliases=["tray"], walls=3, infill=20, sizes=["power_bank"]),
+    "power_drum": dict(aliases=["drum", "battery", "sleeve"], walls=4, infill=25,
+                       sizes=["power_bank", "buck", "latch", "pd_trigger", "switch"],
+                       note={"without_uwb": "printed floor down, open top up: the tripod screws into it, so it carries the whole camera",
+                             "with_uwb": "printed floor down, open top up: the tripod screws into it, so it carries the whole camera; "
+                                         "the arm bosses run down to the plate, so no supports"}),
+    "bank_plate": dict(aliases=["plate", "tray"], walls=3, infill=40, sizes=["power_bank", "tripod_nut"],
+                       note="printed flat, underside down; its catch crossbar bridges a short gap"),
     "anchor_arm": dict(aliases=["arm", "arms"], walls=4, infill=25, builds=["with_uwb"], sizes=["ula1", "usb_extension"],
                        note="you need two: --copies 2 puts both on one plate"),
     "mast_foot": dict(aliases=["foot"], walls=4, infill=25, builds=["with_uwb"], sizes=["dowel"]),
@@ -659,7 +662,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0],
                                  epilog="Full notes: the top of cad/printer.py.",
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("parts", nargs="*", help="part(s) to print, e.g. lid, enclosure, tray (see --list)")
+    ap.add_argument("parts", nargs="*", help="part(s) to print, e.g. lid, enclosure, drum (see --list)")
     ap.add_argument("--build", choices=BUILDS, help="which build's parts (default: `build` in the config file)")
     ap.add_argument("--list", action="store_true", help="list the parts and their settings")
     ap.add_argument("--status", action="store_true", help="show what the printer is doing")

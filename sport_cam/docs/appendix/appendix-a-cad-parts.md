@@ -27,15 +27,21 @@ python3 cad/fit.py            # solve, regenerate, render, audit — both builds
 `fit.py` reads the part sizes and design parameters, then:
 
 1. **Solves the layout.**
-   - Floor: power boards clear of the tripod boss, shelf posts and each
-     other; PD trigger socket at the wall USB-C inlet.
-   - LED ring under the shelf, within the LED window band; Pi on the shelf.
-   - Search space: Pi orientation and position, wall positions of inlet
-     and switch, post positions. Objective: minimum enclosure height.
+   - Power drum under the floor: the bank's pocket across it, as far forward
+     as the outline allows with the tripod axis under the bank; the buck and
+     the power latch on edge against the pocket's walls (whichever walls they
+     fit); the PD trigger on the floor nearest a finger window; the switch in
+     the wall; three or four posts for the screws up into the enclosure,
+     spread round the axis<!--with_uwb-->; the opening clear of the arm bosses<!--/-->.
+   - Enclosure: shelf posts clear of the drum's screws (with a screwdriver's
+     way down to each) and its wire hole; LED ring under the shelf, within the
+     LED window band, just above the floor; Pi on the shelf.
+   - Search space: the pocket's offset and which walls the boards stand on,
+     the trigger's place, the switch's angle, Pi orientation and position,
+     post positions. Objective: minimum height.
 2. **Falls back when parts don't fit**, in order:
-   - boards raised on printed risers over the tripod boss;
    - taller enclosure;
-   - wider enclosure, 2 mm steps, up to the A1 Mini limit;<!--with_uwb-->
+   - wider enclosure and drum, 2 mm steps, up to the A1 Mini limit;<!--with_uwb-->
    - with UWB: anchor boards turned across the arms if the extension socket
      doesn't fit along them;<!--/-->
    - lid slots stretched to the measured standoff spacing, and the lid's
@@ -52,13 +58,14 @@ python3 cad/fit.py            # solve, regenerate, render, audit — both builds
 5. **Audits** both builds and writes [`cad/FIT_REPORT.md`](../../cad/FIT_REPORT.md).
    The audit checks:
    - every bought part, as a 3D envelope, is inside the enclosure and below
-     the lid;
-   - no two parts overlap, and none hits a post, the boss, the shelf, the
-     lid's ring or the screw heads under the lid;
-   - the power boards sit below the LED window;
-   - the wall openings can be reached, and the switch's ring can clamp it to the wall, and its key flat fits its hole;
-   - the bolts are long enough;
-   - the tray, the pod and the dowel come out of their stock;
+     the lid, or inside the drum and below the enclosure floor;
+   - no two parts overlap, and none hits a post, a pocket wall, a drum screw,
+     the shelf, the lid's ring or the screw heads under the lid;
+   - nothing on the enclosure floor stands in front of the LED window;
+   - the switch is clear of the bank's opening, its ring can clamp it to the wall, and its key flat fits its hole;
+   - every board's screws land where they can be driven, and the bolts are long enough;
+   - the bank's pocket fits the drum, its catch flexes within PETG's limit, its cable reaches the trigger, and the tripod nut fits the plate;
+   - the pod and the dowel come out of their stock;
    - each STL is one piece no bigger than 170 mm on any side.
    It also lists every part size that is still assumed rather than measured.
 
@@ -90,11 +97,12 @@ In both builds' `cad/`. Print settings for each are in
 
 | File | Part |
 | --- | --- |
-| `base_housing.scad` | Enclosure: three shelf posts merged into the wall, the LED window all the way round with a ledge below it for the diffuser band, USB-C inlet, round switch hole keyed to the flat on its thread, with a flat seat outside for its bezel and a flat boss inside for its ring, low and high vents, four radial lid-screw holes, tripod boss with a hex pocket for a 3/8-16 nut, risers when needed. The wall differs by build — see below |
+| `base_housing.scad` | Enclosure: three shelf posts merged into the wall, the LED window all the way round with a ledge below it for the diffuser band, vents above the shelf, four radial lid-screw holes; in the floor, countersunk holes for the power drum's screws and a hole for the leads up from it. The wall differs by build — see below |
 | `shelf.scad` | Pi shelf: rests on the posts (3 × M3 × 8 into inserts), Pi holes for M2.5 nylon standoffs, a cut-away side for the cables, a centre mark for the LED ring underneath |
 | `lid.scad` | Top plate carrying the Arducam pan-tilt base; slotted pattern for the base's standoffs, a cable slot at the back, a locating ring underneath with four radial M3 inserts |
 | `led_diffuser_ring.scad` | Translucent band that slides over the outside of the LED window |
-| `battery_tray.scad` | Saddle for the USB-C power bank, strap slots |
+| `power_drum.scad` | Power drum, the enclosure's diameter, screwed under its floor: the bank's pocket across it, open at one side, with finger windows either side of the opening; countersunk holes through the pocket walls for the buck and latch standing on edge against them; the PD trigger's floor holes and rest; the round switch hole keyed to the flat on its thread, with a flat seat outside for its bezel and a flat boss inside for its ring; vents by the buck; posts with M3 inserts for the screws down through the enclosure floor; the tripod screw's hole<!--with_uwb-->; with UWB, the three bosses the arms and mast foot bolt to<!--/--> |
+| `bank_plate.scad` | The bank pocket's drop-in floor: the tripod's 3/8-16 nut in a hex hole through it, a sprung crossbar with a catch at its front edge, two M3 inserts underneath for the screws up through the drum floor |
 
 ## Before printing — measure these
 
@@ -112,15 +120,15 @@ Prefer remixing community designs instead? See
 
 ## With UWB
 
-`with_uwb/cad/base_housing.scad` adds **three wall bosses** — anchor arms at
-±Y, the A3 mast at −X — and needs support only under them. It also adds a
-**slot high in the wall** behind the Pi's USB ports, where the three anchor
-cables come in. Three more files:
+`with_uwb/cad/power_drum.scad` adds **three wall bosses** — anchor arms at
+±Y, the A3 mast at −X — run down to the bed so they print without support.
+`with_uwb/cad/base_housing.scad` adds a **slot high in the wall** behind the
+Pi's USB ports, where the three anchor cables come in. Three more files:
 
 | File | Part |
 | --- | --- |
-| `anchor_arm.scad` | Static UWB anchor arm (×2); bolts to the M3 inserts in the ±Y bosses. The board pad runs along or across the arm, whichever way `fit.py` turned the ULA1s |
-| `anchor_mast.scad` | A3 mast: `part="foot"` bolts to the −X boss and holds a ½" dowel; `part="cradle"` caps it and carries the board. Echoes the dowel cut length (246 mm with the defaults) |
+| `anchor_arm.scad` | Static UWB anchor arm (×2); bolts to the M3 inserts in the drum's ±Y bosses. The board pad runs along or across the arm, whichever way `fit.py` turned the ULA1s |
+| `anchor_mast.scad` | A3 mast: `part="foot"` bolts to the drum's −X boss and holds a ½" dowel; `part="cradle"` caps it and carries the board. Echoes the dowel cut length (246 mm with the defaults) |
 | `wearable_case.scad` | Wearable pod body + lid, strap bars, USB-C slot; sized by `fit.py` for the ULA1 plugged straight into the end of its bank |
 
 One dimension worth *choosing* rather than measuring: `uwb_half_base`. It is

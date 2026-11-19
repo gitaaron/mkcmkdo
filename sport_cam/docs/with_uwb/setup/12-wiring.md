@@ -70,7 +70,7 @@ happens.
 It goes on the 12 V side, not the 5 V side. On the 5 V rail it would carry up
 to 4 A and drop ≈ 0.4–0.5 V, so the 5.1 V you set becomes ≈ 4.6 V at the
 Pi, under the Pi's 4.63 V low-voltage warning, and it would turn ≈ 2 W into
-heat inside the enclosure. On the 12 V side it carries under 2 A, the buck
+heat inside the drum. On the 12 V side it carries under 2 A, the buck
 regulates its drop away, and it costs ≈ 0.4 V of 12 V (≈ 3 % of the runtime).
 
 - **Check its rating** from the marking on its body: at least **3 A** and
@@ -80,8 +80,8 @@ regulates its drop away, and it costs ≈ 0.4 V of 12 V (≈ 3 % of the runtime)
   cathode (band) lead into the buck's IN+ terminal, or splice it inline.
   Heat-shrink over the body and both joints.
 - It runs warm (≈ 0.7 W when the camera is tracking and recording). Leave
-  ≈ 5 mm of lead at each end and keep it off the foam tape and the printed
-  floor.
+  ≈ 5 mm of lead at each end and keep it off the printed drum wall and the
+  boards.
 
 ### Power latch
 
@@ -92,9 +92,8 @@ Design reasons: [04 — Electronics](../../design/04-electronics.md#power-switch
 
 **Build and test it first with the [power latch guide](../../setup/12a-power-latch.md)**: it gives the
 layout hole by hole, with a diagram of both sides, and a bench test. Build it on the 3 × 7 cm board from a double-sided perfboard kit (BOM 13a; each part is listed in
-[its own table](10-bill-of-materials.md#power-latch)), with the IRF4905 bent over flat so it stays below
-the LED window. Keep parts and wires clear of the four corner holes: the board stands on four M3
-standoffs, screwed up through the enclosure floor like the buck.
+[its own table](10-bill-of-materials.md#power-latch)), with the IRF4905 bent over flat so the board stays thin. Keep parts and wires clear of the four corner holes: the board stands on edge on four M3
+standoffs against a wall of the bank pocket in the power drum, screwed through the wall like the buck.
 
 ```
   IN (+12 V) ───────●────────── Q1 S ┐

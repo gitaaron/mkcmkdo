@@ -6,7 +6,7 @@ When you switch off, it keeps the power on until the Pi has saved the recording,
 parked the head and halted. Only then does it disconnect the camera.
 
 The latch is the same in both builds. Build it and test it on the bench
-**before** it goes into the enclosure. It's the first board in the 12 V chain,
+**before** it goes into the power drum. It's the first board in the 12 V chain,
 in step 3 of the wiring guide ([with UWB](../with_uwb/setup/12-wiring.md#power-latch) ·
 [without UWB](../without_uwb/setup/12-wiring.md#power-latch)). That section has the
 circuit and explains how the latch behaves; this guide covers how to build it.
@@ -34,7 +34,7 @@ When you turn the board over to solder, turn it left to right, as in view 2 of t
 diagram. Column 1 is then on your right, and the rows don't move.
 
 **The corner holes are where the board is screwed down.** It stands on four M3 standoffs
-inside the enclosure, like the buck. The dashed circles in the diagram are the
+against a wall of the bank pocket in the power drum, like the buck. The dashed circles in the diagram are the
 standoffs and their screw heads: nothing goes there, and no lead or wire may cross
 them. If your board's corner holes are smaller than 3.2 mm, drill them out **before**
 you start, so the drill can't catch on a part.
@@ -189,13 +189,13 @@ switch on through SW, and check that Q1 stays cool. At the camera's 1.7 A it war
 
 1. **Screw the four standoffs on from the top.** Each 8 mm M3 female–female nylon standoff
    (BOM 13a.11) goes under a corner hole, held by an M3 × 6 screw from the parts side.
-2. **Fit the board in the enclosure.** Set it where the 3D model shows, Q1's tab clear
-   of the buck and of the wall. If `fit.py` has raised the floor boards over the tripod
-   boss, each standoff stands on a printed riser.
-3. **Screw it down from underneath.** Four M3 countersunk screws go up through the
-   floor (and the risers, if there are any) into the standoffs. Their length is in
-   `cad/FIT_REPORT.md`: M3 × 8 through the floor alone, M3 × 20 through the floor and
-   the risers.
+2. **Fit the board in the power drum.** It stands on its long edge against a wall of
+   the bank pocket, parts facing out, where the 3D model shows it (behind the pocket's
+   closed end with the assumed sizes), Q1's tab clear of the drum wall.
+3. **Screw it to the wall from inside the pocket.** Four M3 × 8 countersunk screws go
+   through the pocket wall into the standoffs (the length is in `cad/FIT_REPORT.md`),
+   heads flush so the bank slides past. Do it with the bank plate out: the lower
+   screws are where the plate lies.
 4. **Make the connections.** Do the rest in the order of the wiring guide's step 3:
    P2, P3, P5, then S1–S4 when the rocker and Pi are in.
 
@@ -205,7 +205,7 @@ in [`cad/ordered_parts.toml`](../../cad/ordered_parts.toml):
 - `standoff_h`;
 - `h`, the height with Q1 lying flat.
 
-Then run `python3 cad/fit.py` before you print the enclosure.
+Then run `python3 cad/fit.py` before you print the power drum.
 
 ## If something is wrong
 

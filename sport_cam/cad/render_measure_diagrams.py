@@ -724,11 +724,10 @@ def boards():
          "shifter: the 2 × 8 cm perfboard on four M3 standoffs, measured as the latch, with the servo plugs on their headers for h.",
          "pd_trigger: it must have a USB-C SOCKET (a hole the cable plugs into), not a plug sticking out.   "
          "Two standoffs, through the holes at the socket end: hole_x — from that end of the board to the holes' centres; "
-         "hole_dy — the two holes centre to centre.   standoff_h — the standoffs' length: it lifts the socket, so "
-         "standoff_h + pcb_t + port_h ÷ 2 sets the height of the USB-C inlet in the wall, and the printed rest under "
+         "hole_dy — the two holes centre to centre.   standoff_h — the standoffs' length: the printed rest under "
          "the terminal end is made this tall.   pcb_t — the board's thickness.   "
          "port_h — the socket's height above the board.   plug_w × plug_h — the bank cable's USB-C plug: the "
-         "moulded body behind the metal, not the metal tip (the wall opening is cut to this)."],
+         "moulded body behind the metal, not the metal tip (room is kept for it in front of the socket)."],
         panels=6, size=(13.0, 7.6), rows=2)
     for ax, t in zip(axes, ("buck converter  [buck]", "PD trigger: outline and holes  [pd_trigger]",
                             "PD trigger: heights, from the side  [pd_trigger]", "the bank cable's plug  [pd_trigger]",
@@ -800,7 +799,7 @@ def boards():
     S.draw()
     S.fit(pad=16)
 
-    # PD trigger from the side: the stack of heights that sets the USB-C inlet in the wall
+    # PD trigger from the side: the stack of heights, and the printed rest under its terminal end
     S = Scene2(axes[2])
     ph_ = t["port_h"]
     S.line((-3, 0), (l + 3, 0), color=NOTE, lw=1.2)                                   # the floor
@@ -817,7 +816,7 @@ def boards():
     S.dim((0, 0), (0, t["h"]), (-4, 0), "h", text_off=(-3, 0), ha="right")
     S.dim((hx, 0), (l, 0), (0, -4), "hole_x", text_off=(0, -3))
     S.text((4, so / 2), "printed\nrest", off=(0, -16))
-    S.text((l + 0.6, top + ph_ / 2), "socket's centre sets\nthe wall inlet's height", off=(10, 14), ha="left")
+    S.text((l + 0.6, top + ph_ / 2), "the bank's cable\nplugs in here", off=(10, 14), ha="left")
     S.fit(pad=6, right=20)
 
     # the bank cable's plug, on its own: the wall opening is cut to it

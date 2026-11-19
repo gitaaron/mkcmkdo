@@ -70,7 +70,8 @@ PARTS = {
     "diffuser": ("led_diffuser_ring.stl", None,        (0, 0, BAND_Z)),
     "shelf":    ("shelf.stl",             None,        (0, 0, SHELF_Z)),
     "lid":      ("lid.stl",               None,        (0, 0, LID_Z)),
-    "tray":     ("battery_tray.stl",      None,        (-77.4, -38.4, -20)),
+    "drum":     ("power_drum.stl",        None,        (0, 0, LY["drum_z"])),
+    "plate":    ("bank_plate.stl",        rot_z(LY["drum"]["ang"]), (0, 0, LY["drum_z"] + LY["drum"]["floor"])),
 }
 _cache: dict[str, np.ndarray] = {}
 
@@ -120,18 +121,19 @@ def shade(tris: np.ndarray, base_hex: str) -> np.ndarray:
 # field of the steps in index.html.
 # ---------------------------------------------------------------------------
 UP = (0, 0, 0)
-ALL = ["tray", "shell", "shelf", "diffuser", "lid"]
+ALL = ["drum", "plate", "shell", "shelf", "diffuser", "lid"]
 SCENES = [
     dict(id="prep", title="Printed parts overview", show=[],
          add=[("shell", UP), ("shelf", (0, 0, 60)), ("diffuser", (0, 0, 95)), ("lid", (0, 0, 150)),
-              ("tray", (0, 0, -90))],
+              ("drum", (0, 0, -70)), ("plate", (0, 0, -150))],
          arrows=False),
-    dict(id="tripod-insert", title="Enclosure", show=[], add=[("shell", UP)], elev=38,
-         marks=[((0, 0, 12), "3/8-16 nut (1/4-20 via bushing)")]),
-    dict(id="power", title="Power boards on the floor", show=[], add=[("shell", UP)], elev=44,
-         marks=[((LY["boxes"]["trigger"]["cx"], LY["boxes"]["trigger"]["cy"], 8), "PD trigger at the USB-C inlet"),
-                ((LY["boxes"]["buck"]["cx"], LY["boxes"]["buck"]["cy"], 20), "buck"),
-                ((LY["boxes"]["latch"]["cx"], LY["boxes"]["latch"]["cy"], 14), "power latch")]),
+    dict(id="tripod-insert", title="Bank plate", show=[], add=[("plate", UP)], elev=38,
+         marks=[((0, 0, LY["nut_seat"]), "3/8-16 nut (1/4-20 via bushing)")]),
+    dict(id="power", title="Power parts into the drum, drum under the enclosure", show=[],
+         add=[("drum", UP), ("plate", (0, 0, 40))], elev=30,
+         marks=[((LY["boxes"]["trigger"]["cx"], LY["boxes"]["trigger"]["cy"], LY["boxes"]["trigger"]["z1"]), "PD trigger"),
+                ((LY["boxes"]["buck"]["cx"], LY["boxes"]["buck"]["cy"], LY["boxes"]["buck"]["z1"]), "buck, on edge"),
+                ((LY["boxes"]["latch"]["cx"], LY["boxes"]["latch"]["cy"], LY["boxes"]["latch"]["z1"]), "power latch, on edge")]),
     dict(id="led", title="LED ring under the shelf, diffuser band", show=["shell"],
          add=[("shelf", (0, 0, 60)), ("diffuser", (0, 0, 80))],
          marks=[((0, 0, SHELF_Z - 2), "ring under the shelf"), ((0, -LY["base_d"] / 2, BAND_Z + 8), "band over the window")]),
@@ -143,9 +145,10 @@ SCENES = [
          marks=[((0, 0, LID_TOP), "slots take 30-72 mm bolt spacing")]),
     dict(id="lid-on", title="Lid onto the enclosure", show=["shell", "diffuser", "shelf"],
          add=[("lid", (0, 0, 95))]),
-    dict(id="battery", title="Battery tray", show=["shell", "shelf", "diffuser", "lid"],
-         add=[("tray", (0, 0, -70))],
-         marks=[((0, 0, -14), "92 Wh bank, slung low")]),
+    dict(id="battery", title="Power bank into the drum", show=ALL,
+         add=[],
+         marks=[((*(LY["base_d"] / 2 * np.array([math.cos(math.radians(LY["drum"]["ang"])), math.sin(math.radians(LY["drum"]["ang"]))])), LY["drum_z"] / 2),
+                 "bank slides in here, USB-C out")]),
     dict(id="complete", title="Completed assembly", show=ALL, add=[]),
 ]
 

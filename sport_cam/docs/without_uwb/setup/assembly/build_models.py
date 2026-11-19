@@ -34,7 +34,8 @@ PARTS: dict[str, str] = {
     "lid":               "lid.stl",
     "led_diffuser_ring": "led_diffuser_ring.stl",
     "shelf":             "shelf.stl",
-    "battery_tray":      "battery_tray.stl",
+    "power_drum":        "power_drum.stl",
+    "bank_plate":        "bank_plate.stl",
 }
 
 

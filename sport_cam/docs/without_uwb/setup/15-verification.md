@@ -22,22 +22,22 @@ Click a drawing for the full size. (Drawn by `python3 cad/render_measure_diagram
 | # | Measure | What exactly to measure (click to enlarge) | Why it matters | What fit.py does / what a mistake costs |
 | --- | --- | --- | --- | --- |
 | 1 | **Arducam base: standoff spacing, standoff height, pan servo, ribbon** → `[ptz]` | <a href="../images/measure/ptz.png"><img src="../images/measure/ptz.png" width="260" alt="Arducam base: horizontal_bolt_spacing and vertical_bolt_spacing between the standoffs, base_d, standoff_h, servo_drop, tilt_axis_h, screw and ribbon"></a> | The base stands on the lid on its four brass standoffs, with the pan servo hanging between them. Measure the standoffs from above with the lens straight ahead: side to side (`horizontal_bolt_spacing`) and front to back (`vertical_bolt_spacing`), centre to centre. It is screwed from under the lid. Arducam publishes no drawing, so the lid is cut with radial slots, 70–104 mm by default. The ribbon and leads run outside, from the camera head to a cable slot at the back of the lid | `fit.py` turns the slots to the rectangle's corners, stretches them to its corner-to-corner spacing, counterbores the lid if `bolt_l` is short, sizes the cable slot to `ribbon_w`, and checks the servo clears the lid and the ribbon (`ribbon_l`) reaches the Pi. Reprinting the lid is the **four-hour** mistake — measure before the printer starts |
-| 2 | **Buck converter, PD trigger, power latch, level shifter** → `[buck]`, `[pd_trigger]`, `[latch]`, `[shifter]` | <a href="../images/measure/boards.png"><img src="../images/measure/boards.png" width="260" alt="Buck, PD trigger, latch and level shifter: l, w, h, each one's standoff spacing, and the PD trigger's plug"></a> | They sit on the enclosure floor round the tripod boss and the shelf posts, under the LED window. Modules of the same rating vary a lot. All four stand on standoffs screwed up from underneath, the shifter through the shelf if it fits there: measure each `h` from the bottom of the standoffs, and the hole spacing centre to centre (`hole_dx` × `hole_dy`; the PD trigger's two holes are `hole_x` in from its socket end, `hole_dy` apart). The latch and shifter are boards you build: measure the perfboards before you start ([12a](../../setup/12a-power-latch.md), [12b](../../setup/12b-level-shifter.md), [12c](../../setup/12c-power-boards.md)) | `fit.py` rearranges them, lifts the boards onto risers over the boss, or makes the enclosure taller or wider. Wrong hole spacing and the screw holes miss the standoffs. A **14-hour** reprint if you skip it |
-| 3 | **Round rocker switch** → `[switch]` | <a href="../images/measure/switch.png"><img src="../images/measure/switch.png" width="260" alt="Rocker switch: bezel, thread and its key flat, ring and depth"></a> | Its hole goes in the wall; the ring must reach past the wall, and its key flat sets the flat in the hole | `fit.py` sizes the hole, the bezel's flat seat, the ring's boss and the hole's flat, and moves the switch so the ring clears the floor |
+| 2 | **Buck converter, PD trigger, power latch, level shifter** → `[buck]`, `[pd_trigger]`, `[latch]`, `[shifter]` | <a href="../images/measure/boards.png"><img src="../images/measure/boards.png" width="260" alt="Buck, PD trigger, latch and level shifter: l, w, h, each one's standoff spacing, and the PD trigger's plug"></a> | The buck and the latch stand on edge against the walls of the bank pocket in the power drum, the PD trigger lies on the drum's floor, and the shifter goes on the shelf if it fits there. Modules of the same rating vary a lot. All four stand on standoffs: measure each `h` from the bottom of the standoffs, and the hole spacing centre to centre (`hole_dx` × `hole_dy`; the PD trigger's two holes are `hole_x` in from its socket end, `hole_dy` apart). The latch and shifter are boards you build: measure the perfboards before you start ([12a](../../setup/12a-power-latch.md), [12b](../../setup/12b-level-shifter.md), [12c](../../setup/12c-power-boards.md)) | `fit.py` rearranges them, or makes the drum taller or wider. Wrong hole spacing and the screw holes miss the standoffs. An **18-hour** reprint of the drum if you skip it |
+| 3 | **Round rocker switch** → `[switch]` | <a href="../images/measure/switch.png"><img src="../images/measure/switch.png" width="260" alt="Rocker switch: bezel, thread and its key flat, ring and depth"></a> | Its hole goes in the power drum's wall; the ring must reach past the wall, and its key flat sets the flat in the hole; its body must clear the boards behind the wall | `fit.py` sizes the hole, the bezel's flat seat, the ring's boss and the hole's flat, and moves the switch round the drum until its body clears everything |
 | 4 | **Pi heatsinks or fan case** → `[pi] heatsink_h` | <a href="../images/measure/pi_heatsink.png"><img src="../images/measure/pi_heatsink.png" width="260" alt="Pi: heatsink_h from the board's top surface"></a> | The Pi sits on the shelf under the lid; a fan case is taller than stick-on heatsinks | `fit.py` makes the enclosure taller |
-| 5 | **Camera power bank** → `[power_bank]` | <a href="../images/measure/power_bank.png"><img src="../images/measure/power_bank.png" width="260" alt="Camera power bank: l, w, h of the body"></a> | The battery tray is a pocket sized to it. Banks of the same advertised capacity vary by 15 mm in every direction | Reprint the tray (3.5 h) |
+| 5 | **Camera power bank** → `[power_bank]` | <a href="../images/measure/power_bank.png"><img src="../images/measure/power_bank.png" width="260" alt="Camera power bank: l, w, h of the body"></a> | The power drum's pocket is sized to it, and everything else in the drum is placed round the pocket. Banks of the same advertised capacity vary by 15 mm in every direction. Note which end its USB-C socket is at: it goes in socket outwards | Reprint the drum (≈ 18 h) and the bank plate (≈ 4 h) |
 
-**Tripod nut** (`[tripod_nut]`): the floor's hex pocket is cut to the nut's
-size across the flats (14.29 mm assumed, a standard 3/8-16 nut) and must be at
-least as deep as the nut is thick (8.33 mm assumed; the pocket is 9 mm). A
+**Tripod nut** (`[tripod_nut]`): the bank plate's hex hole is cut to the nut's
+size across the flats (14.29 mm assumed, a standard 3/8-16 nut) and the plate
+must be at least as thick as the nut (8.33 mm assumed; the plate is 9 mm). A
 nut that is slightly too big can be filed down on its flats rather than
 reprinting. Check both threads: 3/8-16 screw into the nut; 1/4-20 screw with
 the bushing fitted.
 
 **Reducer bushing** (BOM item 23): it must screw all the way up into the nut
-and sit flush with the floor — a plain slotted sleeve, not one with a collar or
-flange, or the tripod plate clamps on the collar instead of the enclosure. It
-must be no longer than the ledge plus the nut (3 + 8.33 ≈ 11 mm), or it
+and sit flush with the drum's underside — a plain slotted sleeve, not one with a collar
+or flange, or the tripod plate clamps on the collar instead of the drum. It
+must be no longer than the drum floor plus the nut (3 + 8.33 ≈ 11 mm), or it
 bottoms out before it is flush; most are 8–10 mm.
 
 <a href="../images/measure/tripod_nut.png"><img src="../images/measure/tripod_nut.png" width="260" alt="Tripod nut: af and t"></a>
@@ -49,7 +49,8 @@ bottoms out before it is flush; most are 8–10 mm.
 | **Lid ring enters the enclosure mouth, and its inserts line up with the wall holes** | dry fit, no force | sand the ring or raise `clr` and reprint the lid |
 | **Shelf drops onto its three posts** | dry fit, screws into the post inserts | check the post tops for stringing; a pass with a file |
 | **Diffuser band slides down over the window onto its ledge** | dry fit | raise `clr` and reprint the band (1.5 h) |
-| **The bank sits in the tray with the strap closed** | dry fit | back to item 5 above |
+| **The bank slides into the drum's pocket and the catch clicks up behind it** | dry fit, bank plate screwed in | back to item 5 above |
+| **The bank's cable reaches from the trigger, out through a finger window, into the bank's face** | dry fit, right-angle end in the bank | a longer cable (item 14) |
 
 ## Software checks
 

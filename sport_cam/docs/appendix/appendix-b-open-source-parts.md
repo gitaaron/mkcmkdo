@@ -5,8 +5,8 @@ parametric parts in `<build>/cad/` ([Appendix A](appendix-a-cad-parts.md)),
 with the cost of each substitution.
 
 Motion is a bought assembly (Arducam PTZ camera and pan-tilt base);
-substitution candidates are the enclosure, LED diffuser and trays.
-Both builds print an enclosure, a lid, a diffuser ring and a tray<!--with_uwb-->; the UWB
+substitution candidates are the enclosure, LED diffuser and battery holder.
+Both builds print an enclosure, a lid, a diffuser ring, a power drum and a bank plate<!--with_uwb-->; the UWB
 build adds two arms, a mast and a pod ([With UWB](#with-uwb))<!--/-->.
 
 ## Enclosure and lid
@@ -25,11 +25,14 @@ build adds two arms, a mast and a pod ([With UWB](#with-uwb))<!--/-->.
 - [16-LED ring diffuser — Thingiverse 1396974](https://www.thingiverse.com/thing:1396974) — same idea, older classic.
 - [NeoPixel ring articulating mount — Printables 277167](https://www.printables.com/model/277167-neopixel-ring-articulating-mount) — handy during bench bring-up.
 
-## Battery tray
+## Battery holder
+
+The power drum holds the bank and every power board, and carries the tripod nut, so a bank holder from elsewhere means putting the boards back in the enclosure (a taller one) and giving it a tripod mount of its own.
+
 
 - [Power bank holder with a universal tripod mount — Printables 1094558](https://www.printables.com/model/1094558-holder-for-a-power-bank-with-a-universal-mount-for) — mounts a bank on a photo tripod; check it fits a 150 × 72 × 30 mm bank before printing.
 - [Parametric container generator, OpenSCAD — Printables 208305](https://www.printables.com/model/208305-parametric-battery-holder-9v-default-openscad-cust) — made for a 9 V battery, but its OpenSCAD parameters generate a holder to your bank's exact size.
-- [Tripod leg accessory clamp — Thingiverse 4536847](https://www.thingiverse.com/thing:4536847) — if you'd rather clamp to a leg than strap to the column.
+- [Tripod leg accessory clamp — Thingiverse 4536847](https://www.thingiverse.com/thing:4536847) — if you'd rather clamp the bank to a leg than carry it under the head.
 
 ## If you want continuous pan
 

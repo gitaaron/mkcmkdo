@@ -18,6 +18,7 @@ render base_housing.scad      base_housing.stl
 render lid.scad               lid.stl
 render led_diffuser_ring.scad led_diffuser_ring.stl
 render shelf.scad             shelf.stl
-render battery_tray.scad      battery_tray.stl
+render power_drum.scad        power_drum.stl
+render bank_plate.scad        bank_plate.stl
 
 echo "done — STLs in cad/stl/"
