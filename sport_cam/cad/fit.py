@@ -80,6 +80,8 @@ EXPECTED_BODIES = {"wearable_case.stl": 2}
 EDGE_BOARDS = (("buck", "buck converter"), ("latch", "power latch"))
 LABELS = dict(EDGE_BOARDS)
 TRIGGER_PLUG_L = 20        # room kept in front of the PD trigger's socket for the cable's plug and its bend
+WIRE_CH = 7                # the leads round the pocket's closed end (trigger and rocker to the latch, latch to the
+                           # buck): this much clear between each back corner of the pocket and any drum post
 DEBUG = []
 # Every board on standoffs: the two on edge above; the PD trigger (two holes at its socket
 # end, a printed rest under the other), screwed up through the drum floor; and the level
@@ -461,6 +463,8 @@ def solve_drum(build, P, C, base_d):
                         c = Cyl("drum post", x, y, pr, 0, DH)
                         if c.rmax() > R_in + 1 + EPS or overlap2d(c, interior, 0.5):
                             continue
+                        if any(math.hypot(x - (x0 - pw), y - cy_) < pr + WIRE_CH for cy_ in (y0 - pw, y1 + pw)):
+                            continue        # the leads' way round the pocket's closed end
                         if any(overlap2d(c, o, 0.5) for o in [*fingers, *(b_ for b_, _ in boards.values()), tplug, swbox, swbody]):
                             continue
                         k = int(math.degrees(math.atan2(y, x)) % 360 // 10)
@@ -1015,7 +1019,7 @@ def gen_scad(build, P, C, L) -> str:
 def gen_json(build, P, C, L) -> dict:
     keep = {k: v for k, v in L.items() if k != "attempts"}
     keep["design"] = {k: C[k] for k in ("base_wall", "lid_t", "spigot_h", "shelf_t", "led_window_h",
-                                        "diffuser_t", "diffuser_lip", "tape_t", "clr") if k in C}
+                                        "diffuser_t", "diffuser_lip", "tape_t", "clr", "finger_z") if k in C}
     keep["parts"] = {k: {kk: vv for kk, vv in v.items() if kk not in ("name",)} for k, v in P.items()}
     if build == "with_uwb":
         keep["uwb"] = {k: C[k] for k in ("uwb_half_base", "anchor_board_z", "uwb_v_base", "arm_boss_z", "mast_floor")}
@@ -1428,6 +1432,13 @@ def audit(build, P, C, L, stl_dir=None) -> Audit:
             f"{h:g} mm catch on a {ln:g} mm crossbar along the bank plate's front edge, {t:g} mm thick, held at both ends "
             f"({100 * strain:.1f} % strain pressed flat; PETG takes about 2 %); {C['finger_l']:g} mm finger windows each side, "
             f"from {D['bank_z'] + C['finger_z']:g} mm up", ["power_bank"])
+    corners = [(D["x0"] - D["pw"], y) for y in (D["y0"] - D["pw"], D["y1"] + D["pw"])]
+    ca, sa = math.cos(math.radians(D["ang"])), math.sin(math.radians(D["ang"]))
+    room = min(math.hypot(x * ca + y * sa - cx, -x * sa + y * ca - cy) - C["drum_post_d"] / 2
+               for x, y in D["screws"] for cx, cy in corners)
+    A.check(room >= WIRE_CH - EPS, "The leads have room round the pocket's closed end",
+            f"{room:.1f} mm between the nearest drum post and a back corner of the bank pocket (needs {WIRE_CH}): "
+            "the trigger's and the rocker's leads to the latch, and the latch's to the buck, go round there", ["power_bank"])
     angs = sorted(D["post_angs"])
     n = len(angs)
     gaps = [angs[(i + 1) % n] - angs[i] + (360 if i == n - 1 else 0) for i in range(n)]

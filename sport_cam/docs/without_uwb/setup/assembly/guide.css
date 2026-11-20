@@ -193,6 +193,10 @@ main { flex: 1; overflow-y: auto; padding: 22px 26px 60px; min-width: 0; }
 .viewer-bar { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .viewer-bar .spacer { flex: 1; }
 .viewer-bar .slider { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); min-width: 220px; }
+.viewer-bar .xray-level { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.viewer-bar .xray-level[hidden] { display: none; }
+.viewer-bar .xray-level input { width: 110px; }
+.viewer-bar .xray-level output { min-width: 3.2em; font-variant-numeric: tabular-nums; }
 .viewer-bar input[type=range] { flex: 1; accent-color: var(--accent); }
 .viewer-bar button {
   background: var(--panel);

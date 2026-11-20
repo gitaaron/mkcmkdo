@@ -92,6 +92,7 @@ window.SPORTCAM_LAYOUT = {
   "clr": 0.25,
   "diffuser_lip": 2,
   "diffuser_t": 1.6,
+  "finger_z": 10,
   "led_window_h": 12,
   "lid_t": 5,
   "shelf_t": 3,
@@ -181,8 +182,8 @@ window.SPORTCAM_LAYOUT = {
   "plate_t": 9.0,
   "post_angs": [
    40.0,
-   110.0,
-   185.0,
+   140.0,
+   200.0,
    280.0
   ],
   "post_d": 10,
@@ -204,12 +205,12 @@ window.SPORTCAM_LAYOUT = {
     47.952
    ],
    [
-    -25.515,
-    70.101
+    -57.147,
+    47.952
    ],
    [
-    -74.316,
-    -6.502
+    -70.101,
+    -25.515
    ],
    [
     12.954,
@@ -230,7 +231,6 @@ window.SPORTCAM_LAYOUT = {
   },
   "vent_z": 27.5,
   "vents": [
-   200,
    210,
    220,
    230,
@@ -649,8 +649,8 @@ window.SPORTCAM_LAYOUT = {
  "pose_rank": 0,
  "post_angs": [
   0,
-  100,
-  200
+  105,
+  210
  ],
  "post_r": 74.0,
  "power_top": 3,

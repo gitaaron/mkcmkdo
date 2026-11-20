@@ -23,7 +23,7 @@ Enclosure Ø162 × 54 mm (floor to lid), on a power drum Ø162 × 55 mm: 114 mm 
 | ✅ | The level shifter's standoffs land on the shelf | standoffs 76×16 mm on a 80×20 board; 4 × M3 × 8 countersunk through the 3 mm shelf |
 | ✅ | The bank's cable reaches the PD trigger inside the drum | ≈ 177 mm: right-angle plug in the bank's face, round through the nearer finger window to the trigger's socket, with slack to unplug it; the cable in the bill of materials is 300 mm |
 | ✅ | The wall above the LED window prints without support | 21 ribs; longest bridge 21 mm (limit 22) |
-| ✅ | Three posts hold the shelf level (its centre is inside them) | posts at 0°, 100°, 200°; widest gap 160° |
+| ✅ | Three posts hold the shelf level (its centre is inside them) | posts at 0°, 105°, 210°; widest gap 150° |
 | ✅ | No post is under the shelf's cable gap | gap 49 mm deep at 285° |
 | ✅ | The Pi's holes have plastic round them on the shelf | nearest edge 5.0 mm |
 | ✅ | The Pi's standoffs clear the parts under the board | 6 mm standoffs, 2.5 mm underneath |
@@ -36,7 +36,8 @@ Enclosure Ø162 × 54 mm (floor to lid), on a power drum Ø162 × 55 mm: 114 mm 
 | ✅ | The camera ribbon reaches the Pi | ≈ 298 mm needed (204 outside with a 60 mm loop for pan and tilt, 89 inside); ribbon 500 mm |
 | ✅ | The bank's pocket runs across the drum, open at one side | its open end faces 330°; the bank's front face is 12 mm in from the outline at the middle, 0 mm at its nearer corner |
 | ✅ | The bank slides in, the catch snaps up behind it, and it pinches out at the open end | 2.5 mm catch on a 50 mm crossbar along the bank plate's front edge, 2.4 mm thick, held at both ends (1.4 % strain pressed flat; PETG takes about 2 %); 24 mm finger windows each side, from 22 mm up |
-| ✅ | The drum screws up under the enclosure on posts spread round it | 4 posts at 40°, 110°, 185°, 280° (widest gap 120°), each an M3 insert; 4 × M3 × 8 countersunk down through the enclosure floor, before the shelf |
+| ✅ | The leads have room round the pocket's closed end | 14.9 mm between the nearest drum post and a back corner of the bank pocket (needs 7): the trigger's and the rocker's leads to the latch, and the latch's to the buck, go round there |
+| ✅ | The drum screws up under the enclosure on posts spread round it | 4 posts at 40°, 140°, 200°, 280° (widest gap 120°), each an M3 insert; 4 × M3 × 8 countersunk down through the enclosure floor, before the shelf |
 | ✅ | The anchor boards' USB plugs have room for the extension cables | 67 mm between plug and arm root |
 | ✅ | The anchor USB cables have a way into the enclosure, and room to plug into the Pi | slot 18×10 mm at 5°, z = 41, behind the Pi's USB ports; 30 mm kept clear beyond them for the plugs |
 | ✅ | The ULA1 hole pattern is inside the board | 32×17 on 40×25 |
@@ -60,11 +61,11 @@ Enclosure Ø162 × 54 mm (floor to lid), on a power drum Ø162 × 55 mm: 114 mm 
 
 ## without uwb — ✅ everything fits
 
-Enclosure Ø162 × 54 mm (floor to lid), on a power drum Ø162 × 55 mm: 114 mm from the tripod plate to the top of the lid. LED window 10–22; shelf at 22; Pi on 4 standoffs at z = 31, turned 0°.
+Enclosure Ø162 × 54 mm (floor to lid), on a power drum Ø162 × 55 mm: 114 mm from the tripod plate to the top of the lid. LED window 10–22; shelf at 22; Pi on 4 standoffs at z = 31, turned 30°.
 
 | | Check | Detail |
 | --- | --- | --- |
-| ✅ | Every bought part in the enclosure is inside its wall | inner radius 78.0 mm; furthest part at r = 75.1 mm |
+| ✅ | Every bought part in the enclosure is inside its wall | inner radius 78.0 mm; furthest part at r = 75.8 mm |
 | ✅ | Everything is below the lid | lid underside at z = 54 mm |
 | ✅ | Every power part is inside the drum, under the enclosure floor | drum Ø162 × 55 mm; buck and latch on edge against the bank pocket's walls, PD trigger on its floor, rocker switch in its wall |
 | ✅ | No two parts overlap, and none hits a post, a pocket wall, a drum screw, the shelf or the lid | 47 envelopes checked pairwise |
@@ -79,8 +80,8 @@ Enclosure Ø162 × 54 mm (floor to lid), on a power drum Ø162 × 55 mm: 114 mm 
 | ✅ | The level shifter's standoffs land on the shelf | standoffs 76×16 mm on a 80×20 board; 4 × M3 × 8 countersunk through the 3 mm shelf |
 | ✅ | The bank's cable reaches the PD trigger inside the drum | ≈ 177 mm: right-angle plug in the bank's face, round through the nearer finger window to the trigger's socket, with slack to unplug it; the cable in the bill of materials is 300 mm |
 | ✅ | The wall above the LED window prints without support | 21 ribs; longest bridge 21 mm (limit 22) |
-| ✅ | Three posts hold the shelf level (its centre is inside them) | posts at 90°, 195°, 345°; widest gap 150° |
-| ✅ | No post is under the shelf's cable gap | gap 48 mm deep at 270° |
+| ✅ | Three posts hold the shelf level (its centre is inside them) | posts at 15°, 120°, 225°; widest gap 150° |
+| ✅ | No post is under the shelf's cable gap | gap 48 mm deep at 300° |
 | ✅ | The Pi's holes have plastic round them on the shelf | nearest edge 5.0 mm |
 | ✅ | The Pi's standoffs clear the parts under the board | 6 mm standoffs, 2.5 mm underneath |
 | ✅ | The leads from the drum have a hole up through the enclosure floor | Ø12 at (0, 51), over the buck, clear of the posts and the drum's screws |
@@ -89,10 +90,11 @@ Enclosure Ø162 × 54 mm (floor to lid), on a power drum Ø162 × 55 mm: 114 mm 
 | ✅ | The PTZ screws reach into the standoffs | M3 × 12 up through the 5 mm lid and 2 washers: 6 mm of thread in each standoff |
 | ✅ | The pan servo under the base clears the lid | servo hangs 30.8 mm below the base, on 32 mm standoffs lifted on 2 M3 washers each (1 mm): 2.2 mm above the lid |
 | ✅ | The ribbon and leads fit the lid's cable slot | slot 28×9 mm at 180° (180° = straight behind the lens); ribbon 16 mm wide, leads Ø8 |
-| ✅ | The camera ribbon reaches the Pi | ≈ 300 mm needed (204 outside with a 60 mm loop for pan and tilt, 91 inside); ribbon 500 mm |
+| ✅ | The camera ribbon reaches the Pi | ≈ 307 mm needed (204 outside with a 60 mm loop for pan and tilt, 98 inside); ribbon 500 mm |
 | ✅ | The bank's pocket runs across the drum, open at one side | its open end faces 180°; the bank's front face is 12 mm in from the outline at the middle, 0 mm at its nearer corner |
 | ✅ | The bank slides in, the catch snaps up behind it, and it pinches out at the open end | 2.5 mm catch on a 50 mm crossbar along the bank plate's front edge, 2.4 mm thick, held at both ends (1.4 % strain pressed flat; PETG takes about 2 %); 24 mm finger windows each side, from 22 mm up |
-| ✅ | The drum screws up under the enclosure on posts spread round it | 4 posts at 35°, 130°, 250°, 320° (widest gap 120°), each an M3 insert; 4 × M3 × 8 countersunk down through the enclosure floor, before the shelf |
+| ✅ | The leads have room round the pocket's closed end | 14.9 mm between the nearest drum post and a back corner of the bank pocket (needs 7): the trigger's and the rocker's leads to the latch, and the latch's to the buck, go round there |
+| ✅ | The drum screws up under the enclosure on posts spread round it | 4 posts at 50°, 130°, 250°, 350° (widest gap 120°), each an M3 insert; 4 × M3 × 8 countersunk down through the enclosure floor, before the shelf |
 | ✅ | Device config matches the geometry | LED_COUNT = 16 |
 | ✅ | STLs are rendered from the current CAD and part sizes |  |
 | ✅ | bank_plate.stl prints in one piece on the Bambu Lab A1 Mini | 127 × 76 × 12 mm |
@@ -100,7 +102,7 @@ Enclosure Ø162 × 54 mm (floor to lid), on a power drum Ø162 × 55 mm: 114 mm 
 | ✅ | led_diffuser_ring.stl prints in one piece on the Bambu Lab A1 Mini | 166 × 166 × 16 mm |
 | ✅ | lid.stl prints in one piece on the Bambu Lab A1 Mini | 162 × 162 × 11 mm |
 | ✅ | power_drum.stl prints in one piece on the Bambu Lab A1 Mini | 162 × 162 × 55 mm |
-| ✅ | shelf.stl prints in one piece on the Bambu Lab A1 Mini | 154 × 107 × 3 mm |
+| ✅ | shelf.stl prints in one piece on the Bambu Lab A1 Mini | 154 × 138 × 3 mm |
 | ℹ️ | Still marked MEASURE_TODO in ordered_parts.toml | Raspberry Pi 4 Model B (item 2: heatsink_h); 74AHCT125 level shifter on a 2 × 8 cm perfboard (item 8: l, w, h, hole_dx, hole_dy, screw_d, standoff_h); USB-C PD trigger board, 12 V (item 10: l, w, h, pcb_t, port_h, hole_x, hole_dy, screw_d, standoff_h, plug_w, plug_h); Power latch (P-MOSFET and two transistors on a 3 × 7 cm double-sided perfboard) (item 13a: l, w, h, hole_dx, hole_dy, screw_d, standoff_h); Round panel-mount rocker switch, threaded, with a locking ring (item 13: hole_d, hole_d_minus_flat, flat_side, flange_d, nut_d, nut_t, thread_l, depth); 3/8-16 hex nut (item 23: af, t) |
 | ℹ️ | Narrower enclosures tried first | Ø150: the power drum (Ø150): the buck converter (80 mm long, 28.2 mm deep on edge) has no room against the bank pocket; Ø152: the power drum (Ø152): the buck converter (80 mm long, 28.2 mm deep on edge) has no room against the bank pocket; Ø154: the power drum (Ø154): the buck converter (80 mm long, 28.2 mm deep on edge) has no room against the bank pocket; Ø156: the power drum (Ø156): the buck converter (80 mm long, 28.2 mm deep on edge) has no room against the bank pocket; Ø158: the power drum (Ø158): the buck converter (80 mm long, 28.2 mm deep on edge) has no room against the bank pocket; Ø160: the power drum (Ø160): no room on the drum floor for the PD trigger |
 | ✅ | Mesh check: no printed part intersects a bought part (OpenSCAD) | clean |

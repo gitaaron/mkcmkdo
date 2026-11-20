@@ -63,6 +63,9 @@
           <button id="btnXray" title="See through already-fitted parts (X)">X-ray</button>
           <button id="btnLabels" class="on" title="Toggle callouts (L)">Labels</button>
           <button id="btnDemo" hidden title="Animate pan and tilt">▶ Motion demo</button>
+          <label class="xray-level" id="xrayLevel" hidden title="How see-through the printed parts are in X-ray"><span>see-through</span>
+            <input type="range" id="xrayPct" min="0" max="100" step="1" value="78" aria-label="X-ray transparency" />
+            <output id="xrayPctOut">78%</output></label>
         </div>
         <div class="legend">
           <span><i class="swatch" style="background:#2f6fed"></i> fitted in this step</span>
@@ -124,7 +127,7 @@ const HEAD = ["lid", "ptz_plate", "ptz_pan", "ptz_yoke", "camera", "lens"];
 const ARMS = ["arm_p", "arm_n", "uwb_p", "uwb_n"];
 const MAST = ["mast_foot", "dowel", "mast_cradle", "uwb_m"];
 const BATT = ["bank"];
-const CABLES = ["ffc", "usb_p", "usb_n", "usb_m", "pwr_pi", "bank_cable"];
+const CABLES = ["ffc", "usb_p", "usb_n", "usb_m", "wiring", "bank_cable"];
 const lift = (ids, dz) => ids.map((id) => [id, 0, 0, dz]);
 
 const STEPS = [
@@ -327,11 +330,17 @@ const STEPS = [
       "<b>PTZ I2C and power:</b> 5 V and ground from the buck, SDA and SCL to GPIO 2/3. Power the controller from the rail, <i>not</i> the Pi's GPIO 5 V pin.",
       "<b>Servos:</b> unplug both servo leads from the PTZ controller and bring them down through the lid's cable slot to the two 3-pin headers by the shifter (extension leads if short): GPIO12 → gate 2 → pan, GPIO13 → gate 3 → tilt, headers powered from the 5 V rail. Brown/black is ground. Connections R7 and M1–M7 in the <a href='../12-wiring.md#servos' target='_blank'>wiring guide</a>.",
       "<b>Anchors:</b> a USB-A extension each, routed along the arms and tied to the rib, down the dowel for A3, and in through the slot high in the wall to the Pi's USB ports. Only one carries data; the others just need 5 V. Leave A3's lead a little slack at the foot so the mast can be pulled for transport.",
-      "Tie everything off. Nothing may hang where a tripod leg folds, and nothing may reach the pan axis.",
+      "<b>What the model shows</b> (X-ray on): every lead from its terminal to its terminal. <b>In the drum</b>, round the pocket's closed end: the trigger's 12 V and ground to the latch, the latch on to the buck through the diode, the rocker's two leads to the latch, and the buck's 5 V out and the latch's HOLD and SENSE up through the hole in the enclosure floor. <b>Under the shelf</b>, from that hole round to the shelf's cut-away side: the pigtail up to the Pi's USB-C, the ring's 5 V and ground, and the shifter's, the servo headers' and the PTZ controller's 5 V. <b>Over the shelf</b>, round the Pi's SD-card end: HOLD and SENSE to pins 11 and 13, pin 19 and pins 32/33 to the shifter, the shifter's data down to the ring. <b>Through the lid's cable slot</b>, beside the ribbon: the PTZ controller's I2C (pins 3/5) and 5 V up, the two servo leads down to their headers. <b>On the camera head</b>: the PTZ controller is the dark board behind the camera board, on four nylon standoffs. The I2C + 5 V lead goes into the 4-pin socket low on its back, and the lens's zoom/focus lead (C2, fitted at the factory) runs from the top of the lens barrel into the socket at its top: leave that one alone, just check it is pushed home. X-ray keeps the boards, the bank, the servos and the leads solid; the slider next to the X-ray button sets how see-through the rest is.",
+      "Tie everything off. Nothing may hang where a tripod leg folds, and nothing may reach the pan axis. In the drum, keep the leads off the pocket walls' faces so the bank slides past, and clear of the finger window the bank's cable comes out of.",
     ],
-    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST, ...BATT], add: lift(CABLES, 0), arrows: false,
+    scene: { show: [...SHELL, ...POWER, ...SHELF, ...PI, ...LED, ...HEAD, ...ARMS, ...MAST, ...BATT], add: lift(CABLES, 0), arrows: false, xray: true,
              view: "iso-back", focus: "all", render: "complete",
-             marks: [[-LY.parts.ptz.base_d / 2 - 8, 0, PTZ_Z, "ribbon service loop, behind the base", -85, 35, 35], [LY.base_d / 2 * Math.cos(LY.usb_entry.ang * Math.PI / 180), LY.base_d / 2 * Math.sin(LY.usb_entry.ang * Math.PI / 180), LY.usb_entry.z, "anchor leads in", -70, 35, 30], [-MAST_R - 8, 0, A3_Z - 80, "A3 lead down the mast", -60, -40, 30]] },
+             marks: () => [[-LY.parts.ptz.base_d / 2 - 8, 0, PTZ_Z, "ribbon service loop, behind the base", -85, 35, 35],
+                     [...wirePts().H, "5 V, HOLD, SENSE up from the drum", 40, 40, -30],
+                     [...wirePts().plugMid, "pigtail into the Pi's USB-C", 30, -40, -25],
+                     [...wirePts().pin11, "HOLD, SENSE → pins 11, 13", 30, 40, 45],
+                     [...wirePts().hdr, "servo leads → shifter headers", 40, 30, 35],
+                     [...wirePts().slotTop, "I2C + 5 V up to the PTZ controller", -60, -40, 30], [PTZ_CTRL.x + 3.3, PTZ_CTRL.sockY, PTZ_CTRL.sockZ, "PTZ controller: I2C + 5 V socket", 40, 40, 20], [PTZ_CTRL.cam - 4, 8, TILT_Z + 25, "lens lead (factory-fitted) → controller", 40, 30, 30], [-10, 0, TILT_Z + 10, "tilt servo, in the U-bracket", -60, 30, 40], [LY.base_d / 2 * Math.cos(LY.usb_entry.ang * Math.PI / 180), LY.base_d / 2 * Math.sin(LY.usb_entry.ang * Math.PI / 180), LY.usb_entry.z, "anchor leads in", -70, 35, 30], [-MAST_R - 8, 0, A3_Z - 80, "A3 lead down the mast", -60, -40, 30]] },
   },
   {
     id: "tripod", phase: 4, title: "Mount on the tripod", time: "10 min",
@@ -458,6 +467,7 @@ function go(i, replaceHash) {
   $("btnNext").textContent = current === STEPS.length - 1 ? "Finish" : "Next →";
   $("btnDemo").hidden = !s.scene.demo;
   $("btnXray").classList.toggle("on", !!s.scene.xray);
+  syncXrayLevel();
   $("explode").value = 1000;
   updateProgress();
   if (viewer) viewer.showStep(s);
@@ -486,7 +496,16 @@ $("btnDone").addEventListener("click", () => {
 $("btnReplay").addEventListener("click", () => viewer && viewer.replay());
 $("explode").addEventListener("input", (e) => viewer && viewer.setExplode(e.target.value / 1000));
 document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => viewer && viewer.setView(b.dataset.view)));
-$("btnXray").addEventListener("click", () => { const b = $("btnXray"); b.classList.toggle("on"); viewer && viewer.setXray(b.classList.contains("on")); });
+$("btnXray").addEventListener("click", () => { const b = $("btnXray"); b.classList.toggle("on"); syncXrayLevel(); viewer && viewer.setXray(b.classList.contains("on")); });
+// the x-ray transparency slider: shown while x-ray is on, remembered in this browser
+function syncXrayLevel() { $("xrayLevel").hidden = !$("btnXray").classList.contains("on"); }
+function setXrayPct(v, save) {
+  $("xrayPct").value = v; $("xrayPctOut").textContent = v + "%";
+  if (viewer && viewer.setXrayLevel) viewer.setXrayLevel(+v);
+  if (save) try { localStorage.setItem("sportcam-xray-pct", v); } catch (e) {}
+}
+$("xrayPct").addEventListener("input", (e) => setXrayPct(e.target.value, true));
+try { const v = localStorage.getItem("sportcam-xray-pct"); if (v != null && v !== "" && isFinite(v)) setXrayPct(Math.max(0, Math.min(100, +v)), false); } catch (e) {}
 $("btnLabels").addEventListener("click", () => { const b = $("btnLabels"); b.classList.toggle("on"); viewer && viewer.setLabels(b.classList.contains("on")); });
 $("btnDemo").addEventListener("click", () => { const b = $("btnDemo"); b.classList.toggle("on"); b.textContent = b.classList.contains("on") ? "■ Stop demo" : "▶ Motion demo"; viewer && viewer.setDemo(b.classList.contains("on")); });
 
@@ -506,6 +525,7 @@ window.addEventListener("viewer-ready", (e) => {
   viewer = e.detail;
   if (window.SportcamCatalog) SportcamCatalog.snapshot = viewer.snapshot;
   $("stageMsg").remove();
+  if (viewer.setXrayLevel) viewer.setXrayLevel(+$("xrayPct").value);
   viewer.setXray($("btnXray").classList.contains("on"));
   viewer.showStep(STEPS[current]);
 });
@@ -534,7 +554,7 @@ function makeTurntable(stage) {
   stage.addEventListener("pointerup", () => { drag = null; stage.classList.remove("dragging"); });
   return {
     showStep(s) { base = s.scene.render || s.id; set(5); },
-    replay() {}, setExplode() {}, setView() {}, setXray() {}, setLabels() {}, setDemo() {},
+    replay() {}, setExplode() {}, setView() {}, setXray() {}, setXrayLevel() {}, setLabels() {}, setDemo() {},
   };
 }
 
@@ -563,14 +583,16 @@ try {
 const COL = {
   print: 0xc3ccdb, printAlt: 0xb3bdd0, white: 0xf3f3ee, black: 0x2a2e35, pcb: 0x2f7a4c, steel: 0xb3b7bd,
   dark: 0x4a4f57, brass: 0xc9a24a, blue: 0x1e4f8f, purple: 0x5b3d8a, rubber: 0x1c1c1c, wire: 0x8e2b2b,
-  ffc: 0xe9e3cf, lensGlass: 0x1b3550, cream: 0xf0e4a0, tripod: 0x50555d,
+  ffc: 0xe9e3cf, lensGlass: 0x1b3550, cream: 0xf0e4a0, tripod: 0x50555d, sig: 0xe2b33a, servo: 0xd9772b,
 };
 const ACCENT = new THREE.Color(0x2f6fed);
 const GREEN = 0x1f9d55;
 
 function mat(color, opts = {}) {
-  return new THREE.MeshStandardMaterial({ color, flatShading: true, metalness: opts.metal ?? 0.08, roughness: opts.rough ?? 0.72,
+  const m = new THREE.MeshStandardMaterial({ color, flatShading: true, metalness: opts.metal ?? 0.08, roughness: opts.rough ?? 0.72,
     transparent: opts.opacity != null, opacity: opts.opacity ?? 1, side: opts.double ? THREE.DoubleSide : THREE.FrontSide });
+  if (opts.elec) m.userData.elec = true;     // an electrical part inside a mechanical model (a servo): solid in x-ray
+  return m;
 }
 
 /* ---- geometry helpers (OpenSCAD axes) -------------------------------- */
@@ -775,55 +797,84 @@ const PARTS = {
                    rb * Math.cos(a * Math.PI / 180), rb * Math.sin(a * Math.PI / 180), LID_TOP + p.standoff_h / 2)),
                  at(mesh(cyl(R, 3), COL.black, { rough: 0.6 }), 0, 0, PTZ_Z + 1.5),
                  at(mesh(cyl(R - 2, 11), COL.steel, { metal: 0.55, rough: 0.45 }), 0, 0, PTZ_Z + 8.5),
-                 at(mesh(box(40, 20, p.servo_drop), COL.black), 10, 0, PTZ_Z - p.servo_drop / 2)); } },
-  // turning half: the top disc, the tilt bracket and its servo
-  ptz_pan: { grp: "pan", build: () => group(at(mesh(cyl(LY.parts.ptz.base_d / 2, 3), COL.black, { rough: 0.6 }), 0, 0, PTZ_Z + 15.5),
-                                            at(mesh(box(44, 30, 4), COL.black, { rough: 0.6 }), 0, 0, PTZ_Z + 19)) },
-  ptz_yoke: { grp: "pan", build: () => group(
-      at(mesh(box(26, 4, 42), COL.black, { rough: 0.6 }), 0, 26, TILT_Z - 2),
-      at(mesh(box(26, 4, 42), COL.black, { rough: 0.6 }), 0, -26, TILT_Z - 2),
-      at(mesh(box(22, 20, 18), COL.black), 0, 30, TILT_Z)) },
-  camera: { grp: "tilt", build: () => group(at(mesh(box(4, 38, 38), COL.pcb), 4, 0, TILT_Z),
-                                            at(mesh(box(2, 26, 26), COL.black), 7, 0, TILT_Z)) },
-  lens: { grp: "tilt", build: () => group(at(mesh(cyl(18, 42, "x"), COL.black, { rough: 0.6 }), 31, 0, TILT_Z),
-                                          at(mesh(tube(18.5, 16, 4, "x"), COL.dark), 48, 0, TILT_Z),
-                                          at(mesh(cyl(13.5, 1.2, "x"), COL.lensGlass, { metal: 0.5, rough: 0.2 }), 53, 0, TILT_Z)) },
-
-  // static anchor arms
-  arm_p: { grp: "static", stl: "anchor_arm", color: COL.print, pos: [15, ARM_R, ARM_Z], rot: [0, 0, Math.PI / 2] },
-  arm_n: { grp: "static", stl: "anchor_arm", color: COL.print, pos: [-15, -ARM_R, ARM_Z], rot: [0, 0, -Math.PI / 2] },
-  uwb_p: { grp: "static", build: () => uwbBoard(0, UWB_HALF, BOARD_Z, 1) },
-  uwb_n: { grp: "static", build: () => uwbBoard(0, -UWB_HALF, BOARD_Z, -1) },
-
-  // A3 mast, behind the lens at −X
-  mast_foot: { grp: "static", stl: "mast_foot", color: COL.print, pos: [-ARM_R, -9, ARM_Z], rot: [0, 0, Math.PI / 2] },
-  dowel: { grp: "static", build: () => at(mesh(cyl(LY.parts.dowel.d / 2, MAST_TOP - DOWEL_Z0), COL.cream, { rough: 0.8 }), -MAST_R, 0, (MAST_TOP + DOWEL_Z0) / 2) },
-  mast_cradle: { grp: "static", stl: "mast_cradle", color: COL.print, pos: [-MAST_R, 0, A3_Z - 4], rot: [Math.PI, 0, 0] },
-  uwb_m: { grp: "static", build: () => uwbBoard(-MAST_R, 0, A3_Z, 1) },
+                 at(mesh(box(40, 20, p.servo_drop), COL.black, { elec: true }), 10, 0, PTZ_Z - p.servo_drop / 2)); } },
+  // turning half: the top disc, and on it the tilt servo lying on its side in its holder, shaft along Y on the tilt axis
+  ptz_pan: { grp: "pan", build: () => { const H = PTZ_CTRL;
+    return group(at(mesh(cyl(LY.parts.ptz.base_d / 2, 3), COL.black, { rough: 0.6 }), 0, 0, PTZ_Z + 15.5),
+                 at(mesh(box(44, 26, TILT_Z - 10 - PTZ_Z - 17), COL.black, { rough: 0.6 }), -10, 0, (PTZ_Z + 17 + TILT_Z - 10) / 2),  // the holder
+                 at(mesh(box(40, 28, 20), COL.black, { elec: true }), -10, 0, TILT_Z),                     // the tilt servo
+                 at(mesh(box(54, 2.5, 20), COL.black, { elec: true }), -10, 12.5, TILT_Z),                 // its mounting flange
+                 at(mesh(cyl(5.5, 3, "y"), COL.dark, { elec: true }), 0, 15.5, TILT_Z),                    // output shaft
+                 at(mesh(cyl(4, 3, "y"), COL.steel, { metal: 0.6, rough: 0.4 }), 0, -15.5, TILT_Z));       // idler pin, the other side
+  } },
+  // the tilting U-bracket: an arm down each side of the tilt servo, pivoting on its shaft and idler, joined by the
+  // face plate in front of it that the PTZ controller and the camera stand on
+  ptz_yoke: { grp: "tilt", build: () => { const H = PTZ_CTRL, arms = [];
+    for (const s of [-1, 1]) arms.push(at(mesh(box(H.ux + 12, 2.5, 22), COL.black, { rough: 0.6 }), (H.ux - 12) / 2, s * H.armY, TILT_Z),
+                                       at(mesh(cyl(11, 2.5, "y"), COL.black, { rough: 0.6 }), 0, s * H.armY, TILT_Z),
+                                       at(mesh(cyl(9, 1.5, "y"), COL.white), 0, s * (H.armY - 2), TILT_Z));    // servo horn / bearing
+    const st = [];
+    for (const y of [-15, 15]) for (const z of [-11, 15])
+      st.push(at(mesh(cyl(2.4, H.x - 0.8 - H.ux - 1.5, "x"), COL.brass, { metal: 0.6, rough: 0.4 }), (H.x - 0.8 + H.ux + 1.5) / 2, y, TILT_Z + z));
+    return group(...arms, at(mesh(box(3, 2 * H.armY + 2.5, 38), COL.black, { rough: 0.6 }), H.ux, 0, TILT_Z), ...st);
+  } },
+  // in front of the bracket's face plate: the PTZ controller, then on four nylon standoffs the camera board. The lens's
+  // zoom/focus lead (C2, factory-fitted) plugs into the controller's top edge, the I2C + 5 V lead (I1, I2, R3) into the
+  // 4-pin socket on its side
+  camera: { grp: "tilt", build: () => { const C = PTZ_CTRL, st = [];
+    for (const y of [-15, 15]) for (const z of [-11, 15]) st.push(at(mesh(cyl(2.4, C.cam - 2 - C.x - 0.8, "x"), COL.white), (C.cam - 2 + C.x + 0.8) / 2, y, TILT_Z + z));
+    return group(at(mesh(box(4, 38, 38), COL.pcb), C.cam, 0, TILT_Z),
+                 at(mesh(box(2, 26, 26), COL.black), C.cam + 3, 0, TILT_Z),
+                 ...st,
+                 at(mesh(box(1.6, 38, 34), COL.dark), C.x, 0, TILT_Z + 2),                        // the PTZ controller
+                 at(mesh(box(5, 5, 12), COL.white), C.x + 3.3, C.sockY - 2.5, C.sockZ),           // I2C + 5 V socket, opening sideways
+                 at(mesh(box(4.5, 8, 4), COL.white), C.x + 3.05, C.lensY, TILT_Z + 17),          // lens lead socket, on its top edge
+                 strands(C.lensLead, 0.35, [0x8e5ad1, 0x3a6fd8, 0x3fae5a, 0xe2c23a]));          // the lens lead
+  } },
+  lens: { grp: "tilt", build: () => { const c = PTZ_CTRL.cam;
+    return group(at(mesh(cyl(18, 42, "x"), COL.black, { rough: 0.6 }), c + 27, 0, TILT_Z),
+                 at(mesh(tube(18.5, 16, 4, "x"), COL.dark), c + 44, 0, TILT_Z),
+                 at(mesh(cyl(13.5, 1.2, "x"), COL.lensGlass, { metal: 0.5, rough: 0.2 }), c + 49, 0, TILT_Z));
+  } },
 
   // cabling
   // ribbon: off the camera head, down behind the turntable, in through the lid's cable slot, to the Pi's CSI socket
   ffc: { grp: "static", build: () => { const p = LY.parts.pi, c = piPoint(45 - p.l / 2, -p.w / 2 + 16, 8), cs = LY.cable_slot;
     const sx = cs.r * Math.cos(cs.ang * Math.PI / 180), sy = cs.r * Math.sin(cs.ang * Math.PI / 180), k = (LY.parts.ptz.base_d / 2 + 14) / cs.r;
-    return cable([[-6, 0, TILT_Z - 16], [-30, 0, TILT_Z - 6], [sx * k, sy * k, PTZ_Z + 4], [sx, sy, LID_TOP + 6], [sx, sy, LID_Z - 8],
+    const C = PTZ_CTRL;   // off the camera board's back, out the -y side between it and the controller, back past the servo
+    return cable([[C.cam - 2, 0, TILT_Z - 14.5], [C.x + 6, -8, TILT_Z - 14.5], [C.x + 6, -27, TILT_Z - 12], [0, -31, TILT_Z - 6], [-34, -22, TILT_Z - 4], [sx * k, sy * k, PTZ_Z + 4], [sx, sy, LID_TOP + 6], [sx, sy, LID_Z - 8],
                   [(sx + c[0]) / 2, (sy + c[1]) / 2, LID_Z - 10], [c[0], c[1], c[2] + 12], c], 1.6, COL.ffc); } },
-  pwr_pi: { grp: "static", build: () => {
-    const p = LY.parts.pi, u = [Math.cos(LY.gap_ang * Math.PI / 180), Math.sin(LY.gap_ang * Math.PI / 180)];
-    const gp = [u[0] * (LY.gap_d + 8), u[1] * (LY.gap_d + 8)], plug = piPoint(p.usbc_x - p.l / 2, -p.w / 2 - 12, 3);
-    const B = bx("buck"), T = bx("trigger"), L = bx("latch"), w = LY.drum.wire_hole;
-    return group(cable([[B.cx, B.cy, B.z1 - 2], [w[0], w[1], -2], [w[0], w[1], LY.floor_z + 4], [gp[0], gp[1], (LY.floor_z + SHELF_Z) / 2], [gp[0], gp[1], LY.shelf_top + 2], plug], 2.2, COL.wire),
-                 cable([[T.cx, T.cy, T.z1], [L.cx, L.cy, L.z1 - 4], [B.cx, B.cy, B.z1 - 6]], 2.0, COL.wire));
+  // every lead in the wiring guide (12-wiring.md), terminal to terminal: see wirePts() for the routes
+  wiring: { grp: "static", build: () => {
+    const w = wirePts(), red = COL.wire, blk = COL.black, sig = COL.sig, grn = COL.pcb, srv = COL.servo;
+    const p = LY.parts.pi;
+    const plug = at(mesh(box(p.plug_w, p.plug_l, p.plug_h), COL.black, { rough: 0.6 }), ...w.plugMid, 0, 0, LY.pi.ang * Math.PI / 180);
+    return group(
+      // in the drum
+      pair(w.p12, 1.0, red, blk),          // P2 + P4: trigger 12 V and GND to the latch (IN, GND)
+      pair(w.p34, 1.0, red, blk),          // P3 + P5: latch OUT (through the diode) and GND to the buck IN
+      pair(w.s12, 0.6, sig, sig),          // S1 + S2: rocker to the latch (IN, SW)
+      pair(w.out, 1.5, red, blk),          // the buck's 5 V out, up through the floor hole
+      // the 5 V rail, from the top of the floor hole
+      pair(w.r2, 1.2, red, blk), plug,     // R2: pigtail into the Pi's USB-C
+      pair(w.r4, 0.7, red, blk),           // R4: LED ring 5 V / GND
+      pair(w.r5, 0.7, red, blk),           // R5: shifter VCC / GND
+      pair(w.r7, 0.8, red, blk),           // R7: servo headers + / −
+      pair(w.r3, 0.8, red, blk),           // R3: PTZ controller 5V / GND, up through the lid slot
+      // signals
+      pair(w.s34, 0.6, sig, grn),          // S3 + S4: latch HOLD and SENSE to Pi pins 11 and 13
+      cable(w.l1, 0.6, sig),               // L1: Pi pin 19 to the shifter's 1A
+      cable(w.l2, 0.6, sig),               // L2: the shifter's 1Y to the ring's DIN
+      pair(w.m12, 0.6, srv, srv),          // M1 + M2: Pi pins 32 and 33 to the shifter's 2A and 3A
+      pair(w.i12, 0.6, sig, COL.blue),     // I1 + I2: Pi pins 3 and 5 to the PTZ controller, up through the slot
+      cable(w.pan, 1.1, srv),              // M7: pan servo lead, down through the slot to its header
+      cable(w.tilt, 1.1, srv));            // M7: tilt servo lead
   } },
-  // the bank's cable: right-angle plug in the bank's face, round through the finger window to the trigger
+  // P1, the bank's cable: right-angle plug in the bank's face, out through the finger window to the trigger
   bank_cable: { grp: "static", build: () => {
-    const D = LY.drum, T = bx("trigger"), yc = (D.y0 + D.y1) / 2;
-    const toW = (x, y) => { const c = polarXY(1, D.ang); return [x * c[0] - y * c[1], x * c[1] + y * c[0]]; };
-    const ts = polarXY(T.l / 2, T.ang), sock = [T.cx + ts[0], T.cy + ts[1]];
-    const sides = [1, -1].map((s) => toW(D.x1 - 12, yc + s * (D.iw / 2 + D.pw + 7)));
-    const win = sides.reduce((a, b) => Math.hypot(a[0] - sock[0], a[1] - sock[1]) < Math.hypot(b[0] - sock[0], b[1] - sock[1]) ? a : b);
-    const zb = LY.drum_z + D.bank_z + LY.parts.power_bank.h / 2;
-    return cable([[...toW(D.x1 + 4, yc), zb], [...toW(D.x1 + 6, yc + (win === sides[0] ? 1 : -1) * D.iw / 2), zb],
-                  [win[0], win[1], zb], [sock[0], sock[1], T.z1 + 4], [sock[0], sock[1], T.z0 + 12]], 2.2, COL.wire);
+    const w = wirePts(), a = LY.drum.ang * Math.PI / 180;
+    return group(cable(w.p1, 2.0, COL.black),
+                 at(mesh(box(7, 11, 6.5), COL.black, { rough: 0.6 }), ...w.p1plug, 0, 0, a));
   } },
   usb_p: { grp: "static", build: () => usbLead([-LY.parts.ula1.l / 2 - 14, UWB_HALF, BOARD_Z + 2]) },
   usb_n: { grp: "static", build: () => usbLead([-LY.parts.ula1.l / 2 - 14, -UWB_HALF, BOARD_Z + 2]) },
@@ -848,6 +899,157 @@ function usbLead(from, mast) {   // anchor plug → round to the wall slot → t
                    : [from, [from[0] - 10, from[1] * 0.85, BOARD_Z + 4], [out[0] * 1.4, out[1] * 1.4, e.z - 10], out, inn, port];
   return cable(pts, 1.5, COL.black);
 }
+
+/* ---- the wiring: where each lead in the wiring guide starts, runs and ends ----
+   Drum leads are worked out in the bank pocket's frame (bank along +x, open end at +x, the tripod
+   axis at the origin) and turned by LY.drum.ang. They run round the pocket's closed end, clear of the
+   posts, to the boards' terminals, and up through the floor hole above the buck. Above the floor, the
+   leads run under the shelf to its cut-away side, up through it, round the Pi's SD-card end to the
+   header and the shifter, and up through the lid's cable slot to the camera head. Called by the
+   wiring parts and by the cabling step's callouts, so it uses no colours (COL comes later). */
+function wirePts() {
+  if (wirePts.memo) return wirePts.memo;
+  const D = LY.drum, rad = Math.PI / 180, dir = (deg) => [Math.cos(deg * rad), Math.sin(deg * rad)];
+  const ca = Math.cos(D.ang * rad), sa = Math.sin(D.ang * rad);
+  const W = (p) => [p[0] * ca - p[1] * sa, p[0] * sa + p[1] * ca, p[2]];                    // pocket frame → world
+  const toP = (x, y) => [x * ca + y * sa, -x * sa + y * ca];                                 // world → pocket frame
+  const d2 = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+  // a board in the pocket frame: s along it, t out from its centre towards its components, at height z
+  const on = (k, s, t, z) => { const b = bx(k), c = toP(b.cx, b.cy), u = dir(b.ang - D.ang), e = b.edge || 0;
+    return [c[0] + u[0] * s - u[1] * e * t, c[1] + u[1] * s + u[0] * e * t, z]; };
+  const centre = (k) => toP(bx(k).cx, bx(k).cy);
+  const T = bx("trigger"), tp = LY.parts.pd_trigger, B = bx("buck"), L = bx("latch");
+  const tz = T.z0 + tp.standoff_h + (tp.pcb_t || 1.6);
+  const trigTerm = on("trigger", -(T.l / 2 - 3), 0, tz + 5);                 // its screw terminal: 12 V and GND
+  const trigSock = on("trigger", T.l / 2 - 2, 0, tz + tp.port_h / 2);        // its USB-C socket
+  // the edge boards' terminals: on their components' side, near the top edge, in from an end
+  const term = (k, s) => on(k, s, bx(k).w / 2 - 5, bx(k).z1 - 6);
+  const lEnd = [1, -1].sort((a, b) => d2(term("latch", a * 29), centre("trigger")) - d2(term("latch", b * 29), centre("trigger")))[0];
+  const bEnd = [1, -1].sort((a, b) => d2(term("buck", a * 34), centre("latch")) - d2(term("buck", b * 34), centre("latch")))[0];
+  const ls = (L.l / 2 - 6) * lEnd, bs = (B.l / 2 - 6) * bEnd;
+  const latchIn = term("latch", ls), latchSw = term("latch", ls - 10 * lEnd);          // the end nearer the trigger
+  const latchOut = term("latch", -ls), latchSig = term("latch", -ls + 10 * lEnd);      // the end nearer the buck
+  const buckIn = term("buck", bs), buckOut = term("buck", -bs);
+  // the rocker's terminals: the inner end of its body
+  const SB = bx("switch_body"), swEnds = [1, -1].map((s) => on("switch_body", s * (SB.l / 2 + 2), 0, (SB.z0 + SB.z1) / 2));
+  const swTerm = swEnds.reduce((a, b) => Math.hypot(a[0], a[1]) < Math.hypot(b[0], b[1]) ? a : b);
+  // round each back corner of the pocket: the point off it clearest of the drum's posts and wall
+  const posts = D.post_angs.map((a) => { const r = D.R_in - D.post_d / 2 + 1; return [r * Math.cos((a - D.ang) * rad), r * Math.sin((a - D.ang) * rad)]; });
+  const corner = (side, z) => { const c = [D.x0 - D.pw, side > 0 ? D.y1 + D.pw : D.y0 - D.pw]; let best = c, bc = -1e9;
+    for (let a = 0; a <= 90; a += 10) for (const r of [4, 6, 8]) {
+      const v = dir((side > 0 ? 90 : 180) + a), q = [c[0] + v[0] * r, c[1] + v[1] * r];
+      const cl = Math.min(...posts.map((o) => d2(q, o) - D.post_d / 2), D.R_in - Math.hypot(...q));
+      if (cl > bc) { bc = cl; best = q; } }
+    return [...best, z]; };
+  const sideOf = (p) => (p[1] > (D.y0 + D.y1) / 2 ? 1 : -1);
+  const hole = toP(D.wire_hole[0], D.wire_hole[1]);
+  const up = (z) => [hole[0], hole[1], z];
+  const along = (p, q, f, z) => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f, z];
+  const outside = (s, z) => on("buck", s, B.w / 2 + 3, z);                  // just past the buck's components
+  const drum = {
+    p12: [trigTerm, [trigTerm[0] - 14, trigTerm[1] - 3, trigTerm[2] + 2], corner(sideOf(latchIn), latchIn[2]), latchIn],
+    s12: [swTerm, along(swTerm, corner(sideOf(latchSw), 0), 0.5, swTerm[2] - 2), corner(sideOf(latchSw), latchSw[2] + 2), latchSw],
+    p34: [latchOut, corner(sideOf(latchOut), latchOut[2] + 6), along(corner(sideOf(latchOut), 0), buckIn, 0.5, buckIn[2] - 2), buckIn],
+    out: [buckOut, along(buckOut, hole, 0.5, -3), up(-1.5), up(LY.floor_z + 4)],
+    s34: [latchSig, corner(sideOf(latchSig), latchSig[2] + 8), outside(-bs * 0.6, -5), outside(0, -2), up(-1), up(LY.floor_z + 4)],
+  };
+  // P1: the right-angle plug in the bank's face, the cable hugging the face to the finger window on the
+  // trigger's side (a notch through the pocket wall and the drum wall), in through it and down to the
+  // trigger's socket
+  const k = LY.parts.power_bank, yc = (D.y0 + D.y1) / 2, face = (D.x0 + D.x1) / 2 + k.l / 2 + 0.3;
+  const zb = LY.drum_z + D.bank_z + k.h / 2, sw = sideOf([0, centre("trigger")[1]]);
+  const wy = sw > 0 ? D.y1 + D.pw / 2 : D.y0 - D.pw / 2;
+  const wz = LY.drum_z + D.floor + D.plate_t + LY.design.finger_z;           // the window's bottom
+  const p1 = [[face + 3, yc + sw * 5, zb], [face + 2.5, yc + sw * (D.iw / 2 - 8), zb], [D.x1 - 2, wy + sw * 1.5, zb],
+              [D.x1 - 10, wy + sw * 7, Math.max(zb - 2, wz + 3)], [trigSock[0] + 10, trigSock[1], trigSock[2] + 3], trigSock];
+  const Wl = (pts) => pts.map(W);
+
+  // ---- above the floor ----
+  const p = LY.parts.pi, hl = p.l / 2, hw = p.w / 2;
+  const Pp = (x, y, z) => { const q = piPoint(x, y, 0); return [q[0], q[1], z]; };                 // Pi frame
+  const S = bx("shifter"), sh = LY.parts.shifter, sr = S.ang * rad;
+  const Sp = (x, y, z) => [S.cx + x * Math.cos(sr) - y * Math.sin(sr), S.cy + x * Math.sin(sr) + y * Math.cos(sr), z];
+  const fy = (() => { const dx = LY.pi.x - S.cx, dy = LY.pi.y - S.cy; return -dx * Math.sin(sr) + dy * Math.cos(sr) > 0 ? 1 : -1; })();
+  const sTop = S.z0 + sh.standoff_h + 1.6;                    // the shifter's board, top face
+  const zU = LY.floor_z + 6, zA = LY.shelf_top + 8, zT = LY.lid_z - 4;   // under the shelf, over it, under the lid
+  const pinXY = (n) => [p.gpio_x0 - hl + 1.27 + 2.54 * Math.floor((n - 1) / 2), hw - 3.5 + (n % 2 ? -1.27 : 1.27)];
+  const pin = (a, b, z = LY.pi.z + p.pcb_t + p.gpio_lead_h) => { const A = pinXY(a), Bq = pinXY(b ?? a); return Pp((A[0] + Bq[0]) / 2, (A[1] + Bq[1]) / 2, z); };
+  const overPin = (a, b) => pin(a, b, zT);
+  // round the enclosure at radius r, z, from p's angle to q's: the short way, unless that's nearly a half
+  // turn, then by the side `via` points to, so leads from the same place stay together
+  const arc = (p0, q0, r, z, via) => { const a0 = Math.atan2(p0[1], p0[0]); let d = Math.atan2(q0[1], q0[0]) - a0;
+    while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    if (via && Math.abs(d) > 2 * Math.PI / 3 && Math.cos(a0 + d / 2) * via[0] + Math.sin(a0 + d / 2) * via[1] < 0) d -= Math.sign(d) * 2 * Math.PI;
+    const n = Math.max(1, Math.ceil(Math.abs(d) / (Math.PI / 6))), out = [];
+    for (let i = 0; i <= n; i++) out.push([r * Math.cos(a0 + d * i / n), r * Math.sin(a0 + d * i / n), z]);
+    return out; };
+  const H = W(up(LY.floor_z + 4)), Rin = D.R_in;
+  // the shelf's cut-away side: off = sideways, + towards the Pi's SD-card end
+  const gu = dir(LY.gap_ang), gv0 = [-gu[1], gu[0]], sdEnd = dir(LY.pi.ang + 180);
+  const gv = gv0[0] * sdEnd[0] + gv0[1] * sdEnd[1] > 0 ? gv0 : [-gv0[0], -gv0[1]], gr = (LY.gap_d + Rin) / 2;
+  const G = (off, z) => [gu[0] * gr + gv[0] * off, gu[1] * gr + gv[1] * off, z];
+  const under = (to, r = 60) => [H, ...arc(H, to, r, zU, dir(LY.pi.ang + 180))];        // hole → round under the shelf, by the SD-card end
+  // round the Pi's SD-card end, up from the cut-away side to the header side
+  const sdRun = (dx) => [Pp(-hl - dx, -hw + 2, zA), Pp(-hl - dx, hw - 1, zA + 4)];
+  // the PTZ base's cable slot in the lid: the 16 mm ribbon flat across its middle, the other leads either
+  // side of it, off sideways from its centre, straight through; and up from it, outside the base, to the head
+  const cs = LY.cable_slot, sc = dir(cs.ang), tv = dir(cs.ang + 90), kOut = (LY.parts.ptz.base_d / 2 + 14) / cs.r;
+  const slot = (off, z) => [sc[0] * cs.r + tv[0] * off, sc[1] * cs.r + tv[1] * off, z];
+  const slotRun = (off) => [slot(off, LID_Z - 10), slot(off, LID_Z - 4), slot(off, LID_TOP + 4), slot(off, LID_TOP + 10)];
+  const outBase = (off) => [[sc[0] * cs.r * kOut + tv[0] * off, sc[1] * cs.r * kOut + tv[1] * off, PTZ_Z + 4],
+                            [sc[0] * cs.r * kOut + tv[0] * off, sc[1] * cs.r * kOut + tv[1] * off, TILT_Z - 10]];
+  const C = PTZ_CTRL, sx = C.x + 3.3;                                             // the controller's socket, opening to +y
+  const toHead = (off, z) => [...slotRun(off), ...outBase(off),                    // round the bracket's +y arm into it
+                              [-40, 28, z - 2], [0, 31, z], [sx, 28, z], [sx, C.sockY + 0.5, z]];
+  // the pigtail: its plug in the Pi's USB-C, out over the shelf's cut-away edge
+  const ux = p.usbc_x - hl, plugZ = LY.pi.z + p.pcb_t + 1.6;
+  const plugMid = Pp(ux, -hw - p.plug_l / 2 + 2, plugZ), plugBack = Pp(ux, -hw - p.plug_l + 2, plugZ);
+  const drop = Pp(ux, -hw - p.plug_l - 8, zA);
+  // the ring's pads: on its outer edge, on the cut-away side
+  const ring = LY.parts.led_ring, rz = (LY.ring_z0 + LY.ring_z1) / 2;
+  const pad = (da, r = ring.od / 2 + 1) => { const v = dir(LY.gap_ang + da); return [v[0] * r, v[1] * r, rz]; };
+  const trunk = [...under(G(42, 0)), G(42, zA), ...sdRun(13)];              // R3, R5, R7, S3/S4 share this run
+  const hdr = (y) => Sp(20, y, sTop + 8.5), chip = (x) => Sp(x, fy * 2, sTop + 3.5);
+  const R = {
+    r2: [...under([drop[0], drop[1]]), drop, [plugBack[0], plugBack[1], plugZ + 2], plugBack],
+    r4: [...under(pad(6)), [pad(6, 34)[0], pad(6, 34)[1], rz], pad(6)],
+    r5: [...trunk, Sp(-sh.l / 2 + 10, fy * (sh.w / 2 + 3), sTop + 4), Sp(-sh.l / 2 + 10, fy * (sh.w / 2 - 3), sTop + 0.5)],
+    r7: [...trunk, Sp(-sh.l / 2 + 10, fy * (sh.w / 2 + 3), zT), Sp(14, fy * 5, zT), Sp(14, fy * 5, sTop + 0.5)],
+    r3: [...trunk, ...toHead(-12, PTZ_CTRL.sockZ - 3)],
+    s34: [...drum.s34.map(W), ...under(G(42, 0)).slice(1), G(42, zA), ...sdRun(13), overPin(11, 13), pin(11, 13)],
+    l1: [pin(19), overPin(19), [chip(-16)[0], chip(-16)[1], zT], chip(-16)],
+    l2: [chip(-12), [chip(-12)[0], chip(-12)[1], zT], Pp(-hl - 9, hw - 1, zT - 4), Pp(-hl - 9, -hw + 2, zA), G(36, zA), G(36, zU + 4),
+         [pad(-6, 34)[0], pad(-6, 34)[1], rz], pad(-6)],
+    m12: [pin(32, 33), overPin(32, 33), [chip(-8)[0], chip(-8)[1], zT], chip(-8)],
+    i12: [pin(3, 5), overPin(3, 5), ...toHead(-9.6, PTZ_CTRL.sockZ + 3)],
+    pan: [[-10, 0, PTZ_Z - 10], [-34, 0, PTZ_Z - 16], ...slotRun(9.4).reverse(), Sp(20, fy * 2.5, zT), hdr(fy * 2.5)],
+    tilt: [[-30, -6, TILT_Z - 3], [-40, -9, TILT_Z - 6], ...outBase(12).reverse(), ...slotRun(12).reverse(), Sp(22, -fy * 2.5, zT), hdr(-fy * 2.5)],
+  };
+  wirePts.memo = { p12: Wl(drum.p12), s12: Wl(drum.s12), p34: Wl(drum.p34), out: Wl(drum.out),
+                   p1: Wl(p1), p1plug: W([face + 3.5, yc, zb]), ...R, plugMid, H, slotTop: slot(0, LID_TOP), hdr: hdr(0), pin11: pin(11, 13) };
+  return wirePts.memo;
+}
+window.wirePts = wirePts;   // for the cabling step's callouts, in the steps script
+function pair(points, r, colA, colB) { return strands(points, r, [colA, colB]); }   // two leads side by side along one route
+function strands(points, r, cols) {     // several leads side by side along one route, a flat bundle
+  const off = (sgn) => points.map((q, i) => {
+    const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
+    const t = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]).normalize();
+    const n = new THREE.Vector3().crossVectors(t, new THREE.Vector3(0, 0, 1));
+    if (n.length() < 0.3) n.crossVectors(t, new THREE.Vector3(1, 0, 0));
+    n.normalize().multiplyScalar(sgn * r * 1.05);
+    return [q[0] + n.x, q[1] + n.y, q[2] + n.z];
+  });
+  return group(...cols.map((c, i) => cable(off(2 * i - (cols.length - 1)), r, c)));
+}
+
+// the camera head, in front of the tilt axis: the U-bracket's face plate (ux), the PTZ controller (x) and the camera
+// board (cam), and where the controller's two sockets are (the leads end on them)
+const PTZ_CTRL = (() => { const ux = 16, x = 22, cam = 34.8;
+  return { ux, x, cam, armY: 19.25, sockY: 19, sockZ: TILT_Z - 4, lensY: 8,
+           lensLead: [[cam + 18, 8, TILT_Z + 17.5], [cam + 18, 8, TILT_Z + 23], [cam - 4, 8, TILT_Z + 25], [x + 3, 8, TILT_Z + 24],
+                      [x + 3, 8, TILT_Z + 19]] }; })();
+window.PTZ_CTRL = PTZ_CTRL;     // the step marks (in the classic script) point at its sockets
 
 /* ---- scene ------------------------------------------------------------ */
 const stage = document.getElementById("stage");
@@ -925,7 +1127,9 @@ const VIEWS = {    // direction from target to camera, OpenSCAD coords (x, y, z-
 };
 const toThree = (v) => new THREE.Vector3(v[0], v[2], -v[1]);
 let stepState = null;   // { adds: [{rec, explode: Vector3}], box, focusBox, arrows: [] , t, anim }
-let labelsOn = true, xray = false, demo = false, demoT = 0;
+let labelsOn = true, xray = false, xrayLevel = 78, demo = false, demoT = 0;
+const ELEC = new Set(["trigger", "latch", "buck", "switch", "ledring", "shifter", "pi", "cooler", "camera", "bank",
+                      "ffc", "wiring", "bank_cable", "usb_p", "usb_n", "usb_m", "uwb_p", "uwb_n", "uwb_m"]);
 const camTween = { active: false };
 
 const arrowMat = new THREE.MeshBasicMaterial({ color: GREEN, depthTest: false, transparent: true, opacity: 0.95 });
@@ -981,7 +1185,8 @@ function showStep(step) {
     overlay.add(ar); arrows.push(ar);
   }
   // callouts
-  for (const [x, y, z, text, ox = 0, oy = 0, oz = 40] of (sc.marks || [])) {
+  // marks: a list, or a function returning one when it needs the module's helpers (wirePts)
+  for (const [x, y, z, text, ox = 0, oy = 0, oz = 40] of ((typeof sc.marks === "function" ? sc.marks() : sc.marks) || [])) {
     const p = new THREE.Vector3(x, y, z), q = new THREE.Vector3(x + ox, y + oy, z + oz);
     overlay.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([p, q]), new THREE.LineBasicMaterial({ color: GREEN })));
     overlay.add(at(new THREE.Mesh(new THREE.SphereGeometry(2.2, 12, 12), new THREE.MeshBasicMaterial({ color: GREEN })), x, y, z));
@@ -1049,15 +1254,17 @@ function setXray(on, silent) {
   const addSet = new Set(stepState.adds.map((a) => a.rec));
   for (const id in built) {
     const r = built[id];
-    const ghost = on && !addSet.has(r);
+    // the boards, the bank, the servos and the cables stay solid: x-ray is for seeing them through the printed parts
+    const ghostPart = on && !addSet.has(r) && !ELEC.has(id), op = 1 - xrayLevel / 100;
     r.mats.forEach((m) => {
-      const b = m.userData.base;
-      m.transparent = ghost || b.transparent; m.opacity = ghost ? Math.min(0.22, b.opacity) : b.opacity; m.depthWrite = ghost ? false : b.depthWrite;
+      const b = m.userData.base, ghost = ghostPart && !m.userData.elec && op < 1;
+      m.transparent = ghost || b.transparent; m.opacity = ghost ? Math.min(op, b.opacity) : b.opacity; m.depthWrite = ghost ? false : b.depthWrite;
       m.needsUpdate = true;
     });
   }
   if (!silent) document.getElementById("btnXray").classList.toggle("on", on);
 }
+function setXrayLevel(pct) { xrayLevel = pct; if (xray) setXray(true, true); }
 function setLabels(on) { labelsOn = on; labelsGroup.visible = on; }
 function setDemo(on) { demo = on; if (!on) { demoT = 0; } }
 
@@ -1138,7 +1345,7 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.dispatchEvent(new CustomEvent("viewer-ready", { detail: { showStep, replay, setExplode, setView, setXray, setLabels, setDemo, snapshot } }));
+window.dispatchEvent(new CustomEvent("viewer-ready", { detail: { showStep, replay, setExplode, setView, setXray, setXrayLevel, setLabels, setDemo, snapshot } }));
 </script>
 </body>
 </html>
